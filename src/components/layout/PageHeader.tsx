@@ -8,16 +8,31 @@ interface PageHeaderProps {
 
 export default function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
-    <div className="sticky-header -mx-6 md:-mx-8 px-6 md:px-8 py-4 mb-6 flex items-center justify-between">
+    <div
+      className="sticky-header -mx-6 md:-mx-8 px-6 md:px-8 mb-6 flex items-center justify-between"
+      style={{ padding: "16px 24px" }}
+    >
       <div>
         <h1
-          className="text-2xl font-bold"
-          style={{ color: "var(--text)", fontFamily: "'DM Sans', sans-serif" }}
+          style={{
+            fontSize: 18,
+            fontWeight: 600,
+            color: "var(--text)",
+            fontFamily: "'DM Sans', sans-serif",
+            lineHeight: 1.3,
+          }}
         >
           {title}
         </h1>
         {description && (
-          <p className="text-sm mt-1" style={{ color: "var(--text-dim)" }}>
+          <p
+            style={{
+              fontSize: 12,
+              color: "var(--text-dim)",
+              marginTop: 2,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
             {description}
           </p>
         )}

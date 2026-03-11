@@ -17,7 +17,6 @@ export default function CallNoteViewer({
 }: CallNoteViewerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  // Listen for messages from iframe
   const handleMessage = useCallback(
     (event: MessageEvent) => {
       if (event.data?.type === "SAVE_NOTE_DATA" && onSaveData) {
@@ -32,7 +31,6 @@ export default function CallNoteViewer({
     return () => window.removeEventListener("message", handleMessage)
   }, [handleMessage])
 
-  // Inject saved data back into iframe on load
   useEffect(() => {
     const iframe = iframeRef.current
     if (!iframe || !savedData) return
@@ -52,31 +50,28 @@ export default function CallNoteViewer({
   }, [savedData])
 
   return (
-    <div
-      className="card overflow-hidden"
-      style={{
-        border: "1px solid var(--border)",
-        height: "calc(100vh - 200px)",
-      }}
-    >
+    <div className="card" style={{ overflow: "hidden", height: "calc(100vh - 200px)" }}>
       <div
-        className="px-4 py-2 text-xs font-semibold flex items-center justify-between"
-        style={{
-          borderBottom: "1px solid var(--border)",
-          background: "var(--bg-elevated)",
-          color: "var(--text-mid)",
-        }}
+        className="card-header flex items-center justify-between"
+        style={{ padding: "10px 20px" }}
       >
-        <span>Call Note Viewer</span>
-        <span style={{ color: "var(--text-dim)" }}>ID: {callNoteId}</span>
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: 14 }}>{"\uD83D\uDCCB"}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+            Call Note Viewer
+          </span>
+        </div>
+        <span style={{ fontSize: 10, color: "var(--text-dim)" }}>
+          ID: {callNoteId}
+        </span>
       </div>
       <iframe
         ref={iframeRef}
         srcDoc={htmlContent}
         className="w-full border-none"
         style={{
-          height: "calc(100% - 36px)",
-          background: "#fff",
+          height: "calc(100% - 44px)",
+          background: "#0F1419",
         }}
         title="Call Note"
         sandbox="allow-scripts allow-same-origin"

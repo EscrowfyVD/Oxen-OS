@@ -28,16 +28,40 @@ function ToolbarButton({ onClick, active, children, title }: ToolbarButtonProps)
       type="button"
       onClick={onClick}
       title={title}
-      className="px-2 py-1.5 rounded text-sm cursor-pointer border-none"
       style={{
+        padding: "6px 10px",
+        borderRadius: 6,
+        fontSize: 12,
+        fontWeight: active ? 600 : 400,
+        cursor: "pointer",
+        border: "none",
         background: active ? "var(--rose-dim)" : "transparent",
         color: active ? "var(--rose)" : "var(--text-mid)",
         fontFamily: "'DM Sans', sans-serif",
         transition: "all 0.15s ease",
       }}
+      onMouseEnter={(e) => {
+        if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.04)"
+      }}
+      onMouseLeave={(e) => {
+        if (!active) e.currentTarget.style.background = "transparent"
+      }}
     >
       {children}
     </button>
+  )
+}
+
+function Divider() {
+  return (
+    <div
+      style={{
+        width: 1,
+        height: 18,
+        background: "var(--border)",
+        margin: "0 4px",
+      }}
+    />
   )
 }
 
@@ -59,13 +83,13 @@ export default function WikiEditor({
       }),
       Image.configure({
         HTMLAttributes: {
-          style: "max-width: 100%; border-radius: 8px; margin: 8px 0;",
+          style: "max-width: 100%; border-radius: 10px; margin: 8px 0; border: 1px solid var(--border);",
         },
       }),
       CodeBlock.configure({
         HTMLAttributes: {
           style:
-            "background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: monospace; font-size: 13px; color: var(--text); overflow-x: auto;",
+            "background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 16px; font-family: monospace; font-size: 13px; color: var(--text); overflow-x: auto;",
         },
       }),
       Placeholder.configure({
@@ -113,17 +137,12 @@ export default function WikiEditor({
   if (!editor) return null
 
   return (
-    <div
-      className="rounded-xl overflow-hidden"
-      style={{
-        border: "1px solid var(--border)",
-        background: "var(--bg-card)",
-      }}
-    >
+    <div className="card" style={{ overflow: "hidden" }}>
       {/* Toolbar */}
       <div
-        className="flex items-center gap-0.5 px-3 py-2 flex-wrap"
+        className="flex items-center gap-0.5 flex-wrap"
         style={{
+          padding: "8px 12px",
           borderBottom: "1px solid var(--border)",
           background: "var(--bg-elevated)",
         }}
@@ -143,51 +162,31 @@ export default function WikiEditor({
           <em>I</em>
         </ToolbarButton>
 
-        <div
-          className="mx-1"
-          style={{
-            width: 1,
-            height: 20,
-            background: "var(--border)",
-          }}
-        />
+        <Divider />
 
         <ToolbarButton
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 1 }).run()
-          }
+          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
           active={editor.isActive("heading", { level: 1 })}
           title="Heading 1"
         >
           H1
         </ToolbarButton>
         <ToolbarButton
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
-          }
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           active={editor.isActive("heading", { level: 2 })}
           title="Heading 2"
         >
           H2
         </ToolbarButton>
         <ToolbarButton
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 3 }).run()
-          }
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
           active={editor.isActive("heading", { level: 3 })}
           title="Heading 3"
         >
           H3
         </ToolbarButton>
 
-        <div
-          className="mx-1"
-          style={{
-            width: 1,
-            height: 20,
-            background: "var(--border)",
-          }}
-        />
+        <Divider />
 
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -204,14 +203,7 @@ export default function WikiEditor({
           1. List
         </ToolbarButton>
 
-        <div
-          className="mx-1"
-          style={{
-            width: 1,
-            height: 20,
-            background: "var(--border)",
-          }}
-        />
+        <Divider />
 
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
@@ -227,14 +219,7 @@ export default function WikiEditor({
           {"\uD83D\uDDBC\uFE0F"}
         </ToolbarButton>
 
-        <div
-          className="mx-1"
-          style={{
-            width: 1,
-            height: 20,
-            background: "var(--border)",
-          }}
-        />
+        <Divider />
 
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
@@ -252,12 +237,13 @@ export default function WikiEditor({
       </div>
 
       {/* Editor */}
-      <div className="p-4">
+      <div style={{ padding: 16 }}>
         <style>{`
           .ProseMirror p.is-editor-empty:first-child::before {
             content: attr(data-placeholder);
             float: left;
             color: var(--text-dim);
+            opacity: 0.5;
             pointer-events: none;
             height: 0;
           }
@@ -269,14 +255,16 @@ export default function WikiEditor({
           .ProseMirror li { margin: 0.25em 0; }
           .ProseMirror blockquote {
             border-left: 3px solid var(--rose);
-            padding-left: 1em;
+            padding: 12px 16px;
             margin: 0.75em 0;
             color: var(--text-mid);
+            background: linear-gradient(135deg, rgba(192,139,136,0.06), transparent);
+            border-radius: 0 10px 10px 0;
           }
           .ProseMirror hr {
             border: none;
             border-top: 1px solid var(--border);
-            margin: 1em 0;
+            margin: 1.5em 0;
           }
           .ProseMirror code {
             background: var(--bg-input);

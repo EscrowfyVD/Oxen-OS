@@ -15,14 +15,8 @@ interface TeamMember {
 }
 
 const TEAM_COLORS = [
-  "#C08B88", // rose
-  "#6BA3D6", // blue
-  "#7BC47F", // green
-  "#B07CD8", // purple
-  "#E0A458", // orange
-  "#5CB8B2", // teal
-  "#D4C75A", // yellow
-  "#D87CA3", // pink
+  "#C08B88", "#6BA3D6", "#7BC47F", "#B07CD8",
+  "#E0A458", "#5CB8B2", "#D4C75A", "#D87CA3",
 ]
 
 export default function CalendarPage() {
@@ -34,21 +28,17 @@ export default function CalendarPage() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [generatingNotes, setGeneratingNotes] = useState<string | null>(null)
 
-  // Team members
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [selectedOwners, setSelectedOwners] = useState<Set<string>>(new Set())
   const [ownerColors, setOwnerColors] = useState<Record<string, string>>({})
 
-  // Fetch team members
   useEffect(() => {
     fetch("/api/calendar/owners")
       .then((r) => r.json())
       .then((data) => {
         const members: TeamMember[] = data.owners ?? []
         setTeamMembers(members)
-        // Select all by default
         setSelectedOwners(new Set(members.map((m) => m.email)))
-        // Assign colors
         const colors: Record<string, string> = {}
         members.forEach((m, i) => {
           colors[m.email] = TEAM_COLORS[i % TEAM_COLORS.length]
@@ -69,7 +59,6 @@ export default function CalendarPage() {
       end: end.toISOString(),
     })
 
-    // Filter by selected owners
     if (selectedOwners.size > 0 && selectedOwners.size < teamMembers.length) {
       params.set("owners", Array.from(selectedOwners).join(","))
     }
@@ -90,7 +79,7 @@ export default function CalendarPage() {
     try {
       const res = await fetch("/api/calendar/sync-all", { method: "POST" })
       if (res.status === 401) {
-        setSyncMessage("Not signed in — please sign in first")
+        setSyncMessage("Not signed in")
         setSyncing(false)
         return
       }
@@ -98,7 +87,6 @@ export default function CalendarPage() {
       if (res.ok) {
         setSyncMessage(`Synced ${data.synced} events from ${data.users} calendars`)
         fetchEvents()
-        // Refresh owners list in case new users synced
         fetch("/api/calendar/owners")
           .then((r) => r.json())
           .then((d) => {
@@ -124,7 +112,7 @@ export default function CalendarPage() {
         setSyncMessage(data.error ?? "Sync failed")
       }
     } catch {
-      setSyncMessage("Network error during sync")
+      setSyncMessage("Network error")
     }
     setSyncing(false)
     setTimeout(() => setSyncMessage(null), 5000)
@@ -161,9 +149,7 @@ export default function CalendarPage() {
     setCurrentDate(newDate)
   }
 
-  const goToToday = () => {
-    setCurrentDate(new Date())
-  }
+  const goToToday = () => setCurrentDate(new Date())
 
   const formatDateRange = () => {
     if (viewMode === "day") {
@@ -180,27 +166,16 @@ export default function CalendarPage() {
     start.setDate(start.getDate() + diff)
     const end = new Date(start)
     end.setDate(start.getDate() + 6)
-
-    const startStr = start.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    })
-    const endStr = end.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-    return `${startStr} - ${endStr}`
+    const startStr = start.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    const endStr = end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    return `${startStr} \u2013 ${endStr}`
   }
 
   const toggleOwner = (email: string) => {
     setSelectedOwners((prev) => {
       const next = new Set(prev)
-      if (next.has(email)) {
-        next.delete(email)
-      } else {
-        next.add(email)
-      }
+      if (next.has(email)) next.delete(email)
+      else next.add(email)
       return next
     })
   }
@@ -213,13 +188,12 @@ export default function CalendarPage() {
     }
   }
 
-  // Filter events client-side for selected owners
   const filteredEvents = events.filter(
     (e) => !e.calendarOwner || selectedOwners.has(e.calendarOwner)
   )
 
   return (
-    <div>
+    <div className="page-content">
       <PageHeader
         title="Calendar"
         description="Team schedule & availability"
@@ -227,21 +201,19 @@ export default function CalendarPage() {
           <div className="flex items-center gap-3">
             {syncMessage && (
               <span
-                className="text-xs"
                 style={{
-                  color: syncMessage.startsWith("Synced")
-                    ? "var(--green)"
-                    : "var(--orange)",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: syncMessage.startsWith("Synced") ? "var(--green)" : "var(--orange)",
                 }}
               >
                 {syncMessage}
               </span>
             )}
             <button
-              className="btn-primary text-sm"
+              className="btn-primary"
               onClick={handleSync}
               disabled={syncing}
-              style={{ opacity: syncing ? 0.6 : 1 }}
             >
               {syncing ? "Syncing..." : "Sync All Calendars"}
             </button>
@@ -250,80 +222,52 @@ export default function CalendarPage() {
       />
 
       {/* Controls */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigateDate(-1)}
-            className="p-2 rounded-lg cursor-pointer border-none"
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              color: "var(--text)",
-              fontSize: 14,
-            }}
+            className="btn-secondary"
+            style={{ padding: "8px 12px", fontSize: 14 }}
           >
             {"\u2190"}
           </button>
           <button
             onClick={goToToday}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border-none"
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              color: "var(--text-mid)",
-              fontFamily: "'DM Sans', sans-serif",
-            }}
+            className="btn-secondary"
+            style={{ padding: "7px 14px", fontSize: 12 }}
           >
             Today
           </button>
           <button
             onClick={() => navigateDate(1)}
-            className="p-2 rounded-lg cursor-pointer border-none"
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              color: "var(--text)",
-              fontSize: 14,
-            }}
+            className="btn-secondary"
+            style={{ padding: "8px 12px", fontSize: 14 }}
           >
             {"\u2192"}
           </button>
           <span
-            className="text-sm font-semibold ml-2"
-            style={{ color: "var(--text)" }}
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: "var(--text)",
+              marginLeft: 8,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             {formatDateRange()}
           </span>
         </div>
 
-        <div
-          className="flex rounded-lg overflow-hidden"
-          style={{ border: "1px solid var(--border)" }}
-        >
+        <div className="toggle-group">
           <button
             onClick={() => setViewMode("week")}
-            className="px-3 py-1.5 text-xs font-semibold cursor-pointer border-none"
-            style={{
-              background:
-                viewMode === "week" ? "var(--rose-dim)" : "transparent",
-              color:
-                viewMode === "week" ? "var(--rose)" : "var(--text-dim)",
-              fontFamily: "'DM Sans', sans-serif",
-            }}
+            className={`toggle-btn ${viewMode === "week" ? "active" : ""}`}
           >
             Week
           </button>
           <button
             onClick={() => setViewMode("day")}
-            className="px-3 py-1.5 text-xs font-semibold cursor-pointer border-none"
-            style={{
-              background:
-                viewMode === "day" ? "var(--rose-dim)" : "transparent",
-              color:
-                viewMode === "day" ? "var(--rose)" : "var(--text-dim)",
-              fontFamily: "'DM Sans', sans-serif",
-              borderLeft: "1px solid var(--border)",
-            }}
+            className={`toggle-btn ${viewMode === "day" ? "active" : ""}`}
           >
             Day
           </button>
@@ -334,27 +278,34 @@ export default function CalendarPage() {
         {/* Team filter sidebar */}
         {teamMembers.length > 0 && (
           <div
-            className="w-52 shrink-0 card p-4 self-start"
-            style={{ border: "1px solid var(--border)" }}
+            className="w-52 shrink-0 card self-start"
+            style={{ overflow: "hidden" }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <h3
-                className="text-[10px] font-semibold"
-                style={{ color: "var(--text-dim)" }}
-              >
-                TEAM MEMBERS
-              </h3>
+            <div
+              className="flex items-center justify-between"
+              style={{
+                padding: "12px 16px",
+                borderBottom: "1px solid rgba(255,255,255,0.03)",
+                background: "rgba(192,139,136,0.02)",
+              }}
+            >
+              <span className="section-label">TEAM MEMBERS</span>
               <button
                 onClick={toggleAll}
-                className="text-[10px] bg-transparent border-none cursor-pointer"
-                style={{ color: "var(--rose)" }}
+                style={{
+                  fontSize: 10,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--rose)",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 600,
+                }}
               >
-                {selectedOwners.size === teamMembers.length
-                  ? "None"
-                  : "All"}
+                {selectedOwners.size === teamMembers.length ? "None" : "All"}
               </button>
             </div>
-            <div className="space-y-1.5">
+            <div style={{ padding: 8 }}>
               {teamMembers.map((member) => {
                 const color = ownerColors[member.email] ?? "var(--rose)"
                 const isSelected = selectedOwners.has(member.email)
@@ -362,29 +313,36 @@ export default function CalendarPage() {
                   <button
                     key={member.email}
                     onClick={() => toggleOwner(member.email)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left border-none cursor-pointer transition-all duration-150"
+                    className="w-full flex items-center gap-2 text-left border-none cursor-pointer"
                     style={{
-                      background: isSelected ? `${color}15` : "transparent",
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      background: isSelected ? `${color}12` : "transparent",
                       opacity: isSelected ? 1 : 0.5,
+                      transition: "all 0.15s ease",
+                      fontFamily: "'DM Sans', sans-serif",
                     }}
                   >
                     <div
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
                         background: color,
                         opacity: isSelected ? 1 : 0.3,
+                        flexShrink: 0,
                       }}
                     />
                     <div className="min-w-0">
                       <div
-                        className="text-xs font-semibold truncate"
-                        style={{ color: "var(--text)" }}
+                        className="truncate"
+                        style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}
                       >
                         {member.name}
                       </div>
                       <div
-                        className="text-[10px] truncate"
-                        style={{ color: "var(--text-dim)" }}
+                        className="truncate"
+                        style={{ fontSize: 10, color: "var(--text-dim)" }}
                       >
                         {member.email.split("@")[0]}
                       </div>
@@ -410,145 +368,133 @@ export default function CalendarPage() {
         {/* Event detail side panel */}
         {selectedEvent && (
           <div
-            className="w-80 shrink-0 card p-5 self-start"
-            style={{
-              border: "1px solid var(--border)",
-              animation: "slideIn 0.2s ease",
-            }}
+            className="w-80 shrink-0 card self-start animate-slideIn"
+            style={{ overflow: "hidden" }}
           >
-            <style>{`
-              @keyframes slideIn {
-                from { opacity: 0; transform: translateX(10px); }
-                to { opacity: 1; transform: translateX(0); }
-              }
-            `}</style>
-
-            <div className="flex items-start justify-between mb-4">
+            {/* Panel header */}
+            <div
+              className="flex items-start justify-between"
+              style={{
+                padding: "14px 16px",
+                borderBottom: "1px solid rgba(255,255,255,0.03)",
+                background: "rgba(192,139,136,0.02)",
+              }}
+            >
               <div className="flex items-center gap-2 min-w-0">
                 {selectedEvent.calendarOwner && ownerColors[selectedEvent.calendarOwner] && (
                   <div
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ background: ownerColors[selectedEvent.calendarOwner] }}
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: ownerColors[selectedEvent.calendarOwner],
+                      flexShrink: 0,
+                    }}
                   />
                 )}
                 <h3
-                  className="text-sm font-bold truncate"
-                  style={{ color: "var(--text)" }}
+                  className="truncate"
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "var(--text)",
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}
                 >
                   {selectedEvent.title}
                 </h3>
               </div>
               <button
                 onClick={() => setSelectedEvent(null)}
-                className="bg-transparent border-none cursor-pointer text-sm shrink-0 ml-2"
-                style={{ color: "var(--text-dim)" }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  color: "var(--text-dim)",
+                  padding: 2,
+                  marginLeft: 8,
+                }}
               >
                 {"\u2715"}
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <div
-                  className="text-[10px] font-semibold mb-0.5"
-                  style={{ color: "var(--text-dim)" }}
-                >
-                  TIME
-                </div>
-                <div
-                  className="text-xs"
-                  style={{ color: "var(--text)" }}
-                >
-                  {new Date(selectedEvent.start).toLocaleString("en-US", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  -{" "}
-                  {new Date(selectedEvent.end).toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-              </div>
-
-              {selectedEvent.calendarOwner && (
+            <div style={{ padding: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div>
-                  <div
-                    className="text-[10px] font-semibold mb-0.5"
-                    style={{ color: "var(--text-dim)" }}
-                  >
-                    CALENDAR
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {ownerColors[selectedEvent.calendarOwner] && (
-                      <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ background: ownerColors[selectedEvent.calendarOwner] }}
-                      />
-                    )}
-                    <div
-                      className="text-xs"
-                      style={{ color: "var(--text)" }}
-                    >
-                      {teamMembers.find((m) => m.email === selectedEvent.calendarOwner)?.name ??
-                        selectedEvent.calendarOwner}
-                    </div>
+                  <div className="section-label" style={{ marginBottom: 4 }}>TIME</div>
+                  <div style={{ fontSize: 12, color: "var(--text)" }}>
+                    {new Date(selectedEvent.start).toLocaleString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    {"\u2013"}{" "}
+                    {new Date(selectedEvent.end).toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
                   </div>
                 </div>
-              )}
 
-              {selectedEvent.location && (
-                <div>
-                  <div
-                    className="text-[10px] font-semibold mb-0.5"
-                    style={{ color: "var(--text-dim)" }}
-                  >
-                    LOCATION
-                  </div>
-                  <div
-                    className="text-xs"
-                    style={{ color: "var(--text)" }}
-                  >
-                    {selectedEvent.location}
-                  </div>
-                </div>
-              )}
-
-              {selectedEvent.description && (
-                <div>
-                  <div
-                    className="text-[10px] font-semibold mb-0.5"
-                    style={{ color: "var(--text-dim)" }}
-                  >
-                    DESCRIPTION
-                  </div>
-                  <div
-                    className="text-xs"
-                    style={{ color: "var(--text-mid)" }}
-                  >
-                    {selectedEvent.description}
-                  </div>
-                </div>
-              )}
-
-              {selectedEvent.attendees &&
-                selectedEvent.attendees.length > 0 && (
+                {selectedEvent.calendarOwner && (
                   <div>
-                    <div
-                      className="text-[10px] font-semibold mb-1"
-                      style={{ color: "var(--text-dim)" }}
-                    >
-                      ATTENDEES
+                    <div className="section-label" style={{ marginBottom: 4 }}>CALENDAR</div>
+                    <div className="flex items-center gap-2">
+                      {ownerColors[selectedEvent.calendarOwner] && (
+                        <div
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: ownerColors[selectedEvent.calendarOwner],
+                          }}
+                        />
+                      )}
+                      <div style={{ fontSize: 12, color: "var(--text)" }}>
+                        {teamMembers.find((m) => m.email === selectedEvent.calendarOwner)?.name ??
+                          selectedEvent.calendarOwner}
+                      </div>
                     </div>
-                    <div className="space-y-1">
+                  </div>
+                )}
+
+                {selectedEvent.location && (
+                  <div>
+                    <div className="section-label" style={{ marginBottom: 4 }}>LOCATION</div>
+                    <div style={{ fontSize: 12, color: "var(--text)" }}>
+                      {selectedEvent.location}
+                    </div>
+                  </div>
+                )}
+
+                {selectedEvent.description && (
+                  <div>
+                    <div className="section-label" style={{ marginBottom: 4 }}>DESCRIPTION</div>
+                    <div style={{ fontSize: 12, color: "var(--text-mid)", lineHeight: 1.5 }}>
+                      {selectedEvent.description}
+                    </div>
+                  </div>
+                )}
+
+                {selectedEvent.attendees && selectedEvent.attendees.length > 0 && (
+                  <div>
+                    <div className="section-label" style={{ marginBottom: 6 }}>ATTENDEES</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       {selectedEvent.attendees.map((attendee, i) => (
                         <div
                           key={i}
-                          className="text-xs"
-                          style={{ color: "var(--text)" }}
+                          className="flex items-center gap-2"
+                          style={{
+                            padding: "4px 8px",
+                            borderRadius: 6,
+                            background: "var(--bg-input)",
+                            fontSize: 11,
+                            color: "var(--text)",
+                          }}
                         >
                           {attendee}
                         </div>
@@ -557,39 +503,39 @@ export default function CalendarPage() {
                   </div>
                 )}
 
-              <div
-                className="pt-3 space-y-2"
-                style={{ borderTop: "1px solid var(--border)" }}
-              >
-                {!selectedEvent.callNoteId && (
-                  <button
-                    onClick={() => handleGenerateCallNotes(selectedEvent)}
-                    disabled={generatingNotes === selectedEvent.id}
-                    className="w-full btn-primary text-xs"
-                    style={{
-                      opacity:
-                        generatingNotes === selectedEvent.id ? 0.6 : 1,
-                    }}
-                  >
-                    {generatingNotes === selectedEvent.id
-                      ? "Generating..."
-                      : "Generate Call Notes"}
-                  </button>
-                )}
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+                  {!selectedEvent.callNoteId && (
+                    <button
+                      onClick={() => handleGenerateCallNotes(selectedEvent)}
+                      disabled={generatingNotes === selectedEvent.id}
+                      className="btn-primary w-full"
+                      style={{ fontSize: 12 }}
+                    >
+                      {generatingNotes === selectedEvent.id
+                        ? "Generating..."
+                        : "Generate Call Notes"}
+                    </button>
+                  )}
 
-                {selectedEvent.callNoteId && (
-                  <Link
-                    href={`/calendar/${selectedEvent.callNoteId}`}
-                    className="block w-full text-center text-xs py-2 rounded-lg no-underline"
-                    style={{
-                      background: "var(--rose-dim)",
-                      border: "1px solid var(--border-active)",
-                      color: "var(--rose-light)",
-                    }}
-                  >
-                    View Call Notes
-                  </Link>
-                )}
+                  {selectedEvent.callNoteId && (
+                    <Link
+                      href={`/calendar/${selectedEvent.callNoteId}`}
+                      className="block w-full text-center no-underline"
+                      style={{
+                        padding: "10px",
+                        borderRadius: 10,
+                        background: "var(--rose-dim)",
+                        border: "1px solid var(--border-active)",
+                        color: "var(--rose-light)",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}
+                    >
+                      View Call Notes
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
           </div>

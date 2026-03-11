@@ -17,13 +17,10 @@ export default function WikiEditPage() {
   const [category, setCategory] = useState(CATEGORIES[0])
   const [content, setContent] = useState<JSONContent | null>(null)
   const [loaded, setLoaded] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
-    "idle"
-  )
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Fetch existing page data
   useEffect(() => {
     if (!slug) return
     fetch(`/api/wiki/${slug}`)
@@ -38,7 +35,6 @@ export default function WikiEditPage() {
       .catch(() => setLoaded(true))
   }, [slug])
 
-  // Auto-save with 2-second debounce
   const autoSave = useCallback(
     (updatedTitle: string, updatedCategory: string, updatedContent: JSONContent | null) => {
       if (!slug) return
@@ -85,21 +81,10 @@ export default function WikiEditPage() {
     autoSave(title, category, newContent)
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "10px 14px",
-    background: "var(--bg-input)",
-    border: "1px solid var(--border)",
-    borderRadius: 10,
-    color: "var(--text)",
-    fontSize: 14,
-    fontFamily: "'DM Sans', sans-serif",
-  }
-
   if (!loaded) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-sm" style={{ color: "var(--text-dim)" }}>
+      <div className="flex items-center justify-center" style={{ padding: "80px 0" }}>
+        <div style={{ fontSize: 13, color: "var(--text-dim)" }}>
           Loading...
         </div>
       </div>
@@ -107,37 +92,29 @@ export default function WikiEditPage() {
   }
 
   return (
-    <div>
+    <div className="page-content">
       <PageHeader
         title="Edit Wiki Page"
         description={`Editing: ${title || "Untitled"}`}
         actions={
           <div className="flex items-center gap-3">
-            <span
-              className="text-xs"
-              style={{
-                color:
-                  saveStatus === "saving"
-                    ? "var(--yellow)"
-                    : saveStatus === "saved"
-                    ? "var(--green)"
-                    : "var(--text-dim)",
-              }}
-            >
-              {saveStatus === "saving"
-                ? "Saving..."
-                : saveStatus === "saved"
-                ? "Saved"
-                : ""}
-            </span>
+            {saveStatus !== "idle" && (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color:
+                    saveStatus === "saving"
+                      ? "var(--yellow)"
+                      : "var(--green)",
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
+                {saveStatus === "saving" ? "Saving..." : "\u2713 Saved"}
+              </span>
+            )}
             <button
-              className="px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer"
-              style={{
-                background: "var(--bg-card)",
-                border: "1px solid var(--border)",
-                color: "var(--text)",
-                fontFamily: "'DM Sans', sans-serif",
-              }}
+              className="btn-secondary"
               onClick={() => router.push(`/wiki/${slug}`)}
             >
               Done Editing
@@ -146,11 +123,17 @@ export default function WikiEditPage() {
         }
       />
 
-      <div className="space-y-4 max-w-4xl">
-        <div>
+      <div style={{ maxWidth: 800 }}>
+        <div style={{ marginBottom: 16 }}>
           <label
-            className="block text-xs font-semibold mb-1"
-            style={{ color: "var(--text-mid)" }}
+            style={{
+              display: "block",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-mid)",
+              marginBottom: 6,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             Title
           </label>
@@ -159,25 +142,28 @@ export default function WikiEditPage() {
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}
             placeholder="Page title..."
-            style={inputStyle}
+            className="oxen-input"
           />
         </div>
 
-        <div>
+        <div style={{ marginBottom: 16 }}>
           <label
-            className="block text-xs font-semibold mb-1"
-            style={{ color: "var(--text-mid)" }}
+            style={{
+              display: "block",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-mid)",
+              marginBottom: 6,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             Category
           </label>
           <select
             value={category}
             onChange={(e) => handleCategoryChange(e.target.value)}
-            style={{
-              ...inputStyle,
-              cursor: "pointer",
-              appearance: "none" as const,
-            }}
+            className="oxen-input"
+            style={{ cursor: "pointer", appearance: "none" as const }}
           >
             {CATEGORIES.map((cat) => (
               <option key={cat} value={cat}>
@@ -189,8 +175,14 @@ export default function WikiEditPage() {
 
         <div>
           <label
-            className="block text-xs font-semibold mb-1"
-            style={{ color: "var(--text-mid)" }}
+            style={{
+              display: "block",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-mid)",
+              marginBottom: 6,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             Content
           </label>

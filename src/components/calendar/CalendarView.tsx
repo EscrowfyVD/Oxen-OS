@@ -16,7 +16,7 @@ const HOURS = Array.from({ length: 14 }, (_, i) => i + 7) // 7 AM to 8 PM
 function getWeekDates(date: Date): Date[] {
   const startOfWeek = new Date(date)
   const day = startOfWeek.getDay()
-  const diff = day === 0 ? -6 : 1 - day // Monday start
+  const diff = day === 0 ? -6 : 1 - day
   startOfWeek.setDate(startOfWeek.getDate() + diff)
 
   return Array.from({ length: 7 }, (_, i) => {
@@ -55,32 +55,26 @@ export default function CalendarView({
   }
 
   return (
-    <div
-      className="card overflow-hidden"
-      style={{ border: "1px solid var(--border)" }}
-    >
+    <div className="card" style={{ overflow: "hidden" }}>
       {/* Day headers */}
       <div
-        className="grid"
         style={{
+          display: "grid",
           gridTemplateColumns:
-            viewMode === "week"
-              ? "60px repeat(7, 1fr)"
-              : "60px 1fr",
+            viewMode === "week" ? "56px repeat(7, 1fr)" : "56px 1fr",
           borderBottom: "1px solid var(--border)",
+          background: "rgba(192,139,136,0.02)",
         }}
       >
-        <div
-          className="p-2"
-          style={{ borderRight: "1px solid var(--border)" }}
-        />
+        <div style={{ borderRight: "1px solid var(--border)", padding: 8 }} />
         {displayDates.map((date, i) => {
           const isToday = isSameDay(date, today)
           return (
             <div
               key={i}
-              className="p-3 text-center"
               style={{
+                padding: "12px 8px",
+                textAlign: "center",
                 borderRight:
                   i < displayDates.length - 1
                     ? "1px solid var(--border)"
@@ -88,9 +82,12 @@ export default function CalendarView({
               }}
             >
               <div
-                className="text-[10px] font-semibold"
                 style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: "0.05em",
                   color: isToday ? "var(--rose)" : "var(--text-dim)",
+                  fontFamily: "'DM Sans', sans-serif",
                 }}
               >
                 {viewMode === "week"
@@ -98,9 +95,12 @@ export default function CalendarView({
                   : date.toLocaleDateString("en-US", { weekday: "long" })}
               </div>
               <div
-                className="text-lg font-bold"
                 style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  fontFamily: "'Playfair Display', serif",
                   color: isToday ? "var(--rose)" : "var(--text)",
+                  marginTop: 2,
                 }}
               >
                 {date.getDate()}
@@ -111,29 +111,27 @@ export default function CalendarView({
       </div>
 
       {/* Time grid */}
-      <div
-        className="overflow-y-auto"
-        style={{ maxHeight: "calc(100vh - 280px)" }}
-      >
+      <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
         {HOURS.map((hour) => (
           <div
             key={hour}
-            className="grid"
             style={{
+              display: "grid",
               gridTemplateColumns:
-                viewMode === "week"
-                  ? "60px repeat(7, 1fr)"
-                  : "60px 1fr",
+                viewMode === "week" ? "56px repeat(7, 1fr)" : "56px 1fr",
               borderBottom: "1px solid var(--border)",
-              minHeight: 60,
+              minHeight: 56,
             }}
           >
             <div
-              className="p-2 text-right"
               style={{
+                padding: "6px 8px",
+                textAlign: "right",
                 color: "var(--text-dim)",
                 fontSize: 10,
+                fontFamily: "'DM Sans', sans-serif",
                 borderRight: "1px solid var(--border)",
+                fontWeight: 500,
               }}
             >
               {hour === 0
@@ -149,12 +147,13 @@ export default function CalendarView({
               return (
                 <div
                   key={i}
-                  className="p-1 relative"
                   style={{
+                    padding: 3,
                     borderRight:
                       i < displayDates.length - 1
                         ? "1px solid var(--border)"
                         : "none",
+                    position: "relative",
                   }}
                 >
                   {cellEvents.map((event) => (

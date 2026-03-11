@@ -36,28 +36,47 @@ export default function EventCard({ event, onClick, style, ownerColor }: EventCa
   return (
     <button
       onClick={() => onClick(event)}
-      className="w-full text-left rounded-lg px-2.5 py-1.5 cursor-pointer border-none transition-all duration-150"
+      className="w-full text-left cursor-pointer border-none"
       style={{
-        background: `${color}20`,
+        padding: "6px 10px",
+        borderRadius: 8,
+        background: `${color}15`,
         borderLeft: `3px solid ${color}`,
+        transition: "all 0.15s ease",
+        fontFamily: "'DM Sans', sans-serif",
+        marginBottom: 2,
         ...style,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = `${color}25`
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = `${color}15`
       }}
     >
       <div
-        className="text-xs font-semibold truncate"
-        style={{ color: "var(--text)" }}
+        className="truncate"
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--text)",
+        }}
       >
         {event.title}
       </div>
       <div
-        className="text-[10px] mt-0.5 flex items-center gap-1"
-        style={{ color: "var(--text-dim)" }}
+        className="flex items-center gap-1"
+        style={{
+          fontSize: 10,
+          color: "var(--text-dim)",
+          marginTop: 2,
+        }}
       >
         <span>{startTime} - {endTime}</span>
         {event.calendarOwner && (
           <>
-            <span style={{ color }}>{"·"}</span>
-            <span className="truncate" style={{ color, maxWidth: 80 }}>
+            <span style={{ color, opacity: 0.7 }}>{"\u00B7"}</span>
+            <span className="truncate" style={{ color, maxWidth: 70, fontSize: 9 }}>
               {event.calendarOwner.split("@")[0]}
             </span>
           </>

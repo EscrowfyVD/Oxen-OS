@@ -40,33 +40,64 @@ export default function WikiPageCard({ page }: WikiPageCardProps) {
   return (
     <Link
       href={`/wiki/${page.slug}`}
-      className="card block p-5 no-underline group"
-      style={{ border: "1px solid var(--border)" }}
+      className="card block no-underline interactive-card"
+      style={{ overflow: "hidden" }}
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <h3
-          className="text-sm font-semibold truncate flex-1"
-          style={{ color: "var(--text)" }}
-        >
-          {page.title}
-        </h3>
+      {/* Card header with category */}
+      <div
+        className="flex items-center justify-between"
+        style={{
+          padding: "12px 16px",
+          borderBottom: "1px solid rgba(255,255,255,0.03)",
+          background: "rgba(192,139,136,0.02)",
+        }}
+      >
         <span
-          className="text-[10px] font-semibold px-2 py-1 rounded-full shrink-0"
           style={{
+            fontSize: 10,
+            fontWeight: 600,
+            padding: "3px 10px",
+            borderRadius: 999,
             background: catColors.bg,
             color: catColors.text,
           }}
         >
           {page.category}
         </span>
+        <span
+          style={{
+            fontSize: 10,
+            color: "var(--text-dim)",
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          {formattedDate}
+        </span>
       </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs" style={{ color: "var(--text-dim)" }}>
-          Updated {formattedDate}
-        </span>
-        <span className="text-xs" style={{ color: "var(--text-dim)" }}>
+
+      {/* Card body */}
+      <div style={{ padding: "14px 16px" }}>
+        <h3
+          className="truncate"
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "var(--text)",
+            fontFamily: "'DM Sans', sans-serif",
+            marginBottom: 6,
+          }}
+        >
+          {page.title}
+        </h3>
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--text-dim)",
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
           by {page.createdBy}
-        </span>
+        </div>
       </div>
     </Link>
   )

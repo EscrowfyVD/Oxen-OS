@@ -6,47 +6,56 @@ import DepartmentCard from "@/components/org/DepartmentCard"
 import PersonCard, { Employee } from "@/components/org/PersonCard"
 import EditEmployeeModal from "@/components/org/EditEmployeeModal"
 
-const DEPT_COLORS: Record<string, { bg: string; avatar: string }> = {
+const DEPT_COLORS: Record<string, { bg: string; avatar: string; text: string }> = {
   Advisory: {
     bg: "rgba(91,155,191,0.15)",
     avatar: "rgba(91,155,191,0.35)",
+    text: "#5B9BBF",
   },
   Shareholders: {
     bg: "rgba(192,139,136,0.2)",
     avatar: "rgba(192,139,136,0.4)",
+    text: "#C08B88",
   },
   Operations: {
     bg: "rgba(92,184,104,0.15)",
     avatar: "rgba(92,184,104,0.35)",
+    text: "#5CB868",
   },
   Finance: {
     bg: "rgba(229,196,83,0.15)",
     avatar: "rgba(229,196,83,0.35)",
+    text: "#E5C453",
   },
   Sales: {
     bg: "rgba(155,127,212,0.15)",
     avatar: "rgba(155,127,212,0.35)",
+    text: "#9B7FD4",
   },
   Compliance: {
     bg: "rgba(212,136,91,0.15)",
     avatar: "rgba(212,136,91,0.35)",
+    text: "#D4885B",
   },
   Support: {
     bg: "rgba(91,184,168,0.15)",
     avatar: "rgba(91,184,168,0.35)",
+    text: "#5BB8A8",
   },
   Tech: {
     bg: "rgba(91,155,191,0.2)",
     avatar: "rgba(91,155,191,0.4)",
+    text: "#5B9BBF",
   },
   "Account Management": {
     bg: "rgba(155,127,212,0.15)",
     avatar: "rgba(155,127,212,0.35)",
+    text: "#9B7FD4",
   },
 }
 
 function getDefaultColors() {
-  return { bg: "rgba(192,139,136,0.12)", avatar: "rgba(192,139,136,0.3)" }
+  return { bg: "rgba(192,139,136,0.12)", avatar: "rgba(192,139,136,0.3)", text: "#C08B88" }
 }
 
 type ViewMode = "department" | "hierarchy"
@@ -134,61 +143,62 @@ export default function OrgPage() {
   })
 
   return (
-    <div>
+    <div className="page-content">
       <PageHeader
         title="Organigramme"
         description="Team structure and organization"
         actions={
           <div className="flex items-center gap-3">
-            <div
-              className="flex rounded-lg overflow-hidden"
-              style={{ border: "1px solid var(--border)" }}
-            >
+            {/* View toggle */}
+            <div className="toggle-group">
               <button
                 onClick={() => setViewMode("department")}
-                className="px-3 py-1.5 text-xs font-semibold cursor-pointer border-none"
-                style={{
-                  background:
-                    viewMode === "department"
-                      ? "var(--rose-dim)"
-                      : "transparent",
-                  color:
-                    viewMode === "department"
-                      ? "var(--rose)"
-                      : "var(--text-dim)",
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
+                className={`toggle-btn ${viewMode === "department" ? "active" : ""}`}
               >
                 Department
               </button>
               <button
                 onClick={() => setViewMode("hierarchy")}
-                className="px-3 py-1.5 text-xs font-semibold cursor-pointer border-none"
-                style={{
-                  background:
-                    viewMode === "hierarchy"
-                      ? "var(--rose-dim)"
-                      : "transparent",
-                  color:
-                    viewMode === "hierarchy"
-                      ? "var(--rose)"
-                      : "var(--text-dim)",
-                  fontFamily: "'DM Sans', sans-serif",
-                  borderLeft: "1px solid var(--border)",
-                }}
+                className={`toggle-btn ${viewMode === "hierarchy" ? "active" : ""}`}
               >
-                Hierarchy
+                All Members
               </button>
             </div>
-            <button className="btn-primary text-sm" onClick={handleAddNew}>
+            <button className="btn-primary" onClick={handleAddNew}>
               + Add Employee
             </button>
           </div>
         }
       />
 
+      {/* Team count highlight */}
+      {employees.length > 0 && (
+        <div className="highlight-box" style={{ marginBottom: 20 }}>
+          <div className="flex items-center gap-4">
+            <div
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: 28,
+                fontWeight: 700,
+                color: "var(--rose)",
+              }}
+            >
+              {employees.length}
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+                Team Members
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                Across {Object.keys(departments).length} departments
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {viewMode === "department" ? (
-        <div className="space-y-6">
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {sortedDepts.map((dept) => {
             const colors = DEPT_COLORS[dept] ?? getDefaultColors()
             return (
@@ -198,17 +208,18 @@ export default function OrgPage() {
                 employees={departments[dept]}
                 bgColor={colors.bg}
                 avatarColor={colors.avatar}
+                textColor={colors.text}
                 onPersonClick={handlePersonClick}
               />
             )
           })}
           {employees.length === 0 && (
             <div
-              className="text-center py-16"
-              style={{ color: "var(--text-dim)" }}
+              className="flex flex-col items-center justify-center"
+              style={{ padding: "64px 0", color: "var(--text-dim)" }}
             >
-              <div className="text-4xl mb-3">{"👥"}</div>
-              <div className="text-sm">
+              <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>{"\uD83D\uDC65"}</div>
+              <div style={{ fontSize: 13 }}>
                 No employees found. Add your first team member to get started.
               </div>
             </div>
@@ -217,24 +228,35 @@ export default function OrgPage() {
       ) : (
         <div>
           <div
-            className="card p-6 mb-4"
-            style={{ border: "1px solid var(--border)" }}
+            className="card"
+            style={{ overflow: "hidden" }}
           >
-            <h3
-              className="text-sm font-semibold mb-4"
-              style={{ color: "var(--text-mid)" }}
+            <div className="card-header">
+              <span style={{ fontSize: 14 }}>{"\uD83D\uDC65"}</span>
+              <span>All Team Members</span>
+              <span
+                className="badge"
+                style={{ marginLeft: "auto" }}
+              >
+                {employees.length}
+              </span>
+            </div>
+            <div
+              style={{
+                padding: 12,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
+                gap: 8,
+              }}
             >
-              All Team Members
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {employees.map((emp) => {
-                const colors =
-                  DEPT_COLORS[emp.department] ?? getDefaultColors()
+                const colors = DEPT_COLORS[emp.department] ?? getDefaultColors()
                 return (
                   <PersonCard
                     key={emp.id}
                     employee={emp}
                     color={colors.avatar}
+                    textColor={colors.text}
                     onClick={() => handlePersonClick(emp)}
                   />
                 )
@@ -243,11 +265,11 @@ export default function OrgPage() {
           </div>
           {employees.length === 0 && (
             <div
-              className="text-center py-16"
-              style={{ color: "var(--text-dim)" }}
+              className="flex flex-col items-center justify-center"
+              style={{ padding: "64px 0", color: "var(--text-dim)" }}
             >
-              <div className="text-4xl mb-3">{"👥"}</div>
-              <div className="text-sm">
+              <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>{"\uD83D\uDC65"}</div>
+              <div style={{ fontSize: 13 }}>
                 No employees found. Add your first team member to get started.
               </div>
             </div>

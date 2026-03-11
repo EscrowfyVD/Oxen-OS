@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 
 interface CalEvent {
   id: string
@@ -20,50 +21,100 @@ export default function UpcomingCalls() {
   }, [])
 
   return (
-    <div className="card p-5">
-      <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text)" }}>
-        📅 Upcoming Calls
-      </h3>
-      {events.length === 0 ? (
-        <p className="text-xs" style={{ color: "var(--text-dim)" }}>
-          No upcoming events
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {events.map((e) => (
-            <div key={e.id} className="flex items-center justify-between">
-              <div>
-                <div className="text-sm" style={{ color: "var(--text)" }}>
-                  {e.title}
+    <div className="card" style={{ overflow: "hidden" }}>
+      <div className="card-header">
+        <span style={{ fontSize: 14 }}>{"\uD83D\uDCC5"}</span>
+        <span>Upcoming Calls</span>
+      </div>
+      <div className="card-body">
+        {events.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center"
+            style={{ padding: "24px 0", color: "var(--text-dim)" }}
+          >
+            <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>{"\uD83D\uDCC5"}</div>
+            <div style={{ fontSize: 12 }}>No upcoming events</div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {events.map((e) => (
+              <Link
+                key={e.id}
+                href={e.callNote ? `/calendar/${e.callNote.id}` : "/calendar"}
+                className="no-underline flex items-center justify-between"
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: "var(--bg-input)",
+                  border: "1px solid var(--border)",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(el) => {
+                  el.currentTarget.style.borderColor = "rgba(192,139,136,0.30)"
+                }}
+                onMouseLeave={(el) => {
+                  el.currentTarget.style.borderColor = "rgba(192,139,136,0.10)"
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: "var(--text)",
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    {e.title}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-dim)",
+                      marginTop: 2,
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    {new Date(e.startTime).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
                 </div>
-                <div className="text-xs" style={{ color: "var(--text-dim)" }}>
-                  {new Date(e.startTime).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-              </div>
-              {e.callNote ? (
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded"
-                  style={{ background: "rgba(92,184,104,0.15)", color: "var(--green)" }}
-                >
-                  Notes ready
-                </span>
-              ) : (
-                <span
-                  className="text-[10px] px-2 py-0.5 rounded"
-                  style={{ background: "var(--rose-dim)", color: "var(--rose)" }}
-                >
-                  No notes
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+                {e.callNote ? (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      background: "rgba(92,184,104,0.15)",
+                      color: "var(--green)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Notes ready
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      padding: "3px 10px",
+                      borderRadius: 999,
+                      background: "var(--rose-dim)",
+                      color: "var(--rose)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    No notes
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

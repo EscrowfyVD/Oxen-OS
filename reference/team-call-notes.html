@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Call — Définition Besoins & Organisation</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0F1419;
+    --bg-elevated: #141A20;
+    --bg-card: #171E25;
+    --bg-card-hover: #1C242C;
+    --bg-input: #111820;
+    --rose: #C08B88;
+    --rose-light: #D4A5A2;
+    --rose-dim: rgba(192,139,136,0.12);
+    --rose-glow: rgba(192,139,136,0.06);
+    --text: #E8E4E0;
+    --text-dim: #6E7681;
+    --text-mid: #9CA3AB;
+    --border: rgba(192,139,136,0.10);
+    --border-active: rgba(192,139,136,0.30);
+    --green: #5CB868;
+    --yellow: #E5C453;
+    --blue: #5B9BBF;
+    --purple: #9B7FD4;
+    --orange: #D4885B;
+    --teal: #5BB8A8;
+    --nav-w: 260px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ─── SIDEBAR ─── */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: var(--nav-w);
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    z-index: 200;
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+  .sidebar-brand {
+    padding: 20px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-mark {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--rose), var(--rose-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--bg);
+    flex-shrink: 0;
+  }
+  .brand-text {
+    font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3;
+  }
+  .brand-text span {
+    display: block; font-size: 11px; font-weight: 400; color: var(--text-dim);
+  }
+  .sidebar-nav {
+    flex: 1; overflow-y: auto; padding: 12px 10px;
+  }
+  .nav-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--text-dim); padding: 12px 12px 6px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    transition: all 0.15s; margin-bottom: 2px;
+    text-decoration: none; color: var(--text-mid);
+    font-size: 13px; font-weight: 500; position: relative;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+  .nav-item.active { background: var(--rose-dim); color: var(--rose); }
+  .nav-item.active::before {
+    content: ''; position: absolute; left: 0; top: 50%;
+    transform: translateY(-50%); width: 3px; height: 20px;
+    background: var(--rose); border-radius: 0 3px 3px 0;
+  }
+  .nav-icon {
+    width: 24px; height: 24px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0;
+  }
+  .nav-badge {
+    margin-left: auto; font-size: 10px; padding: 2px 7px;
+    border-radius: 10px; background: rgba(255,255,255,0.06); color: var(--text-dim);
+  }
+  .nav-item.active .nav-badge { background: rgba(192,139,136,0.2); color: var(--rose); }
+  .sidebar-footer {
+    padding: 14px 16px; border-top: 1px solid var(--border);
+  }
+  .export-btn {
+    width: 100%; padding: 10px; border-radius: 8px;
+    border: 1px solid var(--rose);
+    background: linear-gradient(135deg, var(--rose), var(--rose-light));
+    color: var(--bg); font-family: inherit; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .export-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* ─── MOBILE ─── */
+  .mobile-toggle {
+    display: none; position: fixed; top: 14px; left: 14px; z-index: 300;
+    width: 40px; height: 40px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text); font-size: 18px; cursor: pointer;
+    align-items: center; justify-content: center;
+  }
+
+  /* ─── MAIN ─── */
+  .main { margin-left: var(--nav-w); flex: 1; min-height: 100vh; }
+  .page { display: none; animation: fadeIn 0.3s ease; }
+  .page.active { display: block; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .page-header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(15,20,25,0.88); backdrop-filter: blur(24px);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px; display: flex;
+    align-items: center; justify-content: space-between;
+  }
+  .page-header-left { display: flex; align-items: center; gap: 14px; }
+  .page-number {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px; font-weight: 700; color: var(--rose);
+    opacity: 0.3; line-height: 1;
+  }
+  .page-header h1 {
+    font-size: 18px; font-weight: 600; color: var(--text); letter-spacing: -0.02em;
+  }
+  .page-header .subtitle { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .page-nav-arrows { display: flex; gap: 6px; }
+  .arrow-btn {
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-mid); font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .arrow-btn:hover { background: var(--rose-dim); color: var(--rose); border-color: var(--border-active); }
+  .arrow-btn:disabled { opacity: 0.2; pointer-events: none; }
+  .page-body { padding: 28px 40px 80px; max-width: 960px; }
+
+  /* ─── COMPONENTS ─── */
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; margin-bottom: 16px; overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: var(--border-active); }
+  .card-header {
+    padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.03);
+    background: rgba(192,139,136,0.02); font-size: 13px;
+    font-weight: 600; color: var(--text); display: flex;
+    align-items: center; gap: 8px;
+  }
+  .card-body { padding: 16px 20px; }
+  .highlight-box {
+    padding: 14px 18px;
+    background: linear-gradient(135deg, var(--rose-glow), transparent);
+    border-left: 3px solid var(--rose); border-radius: 0 10px 10px 0;
+    margin-bottom: 16px; font-size: 14px; color: var(--text); line-height: 1.6;
+  }
+  .highlight-box strong { color: var(--rose-light); }
+
+  /* Org tree */
+  .org-node {
+    padding: 10px 16px; margin: 4px 0;
+    background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 8px; font-size: 13px; transition: background 0.15s;
+  }
+  .org-node:hover { background: rgba(255,255,255,0.035); }
+  .org-node .name { font-weight: 600; color: var(--text); }
+  .org-node .detail { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .org-children { margin-left: 24px; border-left: 2px solid var(--border); padding-left: 16px; }
+
+  /* People */
+  .people-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 8px;
+    padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .people-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px; margin-bottom: 20px;
+  }
+  .person {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; background: rgba(255,255,255,0.015);
+    border: 1px solid rgba(255,255,255,0.04); border-radius: 8px;
+    transition: all 0.15s;
+  }
+  .person:hover { background: rgba(255,255,255,0.04); border-color: var(--border-active); }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+  .person .pname { font-size: 13px; font-weight: 600; color: var(--text); }
+  .person .prole { font-size: 11px; color: var(--text-dim); }
+  .person .ploc { font-size: 11px; color: var(--rose); opacity: 0.8; }
+
+  .c-adv { background: rgba(91,155,191,0.15); color: var(--blue); }
+  .c-sh { background: rgba(192,139,136,0.2); color: var(--rose); }
+  .c-ops { background: rgba(92,184,104,0.15); color: var(--green); }
+  .c-fin { background: rgba(229,196,83,0.15); color: var(--yellow); }
+  .c-sales { background: rgba(155,127,212,0.15); color: var(--purple); }
+  .c-comp { background: rgba(212,136,91,0.15); color: var(--orange); }
+  .c-sup { background: rgba(91,184,168,0.15); color: var(--teal); }
+  .c-tech { background: rgba(91,155,191,0.2); color: var(--blue); }
+
+  /* Req blocks */
+  .req-block {
+    padding: 14px 18px; background: rgba(255,255,255,0.015);
+    border: 1px solid rgba(255,255,255,0.04); border-radius: 10px; margin-bottom: 10px;
+  }
+  .req-block h4 { font-size: 13px; font-weight: 600; color: var(--rose); margin-bottom: 8px; }
+  .req-block li {
+    font-size: 13px; color: var(--text-mid); padding: 3px 0 3px 18px;
+    position: relative; list-style: none;
+  }
+  .req-block li::before { content: '→'; position: absolute; left: 0; color: var(--rose); opacity: 0.4; }
+
+  /* Checklist */
+  .check-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.025);
+  }
+  .check-item:last-child { border-bottom: none; }
+  .check-item input[type="checkbox"] {
+    appearance: none; width: 18px; height: 18px;
+    border: 2px solid var(--border-active); border-radius: 5px;
+    cursor: pointer; flex-shrink: 0; margin-top: 1px;
+    transition: all 0.15s; position: relative;
+  }
+  .check-item input[type="checkbox"]:checked {
+    background: var(--rose); border-color: var(--rose);
+  }
+  .check-item input[type="checkbox"]:checked::after {
+    content: '✓'; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%); font-size: 12px;
+    color: var(--bg); font-weight: 700;
+  }
+  .check-item input:checked + span { text-decoration: line-through; opacity: 0.4; }
+  .check-item span { font-size: 13px; color: var(--text-mid); line-height: 1.5; }
+
+  /* Timeline */
+  .tl-item { display: flex; gap: 14px; padding: 10px 0; }
+  .tl-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .tl-dot.now { background: var(--rose); }
+  .tl-dot.future { background: transparent; border: 2px solid var(--rose); opacity: 0.4; }
+  .tl-text { font-size: 13px; color: var(--text-mid); line-height: 1.5; }
+  .tl-text strong { color: var(--text); }
+
+  /* Notes */
+  .notes-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .notes-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--rose); font-weight: 600; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .notes-label::before { content: '✎'; font-size: 13px; }
+  .note-area {
+    width: 100%; min-height: 100px; background: var(--bg-input);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 13px; line-height: 1.7; resize: vertical; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .note-area:focus { border-color: var(--rose); box-shadow: 0 0 0 3px rgba(192,139,136,0.08); }
+  .note-area::placeholder { color: var(--text-dim); opacity: 0.5; }
+
+  /* Agenda tiles */
+  .agenda-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;
+  }
+  .agenda-tile {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 20px; cursor: pointer;
+    transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .agenda-tile:hover {
+    border-color: var(--border-active); transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  }
+  .agenda-tile::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .agenda-tile .tile-num {
+    font-family: 'Playfair Display', serif; font-size: 32px; font-weight: 700;
+    color: var(--rose); opacity: 0.15; position: absolute; top: 10px; right: 16px;
+  }
+  .agenda-tile .tile-icon { font-size: 20px; margin-bottom: 8px; }
+  .agenda-tile .tile-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .agenda-tile .tile-sub { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .agenda-tile:nth-child(1)::before { background: var(--rose); }
+  .agenda-tile:nth-child(2)::before { background: var(--yellow); }
+  .agenda-tile:nth-child(3)::before { background: var(--green); }
+  .agenda-tile:nth-child(4)::before { background: var(--blue); }
+  .agenda-tile:nth-child(5)::before { background: var(--purple); }
+  .agenda-tile:nth-child(6)::before { background: var(--orange); }
+  .agenda-tile:nth-child(7)::before { background: var(--teal); }
+
+  /* Summary grid */
+  .summary-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .summary-grid .full-width { grid-column: 1 / -1; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 20px; right: 20px;
+    padding: 10px 18px; background: rgba(15,20,25,0.95);
+    border: 1px solid var(--border); border-radius: 10px;
+    font-size: 12px; color: var(--text-dim); backdrop-filter: blur(12px);
+    opacity: 0; transform: translateY(8px); transition: all 0.3s; z-index: 500;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 860px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .mobile-toggle { display: flex; }
+    .main { margin-left: 0; }
+    .page-body { padding: 20px 18px 80px; }
+    .page-header { padding: 16px 18px; padding-left: 60px; }
+    .summary-grid { grid-template-columns: 1fr; }
+    .agenda-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<button class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-mark">O</div>
+    <div class="brand-text">Team Call<span id="sidebarDate"></span></div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">Pages</div>
+    <a class="nav-item active" data-page="agenda" onclick="goTo('agenda')">
+      <div class="nav-icon" style="background:var(--rose-dim);color:var(--rose);">📋</div>Agenda
+    </a>
+    <a class="nav-item" data-page="p1" onclick="goTo('p1')">
+      <div class="nav-icon" style="background:rgba(192,139,136,0.1);color:var(--rose);">🏛</div>Structure Groupe<span class="nav-badge">1</span>
+    </a>
+    <a class="nav-item" data-page="p2" onclick="goTo('p2')">
+      <div class="nav-icon" style="background:rgba(229,196,83,0.12);color:var(--yellow);">🌍</div>Lieux de travail<span class="nav-badge">2</span>
+    </a>
+    <a class="nav-item" data-page="p3" onclick="goTo('p3')">
+      <div class="nav-icon" style="background:rgba(92,184,104,0.12);color:var(--green);">👥</div>Organigramme<span class="nav-badge">3</span>
+    </a>
+    <a class="nav-item" data-page="p4" onclick="goTo('p4')">
+      <div class="nav-icon" style="background:rgba(91,155,191,0.12);color:var(--blue);">🤖</div>3 Ingénieurs IA<span class="nav-badge">4</span>
+    </a>
+    <a class="nav-item" data-page="p5" onclick="goTo('p5')">
+      <div class="nav-icon" style="background:rgba(155,127,212,0.12);color:var(--purple);">💼</div>Postes clés<span class="nav-badge">5</span>
+    </a>
+    <a class="nav-item" data-page="p6" onclick="goTo('p6')">
+      <div class="nav-icon" style="background:rgba(212,136,91,0.12);color:var(--orange);">📜</div>ORIAS<span class="nav-badge">6</span>
+    </a>
+    <div class="nav-label" style="margin-top:8px;">Conclusion</div>
+    <a class="nav-item" data-page="summary" onclick="goTo('summary')">
+      <div class="nav-icon" style="background:rgba(91,184,168,0.12);color:var(--teal);">✅</div>Summary & Actions
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="export-btn" onclick="exportAll()">↓ Export All Notes</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- AGENDA -->
+  <div class="page active" id="page-agenda">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div><h1>Agenda — Team Call</h1><div class="subtitle" id="headerDate"></div></div>
+      </div>
+      <div class="page-nav-arrows">
+        <button class="arrow-btn" disabled>←</button>
+        <button class="arrow-btn" onclick="goTo('p1')">→</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="highlight-box" style="margin-bottom:24px;">
+        <strong>Sujets :</strong> Définition besoins 3 ingénieurs · Organigramme juridique · Lieu de vie dirigeants · Lieu de travail collaborateurs (3 ing, Andy, CFO, Compliance) · Formation ORIAS update
+      </div>
+      <div class="agenda-grid">
+        <div class="agenda-tile" onclick="goTo('p1')">
+          <div class="tile-num">01</div><div class="tile-icon">🏛</div>
+          <div class="tile-title">Structure du Groupe</div>
+          <div class="tile-sub">Holding Luxembourg, filiales, participations, rôle Escrowfy vs Oxen</div>
+        </div>
+        <div class="agenda-tile" onclick="goTo('p2')">
+          <div class="tile-num">02</div><div class="tile-icon">🌍</div>
+          <div class="tile-title">Lieux de travail & Dirigeants</div>
+          <div class="tile-sub">Transition vers Dubai sept. 2026, lieu de vie des dirigeants et collaborateurs</div>
+        </div>
+        <div class="agenda-tile" onclick="goTo('p3')">
+          <div class="tile-num">03</div><div class="tile-icon">👥</div>
+          <div class="tile-title">Organigramme & Équipe</div>
+          <div class="tile-sub">Force de travail complète : Advisory, Shareholders, Employees par département</div>
+        </div>
+        <div class="agenda-tile" onclick="goTo('p4')">
+          <div class="tile-num">04</div><div class="tile-icon">🤖</div>
+          <div class="tile-title">3 Ingénieurs IA — Besoins</div>
+          <div class="tile-sub">Profil, missions, compétences, localisation Dubai</div>
+        </div>
+        <div class="agenda-tile" onclick="goTo('p5')">
+          <div class="tile-num">05</div><div class="tile-icon">💼</div>
+          <div class="tile-title">Postes clés</div>
+          <div class="tile-sub">Andy, CFO, Compliance — périmètre, localisation, contrats</div>
+        </div>
+        <div class="agenda-tile" onclick="goTo('p6')">
+          <div class="tile-num">06</div><div class="tile-icon">📜</div>
+          <div class="tile-title">Formation ORIAS</div>
+          <div class="tile-sub">Update formations en cours, deadlines, registre</div>
+        </div>
+        <div class="agenda-tile" onclick="goTo('summary')">
+          <div class="tile-num">✅</div><div class="tile-icon">📝</div>
+          <div class="tile-title">Summary & Action Items</div>
+          <div class="tile-sub">Récapitulatif, décisions, next steps</div>
+        </div>
+      </div>
+      <div class="notes-section">
+        <div class="notes-label">Notes — Agenda / Général</div>
+        <textarea class="note-area" data-key="agenda-notes" placeholder="Notes générales, contexte du call, participants présents..." rows="4"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 1: STRUCTURE -->
+  <div class="page" id="page-p1">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">01</div>
+        <div><h1>Structure du Groupe</h1><div class="subtitle">Organigramme juridique & participations</div></div>
+      </div>
+      <div class="page-nav-arrows">
+        <button class="arrow-btn" onclick="goTo('agenda')">←</button>
+        <button class="arrow-btn" onclick="goTo('p2')">→</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="highlight-box">
+        <strong>Escrowfy</strong> n'exploite plus de plateforme. Tout passe par <strong>Oxen</strong>. On utilise la licence d'Escrowfy pour les rails.
+      </div>
+      <div class="card">
+        <div class="card-header">🏛 Holding & Filiales</div>
+        <div class="card-body">
+          <div class="org-node"><div class="name">🇱🇺 Holding Luxembourg</div><div class="detail">Société mère du groupe</div></div>
+          <div class="org-children">
+            <div class="org-node"><div class="name">🇱🇻 Société Riga</div><div class="detail">Filiale Lettonie</div></div>
+            <div class="org-node"><div class="name">🇦🇪 Société Dubai</div><div class="detail">Filiale Émirats</div></div>
+            <div class="org-node"><div class="name">🇨🇭 Escrowfy GmbH — Participation</div><div class="detail">SRO-regulated · Licence utilisée pour les rails · Ne gère plus la plateforme</div></div>
+            <div class="org-node"><div class="name">🇬🇧 SEMI UK — Participation</div><div class="detail">Small Electronic Money Institution · FCA application en cours</div></div>
+            <div class="org-node"><div class="name">🇮🇹 Neural ID Pay Srl — Participation</div><div class="detail">Italie</div></div>
+            <div class="org-node"><div class="name">🇲🇺 Société Île Maurice</div><div class="detail">Dépôt de dossier licence bancaire</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="notes-section">
+        <div class="notes-label">Notes — Structure Groupe</div>
+        <textarea class="note-area" data-key="p1-notes" placeholder="Notes sur la structure juridique, points discutés, changements à apporter..." rows="5"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 2: LIEUX -->
+  <div class="page" id="page-p2">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">02</div>
+        <div><h1>Lieux de travail & Lieu de vie</h1><div class="subtitle">Dirigeants & collaborateurs</div></div>
+      </div>
+      <div class="page-nav-arrows">
+        <button class="arrow-btn" onclick="goTo('p1')">←</button>
+        <button class="arrow-btn" onclick="goTo('p3')">→</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="highlight-box">Principalement <strong>Dubai</strong> à partir de <strong>septembre 2026</strong></div>
+      <div class="card">
+        <div class="card-header">📍 Timeline</div>
+        <div class="card-body">
+          <div class="tl-item"><div class="tl-dot now"></div><div class="tl-text"><strong>Aujourd'hui</strong> — Équipe répartie multi-juridictions (Riga, Dubai, UK, Remote)</div></div>
+          <div class="tl-item"><div class="tl-dot future"></div><div class="tl-text"><strong>Septembre 2026</strong> — Concentration principale à Dubai</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">👔 Dirigeants — Lieu de vie</div>
+        <div class="card-body">
+          <div class="people-grid">
+            <div class="person"><div class="avatar c-sh">V</div><div><div class="pname">Vernon</div><div class="prole">CEO / Shareholder</div><div class="ploc">📍 Dubai</div></div></div>
+            <div class="person"><div class="avatar c-sh">A</div><div><div class="pname">Arthur</div><div class="prole">Shareholder · CEO Escrowfy</div><div class="ploc">📍 —</div></div></div>
+            <div class="person"><div class="avatar c-sh">PL</div><div><div class="pname">Paul Louis</div><div class="prole">Shareholder</div><div class="ploc">📍 Dubai</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">👥 Collaborateurs — Lieu de travail prévu</div>
+        <div class="card-body">
+          <div class="people-grid">
+            <div class="person"><div class="avatar c-ops">A</div><div><div class="pname">Aleks</div><div class="prole">Operations</div><div class="ploc">📍 Dubai</div></div></div>
+            <div class="person"><div class="avatar c-ops">L</div><div><div class="pname">Luiza</div><div class="prole">Account Manager</div><div class="ploc">📍 Dubai</div></div></div>
+            <div class="person"><div class="avatar c-fin">R</div><div><div class="pname">Rudolfs</div><div class="prole">Finance</div><div class="ploc">📍 Potentiellement Dubai</div></div></div>
+            <div class="person"><div class="avatar c-sales">A</div><div><div class="pname">Andy</div><div class="prole">Sales</div><div class="ploc">📍 Dubai</div></div></div>
+            <div class="person"><div class="avatar c-comp">A</div><div><div class="pname">Aysegul</div><div class="prole">Compliance</div><div class="ploc">📍 UK</div></div></div>
+            <div class="person"><div class="avatar c-tech">×3</div><div><div class="pname">3 Ingénieurs IA</div><div class="prole">Tech (à recruter)</div><div class="ploc">📍 Dubai</div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="notes-section">
+        <div class="notes-label">Notes — Lieux de travail</div>
+        <textarea class="note-area" data-key="p2-notes" placeholder="Détails sur le déménagement, substance fiscale, visas, implications juridiques..." rows="5"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 3: ORGANIGRAMME -->
+  <div class="page" id="page-p3">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">03</div>
+        <div><h1>Organigramme & Force de travail</h1><div class="subtitle">Équipe complète par département</div></div>
+      </div>
+      <div class="page-nav-arrows">
+        <button class="arrow-btn" onclick="goTo('p2')">←</button>
+        <button class="arrow-btn" onclick="goTo('p4')">→</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="card"><div class="card-header" style="color:var(--blue);">🔷 Advisory</div><div class="card-body"><div class="people-grid">
+        <div class="person"><div class="avatar c-adv">C</div><div><div class="pname">Cyril</div><div class="prole">Advisor</div></div></div>
+      </div></div></div>
+
+      <div class="card"><div class="card-header" style="color:var(--rose);">💎 Shareholders</div><div class="card-body"><div class="people-grid">
+        <div class="person"><div class="avatar c-sh">A</div><div><div class="pname">Arthur</div><div class="prole">Shareholder</div></div></div>
+        <div class="person"><div class="avatar c-sh">V</div><div><div class="pname">Vernon</div><div class="prole">Shareholder</div><div class="ploc">📍 Dubai</div></div></div>
+        <div class="person"><div class="avatar c-sh">PL</div><div><div class="pname">Paul Louis</div><div class="prole">Shareholder</div><div class="ploc">📍 Dubai</div></div></div>
+      </div></div></div>
+
+      <div class="card"><div class="card-header" style="color:var(--green);">⚙️ Operations</div><div class="card-body"><div class="people-grid">
+        <div class="person"><div class="avatar c-ops">A</div><div><div class="pname">Aleks</div><div class="prole">Operations</div><div class="ploc">📍 Dubai</div></div></div>
+      </div></div></div>
+
+      <div class="card"><div class="card-header" style="color:var(--green);">🤝 Account / Client Manager</div><div class="card-body"><div class="people-grid">
+        <div class="person"><div class="avatar c-ops">L</div><div><div class="pname">Luiza</div><div class="prole">Account Client Manager</div><div class="ploc">📍 Dubai</div></div></div>
+      </div></div></div>
+
+      <div class="card"><div class="card-header" style="color:var(--yellow);">💰 Finance</div><div class="card-body"><div class="people-grid">
+        <div class="person"><div class="avatar c-fin">R</div><div><div class="pname">Rudolfs</div><div class="prole">Finance</div><div class="ploc">📍 Potentiellement Dubai</div></div></div>
+      </div></div></div>
+
+      <div class="card"><div class="card-header" style="color:var(--purple);">📈 Sales</div><div class="card-body"><div class="people-grid">
+        <div class="person"><div class="avatar c-sales">E</div><div><div class="pname">Ervins</div><div class="prole">Sales</div><div class="ploc">🤡</div></div></div>
+        <div class="person"><div class="avatar c-sales">A</div><div><div class="pname">Andy</div><div class="prole">Sales</div><div class="ploc">📍 Dubai</div></div></div>
+      </div></div></div>
+
+      <div class="card"><div class="card-header" style="color:var(--orange);">🛡 Compliance</div><div class="card-body"><div class="people-grid">
+        <div class="person"><div class="avatar c-comp">V</div><div><div class="pname">Veronika</div><div class="prole">Compliance</div></div></div>
+        <div class="person"><div class="avatar c-comp">A</div><div><div class="pname">Aysegul</div><div class="prole">Compliance</div><div class="ploc">📍 UK</div></div></div>
+      </div></div></div>
+
+      <div class="card"><div class="card-header" style="color:var(--teal);">💬 Customer Support</div><div class="card-body"><div class="people-grid">
+        <div class="person"><div class="avatar c-sup">C</div><div><div class="pname">Christel</div><div class="prole">Customer Support</div></div></div>
+        <div class="person"><div class="avatar c-sup">T</div><div><div class="pname">Tsiaro</div><div class="prole">Customer Support</div></div></div>
+      </div></div></div>
+
+      <div class="card"><div class="card-header" style="color:var(--blue);">🤖 Tech — À recruter</div><div class="card-body"><div class="people-grid">
+        <div class="person"><div class="avatar c-tech">?</div><div><div class="pname">Ingénieur IA #1</div><div class="prole">À recruter</div><div class="ploc">📍 Dubai</div></div></div>
+        <div class="person"><div class="avatar c-tech">?</div><div><div class="pname">Ingénieur IA #2</div><div class="prole">À recruter</div><div class="ploc">📍 Dubai</div></div></div>
+        <div class="person"><div class="avatar c-tech">?</div><div><div class="pname">Ingénieur IA #3</div><div class="prole">À recruter</div><div class="ploc">📍 Dubai</div></div></div>
+      </div></div></div>
+
+      <div class="notes-section">
+        <div class="notes-label">Notes — Organigramme</div>
+        <textarea class="note-area" data-key="p3-notes" placeholder="Changements d'organisation, nouvelles responsabilités, liens hiérarchiques..." rows="5"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 4: INGÉNIEURS IA -->
+  <div class="page" id="page-p4">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">04</div>
+        <div><h1>Besoins : 3 Ingénieurs IA</h1><div class="subtitle">Profil, missions & localisation Dubai</div></div>
+      </div>
+      <div class="page-nav-arrows">
+        <button class="arrow-btn" onclick="goTo('p3')">←</button>
+        <button class="arrow-btn" onclick="goTo('p5')">→</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="highlight-box">
+        <strong>Localisation :</strong> Dubai — à partir de septembre 2026<br>
+        <strong>Profil :</strong> Ingénieurs-conseils IA, école d'ingénieur reconnue, business & customer oriented
+      </div>
+      <div class="card">
+        <div class="card-header">🎯 Profil recherché</div>
+        <div class="card-body"><div class="req-block"><h4>Compétences clés</h4><ul>
+          <li>École d'ingénieur reconnue</li>
+          <li>Business & customer oriented</li>
+          <li>Capacité à créer des MVP en no-code avec N8N pour tester</li>
+          <li>Veille constante sur les nouveaux outils IA</li>
+          <li>Veille et améliorations constantes de nos outils</li>
+          <li>Supervision des équipes de développement</li>
+        </ul></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">🚀 Missions</div>
+        <div class="card-body"><div class="req-block"><h4>Au quotidien</h4><ul>
+          <li>Tester rapidement des concepts via MVP no-code (N8N)</li>
+          <li>Assurer une veille technologique IA permanente</li>
+          <li>Améliorer continuellement les outils internes</li>
+          <li>Superviser les devs externes / freelance</li>
+          <li>Orienter les choix tech vers le business et le client</li>
+        </ul></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">☑️ Points à valider</div>
+        <div class="card-body">
+          <div class="check-item"><input type="checkbox" data-key="p4-c1"><span>Niveau d'expérience requis (junior/mid/senior ?)</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p4-c2"><span>Stack technique précise attendue</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p4-c3"><span>Budget recrutement / package salarial</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p4-c4"><span>Timeline de recrutement</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p4-c5"><span>Contrat local Dubai ou autre juridiction ?</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p4-c6"><span>Visa sponsorship nécessaire ?</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p4-c7"><span>Reporting line : à qui reportent-ils ?</span></div>
+        </div>
+      </div>
+      <div class="notes-section">
+        <div class="notes-label">Notes — Ingénieurs IA</div>
+        <textarea class="note-area" data-key="p4-notes" placeholder="Précisions profil, stack, budget, recrutement, management..." rows="6"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 5: POSTES CLÉS -->
+  <div class="page" id="page-p5">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">05</div>
+        <div><h1>Postes clés</h1><div class="subtitle">Andy, CFO, Compliance</div></div>
+      </div>
+      <div class="page-nav-arrows">
+        <button class="arrow-btn" onclick="goTo('p4')">←</button>
+        <button class="arrow-btn" onclick="goTo('p6')">→</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header" style="color:var(--purple);">📈 Andy — Sales / BD Dubai</div>
+        <div class="card-body">
+          <div class="check-item"><input type="checkbox" data-key="p5-c1"><span>Périmètre exact du rôle Sales/BD à Dubai</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p5-c2"><span>Objectifs et KPIs</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p5-c3"><span>Contrat de travail — quelle entité ?</span></div>
+          <textarea class="note-area" data-key="p5-andy" placeholder="Notes Andy..." rows="3" style="margin-top:10px;min-height:60px;"></textarea>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header" style="color:var(--yellow);">💰 CFO — À définir</div>
+        <div class="card-body">
+          <div class="check-item"><input type="checkbox" data-key="p5-c4"><span>Profil recherché pour le CFO</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p5-c5"><span>Localisation : Dubai ou autre ?</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p5-c6"><span>Scope : groupe entier ou filiale ?</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p5-c7"><span>Interim / fractional vs full-time ?</span></div>
+          <textarea class="note-area" data-key="p5-cfo" placeholder="Notes CFO..." rows="3" style="margin-top:10px;min-height:60px;"></textarea>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header" style="color:var(--orange);">🛡 Compliance — Organisation</div>
+        <div class="card-body">
+          <div class="check-item"><input type="checkbox" data-key="p5-c8"><span>Répartition Veronika / Aysegul (UK) — qui fait quoi ?</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p5-c9"><span>Besoin d'un Head of Compliance groupe ?</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p5-c10"><span>Reporting lines compliance</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p5-c11"><span>Couverture réglementaire : CH, UK, LU, AE, IT, MU ?</span></div>
+          <textarea class="note-area" data-key="p5-comp" placeholder="Notes Compliance..." rows="3" style="margin-top:10px;min-height:60px;"></textarea>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">📋 Contrats — Général</div>
+        <div class="card-body">
+          <div class="check-item"><input type="checkbox" data-key="p5-c12"><span>Juridiction d'emploi pour chaque poste</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p5-c13"><span>Droit du travail applicable (UAE, UK, LV, autre)</span></div>
+        </div>
+      </div>
+      <div class="notes-section">
+        <div class="notes-label">Notes — Postes clés (général)</div>
+        <textarea class="note-area" data-key="p5-notes" placeholder="Notes générales postes clés..." rows="4"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 6: ORIAS -->
+  <div class="page" id="page-p6">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">06</div>
+        <div><h1>Formation ORIAS — Update</h1><div class="subtitle">Statut formations & conformité</div></div>
+      </div>
+      <div class="page-nav-arrows">
+        <button class="arrow-btn" onclick="goTo('p5')">←</button>
+        <button class="arrow-btn" onclick="goTo('summary')">→</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="card-header">📜 Points à couvrir</div>
+        <div class="card-body">
+          <div class="check-item"><input type="checkbox" data-key="p6-c1"><span>Statut des formations en cours</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p6-c2"><span>Qui doit encore compléter la formation ?</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p6-c3"><span>Deadlines réglementaires</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p6-c4"><span>Mise à jour du registre ORIAS</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p6-c5"><span>Nouvelles exigences ou changements réglementaires</span></div>
+          <div class="check-item"><input type="checkbox" data-key="p6-c6"><span>Certificats / attestations à fournir</span></div>
+        </div>
+      </div>
+      <div class="notes-section">
+        <div class="notes-label">Notes — ORIAS</div>
+        <textarea class="note-area" data-key="p6-notes" placeholder="Updates formation, personnes concernées, deadlines, actions..." rows="6"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="page" id="page-summary">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">✅</div>
+        <div><h1>Summary & Action Items</h1><div class="subtitle">Récapitulatif du call</div></div>
+      </div>
+      <div class="page-nav-arrows">
+        <button class="arrow-btn" onclick="goTo('p6')">←</button>
+        <button class="arrow-btn" disabled>→</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="highlight-box" style="margin-bottom:24px;">
+        Page de conclusion — récapitule les décisions, actions, et responsables identifiés pendant le call.
+      </div>
+      <div class="summary-grid">
+        <div class="card"><div class="card-header">🏛 Décisions — Structure</div><div class="card-body">
+          <textarea class="note-area" data-key="sum-structure" placeholder="Décisions prises sur la structure du groupe..." rows="4"></textarea>
+        </div></div>
+        <div class="card"><div class="card-header">🌍 Décisions — Lieux</div><div class="card-body">
+          <textarea class="note-area" data-key="sum-lieux" placeholder="Décisions sur les lieux de travail, Dubai transition..." rows="4"></textarea>
+        </div></div>
+        <div class="card"><div class="card-header">👥 Décisions — Équipe</div><div class="card-body">
+          <textarea class="note-area" data-key="sum-equipe" placeholder="Changements organigramme, nouvelles responsabilités..." rows="4"></textarea>
+        </div></div>
+        <div class="card"><div class="card-header">🤖 Décisions — Ingénieurs IA</div><div class="card-body">
+          <textarea class="note-area" data-key="sum-engineers" placeholder="Profil validé, budget, timeline recrutement..." rows="4"></textarea>
+        </div></div>
+        <div class="card full-width"><div class="card-header" style="color:var(--green);">✅ Action Items</div><div class="card-body">
+          <textarea class="note-area" data-key="sum-actions" placeholder="• [Responsable] — [Action] — [Deadline]&#10;• [Responsable] — [Action] — [Deadline]&#10;• [Responsable] — [Action] — [Deadline]&#10;• ..." rows="10" style="min-height:180px;"></textarea>
+        </div></div>
+        <div class="card full-width"><div class="card-header" style="color:var(--purple);">🔮 Prochaines étapes</div><div class="card-body">
+          <textarea class="note-area" data-key="sum-next" placeholder="Prochains calls, décisions en suspens, follow-ups à planifier..." rows="5"></textarea>
+        </div></div>
+        <div class="card full-width"><div class="card-header">📝 Notes libres — Summary</div><div class="card-body">
+          <textarea class="note-area" data-key="sum-free" placeholder="Autres remarques, idées, points à creuser..." rows="5"></textarea>
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast">✓ Sauvegardé</div>
+
+<script>
+const now = new Date();
+const dateFr = now.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+document.getElementById('sidebarDate').textContent = dateFr;
+document.getElementById('headerDate').textContent = dateFr;
+
+const pages = ['agenda','p1','p2','p3','p4','p5','p6','summary'];
+let current = 'agenda';
+
+function goTo(id) {
+  current = id;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector('.nav-item[data-page="'+id+'"]').classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+  document.querySelector('.sidebar').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA') return;
+  const idx = pages.indexOf(current);
+  if (e.key === 'ArrowRight' && idx < pages.length-1) goTo(pages[idx+1]);
+  if (e.key === 'ArrowLeft' && idx > 0) goTo(pages[idx-1]);
+});
+
+const STORE_KEY = 'oxen-team-call-v2';
+
+function saveAll() {
+  const data = {};
+  document.querySelectorAll('.note-area').forEach(ta => { if(ta.dataset.key) data[ta.dataset.key] = ta.value; });
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => { if(cb.dataset.key) data[cb.dataset.key] = cb.checked; });
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); showToast(); } catch(e) {}
+}
+
+function loadAll() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    document.querySelectorAll('.note-area').forEach(ta => { if(ta.dataset.key && data[ta.dataset.key]!==undefined) ta.value = data[ta.dataset.key]; });
+    document.querySelectorAll('input[type="checkbox"]').forEach(cb => { if(cb.dataset.key && data[cb.dataset.key]!==undefined) cb.checked = data[cb.dataset.key]; });
+  } catch(e) {}
+}
+
+function showToast() {
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1200);
+}
+
+let saveTimer;
+document.addEventListener('input', () => { clearTimeout(saveTimer); saveTimer = setTimeout(saveAll, 600); });
+document.addEventListener('change', saveAll);
+loadAll();
+
+function exportAll() {
+  let md = `# Team Call — Définition Besoins & Organisation\n# ${dateFr}\n\n`;
+  const sections = [
+    {key:'agenda-notes',title:'Agenda — Notes générales'},
+    {key:'p1-notes',title:'01 — Structure du Groupe'},
+    {key:'p2-notes',title:'02 — Lieux de travail'},
+    {key:'p3-notes',title:'03 — Organigramme'},
+    {key:'p4-notes',title:'04 — Ingénieurs IA'},
+    {key:'p5-andy',title:'05a — Andy'},
+    {key:'p5-cfo',title:'05b — CFO'},
+    {key:'p5-comp',title:'05c — Compliance'},
+    {key:'p5-notes',title:'05 — Postes clés (général)'},
+    {key:'p6-notes',title:'06 — ORIAS'},
+    {key:'sum-structure',title:'Summary — Structure'},
+    {key:'sum-lieux',title:'Summary — Lieux'},
+    {key:'sum-equipe',title:'Summary — Équipe'},
+    {key:'sum-engineers',title:'Summary — Ingénieurs IA'},
+    {key:'sum-actions',title:'Summary — Action Items'},
+    {key:'sum-next',title:'Summary — Prochaines étapes'},
+    {key:'sum-free',title:'Summary — Notes libres'},
+  ];
+  sections.forEach(s => {
+    const el = document.querySelector('[data-key="'+s.key+'"]');
+    if(el && el.value.trim()) md += `## ${s.title}\n\n${el.value.trim()}\n\n`;
+  });
+  md += `## Checklist Status\n\n`;
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    if(cb.dataset.key) {
+      const label = cb.closest('.check-item')?.querySelector('span')?.textContent || cb.dataset.key;
+      md += `${cb.checked ? '✅' : '☐'} ${label}\n`;
+    }
+  });
+  const blob = new Blob([md],{type:'text/markdown'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `team-call-notes-${now.toISOString().slice(0,10)}.md`;
+  a.click(); URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

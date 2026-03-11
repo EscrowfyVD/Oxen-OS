@@ -55,8 +55,8 @@ export default function CallNotePage() {
 
   if (!callNote) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-sm" style={{ color: "var(--text-dim)" }}>
+      <div className="flex items-center justify-center" style={{ padding: "80px 0" }}>
+        <div style={{ fontSize: 13, color: "var(--text-dim)" }}>
           Loading call note...
         </div>
       </div>
@@ -64,28 +64,17 @@ export default function CallNotePage() {
   }
 
   return (
-    <div>
+    <div className="page-content">
       <PageHeader
         title={callNote.title || "Call Note"}
-        description={`Created ${new Date(callNote.createdAt).toLocaleDateString(
-          "en-US",
-          {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          }
-        )}`}
+        description={`Created ${new Date(callNote.createdAt).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })}`}
         actions={
-          <Link
-            href="/calendar"
-            className="px-4 py-2 rounded-lg text-sm font-semibold no-underline"
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              color: "var(--text)",
-            }}
-          >
-            Back to Calendar
+          <Link href="/calendar" className="btn-secondary no-underline">
+            {"\u2190"} Back to Calendar
           </Link>
         }
       />

@@ -42,41 +42,33 @@ export default function WikiNewPage() {
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "10px 14px",
-    background: "var(--bg-input)",
-    border: "1px solid var(--border)",
-    borderRadius: 10,
-    color: "var(--text)",
-    fontSize: 14,
-    fontFamily: "'DM Sans', sans-serif",
-  }
-
   return (
-    <div>
+    <div className="page-content">
       <PageHeader
         title="New Wiki Page"
         description="Create a new knowledge base article"
         actions={
           <button
-            className="btn-primary text-sm"
+            className="btn-primary"
             onClick={handleSave}
             disabled={saving || !title.trim()}
-            style={{
-              opacity: saving || !title.trim() ? 0.5 : 1,
-            }}
           >
             {saving ? "Saving..." : "Save Page"}
           </button>
         }
       />
 
-      <div className="space-y-4 max-w-4xl">
-        <div>
+      <div style={{ maxWidth: 800 }}>
+        <div style={{ marginBottom: 16 }}>
           <label
-            className="block text-xs font-semibold mb-1"
-            style={{ color: "var(--text-mid)" }}
+            style={{
+              display: "block",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-mid)",
+              marginBottom: 6,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             Title
           </label>
@@ -85,25 +77,28 @@ export default function WikiNewPage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Page title..."
-            style={inputStyle}
+            className="oxen-input"
           />
         </div>
 
-        <div>
+        <div style={{ marginBottom: 16 }}>
           <label
-            className="block text-xs font-semibold mb-1"
-            style={{ color: "var(--text-mid)" }}
+            style={{
+              display: "block",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-mid)",
+              marginBottom: 6,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             Category
           </label>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            style={{
-              ...inputStyle,
-              cursor: "pointer",
-              appearance: "none" as const,
-            }}
+            className="oxen-input"
+            style={{ cursor: "pointer", appearance: "none" as const }}
           >
             {CATEGORIES.map((cat) => (
               <option key={cat} value={cat}>
@@ -115,8 +110,14 @@ export default function WikiNewPage() {
 
         <div>
           <label
-            className="block text-xs font-semibold mb-1"
-            style={{ color: "var(--text-mid)" }}
+            style={{
+              display: "block",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-mid)",
+              marginBottom: 6,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             Content
           </label>
