@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import type { NextRequest } from "next/server"
 
-export default auth((req) => {
+export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Allow auth API routes, login page, and static assets
@@ -14,15 +14,21 @@ export default auth((req) => {
     return NextResponse.next()
   }
 
-  // Redirect unauthenticated users to login
-  if (!req.auth) {
+  // Check for NextAuth session cookie (works in Edge Runtime without Prisma)
+  const hasSession =
+    req.cookies.has("authjs.session-token") ||
+    req.cookies.has("__Secure-authjs.session-token") ||
+    req.cookies.has("next-auth.session-token") ||
+    req.cookies.has("__Secure-next-auth.session-token")
+
+  if (!hasSession) {
     const loginUrl = new URL("/login", req.url)
     loginUrl.searchParams.set("callbackUrl", pathname)
     return NextResponse.redirect(loginUrl)
   }
 
   return NextResponse.next()
-})
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
