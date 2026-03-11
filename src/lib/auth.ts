@@ -22,14 +22,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ profile }) {
-      return profile?.email?.endsWith("@oxen.finance") ?? false
+      console.log("[AUTH] signIn callback - email:", profile?.email)
+      if (!profile?.email) {
+        console.log("[AUTH] No email in profile, rejecting")
+        return false
+      }
+      const allowed = profile.email.endsWith("@oxen.finance")
+      console.log("[AUTH] Domain check:", allowed ? "ALLOWED" : "REJECTED")
+      return allowed
     },
     async session({ session, user }) {
       session.user.id = user.id
       return session
     },
   },
-  debug: process.env.NODE_ENV === "development",
+  debug: true,
   pages: {
     signIn: "/login",
     error: "/login",
