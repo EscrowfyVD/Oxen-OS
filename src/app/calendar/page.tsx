@@ -14,13 +14,14 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [generatingNotes, setGeneratingNotes] = useState<string | null>(null)
 
   const fetchEvents = useCallback(() => {
     const start = new Date(currentDate)
-    start.setDate(start.getDate() - 7)
+    start.setDate(start.getDate() - 14)
     const end = new Date(currentDate)
-    end.setDate(end.getDate() + 7)
+    end.setDate(end.getDate() + 14)
 
     fetch(
       `/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}`
@@ -36,24 +37,39 @@ export default function CalendarPage() {
 
   const handleSync = async () => {
     setSyncing(true)
+    setSyncMessage(null)
     try {
-      await fetch("/api/calendar/sync", { method: "POST" })
-      fetchEvents()
+      const res = await fetch("/api/calendar/sync", { method: "POST" })
+      const data = await res.json()
+      if (res.ok) {
+        setSyncMessage(`Synced ${data.synced} events`)
+        fetchEvents()
+      } else {
+        setSyncMessage(data.error ?? "Sync failed")
+      }
     } catch {
-      // handle error silently
+      setSyncMessage("Network error during sync")
     }
     setSyncing(false)
+    setTimeout(() => setSyncMessage(null), 5000)
   }
 
-  const handleGenerateCallNotes = async (eventId: string) => {
-    setGeneratingNotes(eventId)
+  const handleGenerateCallNotes = async (event: CalendarEvent) => {
+    setGeneratingNotes(event.id)
     try {
-      await fetch("/api/call-notes/generate", {
+      const res = await fetch("/api/call-notes/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId }),
+        body: JSON.stringify({ eventId: event.id }),
       })
-      fetchEvents()
+      const data = await res.json()
+      if (res.ok) {
+        fetchEvents()
+        // Update selected event with new callNoteId
+        if (data.callNoteId) {
+          setSelectedEvent({ ...event, callNoteId: data.callNoteId })
+        }
+      }
     } catch {
       // handle error silently
     }
@@ -108,14 +124,28 @@ export default function CalendarPage() {
         title="Calendar"
         description="Meetings and schedule"
         actions={
-          <button
-            className="btn-primary text-sm"
-            onClick={handleSync}
-            disabled={syncing}
-            style={{ opacity: syncing ? 0.6 : 1 }}
-          >
-            {syncing ? "Syncing..." : "Sync Calendar"}
-          </button>
+          <div className="flex items-center gap-3">
+            {syncMessage && (
+              <span
+                className="text-xs"
+                style={{
+                  color: syncMessage.startsWith("Synced")
+                    ? "var(--green)"
+                    : "var(--orange)",
+                }}
+              >
+                {syncMessage}
+              </span>
+            )}
+            <button
+              className="btn-primary text-sm"
+              onClick={handleSync}
+              disabled={syncing}
+              style={{ opacity: syncing ? 0.6 : 1 }}
+            >
+              {syncing ? "Syncing..." : "Sync Calendar"}
+            </button>
+          </div>
         }
       />
 
@@ -331,30 +361,30 @@ export default function CalendarPage() {
                 className="pt-3 space-y-2"
                 style={{ borderTop: "1px solid var(--border)" }}
               >
-                <button
-                  onClick={() =>
-                    handleGenerateCallNotes(selectedEvent.id)
-                  }
-                  disabled={generatingNotes === selectedEvent.id}
-                  className="w-full btn-primary text-xs"
-                  style={{
-                    opacity:
-                      generatingNotes === selectedEvent.id ? 0.6 : 1,
-                  }}
-                >
-                  {generatingNotes === selectedEvent.id
-                    ? "Generating..."
-                    : "Generate Call Notes"}
-                </button>
+                {!selectedEvent.callNoteId && (
+                  <button
+                    onClick={() => handleGenerateCallNotes(selectedEvent)}
+                    disabled={generatingNotes === selectedEvent.id}
+                    className="w-full btn-primary text-xs"
+                    style={{
+                      opacity:
+                        generatingNotes === selectedEvent.id ? 0.6 : 1,
+                    }}
+                  >
+                    {generatingNotes === selectedEvent.id
+                      ? "Generating..."
+                      : "Generate Call Notes"}
+                  </button>
+                )}
 
                 {selectedEvent.callNoteId && (
                   <Link
                     href={`/calendar/${selectedEvent.callNoteId}`}
                     className="block w-full text-center text-xs py-2 rounded-lg no-underline"
                     style={{
-                      background: "var(--bg-input)",
-                      border: "1px solid var(--border)",
-                      color: "var(--text-mid)",
+                      background: "var(--rose-dim)",
+                      border: "1px solid var(--border-active)",
+                      color: "var(--rose-light)",
                     }}
                   >
                     View Call Notes
