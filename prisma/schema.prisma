@@ -82,17 +82,18 @@ model Employee {
 // ─── Tasks (Kanban) ───
 
 model Task {
-  id        String    @id @default(cuid())
-  title     String
-  tag       String
-  priority  String    @default("medium")
-  assignee  String?
-  deadline  DateTime?
-  column    String    @default("todo")
-  order     Int       @default(0)
-  createdBy String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  tag         String
+  priority    String    @default("medium")
+  assignee    String?
+  deadline    DateTime?
+  column      String    @default("todo")
+  order       Int       @default(0)
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 // ─── Organigramme (Legal Structure) ───

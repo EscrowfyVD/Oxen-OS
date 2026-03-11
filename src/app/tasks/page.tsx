@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 
 /* ── Design tokens ── */
+const CARD_BG = "#0F1118"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
@@ -12,14 +13,18 @@ const GREEN = "#34D399"
 const AMBER = "#FBBF24"
 const INDIGO = "#818CF8"
 const RED = "#F87171"
+const PURPLE = "#A78BFA"
+const YELLOW = "#FDE68A"
 const FROST = "#FFFFFF"
 
-/* ── Tag color palette ── */
+/* ── Tag color palette (6 tags) ── */
 const TAG_COLORS: Record<string, { bg: string; text: string }> = {
-  compliance: { bg: "rgba(251,191,36,0.12)", text: "#FBBF24" },
-  onboarding: { bg: "rgba(52,211,153,0.12)", text: "#34D399" },
-  tech: { bg: "rgba(129,140,248,0.12)", text: "#818CF8" },
-  sales: { bg: "rgba(192,139,136,0.12)", text: "#C08B88" },
+  compliance: { bg: "rgba(251,191,36,0.12)", text: AMBER },
+  onboarding: { bg: "rgba(52,211,153,0.12)", text: GREEN },
+  tech:       { bg: "rgba(129,140,248,0.12)", text: INDIGO },
+  sales:      { bg: "rgba(192,139,136,0.12)", text: ROSE_GOLD },
+  legal:      { bg: "rgba(167,139,250,0.12)", text: PURPLE },
+  finance:    { bg: "rgba(253,230,138,0.12)", text: YELLOW },
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -35,12 +40,13 @@ const COLUMNS = [
   { id: "done", label: "Done", accent: GREEN },
 ]
 
-const FILTER_TAGS = ["all", "compliance", "onboarding", "tech", "sales"]
+const FILTER_TAGS = ["all", "compliance", "onboarding", "tech", "sales", "legal", "finance"]
 
 /* ── Types ── */
 interface Task {
   id: string
   title: string
+  description: string | null
   tag: string
   priority: string
   assignee: string | null
@@ -49,8 +55,36 @@ interface Task {
   order?: number
 }
 
+interface Employee {
+  id: string
+  name: string
+  initials: string
+  role: string
+}
+
+interface TaskFormData {
+  title: string
+  description: string
+  tag: string
+  priority: string
+  assignee: string
+  deadline: string
+}
+
+/* ── Shared label style ── */
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 10,
+  color: TEXT_TERTIARY,
+  textTransform: "uppercase",
+  letterSpacing: 1,
+  marginBottom: 6,
+  fontFamily: "'DM Sans', sans-serif",
+  fontWeight: 500,
+}
+
 /* ── TaskCard (inline component) ── */
-function TaskCard({ task }: { task: Task }) {
+function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
   const tagStyle = TAG_COLORS[task.tag] || { bg: "rgba(255,255,255,0.06)", text: TEXT_SECONDARY }
   const priorityColor = PRIORITY_COLORS[task.priority] || TEXT_TERTIARY
 
@@ -69,6 +103,7 @@ function TaskCard({ task }: { task: Task }) {
     <div
       draggable
       onDragStart={handleDragStart}
+      onClick={onClick}
       style={{
         background: "rgba(255,255,255,0.02)",
         border: `1px solid ${CARD_BORDER}`,
@@ -77,11 +112,13 @@ function TaskCard({ task }: { task: Task }) {
         cursor: "grab",
         transition: "all 0.2s ease",
         marginBottom: 8,
+        position: "relative",
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLDivElement
         el.style.borderColor = "rgba(192,139,136,0.2)"
         el.style.transform = "translateY(-1px)"
+        el.style.cursor = "pointer"
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLDivElement
@@ -89,28 +126,50 @@ function TaskCard({ task }: { task: Task }) {
         el.style.transform = "translateY(0)"
       }}
     >
-      {/* Title row with priority dot */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      {/* Priority dot — top right */}
+      <div
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          width: 7,
+          height: 7,
+          borderRadius: "50%",
+          background: priorityColor,
+        }}
+      />
+
+      {/* Title */}
+      <div
+        style={{
+          fontSize: 12,
+          color: TEXT_PRIMARY,
+          fontFamily: "'DM Sans', sans-serif",
+          lineHeight: 1.4,
+          marginBottom: 6,
+          paddingRight: 16,
+        }}
+      >
+        {task.title}
+      </div>
+
+      {/* Description preview */}
+      {task.description && (
         <div
           style={{
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: priorityColor,
-            flexShrink: 0,
-          }}
-        />
-        <span
-          style={{
-            fontSize: 12,
-            color: TEXT_PRIMARY,
+            fontSize: 10,
+            color: TEXT_TERTIARY,
             fontFamily: "'DM Sans', sans-serif",
             lineHeight: 1.4,
+            marginBottom: 8,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
-          {task.title}
-        </span>
-      </div>
+          {task.description}
+        </div>
+      )}
 
       {/* Tag pill */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -165,16 +224,21 @@ function TaskCard({ task }: { task: Task }) {
 /* ── Main Tasks Page ── */
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
   const [activeFilter, setActiveFilter] = useState("all")
   const [showModal, setShowModal] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
 
   /* Form state */
-  const [formTitle, setFormTitle] = useState("")
-  const [formTag, setFormTag] = useState("compliance")
-  const [formPriority, setFormPriority] = useState("medium")
-  const [formAssignee, setFormAssignee] = useState("")
-  const [formDeadline, setFormDeadline] = useState("")
+  const [form, setForm] = useState<TaskFormData>({
+    title: "",
+    description: "",
+    tag: "compliance",
+    priority: "medium",
+    assignee: "",
+    deadline: "",
+  })
 
   /* ── Fetch tasks ── */
   const fetchTasks = useCallback(() => {
@@ -184,15 +248,63 @@ export default function TasksPage() {
       .catch(() => {})
   }, [])
 
+  /* ── Fetch employees for assignee dropdown ── */
+  const fetchEmployees = useCallback(() => {
+    fetch("/api/employees")
+      .then((r) => r.json())
+      .then((data) => setEmployees(data.employees ?? []))
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     fetchTasks()
-  }, [fetchTasks])
+    fetchEmployees()
+  }, [fetchTasks, fetchEmployees])
 
   /* ── Filtered tasks ── */
   const filtered =
     activeFilter === "all" ? tasks : tasks.filter((t) => t.tag === activeFilter)
 
   const getColumnTasks = (colId: string) => filtered.filter((t) => t.column === colId)
+
+  /* ── Reset form ── */
+  const resetForm = () => {
+    setForm({
+      title: "",
+      description: "",
+      tag: "compliance",
+      priority: "medium",
+      assignee: "",
+      deadline: "",
+    })
+    setEditingTask(null)
+  }
+
+  /* ── Open create modal ── */
+  const openCreate = () => {
+    resetForm()
+    setShowModal(true)
+  }
+
+  /* ── Open edit modal (click on card) ── */
+  const openEdit = (task: Task) => {
+    setEditingTask(task)
+    setForm({
+      title: task.title,
+      description: task.description || "",
+      tag: task.tag,
+      priority: task.priority,
+      assignee: task.assignee || "",
+      deadline: task.deadline ? task.deadline.split("T")[0] : "",
+    })
+    setShowModal(true)
+  }
+
+  /* ── Close modal ── */
+  const closeModal = () => {
+    setShowModal(false)
+    resetForm()
+  }
 
   /* ── Drag & drop handlers ── */
   const handleDragOver = (e: React.DragEvent, colId: string) => {
@@ -225,27 +337,77 @@ export default function TasksPage() {
 
   /* ── Create task ── */
   const handleCreateTask = async () => {
-    if (!formTitle.trim()) return
+    if (!form.title.trim()) return
 
     try {
       await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: formTitle.trim(),
-          tag: formTag,
-          priority: formPriority,
-          assignee: formAssignee.trim() || null,
-          deadline: formDeadline || null,
+          title: form.title.trim(),
+          description: form.description.trim() || null,
+          tag: form.tag,
+          priority: form.priority,
+          assignee: form.assignee || null,
+          deadline: form.deadline || null,
           column: "todo",
         }),
       })
-      setFormTitle("")
-      setFormTag("compliance")
-      setFormPriority("medium")
-      setFormAssignee("")
-      setFormDeadline("")
-      setShowModal(false)
+      closeModal()
+      fetchTasks()
+    } catch {
+      /* silent */
+    }
+  }
+
+  /* ── Update task ── */
+  const handleUpdateTask = async () => {
+    if (!editingTask || !form.title.trim()) return
+
+    try {
+      await fetch(`/api/tasks/${editingTask.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title.trim(),
+          description: form.description.trim() || null,
+          tag: form.tag,
+          priority: form.priority,
+          assignee: form.assignee || null,
+          deadline: form.deadline || null,
+        }),
+      })
+      closeModal()
+      fetchTasks()
+    } catch {
+      /* silent */
+    }
+  }
+
+  /* ── Delete task ── */
+  const handleDeleteTask = async () => {
+    if (!editingTask) return
+
+    try {
+      await fetch(`/api/tasks/${editingTask.id}`, { method: "DELETE" })
+      closeModal()
+      fetchTasks()
+    } catch {
+      /* silent */
+    }
+  }
+
+  /* ── Move task to column (from modal) ── */
+  const handleMoveTask = async (newColumn: string) => {
+    if (!editingTask) return
+
+    try {
+      await fetch(`/api/tasks/${editingTask.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ column: newColumn }),
+      })
+      setEditingTask({ ...editingTask, column: newColumn })
       fetchTasks()
     } catch {
       /* silent */
@@ -297,10 +459,10 @@ export default function TasksPage() {
               lineHeight: 1.4,
             }}
           >
-            Kanban board &mdash; drag cards to update status
+            Kanban board &mdash; drag cards to update status, click to edit
           </p>
         </div>
-        <button className="header-btn" onClick={() => setShowModal(true)}>
+        <button className="header-btn" onClick={openCreate}>
           New Task
         </button>
       </div>
@@ -314,6 +476,7 @@ export default function TasksPage() {
             display: "flex",
             gap: 8,
             marginBottom: 20,
+            flexWrap: "wrap",
             animationDelay: "0.05s",
           }}
         >
@@ -349,11 +512,17 @@ export default function TasksPage() {
                     flex: 1,
                     minWidth: 0,
                     background: isDragTarget
-                      ? "rgba(192,139,136,0.04)"
+                      ? "rgba(192,139,136,0.06)"
                       : "transparent",
+                    border: isDragTarget
+                      ? "1px dashed rgba(192,139,136,0.3)"
+                      : "1px solid transparent",
                     borderRadius: 8,
                     padding: 8,
-                    transition: "background 0.2s ease",
+                    transition: "all 0.2s ease",
+                    boxShadow: isDragTarget
+                      ? "inset 0 0 20px rgba(192,139,136,0.05)"
+                      : "none",
                   }}
                   onDragOver={(e) => handleDragOver(e, col.id)}
                   onDragLeave={handleDragLeave}
@@ -406,7 +575,11 @@ export default function TasksPage() {
                   {/* Column body */}
                   <div style={{ minHeight: 100 }}>
                     {colTasks.map((task) => (
-                      <TaskCard key={task.id} task={task} />
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onClick={() => openEdit(task)}
+                      />
                     ))}
                     {colTasks.length === 0 && (
                       <div
@@ -465,7 +638,7 @@ export default function TasksPage() {
                   <span
                     style={{
                       fontFamily: "'Bellfair', serif",
-                      fontSize: 24,
+                      fontSize: 28,
                       fontWeight: 400,
                       color: FROST,
                       lineHeight: 1,
@@ -497,7 +670,7 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* ── New Task Modal ── */}
+      {/* ── Create / Edit Task Modal ── */}
       {showModal && (
         <div
           style={{
@@ -511,17 +684,18 @@ export default function TasksPage() {
             backdropFilter: "blur(4px)",
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setShowModal(false)
+            if (e.target === e.currentTarget) closeModal()
           }}
         >
           <div
             className="animate-slideUp"
             style={{
-              width: 420,
-              background: "#0F1118",
+              width: 480,
+              maxHeight: "85vh",
+              overflowY: "auto",
+              background: CARD_BG,
               border: `1px solid ${CARD_BORDER}`,
               borderRadius: 12,
-              overflow: "hidden",
             }}
           >
             {/* Modal header */}
@@ -532,6 +706,10 @@ export default function TasksPage() {
                 justifyContent: "space-between",
                 padding: "16px 20px",
                 borderBottom: "1px solid rgba(255,255,255,0.03)",
+                position: "sticky",
+                top: 0,
+                background: CARD_BG,
+                zIndex: 1,
               }}
             >
               <span
@@ -541,10 +719,10 @@ export default function TasksPage() {
                   color: FROST,
                 }}
               >
-                New Task
+                {editingTask ? "Edit Task" : "New Task"}
               </span>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={closeModal}
                 style={{
                   background: "none",
                   border: "none",
@@ -563,77 +741,57 @@ export default function TasksPage() {
             <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 14 }}>
               {/* Title */}
               <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 10,
-                    color: TEXT_TERTIARY,
-                    textTransform: "uppercase",
-                    letterSpacing: 1,
-                    marginBottom: 6,
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontWeight: 500,
-                  }}
-                >
-                  Title
-                </label>
+                <label style={labelStyle}>Title</label>
                 <input
                   className="oxen-input"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
                   placeholder="Enter task title..."
                   autoFocus
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label style={labelStyle}>Description</label>
+                <textarea
+                  className="oxen-input"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Add details, notes, links..."
+                  rows={3}
+                  style={{
+                    resize: "vertical",
+                    minHeight: 60,
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}
                 />
               </div>
 
               {/* Tag + Priority row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 10,
-                      color: TEXT_TERTIARY,
-                      textTransform: "uppercase",
-                      letterSpacing: 1,
-                      marginBottom: 6,
-                      fontFamily: "'DM Sans', sans-serif",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Tag
-                  </label>
+                  <label style={labelStyle}>Tag</label>
                   <select
                     className="oxen-input"
-                    value={formTag}
-                    onChange={(e) => setFormTag(e.target.value)}
+                    value={form.tag}
+                    onChange={(e) => setForm({ ...form, tag: e.target.value })}
                     style={{ appearance: "none" }}
                   >
                     <option value="compliance">Compliance</option>
                     <option value="onboarding">Onboarding</option>
                     <option value="tech">Tech</option>
                     <option value="sales">Sales</option>
+                    <option value="legal">Legal</option>
+                    <option value="finance">Finance</option>
                   </select>
                 </div>
                 <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 10,
-                      color: TEXT_TERTIARY,
-                      textTransform: "uppercase",
-                      letterSpacing: 1,
-                      marginBottom: 6,
-                      fontFamily: "'DM Sans', sans-serif",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Priority
-                  </label>
+                  <label style={labelStyle}>Priority</label>
                   <select
                     className="oxen-input"
-                    value={formPriority}
-                    onChange={(e) => setFormPriority(e.target.value)}
+                    value={form.priority}
+                    onChange={(e) => setForm({ ...form, priority: e.target.value })}
                     style={{ appearance: "none" }}
                   >
                     <option value="high">High</option>
@@ -643,80 +801,136 @@ export default function TasksPage() {
                 </div>
               </div>
 
-              {/* Assignee */}
+              {/* Assignee (dropdown from Employee table) */}
               <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 10,
-                    color: TEXT_TERTIARY,
-                    textTransform: "uppercase",
-                    letterSpacing: 1,
-                    marginBottom: 6,
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontWeight: 500,
-                  }}
-                >
-                  Assignee
-                </label>
-                <input
+                <label style={labelStyle}>Assignee</label>
+                <select
                   className="oxen-input"
-                  value={formAssignee}
-                  onChange={(e) => setFormAssignee(e.target.value)}
-                  placeholder="e.g. Arthur"
-                />
+                  value={form.assignee}
+                  onChange={(e) => setForm({ ...form, assignee: e.target.value })}
+                  style={{ appearance: "none" }}
+                >
+                  <option value="">Unassigned</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.name}>
+                      {emp.name} — {emp.role}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Deadline */}
               <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 10,
-                    color: TEXT_TERTIARY,
-                    textTransform: "uppercase",
-                    letterSpacing: 1,
-                    marginBottom: 6,
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontWeight: 500,
-                  }}
-                >
-                  Deadline
-                </label>
+                <label style={labelStyle}>Deadline</label>
                 <input
                   className="oxen-input"
                   type="date"
-                  value={formDeadline}
-                  onChange={(e) => setFormDeadline(e.target.value)}
+                  value={form.deadline}
+                  onChange={(e) => setForm({ ...form, deadline: e.target.value })}
                   style={{ colorScheme: "dark" }}
                 />
               </div>
+
+              {/* Status buttons (only when editing) */}
+              {editingTask && (
+                <div>
+                  <label style={labelStyle}>Status</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {COLUMNS.map((col) => (
+                      <button
+                        key={col.id}
+                        onClick={() => handleMoveTask(col.id)}
+                        style={{
+                          flex: 1,
+                          padding: "8px 0",
+                          fontSize: 11,
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontWeight: 500,
+                          letterSpacing: 0.5,
+                          border: `1px solid ${
+                            editingTask.column === col.id
+                              ? col.accent
+                              : "rgba(255,255,255,0.06)"
+                          }`,
+                          borderRadius: 6,
+                          background:
+                            editingTask.column === col.id
+                              ? `${col.accent}18`
+                              : "transparent",
+                          color:
+                            editingTask.column === col.id
+                              ? col.accent
+                              : TEXT_SECONDARY,
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        {col.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal footer */}
             <div
               style={{
                 display: "flex",
-                justifyContent: "flex-end",
-                gap: 10,
+                alignItems: "center",
+                justifyContent: "space-between",
                 padding: "0 20px 20px",
               }}
             >
-              <button
-                className="btn-secondary"
-                onClick={() => setShowModal(false)}
-                style={{ padding: "8px 18px" }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleCreateTask}
-                disabled={!formTitle.trim()}
-                style={{ padding: "8px 18px" }}
-              >
-                Create Task
-              </button>
+              {/* Left side: delete button (edit mode only) */}
+              <div>
+                {editingTask && (
+                  <button
+                    onClick={handleDeleteTask}
+                    style={{
+                      background: "rgba(248,113,113,0.08)",
+                      border: `1px solid rgba(248,113,113,0.2)`,
+                      color: RED,
+                      fontSize: 12,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontWeight: 500,
+                      padding: "8px 16px",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      const el = e.currentTarget
+                      el.style.background = "rgba(248,113,113,0.15)"
+                    }}
+                    onMouseLeave={(e) => {
+                      const el = e.currentTarget
+                      el.style.background = "rgba(248,113,113,0.08)"
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+
+              {/* Right side: cancel + save/create */}
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  className="btn-secondary"
+                  onClick={closeModal}
+                  style={{ padding: "8px 18px" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={editingTask ? handleUpdateTask : handleCreateTask}
+                  disabled={!form.title.trim()}
+                  style={{ padding: "8px 18px" }}
+                >
+                  {editingTask ? "Save Changes" : "Create Task"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

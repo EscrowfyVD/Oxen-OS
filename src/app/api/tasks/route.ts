@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { title, tag, priority, assignee, deadline, column } = body
+  const { title, description, tag, priority, assignee, deadline, column } = body
 
   if (!title || !tag) {
     return NextResponse.json(
@@ -46,6 +46,7 @@ export async function POST(request: Request) {
   const task = await prisma.task.create({
     data: {
       title,
+      description: description ?? null,
       tag,
       priority: priority ?? "medium",
       assignee: assignee ?? null,
