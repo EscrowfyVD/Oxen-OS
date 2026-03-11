@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { label: "Team", href: "/team", icon: "\u2687", badge: null, count: null },
   { label: "Finance", href: "/finance", icon: "\u25C8", badge: null, count: null },
   { label: "Marketing", href: "/marketing", icon: "\u25D0", badge: null, count: null },
+  { label: "Support", href: "/support", icon: "\uD83C\uDFA7", badge: null, count: null },
   { label: "CRM", href: "/crm", icon: "\u25CE", badge: null, count: null },
 ]
 
