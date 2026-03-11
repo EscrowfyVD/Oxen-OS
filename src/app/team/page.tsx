@@ -717,12 +717,12 @@ export default function TeamPage() {
   }
 
   return (
-    <div className="page-content">
+    <div className="page-content" style={{ padding: 0 }}>
       <PageHeader
         title="Team"
         description={`Internal directory — ${employees.length} members`}
         actions={
-          <div className="flex items-center gap-3">
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <input
               type="text"
               value={search}
@@ -767,7 +767,7 @@ export default function TeamPage() {
           display: "flex",
           flexDirection: "column",
           gap: 8,
-          padding: "20px 0",
+          padding: "20px 32px",
         }}
       >
         {/* Add member form */}

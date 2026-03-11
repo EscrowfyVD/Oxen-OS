@@ -38,11 +38,18 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="flex min-h-screen" style={{ background: "var(--void)" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "var(--void)" }}>
       <Sidebar />
       <main
-        className="main-content flex-1 md:ml-[220px]"
-        style={{ background: "var(--void)", minHeight: "100vh", position: "relative" }}
+        className="main-content"
+        style={{
+          flex: 1,
+          marginLeft: 220,
+          background: "var(--void)",
+          minHeight: "100vh",
+          position: "relative",
+          minWidth: 0,
+        }}
       >
         <div className="accent-line" />
         {children}

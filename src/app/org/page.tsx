@@ -649,7 +649,7 @@ export default function OrgPage() {
   }
 
   return (
-    <div className="page-content">
+    <div className="page-content" style={{ padding: 0 }}>
       <PageHeader
         title="Legal Structure"
         description="Corporate organigramme — click ✎ to edit, hover for actions"
@@ -737,7 +737,7 @@ export default function OrgPage() {
       {/* Legend */}
       <div
         style={{
-          marginTop: 40,
+          margin: "40px 32px 32px",
           background: CARD_BG,
           border: `1px solid ${CARD_BORDER}`,
           borderRadius: 12,
