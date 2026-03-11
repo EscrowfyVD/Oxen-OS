@@ -7,6 +7,48 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   trustHost: true,
   adapter: PrismaAdapter(prisma),
+  cookies: {
+    // Fix PKCE cookie parsing behind Railway reverse proxy
+    // Remove __Secure- prefix that can fail when TLS is terminated at the proxy
+    pkceCodeVerifier: {
+      name: "authjs.pkce.code_verifier",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        maxAge: 60 * 15, // 15 minutes
+      },
+    },
+    state: {
+      name: "authjs.state",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        maxAge: 60 * 15,
+      },
+    },
+    callbackUrl: {
+      name: "authjs.callback-url",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+      },
+    },
+    sessionToken: {
+      name: "authjs.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+      },
+    },
+  },
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
