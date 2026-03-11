@@ -59,7 +59,8 @@ export async function POST(request: Request) {
   const {
     name, email, phone, company, sector, status, source,
     value, currency, notes, assignedTo, telegram, whatsapp,
-    website, country,
+    website, country, healthStatus, monthlyGtv, monthlyRevenue,
+    takeRate, segment, projectedVolume,
   } = body
 
   if (!name) {
@@ -88,6 +89,12 @@ export async function POST(request: Request) {
       whatsapp: whatsapp ?? null,
       website: website ?? null,
       country: country ?? null,
+      healthStatus: healthStatus ?? "healthy",
+      monthlyGtv: monthlyGtv ? parseFloat(monthlyGtv) : null,
+      monthlyRevenue: monthlyRevenue ? parseFloat(monthlyRevenue) : null,
+      takeRate: takeRate ? parseFloat(takeRate) : null,
+      segment: segment ?? null,
+      projectedVolume: projectedVolume ? parseFloat(projectedVolume) : null,
       createdBy: userId,
     },
   })

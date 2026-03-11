@@ -4,7 +4,8 @@ import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
-  FROST, SECTOR_COLORS, STATUS_COLORS, SECTORS, STATUSES,
+  FROST, SECTOR_COLORS, STATUS_COLORS, HEALTH_COLORS,
+  SECTORS, STATUSES, SEGMENTS,
 } from "./constants"
 import type { Contact, Employee } from "./types"
 
@@ -13,7 +14,7 @@ interface ClientsTabProps {
   employees: Employee[]
 }
 
-type SortKey = "name" | "company" | "sector" | "status" | "value" | "assignedTo" | "createdAt"
+type SortKey = "name" | "company" | "sector" | "status" | "value" | "assignedTo" | "createdAt" | "healthStatus" | "monthlyGtv" | "monthlyRevenue" | "takeRate" | "segment"
 
 export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
   const router = useRouter()
@@ -21,6 +22,8 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
   const [statusFilter, setStatusFilter] = useState("all")
   const [sectorFilter, setSectorFilter] = useState("all")
   const [assigneeFilter, setAssigneeFilter] = useState("all")
+  const [healthFilter, setHealthFilter] = useState("all")
+  const [segmentFilter, setSegmentFilter] = useState("all")
   const [sortBy, setSortBy] = useState<SortKey>("createdAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
 
@@ -29,7 +32,7 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
       setSortDir(sortDir === "asc" ? "desc" : "asc")
     } else {
       setSortBy(key)
-      setSortDir("asc")
+      setSortDir(key === "monthlyGtv" || key === "monthlyRevenue" || key === "value" ? "desc" : "asc")
     }
   }
 
@@ -45,15 +48,11 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
           (c.email && c.email.toLowerCase().includes(q))
       )
     }
-    if (statusFilter !== "all") {
-      result = result.filter((c) => c.status === statusFilter)
-    }
-    if (sectorFilter !== "all") {
-      result = result.filter((c) => c.sector === sectorFilter)
-    }
-    if (assigneeFilter !== "all") {
-      result = result.filter((c) => c.assignedTo === assigneeFilter)
-    }
+    if (statusFilter !== "all") result = result.filter((c) => c.status === statusFilter)
+    if (sectorFilter !== "all") result = result.filter((c) => c.sector === sectorFilter)
+    if (assigneeFilter !== "all") result = result.filter((c) => c.assignedTo === assigneeFilter)
+    if (healthFilter !== "all") result = result.filter((c) => c.healthStatus === healthFilter)
+    if (segmentFilter !== "all") result = result.filter((c) => c.segment === segmentFilter)
 
     result.sort((a, b) => {
       let aVal: string | number = ""
@@ -67,6 +66,11 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
         case "value": aVal = a.value ?? 0; bVal = b.value ?? 0; break
         case "assignedTo": aVal = (a.assignedTo || "").toLowerCase(); bVal = (b.assignedTo || "").toLowerCase(); break
         case "createdAt": aVal = a.createdAt; bVal = b.createdAt; break
+        case "healthStatus": aVal = a.healthStatus; bVal = b.healthStatus; break
+        case "monthlyGtv": aVal = a.monthlyGtv ?? 0; bVal = b.monthlyGtv ?? 0; break
+        case "monthlyRevenue": aVal = a.monthlyRevenue ?? 0; bVal = b.monthlyRevenue ?? 0; break
+        case "takeRate": aVal = a.takeRate ?? 0; bVal = b.takeRate ?? 0; break
+        case "segment": aVal = (a.segment || "").toLowerCase(); bVal = (b.segment || "").toLowerCase(); break
       }
 
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1
@@ -75,16 +79,13 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
     })
 
     return result
-  }, [contacts, search, statusFilter, sectorFilter, assigneeFilter, sortBy, sortDir])
+  }, [contacts, search, statusFilter, sectorFilter, assigneeFilter, healthFilter, segmentFilter, sortBy, sortDir])
 
-  const formatValue = (val: number | null, currency: string) => {
+  const formatValue = (val: number | null, prefix = "€") => {
     if (val == null) return "—"
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(val)
+    if (val >= 1_000_000) return `${prefix}${(val / 1_000_000).toFixed(1)}M`
+    if (val >= 1_000) return `${prefix}${(val / 1_000).toFixed(0)}K`
+    return `${prefix}${val.toFixed(0)}`
   }
 
   const formatDate = (iso: string) => {
@@ -119,7 +120,7 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
     letterSpacing: 1,
     fontFamily: "'DM Sans', sans-serif",
     fontWeight: 500,
-    padding: "10px 12px",
+    padding: "10px 10px",
     textAlign: "left",
     cursor: "pointer",
     userSelect: "none",
@@ -131,7 +132,7 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
     fontSize: 12,
     color: TEXT_PRIMARY,
     fontFamily: "'DM Sans', sans-serif",
-    padding: "10px 12px",
+    padding: "10px 10px",
     borderBottom: `1px solid ${CARD_BORDER}`,
   }
 
@@ -142,43 +143,64 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
         className="fade-in"
         style={{
           display: "flex",
-          gap: 10,
+          gap: 8,
           marginBottom: 20,
           flexWrap: "wrap",
           alignItems: "center",
           animationDelay: "0.05s",
         }}
       >
-        {/* Search */}
         <input
           className="oxen-input"
           placeholder="Search name, company, email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 260 }}
+          style={{ width: 220 }}
         />
 
-        {/* Status filter */}
         <select
           className="oxen-input"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ width: 140, appearance: "none" }}
+          style={{ width: 120, appearance: "none" }}
         >
           <option value="all">All Status</option>
           {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s.charAt(0).toUpperCase() + s.slice(1)}
-            </option>
+            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
           ))}
         </select>
 
-        {/* Sector filter */}
+        <select
+          className="oxen-input"
+          value={healthFilter}
+          onChange={(e) => setHealthFilter(e.target.value)}
+          style={{ width: 120, appearance: "none" }}
+        >
+          <option value="all">All Health</option>
+          <option value="healthy">Healthy</option>
+          <option value="watch">Watch</option>
+          <option value="at_risk">At Risk</option>
+          <option value="declining">Declining</option>
+          <option value="churned">Churned</option>
+        </select>
+
+        <select
+          className="oxen-input"
+          value={segmentFilter}
+          onChange={(e) => setSegmentFilter(e.target.value)}
+          style={{ width: 120, appearance: "none" }}
+        >
+          <option value="all">All Segments</option>
+          {SEGMENTS.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+
         <select
           className="oxen-input"
           value={sectorFilter}
           onChange={(e) => setSectorFilter(e.target.value)}
-          style={{ width: 150, appearance: "none" }}
+          style={{ width: 130, appearance: "none" }}
         >
           <option value="all">All Sectors</option>
           {SECTORS.map((s) => (
@@ -186,12 +208,11 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
           ))}
         </select>
 
-        {/* Assignee filter */}
         <select
           className="oxen-input"
           value={assigneeFilter}
           onChange={(e) => setAssigneeFilter(e.target.value)}
-          style={{ width: 150, appearance: "none" }}
+          style={{ width: 130, appearance: "none" }}
         >
           <option value="all">All Assignees</option>
           {uniqueAssignees.map((a) => (
@@ -212,10 +233,7 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
       </div>
 
       {/* ── Table ── */}
-      <div
-        className="card fade-in"
-        style={{ overflow: "hidden", animationDelay: "0.1s" }}
-      >
+      <div className="card fade-in" style={{ overflow: "hidden", animationDelay: "0.1s" }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
@@ -226,48 +244,71 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
                 <th style={thStyle} onClick={() => toggleSort("company")}>
                   Company{sortIcon("company")}
                 </th>
+                <th style={thStyle} onClick={() => toggleSort("segment")}>
+                  Segment{sortIcon("segment")}
+                </th>
+                <th style={thStyle} onClick={() => toggleSort("healthStatus")}>
+                  Health{sortIcon("healthStatus")}
+                </th>
                 <th style={thStyle} onClick={() => toggleSort("sector")}>
                   Sector{sortIcon("sector")}
                 </th>
                 <th style={thStyle} onClick={() => toggleSort("status")}>
                   Status{sortIcon("status")}
                 </th>
-                <th style={{ ...thStyle, textAlign: "right" }} onClick={() => toggleSort("value")}>
-                  Value{sortIcon("value")}
+                <th style={{ ...thStyle, textAlign: "right" }} onClick={() => toggleSort("monthlyGtv")}>
+                  Monthly GTV{sortIcon("monthlyGtv")}
+                </th>
+                <th style={{ ...thStyle, textAlign: "right" }} onClick={() => toggleSort("monthlyRevenue")}>
+                  Revenue{sortIcon("monthlyRevenue")}
+                </th>
+                <th style={{ ...thStyle, textAlign: "right" }} onClick={() => toggleSort("takeRate")}>
+                  Rate{sortIcon("takeRate")}
                 </th>
                 <th style={thStyle} onClick={() => toggleSort("assignedTo")}>
                   Assigned{sortIcon("assignedTo")}
                 </th>
                 <th style={thStyle}>Last Contact</th>
-                <th style={thStyle} onClick={() => toggleSort("createdAt")}>
-                  Created{sortIcon("createdAt")}
-                </th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((contact) => {
                 const statusColor = STATUS_COLORS[contact.status] || STATUS_COLORS.lead
-                const sectorColor = contact.sector
-                  ? SECTOR_COLORS[contact.sector] || SECTOR_COLORS.Other
-                  : null
+                const sectorColor = contact.sector ? SECTOR_COLORS[contact.sector] || SECTOR_COLORS.Other : null
+                const healthColor = HEALTH_COLORS[contact.healthStatus] || HEALTH_COLORS.healthy
 
                 return (
                   <tr
                     key={contact.id}
                     onClick={() => router.push(`/crm/${contact.id}`)}
                     style={{ cursor: "pointer", transition: "background 0.15s" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.02)"
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent"
-                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)" }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
                   >
                     <td style={tdStyle}>
                       <span style={{ fontWeight: 500 }}>{contact.name}</span>
                     </td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>
                       {contact.company || "—"}
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: 10, color: TEXT_SECONDARY }}>
+                      {contact.segment || "—"}
+                    </td>
+                    <td style={tdStyle}>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                          fontWeight: 500,
+                          padding: "2px 6px",
+                          borderRadius: 8,
+                          background: healthColor.bg,
+                          color: healthColor.text,
+                        }}
+                      >
+                        {contact.healthStatus.replace("_", " ")}
+                      </span>
                     </td>
                     <td style={tdStyle}>
                       {sectorColor ? (
@@ -306,7 +347,13 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
                       </span>
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right", fontFamily: "'Bellfair', serif", fontSize: 13 }}>
-                      {formatValue(contact.value, contact.currency)}
+                      {formatValue(contact.monthlyGtv)}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontFamily: "'Bellfair', serif", fontSize: 13 }}>
+                      {formatValue(contact.monthlyRevenue)}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right", color: TEXT_SECONDARY, fontSize: 11 }}>
+                      {contact.takeRate != null ? `${contact.takeRate}%` : "—"}
                     </td>
                     <td style={{ ...tdStyle, color: TEXT_SECONDARY }}>
                       {contact.assignedTo || "—"}
@@ -314,16 +361,13 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
                     <td style={{ ...tdStyle, color: TEXT_TERTIARY, fontSize: 11 }}>
                       {lastContact(contact)}
                     </td>
-                    <td style={{ ...tdStyle, color: TEXT_TERTIARY, fontSize: 11 }}>
-                      {formatDate(contact.createdAt)}
-                    </td>
                   </tr>
                 )
               })}
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={11}
                     style={{
                       ...tdStyle,
                       textAlign: "center",
@@ -331,7 +375,7 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
                       color: TEXT_TERTIARY,
                     }}
                   >
-                    {search || statusFilter !== "all" || sectorFilter !== "all"
+                    {search || statusFilter !== "all" || sectorFilter !== "all" || healthFilter !== "all"
                       ? "No contacts match your filters"
                       : "No contacts yet — click \"+ New Contact\" to add one"}
                   </td>

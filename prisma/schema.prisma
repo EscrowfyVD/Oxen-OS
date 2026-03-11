@@ -190,29 +190,38 @@ model ActivityLog {
   createdAt DateTime @default(now())
 }
 
-// ─── CRM ───
+// ─── CRM / CRO Revenue Intelligence ───
 
 model Contact {
-  id           String        @id @default(cuid())
-  name         String
-  email        String?
-  phone        String?
-  company      String?
-  sector       String?
-  status       String        @default("lead")
-  source       String?
-  value        Float?
-  currency     String        @default("EUR")
-  notes        String?       @db.Text
-  assignedTo   String?
-  telegram     String?
-  whatsapp     String?
-  website      String?
-  country      String?
-  createdBy    String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  interactions Interaction[]
+  id              String            @id @default(cuid())
+  name            String
+  email           String?
+  phone           String?
+  company         String?
+  sector          String?
+  status          String            @default("lead")
+  source          String?
+  value           Float?
+  currency        String            @default("EUR")
+  notes           String?           @db.Text
+  assignedTo      String?
+  telegram        String?
+  whatsapp        String?
+  website         String?
+  country         String?
+  // CRO fields
+  healthStatus    String            @default("healthy")
+  monthlyGtv      Float?
+  monthlyRevenue  Float?
+  takeRate        Float?
+  segment         String?
+  projectedVolume Float?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  interactions    Interaction[]
+  metrics         CustomerMetrics[]
+  deals           Deal[]
 }
 
 model Interaction {
@@ -223,4 +232,37 @@ model Interaction {
   content   String   @db.Text
   createdBy String
   createdAt DateTime @default(now())
+}
+
+model CustomerMetrics {
+  id        String   @id @default(cuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  month     String   // "YYYY-MM"
+  gtv       Float    @default(0)
+  revenue   Float    @default(0)
+  takeRate  Float    @default(0)
+  txCount   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contactId, month])
+}
+
+model Deal {
+  id              String   @id @default(cuid())
+  name            String
+  contactId       String
+  contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  stage           String   @default("discovery")
+  expectedVolume  Float?
+  takeRate        Float?
+  expectedRevenue Float?
+  probability     Float    @default(50)
+  closeDate       DateTime?
+  assignedTo      String?
+  notes           String?  @db.Text
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

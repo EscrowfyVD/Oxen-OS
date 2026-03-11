@@ -83,28 +83,8 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
       >
         {/* Total Contacts */}
         <div className="kpi-card" style={{ padding: "20px", position: "relative", overflow: "hidden" }}>
-          <div
-            style={{
-              fontSize: 10,
-              color: TEXT_TERTIARY,
-              textTransform: "uppercase",
-              letterSpacing: 1.5,
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 500,
-              marginBottom: 8,
-            }}
-          >
-            Total Contacts
-          </div>
-          <div
-            style={{
-              fontFamily: "'Bellfair', serif",
-              fontSize: 32,
-              fontWeight: 400,
-              color: FROST,
-              lineHeight: 1,
-            }}
-          >
+          <div style={kpiLabel}>Total Contacts</div>
+          <div style={kpiValue}>
             <Counter target={stats.totalContacts} />
           </div>
           <div style={{ position: "absolute", bottom: 8, right: 12, opacity: 0.5 }}>
@@ -114,28 +94,8 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
 
         {/* Pipeline Value */}
         <div className="kpi-card" style={{ padding: "20px", position: "relative", overflow: "hidden" }}>
-          <div
-            style={{
-              fontSize: 10,
-              color: TEXT_TERTIARY,
-              textTransform: "uppercase",
-              letterSpacing: 1.5,
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 500,
-              marginBottom: 8,
-            }}
-          >
-            Pipeline Value
-          </div>
-          <div
-            style={{
-              fontFamily: "'Bellfair', serif",
-              fontSize: 32,
-              fontWeight: 400,
-              color: FROST,
-              lineHeight: 1,
-            }}
-          >
+          <div style={kpiLabel}>Pipeline Value</div>
+          <div style={kpiValue}>
             <Counter target={stats.pipelineValue} prefix="€" />
           </div>
           <div style={{ position: "absolute", bottom: 8, right: 12, opacity: 0.5 }}>
@@ -145,29 +105,8 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
 
         {/* Won Deals */}
         <div className="kpi-card" style={{ padding: "20px", position: "relative", overflow: "hidden" }}>
-          <div
-            style={{
-              fontSize: 10,
-              color: TEXT_TERTIARY,
-              textTransform: "uppercase",
-              letterSpacing: 1.5,
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 500,
-              marginBottom: 8,
-            }}
-          >
-            Won Deals
-          </div>
-          <div
-            style={{
-              fontFamily: "'Bellfair', serif",
-              fontSize: 32,
-              fontWeight: 400,
-              color: FROST,
-              lineHeight: 1,
-              marginBottom: 4,
-            }}
-          >
+          <div style={kpiLabel}>Won Deals</div>
+          <div style={kpiValue}>
             <Counter target={stats.wonDeals} />
           </div>
           <div style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
@@ -180,28 +119,8 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
 
         {/* Conversion Rate */}
         <div className="kpi-card" style={{ padding: "20px", position: "relative", overflow: "hidden" }}>
-          <div
-            style={{
-              fontSize: 10,
-              color: TEXT_TERTIARY,
-              textTransform: "uppercase",
-              letterSpacing: 1.5,
-              fontFamily: "'DM Sans', sans-serif",
-              fontWeight: 500,
-              marginBottom: 8,
-            }}
-          >
-            Conversion Rate
-          </div>
-          <div
-            style={{
-              fontFamily: "'Bellfair', serif",
-              fontSize: 32,
-              fontWeight: 400,
-              color: FROST,
-              lineHeight: 1,
-            }}
-          >
+          <div style={kpiLabel}>Conversion Rate</div>
+          <div style={kpiValue}>
             <Counter target={stats.conversionRate} />
             <span style={{ fontSize: 18, color: TEXT_SECONDARY }}>%</span>
           </div>
@@ -224,16 +143,7 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
       >
         {/* Pipeline by Status */}
         <div className="card" style={{ padding: "20px" }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontFamily: "'Bellfair', serif",
-              color: FROST,
-              marginBottom: 16,
-            }}
-          >
-            Pipeline by Status
-          </div>
+          <div style={sectionTitle}>Pipeline by Status</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {statusOrder.map((status) => {
               const item = stats.byStatus.find((s) => s.status === status)
@@ -245,28 +155,14 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
               return (
                 <div key={status}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: TEXT_SECONDARY,
-                        fontFamily: "'DM Sans', sans-serif",
-                        textTransform: "capitalize",
-                      }}
-                    >
+                    <span style={{ fontSize: 11, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", textTransform: "capitalize" }}>
                       {status}
                     </span>
                     <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
                       {count} · {formatCurrency(value)}
                     </span>
                   </div>
-                  <div
-                    style={{
-                      height: 6,
-                      borderRadius: 3,
-                      background: "rgba(255,255,255,0.04)",
-                      overflow: "hidden",
-                    }}
-                  >
+                  <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.04)", overflow: "hidden" }}>
                     <div
                       style={{
                         height: "100%",
@@ -285,16 +181,7 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
 
         {/* Clients by Sector */}
         <div className="card" style={{ padding: "20px" }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontFamily: "'Bellfair', serif",
-              color: FROST,
-              marginBottom: 16,
-            }}
-          >
-            Clients by Sector
-          </div>
+          <div style={sectionTitle}>Clients by Sector</div>
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             <DonutChart
               segments={donutSegments.length > 0 ? donutSegments : [{ value: 1, color: "rgba(255,255,255,0.06)" }]}
@@ -305,32 +192,11 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
                 const color = sectorColorMap[s.sector] || TEXT_SECONDARY
                 return (
                   <div key={s.sector} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: TEXT_SECONDARY,
-                        fontFamily: "'DM Sans', sans-serif",
-                        flex: 1,
-                      }}
-                    >
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", flex: 1 }}>
                       {s.sector}
                     </span>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: TEXT_TERTIARY,
-                        fontFamily: "'DM Sans', sans-serif",
-                      }}
-                    >
+                    <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
                       {s.count}
                     </span>
                   </div>
@@ -353,16 +219,7 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
       >
         {/* Monthly New Clients */}
         <div className="card" style={{ padding: "20px" }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontFamily: "'Bellfair', serif",
-              color: FROST,
-              marginBottom: 16,
-            }}
-          >
-            Monthly New Clients
-          </div>
+          <div style={sectionTitle}>Monthly New Clients</div>
           {monthlyData.length > 0 ? (
             <RevenueChart data={monthlyData} />
           ) : (
@@ -374,16 +231,7 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
 
         {/* Top Deals */}
         <div className="card" style={{ padding: "20px" }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontFamily: "'Bellfair', serif",
-              color: FROST,
-              marginBottom: 16,
-            }}
-          >
-            Top Deals
-          </div>
+          <div style={sectionTitle}>Top Deals</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {stats.topDeals.length > 0 ? (
               stats.topDeals.slice(0, 8).map((deal, i) => {
@@ -399,29 +247,11 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
                       borderBottom: i < stats.topDeals.length - 1 ? `1px solid ${CARD_BORDER}` : "none",
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: TEXT_TERTIARY,
-                        fontFamily: "'DM Sans', sans-serif",
-                        fontVariantNumeric: "tabular-nums",
-                        width: 16,
-                      }}
-                    >
+                    <span style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", fontVariantNumeric: "tabular-nums", width: 16 }}>
                       {i + 1}
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: TEXT_PRIMARY,
-                          fontFamily: "'DM Sans', sans-serif",
-                          fontWeight: 500,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                      <div style={{ fontSize: 12, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {deal.company || deal.name}
                       </div>
                       {deal.company && (
@@ -442,15 +272,7 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
                     >
                       {deal.status}
                     </span>
-                    <span
-                      style={{
-                        fontFamily: "'Bellfair', serif",
-                        fontSize: 13,
-                        color: FROST,
-                        minWidth: 70,
-                        textAlign: "right",
-                      }}
-                    >
+                    <span style={{ fontFamily: "'Bellfair', serif", fontSize: 13, color: FROST, minWidth: 70, textAlign: "right" }}>
                       {formatCurrency(deal.value ?? 0)}
                     </span>
                   </div>
@@ -466,4 +288,29 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
       </div>
     </div>
   )
+}
+
+const kpiLabel: React.CSSProperties = {
+  fontSize: 10,
+  color: TEXT_TERTIARY,
+  textTransform: "uppercase",
+  letterSpacing: 1.5,
+  fontFamily: "'DM Sans', sans-serif",
+  fontWeight: 500,
+  marginBottom: 8,
+}
+
+const kpiValue: React.CSSProperties = {
+  fontFamily: "'Bellfair', serif",
+  fontSize: 32,
+  fontWeight: 400,
+  color: FROST,
+  lineHeight: 1,
+}
+
+const sectionTitle: React.CSSProperties = {
+  fontSize: 13,
+  fontFamily: "'Bellfair', serif",
+  color: FROST,
+  marginBottom: 16,
 }

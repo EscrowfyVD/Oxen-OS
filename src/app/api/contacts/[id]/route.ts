@@ -19,6 +19,12 @@ export async function GET(
       interactions: {
         orderBy: { createdAt: "desc" },
       },
+      metrics: {
+        orderBy: { month: "desc" },
+      },
+      deals: {
+        orderBy: { createdAt: "desc" },
+      },
     },
   })
 
@@ -43,7 +49,8 @@ export async function PATCH(
   const {
     name, email, phone, company, sector, status, source,
     value, currency, notes, assignedTo, telegram, whatsapp,
-    website, country,
+    website, country, healthStatus, monthlyGtv, monthlyRevenue,
+    takeRate, segment, projectedVolume,
   } = body
 
   const existing = await prisma.contact.findUnique({ where: { id } })
@@ -69,6 +76,12 @@ export async function PATCH(
       ...(whatsapp !== undefined && { whatsapp: whatsapp || null }),
       ...(website !== undefined && { website: website || null }),
       ...(country !== undefined && { country: country || null }),
+      ...(healthStatus !== undefined && { healthStatus }),
+      ...(monthlyGtv !== undefined && { monthlyGtv: monthlyGtv !== null ? parseFloat(monthlyGtv) : null }),
+      ...(monthlyRevenue !== undefined && { monthlyRevenue: monthlyRevenue !== null ? parseFloat(monthlyRevenue) : null }),
+      ...(takeRate !== undefined && { takeRate: takeRate !== null ? parseFloat(takeRate) : null }),
+      ...(segment !== undefined && { segment: segment || null }),
+      ...(projectedVolume !== undefined && { projectedVolume: projectedVolume !== null ? parseFloat(projectedVolume) : null }),
     },
   })
 

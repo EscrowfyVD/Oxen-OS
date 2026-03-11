@@ -1,25 +1,34 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import PipelineTab from "@/components/crm/PipelineTab"
+import OverviewTab from "@/components/crm/OverviewTab"
 import ClientsTab from "@/components/crm/ClientsTab"
+import CroPipelineTab from "@/components/crm/CroPipelineTab"
+import RevenueTab from "@/components/crm/RevenueTab"
+import ForecastTab from "@/components/crm/ForecastTab"
 import ReportsTab from "@/components/crm/ReportsTab"
 import ContactModal from "@/components/crm/ContactModal"
-import type { Contact, Employee, CrmStats } from "@/components/crm/types"
+import DealModal from "@/components/crm/DealModal"
+import type {
+  Contact, Employee, CrmStats,
+  OverviewData, PipelineData, ForecastData, MetricsData,
+} from "@/components/crm/types"
 
 /* ── Design tokens ── */
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
-const ROSE_GOLD = "#C08B88"
 const FROST = "#FFFFFF"
 
-type TabId = "pipeline" | "clients" | "reports"
+type TabId = "overview" | "clients" | "pipeline" | "revenue" | "forecast" | "reports"
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "pipeline", label: "Pipeline" },
+  { id: "overview", label: "Overview" },
   { id: "clients", label: "Clients" },
+  { id: "pipeline", label: "Pipeline" },
+  { id: "revenue", label: "Revenue" },
+  { id: "forecast", label: "Forecast" },
   { id: "reports", label: "Reports" },
 ]
 
@@ -27,11 +36,16 @@ export default function CrmPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [stats, setStats] = useState<CrmStats | null>(null)
-  const [activeTab, setActiveTab] = useState<TabId>("pipeline")
-  const [showModal, setShowModal] = useState(false)
+  const [overview, setOverview] = useState<OverviewData | null>(null)
+  const [pipelineData, setPipelineData] = useState<PipelineData | null>(null)
+  const [forecastData, setForecastData] = useState<ForecastData | null>(null)
+  const [metricsData, setMetricsData] = useState<MetricsData | null>(null)
+  const [activeTab, setActiveTab] = useState<TabId>("overview")
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [showDealModal, setShowDealModal] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
 
-  /* ── Fetch contacts ── */
+  /* ── Fetchers ── */
   const fetchContacts = useCallback(() => {
     fetch("/api/contacts")
       .then((r) => r.json())
@@ -39,7 +53,6 @@ export default function CrmPage() {
       .catch(() => {})
   }, [])
 
-  /* ── Fetch employees ── */
   const fetchEmployees = useCallback(() => {
     fetch("/api/employees")
       .then((r) => r.json())
@@ -47,7 +60,6 @@ export default function CrmPage() {
       .catch(() => {})
   }, [])
 
-  /* ── Fetch stats ── */
   const fetchStats = useCallback(() => {
     fetch("/api/contacts/stats")
       .then((r) => r.json())
@@ -55,16 +67,73 @@ export default function CrmPage() {
       .catch(() => {})
   }, [])
 
+  const fetchOverview = useCallback(() => {
+    fetch("/api/crm/overview")
+      .then((r) => r.json())
+      .then((data) => setOverview(data.overview ?? null))
+      .catch(() => {})
+  }, [])
+
+  const fetchPipeline = useCallback(() => {
+    fetch("/api/crm/pipeline")
+      .then((r) => r.json())
+      .then((data) => setPipelineData(data.pipeline ?? null))
+      .catch(() => {})
+  }, [])
+
+  const fetchForecast = useCallback(() => {
+    fetch("/api/crm/forecast")
+      .then((r) => r.json())
+      .then((data) => setForecastData(data.forecast ?? null))
+      .catch(() => {})
+  }, [])
+
+  const fetchMetrics = useCallback(() => {
+    fetch("/api/crm/metrics")
+      .then((r) => r.json())
+      .then((data) => setMetricsData(data.metrics ?? null))
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     fetchContacts()
     fetchEmployees()
     fetchStats()
-  }, [fetchContacts, fetchEmployees, fetchStats])
+    fetchOverview()
+    fetchPipeline()
+    fetchForecast()
+    fetchMetrics()
+  }, [fetchContacts, fetchEmployees, fetchStats, fetchOverview, fetchPipeline, fetchForecast, fetchMetrics])
 
-  /* ── Pipeline value ── */
-  const pipelineValue = contacts
-    .filter((c) => c.status !== "lost")
-    .reduce((sum, c) => sum + (c.value ?? 0), 0)
+  const refreshAll = () => {
+    fetchContacts()
+    fetchStats()
+    fetchOverview()
+    fetchPipeline()
+    fetchForecast()
+    fetchMetrics()
+  }
+
+  /* ── Handlers ── */
+  const openNewContact = () => {
+    setEditingContact(null)
+    setShowContactModal(true)
+  }
+
+  const openNewDeal = () => {
+    setShowDealModal(true)
+  }
+
+  const handleContactSaved = () => {
+    setShowContactModal(false)
+    setEditingContact(null)
+    refreshAll()
+  }
+
+  const handleDealSaved = () => {
+    setShowDealModal(false)
+    refreshAll()
+  }
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("en-US", {
@@ -74,42 +143,19 @@ export default function CrmPage() {
       maximumFractionDigits: 0,
     }).format(val)
 
-  /* ── Handlers ── */
-  const handleDrop = async (contactId: string, newStatus: string) => {
-    try {
-      await fetch(`/api/contacts/${contactId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      })
-      fetchContacts()
-      fetchStats()
-    } catch {
-      /* silent */
-    }
-  }
-
-  const handleCardClick = (contact: Contact) => {
-    setEditingContact(contact)
-    setShowModal(true)
-  }
-
-  const openNewContact = () => {
-    setEditingContact(null)
-    setShowModal(true)
-  }
-
-  const handleSaved = () => {
-    setShowModal(false)
-    setEditingContact(null)
-    fetchContacts()
-    fetchStats()
-  }
-
   const tabDescriptions: Record<TabId, string> = {
-    pipeline: `Pipeline · ${formatCurrency(pipelineValue)} total value`,
+    overview: overview
+      ? `${overview.activeCustomers} active customers · ${formatCurrency(overview.monthlyRevenue)}/mo revenue`
+      : "Revenue intelligence overview",
     clients: `${contacts.length} contact${contacts.length !== 1 ? "s" : ""} in database`,
-    reports: "Analytics & insights",
+    pipeline: pipelineData
+      ? `${pipelineData.totalDeals} deals · ${formatCurrency(pipelineData.totalWeightedRevenue)} weighted`
+      : "Sales pipeline & deals",
+    revenue: "Monthly GTV & revenue analysis",
+    forecast: forecastData
+      ? `${formatCurrency(forecastData.currentMonthlyRevenue)}/mo base revenue`
+      : "Revenue forecast & projections",
+    reports: "Analytics & conversion metrics",
   }
 
   return (
@@ -143,7 +189,7 @@ export default function CrmPage() {
                 margin: 0,
               }}
             >
-              CRM
+              Revenue Intelligence
             </h1>
             <p
               style={{
@@ -173,7 +219,7 @@ export default function CrmPage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  padding: "6px 16px",
+                  padding: "6px 14px",
                   fontSize: 11,
                   fontFamily: "'DM Sans', sans-serif",
                   fontWeight: 500,
@@ -192,26 +238,38 @@ export default function CrmPage() {
           </div>
         </div>
 
-        <button className="header-btn" onClick={openNewContact}>
-          + New Contact
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {activeTab === "pipeline" && (
+            <button className="header-btn" onClick={openNewDeal}>
+              + New Deal
+            </button>
+          )}
+          <button className="header-btn" onClick={openNewContact}>
+            + New Contact
+          </button>
+        </div>
       </div>
 
       {/* ── Tab Content ── */}
       <div style={{ padding: "28px 32px" }}>
-        {activeTab === "pipeline" && (
-          <PipelineTab
-            contacts={contacts}
-            onDrop={handleDrop}
-            onCardClick={handleCardClick}
-          />
+        {activeTab === "overview" && (
+          <OverviewTab data={overview} />
         )}
 
         {activeTab === "clients" && (
-          <ClientsTab
-            contacts={contacts}
-            employees={employees}
-          />
+          <ClientsTab contacts={contacts} employees={employees} />
+        )}
+
+        {activeTab === "pipeline" && (
+          <CroPipelineTab data={pipelineData} onNewDeal={openNewDeal} />
+        )}
+
+        {activeTab === "revenue" && (
+          <RevenueTab data={metricsData} />
+        )}
+
+        {activeTab === "forecast" && (
+          <ForecastTab data={forecastData} />
         )}
 
         {activeTab === "reports" && (
@@ -221,14 +279,24 @@ export default function CrmPage() {
 
       {/* ── Contact Modal ── */}
       <ContactModal
-        show={showModal}
+        show={showContactModal}
         onClose={() => {
-          setShowModal(false)
+          setShowContactModal(false)
           setEditingContact(null)
         }}
         contact={editingContact}
         employees={employees}
-        onSaved={handleSaved}
+        onSaved={handleContactSaved}
+      />
+
+      {/* ── Deal Modal ── */}
+      <DealModal
+        show={showDealModal}
+        onClose={() => setShowDealModal(false)}
+        deal={null}
+        contacts={contacts}
+        employees={employees}
+        onSaved={handleDealSaved}
       />
     </div>
   )

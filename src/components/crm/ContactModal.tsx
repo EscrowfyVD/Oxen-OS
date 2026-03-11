@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import {
   CARD_BG, CARD_BORDER, TEXT_TERTIARY, RED, FROST,
-  SECTORS, STATUSES, SOURCES, labelStyle,
+  SECTORS, STATUSES, SOURCES, SEGMENTS, labelStyle,
 } from "./constants"
 import type { Contact, Employee, ContactFormData } from "./types"
 
@@ -31,11 +31,18 @@ const emptyForm: ContactFormData = {
   whatsapp: "",
   website: "",
   notes: "",
+  healthStatus: "healthy",
+  monthlyGtv: "",
+  monthlyRevenue: "",
+  takeRate: "",
+  segment: "",
+  projectedVolume: "",
 }
 
 export default function ContactModal({ show, onClose, contact, employees, onSaved }: ContactModalProps) {
   const [form, setForm] = useState<ContactFormData>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [showCro, setShowCro] = useState(false)
 
   useEffect(() => {
     if (contact) {
@@ -55,9 +62,20 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
         whatsapp: contact.whatsapp || "",
         website: contact.website || "",
         notes: contact.notes || "",
+        healthStatus: contact.healthStatus || "healthy",
+        monthlyGtv: contact.monthlyGtv != null ? String(contact.monthlyGtv) : "",
+        monthlyRevenue: contact.monthlyRevenue != null ? String(contact.monthlyRevenue) : "",
+        takeRate: contact.takeRate != null ? String(contact.takeRate) : "",
+        segment: contact.segment || "",
+        projectedVolume: contact.projectedVolume != null ? String(contact.projectedVolume) : "",
       })
+      // Show CRO section if any CRO fields are filled
+      if (contact.monthlyGtv || contact.monthlyRevenue || contact.takeRate || contact.segment) {
+        setShowCro(true)
+      }
     } else {
       setForm(emptyForm)
+      setShowCro(false)
     }
   }, [contact, show])
 
@@ -93,6 +111,12 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           whatsapp: form.whatsapp.trim() || null,
           website: form.website.trim() || null,
           notes: form.notes.trim() || null,
+          healthStatus: form.healthStatus || "healthy",
+          monthlyGtv: form.monthlyGtv || null,
+          monthlyRevenue: form.monthlyRevenue || null,
+          takeRate: form.takeRate || null,
+          segment: form.segment || null,
+          projectedVolume: form.projectedVolume || null,
         }),
       })
       onSaved()
@@ -157,13 +181,7 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
             zIndex: 1,
           }}
         >
-          <span
-            style={{
-              fontFamily: "'Bellfair', serif",
-              fontSize: 18,
-              color: FROST,
-            }}
-          >
+          <span style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: FROST }}>
             {contact ? "Edit Contact" : "New Contact"}
           </span>
           <button
@@ -188,22 +206,11 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Name *</label>
-              <input
-                className="oxen-input"
-                value={form.name}
-                onChange={(e) => set("name", e.target.value)}
-                placeholder="Contact name"
-                autoFocus
-              />
+              <input className="oxen-input" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Contact name" autoFocus />
             </div>
             <div>
               <label style={labelStyle}>Company</label>
-              <input
-                className="oxen-input"
-                value={form.company}
-                onChange={(e) => set("company", e.target.value)}
-                placeholder="Company name"
-              />
+              <input className="oxen-input" value={form.company} onChange={(e) => set("company", e.target.value)} placeholder="Company name" />
             </div>
           </div>
 
@@ -211,22 +218,11 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Email</label>
-              <input
-                className="oxen-input"
-                type="email"
-                value={form.email}
-                onChange={(e) => set("email", e.target.value)}
-                placeholder="email@example.com"
-              />
+              <input className="oxen-input" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="email@example.com" />
             </div>
             <div>
               <label style={labelStyle}>Phone</label>
-              <input
-                className="oxen-input"
-                value={form.phone}
-                onChange={(e) => set("phone", e.target.value)}
-                placeholder="+971..."
-              />
+              <input className="oxen-input" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+971..." />
             </div>
           </div>
 
@@ -234,31 +230,15 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Sector</label>
-              <select
-                className="oxen-input"
-                value={form.sector}
-                onChange={(e) => set("sector", e.target.value)}
-                style={{ appearance: "none" }}
-              >
+              <select className="oxen-input" value={form.sector} onChange={(e) => set("sector", e.target.value)} style={{ appearance: "none" }}>
                 <option value="">Select sector...</option>
-                {SECTORS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
+                {SECTORS.map((s) => (<option key={s} value={s}>{s}</option>))}
               </select>
             </div>
             <div>
               <label style={labelStyle}>Status</label>
-              <select
-                className="oxen-input"
-                value={form.status}
-                onChange={(e) => set("status", e.target.value)}
-                style={{ appearance: "none" }}
-              >
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </option>
-                ))}
+              <select className="oxen-input" value={form.status} onChange={(e) => set("status", e.target.value)} style={{ appearance: "none" }}>
+                {STATUSES.map((s) => (<option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>))}
               </select>
             </div>
           </div>
@@ -267,35 +247,16 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Source</label>
-              <select
-                className="oxen-input"
-                value={form.source}
-                onChange={(e) => set("source", e.target.value)}
-                style={{ appearance: "none" }}
-              >
+              <select className="oxen-input" value={form.source} onChange={(e) => set("source", e.target.value)} style={{ appearance: "none" }}>
                 <option value="">Select source...</option>
-                {SOURCES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
+                {SOURCES.map((s) => (<option key={s} value={s}>{s}</option>))}
               </select>
             </div>
             <div>
               <label style={labelStyle}>Deal Value</label>
               <div style={{ display: "flex", gap: 6 }}>
-                <input
-                  className="oxen-input"
-                  type="number"
-                  value={form.value}
-                  onChange={(e) => set("value", e.target.value)}
-                  placeholder="0"
-                  style={{ flex: 1 }}
-                />
-                <select
-                  className="oxen-input"
-                  value={form.currency}
-                  onChange={(e) => set("currency", e.target.value)}
-                  style={{ width: 70, appearance: "none" }}
-                >
+                <input className="oxen-input" type="number" value={form.value} onChange={(e) => set("value", e.target.value)} placeholder="0" style={{ flex: 1 }} />
+                <select className="oxen-input" value={form.currency} onChange={(e) => set("currency", e.target.value)} style={{ width: 70, appearance: "none" }}>
                   <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
                   <option value="GBP">GBP</option>
@@ -309,28 +270,14 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Assigned To</label>
-              <select
-                className="oxen-input"
-                value={form.assignedTo}
-                onChange={(e) => set("assignedTo", e.target.value)}
-                style={{ appearance: "none" }}
-              >
+              <select className="oxen-input" value={form.assignedTo} onChange={(e) => set("assignedTo", e.target.value)} style={{ appearance: "none" }}>
                 <option value="">Unassigned</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.name}>
-                    {emp.name} — {emp.role}
-                  </option>
-                ))}
+                {employees.map((emp) => (<option key={emp.id} value={emp.name}>{emp.name} — {emp.role}</option>))}
               </select>
             </div>
             <div>
               <label style={labelStyle}>Country</label>
-              <input
-                className="oxen-input"
-                value={form.country}
-                onChange={(e) => set("country", e.target.value)}
-                placeholder="e.g. UAE, Malta..."
-              />
+              <input className="oxen-input" value={form.country} onChange={(e) => set("country", e.target.value)} placeholder="e.g. UAE, Malta..." />
             </div>
           </div>
 
@@ -338,36 +285,91 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={labelStyle}>Telegram</label>
-              <input
-                className="oxen-input"
-                value={form.telegram}
-                onChange={(e) => set("telegram", e.target.value)}
-                placeholder="@handle"
-              />
+              <input className="oxen-input" value={form.telegram} onChange={(e) => set("telegram", e.target.value)} placeholder="@handle" />
             </div>
             <div>
               <label style={labelStyle}>WhatsApp</label>
-              <input
-                className="oxen-input"
-                value={form.whatsapp}
-                onChange={(e) => set("whatsapp", e.target.value)}
-                placeholder="+971..."
-              />
+              <input className="oxen-input" value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} placeholder="+971..." />
             </div>
           </div>
 
           {/* Row 7: Website */}
           <div>
             <label style={labelStyle}>Website</label>
-            <input
-              className="oxen-input"
-              value={form.website}
-              onChange={(e) => set("website", e.target.value)}
-              placeholder="https://..."
-            />
+            <input className="oxen-input" value={form.website} onChange={(e) => set("website", e.target.value)} placeholder="https://..." />
           </div>
 
-          {/* Row 8: Notes */}
+          {/* ── CRO Section Toggle ── */}
+          <div
+            onClick={() => setShowCro(!showCro)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+              padding: "6px 0",
+              borderTop: "1px solid rgba(255,255,255,0.03)",
+              marginTop: 4,
+            }}
+          >
+            <span style={{ fontSize: 12, color: TEXT_TERTIARY, transition: "transform 0.2s", transform: showCro ? "rotate(180deg)" : "rotate(0)" }}>
+              ▾
+            </span>
+            <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+              Revenue Intelligence
+            </span>
+          </div>
+
+          {showCro && (
+            <>
+              {/* CRO Row 1: Segment, Health Status */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Segment</label>
+                  <select className="oxen-input" value={form.segment} onChange={(e) => set("segment", e.target.value)} style={{ appearance: "none" }}>
+                    <option value="">Select segment...</option>
+                    {SEGMENTS.map((s) => (<option key={s} value={s}>{s}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Health Status</label>
+                  <select className="oxen-input" value={form.healthStatus} onChange={(e) => set("healthStatus", e.target.value)} style={{ appearance: "none" }}>
+                    <option value="healthy">Healthy</option>
+                    <option value="watch">Watch</option>
+                    <option value="at_risk">At Risk</option>
+                    <option value="declining">Declining</option>
+                    <option value="churned">Churned</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* CRO Row 2: Monthly GTV, Monthly Revenue */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Monthly GTV (€)</label>
+                  <input className="oxen-input" type="number" value={form.monthlyGtv} onChange={(e) => set("monthlyGtv", e.target.value)} placeholder="0" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Monthly Revenue (€)</label>
+                  <input className="oxen-input" type="number" value={form.monthlyRevenue} onChange={(e) => set("monthlyRevenue", e.target.value)} placeholder="0" />
+                </div>
+              </div>
+
+              {/* CRO Row 3: Take Rate, Projected Volume */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Take Rate (%)</label>
+                  <input className="oxen-input" type="number" step="0.01" value={form.takeRate} onChange={(e) => set("takeRate", e.target.value)} placeholder="1.0" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Projected Volume (€)</label>
+                  <input className="oxen-input" type="number" value={form.projectedVolume} onChange={(e) => set("projectedVolume", e.target.value)} placeholder="0" />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Notes */}
           <div>
             <label style={labelStyle}>Notes</label>
             <textarea
@@ -376,11 +378,7 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
               onChange={(e) => set("notes", e.target.value)}
               placeholder="Add notes about this contact..."
               rows={3}
-              style={{
-                resize: "vertical",
-                minHeight: 60,
-                fontFamily: "'DM Sans', sans-serif",
-              }}
+              style={{ resize: "vertical", minHeight: 60, fontFamily: "'DM Sans', sans-serif" }}
             />
           </div>
         </div>
@@ -411,23 +409,15 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
                   cursor: saving ? "not-allowed" : "pointer",
                   transition: "all 0.15s ease",
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(248,113,113,0.15)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(248,113,113,0.08)"
-                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(248,113,113,0.15)" }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(248,113,113,0.08)" }}
               >
                 Delete
               </button>
             )}
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <button
-              className="btn-secondary"
-              onClick={onClose}
-              style={{ padding: "8px 18px" }}
-            >
+            <button className="btn-secondary" onClick={onClose} style={{ padding: "8px 18px" }}>
               Cancel
             </button>
             <button
