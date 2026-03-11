@@ -1,154 +1,235 @@
 "use client"
 
-import PageHeader from "@/components/layout/PageHeader"
+import { useState, useEffect, useCallback } from "react"
+import PipelineTab from "@/components/crm/PipelineTab"
+import ClientsTab from "@/components/crm/ClientsTab"
+import ReportsTab from "@/components/crm/ReportsTab"
+import ContactModal from "@/components/crm/ContactModal"
+import type { Contact, Employee, CrmStats } from "@/components/crm/types"
 
-const features = [
-  {
-    icon: "\uD83D\uDCCA",
-    label: "Pipelines",
-    desc: "Track deal stages",
-    color: "#5B9BBF",
-  },
-  {
-    icon: "\uD83D\uDC64",
-    label: "Contacts",
-    desc: "Manage relationships",
-    color: "#5CB868",
-  },
-  {
-    icon: "\uD83D\uDCB0",
-    label: "Deals",
-    desc: "Monitor revenue",
-    color: "#E5C453",
-  },
-  {
-    icon: "\uD83D\uDCE7",
-    label: "Outreach",
-    desc: "Email campaigns",
-    color: "#9B7FD4",
-  },
+/* ── Design tokens ── */
+const CARD_BORDER = "rgba(255,255,255,0.06)"
+const TEXT_PRIMARY = "#F0F0F2"
+const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
+const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const ROSE_GOLD = "#C08B88"
+const FROST = "#FFFFFF"
+
+type TabId = "pipeline" | "clients" | "reports"
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "pipeline", label: "Pipeline" },
+  { id: "clients", label: "Clients" },
+  { id: "reports", label: "Reports" },
 ]
 
 export default function CrmPage() {
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [stats, setStats] = useState<CrmStats | null>(null)
+  const [activeTab, setActiveTab] = useState<TabId>("pipeline")
+  const [showModal, setShowModal] = useState(false)
+  const [editingContact, setEditingContact] = useState<Contact | null>(null)
+
+  /* ── Fetch contacts ── */
+  const fetchContacts = useCallback(() => {
+    fetch("/api/contacts")
+      .then((r) => r.json())
+      .then((data) => setContacts(data.contacts ?? []))
+      .catch(() => {})
+  }, [])
+
+  /* ── Fetch employees ── */
+  const fetchEmployees = useCallback(() => {
+    fetch("/api/employees")
+      .then((r) => r.json())
+      .then((data) => setEmployees(data.employees ?? []))
+      .catch(() => {})
+  }, [])
+
+  /* ── Fetch stats ── */
+  const fetchStats = useCallback(() => {
+    fetch("/api/contacts/stats")
+      .then((r) => r.json())
+      .then((data) => setStats(data.stats ?? null))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetchContacts()
+    fetchEmployees()
+    fetchStats()
+  }, [fetchContacts, fetchEmployees, fetchStats])
+
+  /* ── Pipeline value ── */
+  const pipelineValue = contacts
+    .filter((c) => c.status !== "lost")
+    .reduce((sum, c) => sum + (c.value ?? 0), 0)
+
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(val)
+
+  /* ── Handlers ── */
+  const handleDrop = async (contactId: string, newStatus: string) => {
+    try {
+      await fetch(`/api/contacts/${contactId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      fetchContacts()
+      fetchStats()
+    } catch {
+      /* silent */
+    }
+  }
+
+  const handleCardClick = (contact: Contact) => {
+    setEditingContact(contact)
+    setShowModal(true)
+  }
+
+  const openNewContact = () => {
+    setEditingContact(null)
+    setShowModal(true)
+  }
+
+  const handleSaved = () => {
+    setShowModal(false)
+    setEditingContact(null)
+    fetchContacts()
+    fetchStats()
+  }
+
+  const tabDescriptions: Record<TabId, string> = {
+    pipeline: `Pipeline · ${formatCurrency(pipelineValue)} total value`,
+    clients: `${contacts.length} contact${contacts.length !== 1 ? "s" : ""} in database`,
+    reports: "Analytics & insights",
+  }
+
   return (
-    <div className="page-content">
-      <PageHeader
-        title="CRM"
-        description="Customer relationship management"
-      />
-
-      <div className="flex flex-col items-center justify-center" style={{ padding: "40px 0" }}>
-        <div
-          className="card"
-          style={{
-            overflow: "hidden",
-            maxWidth: 480,
-            width: "100%",
-            textAlign: "center",
-          }}
-        >
-          {/* Header */}
-          <div
-            style={{
-              padding: "32px 32px 24px",
-              background: "linear-gradient(135deg, rgba(192,139,136,0.08), transparent)",
-            }}
-          >
-            <div
-              className="flex items-center justify-center"
+    <div className="page-content" style={{ padding: 0 }}>
+      {/* ── Header ── */}
+      <div
+        className="sticky-header"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "16px 32px",
+          background: "rgba(6,7,9,0.88)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          borderBottom: `1px solid ${CARD_BORDER}`,
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+          <div>
+            <h1
               style={{
-                width: 72,
-                height: 72,
-                borderRadius: 18,
-                background: "var(--rose-dim)",
-                margin: "0 auto 20px",
-              }}
-            >
-              <span style={{ fontSize: 32 }}>{"\uD83D\uDD04"}</span>
-            </div>
-
-            <h2
-              style={{
-                fontSize: 22,
-                fontWeight: 400,
                 fontFamily: "'Bellfair', serif",
-                color: "var(--text)",
-                marginBottom: 8,
+                fontSize: 28,
+                fontWeight: 400,
+                color: FROST,
+                lineHeight: 1.2,
+                margin: 0,
               }}
             >
-              Coming Soon
-            </h2>
-
+              CRM
+            </h1>
             <p
               style={{
-                fontSize: 13,
-                color: "var(--text-dim)",
-                lineHeight: 1.6,
-                maxWidth: 320,
-                margin: "0 auto",
+                fontSize: 12,
+                color: TEXT_TERTIARY,
+                marginTop: 4,
+                fontFamily: "'DM Sans', sans-serif",
+                lineHeight: 1.4,
               }}
             >
-              The CRM module is under development. Track clients,
-              manage pipelines, and monitor deal flow all in one place.
+              {tabDescriptions[activeTab]}
             </p>
           </div>
 
-          {/* Feature grid */}
+          {/* Tab switcher */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 1,
-              background: "var(--border)",
-              borderTop: "1px solid var(--border)",
+              display: "flex",
+              gap: 2,
+              background: "rgba(255,255,255,0.04)",
+              borderRadius: 8,
+              padding: 3,
             }}
           >
-            {features.map((f) => (
-              <div
-                key={f.label}
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
                 style={{
-                  padding: "20px 16px",
-                  background: "var(--bg-card)",
-                  textAlign: "center",
+                  padding: "6px 16px",
+                  fontSize: 11,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 500,
+                  letterSpacing: 0.3,
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  background: activeTab === tab.id ? "rgba(192,139,136,0.15)" : "transparent",
+                  color: activeTab === tab.id ? TEXT_PRIMARY : TEXT_SECONDARY,
                 }}
               >
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: `${f.color}18`,
-                    margin: "0 auto 10px",
-                    fontSize: 18,
-                  }}
-                >
-                  {f.icon}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--text)",
-                    fontFamily: "'DM Sans', sans-serif",
-                    marginBottom: 2,
-                  }}
-                >
-                  {f.label}
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-dim)",
-                  }}
-                >
-                  {f.desc}
-                </div>
-              </div>
+                {tab.label}
+              </button>
             ))}
           </div>
         </div>
+
+        <button className="header-btn" onClick={openNewContact}>
+          + New Contact
+        </button>
       </div>
+
+      {/* ── Tab Content ── */}
+      <div style={{ padding: "28px 32px" }}>
+        {activeTab === "pipeline" && (
+          <PipelineTab
+            contacts={contacts}
+            onDrop={handleDrop}
+            onCardClick={handleCardClick}
+          />
+        )}
+
+        {activeTab === "clients" && (
+          <ClientsTab
+            contacts={contacts}
+            employees={employees}
+          />
+        )}
+
+        {activeTab === "reports" && (
+          <ReportsTab stats={stats} />
+        )}
+      </div>
+
+      {/* ── Contact Modal ── */}
+      <ContactModal
+        show={showModal}
+        onClose={() => {
+          setShowModal(false)
+          setEditingContact(null)
+        }}
+        contact={editingContact}
+        employees={employees}
+        onSaved={handleSaved}
+      />
     </div>
   )
 }
