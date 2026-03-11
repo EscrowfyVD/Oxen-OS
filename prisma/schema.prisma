@@ -306,3 +306,51 @@ model FinanceGoal {
   createdBy String
   createdAt DateTime @default(now())
 }
+
+// ─── Marketing ───
+
+model SocialMetrics {
+  id          String   @id @default(cuid())
+  platform    String   // "linkedin", "twitter", "telegram", "instagram", "youtube", "tiktok"
+  date        DateTime
+  followers   Int      @default(0)
+  impressions Int      @default(0)
+  engagement  Int      @default(0)
+  clicks      Int      @default(0)
+  posts       Int      @default(0)
+  entity      String   @default("oxen")
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@unique([platform, date, entity])
+}
+
+model ContentIdea {
+  id           String    @id @default(cuid())
+  title        String
+  description  String?   @db.Text
+  platform     String?
+  type         String?
+  status       String    @default("idea")
+  priority     String    @default("medium")
+  scheduledFor DateTime?
+  publishedAt  DateTime?
+  assignedTo   String?
+  tags         String[]
+  notes        String?   @db.Text
+  createdBy    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model MarketingIntel {
+  id        String   @id @default(cuid())
+  type      String   // "competitor", "trend", "tool", "regulation", "opportunity"
+  title     String
+  source    String?
+  summary   String   @db.Text
+  relevance String   @default("medium")
+  tags      String[]
+  createdBy String
+  createdAt DateTime @default(now())
+}
