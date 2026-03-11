@@ -89,6 +89,11 @@ export default function CalendarPage() {
     setSyncMessage(null)
     try {
       const res = await fetch("/api/calendar/sync-all", { method: "POST" })
+      if (res.status === 401) {
+        setSyncMessage("Not signed in — please sign in first")
+        setSyncing(false)
+        return
+      }
       const data = await res.json()
       if (res.ok) {
         setSyncMessage(`Synced ${data.synced} events from ${data.users} calendars`)
