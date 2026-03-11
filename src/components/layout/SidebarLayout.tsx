@@ -25,11 +25,11 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
     return (
       <div
         className="flex items-center justify-center"
-        style={{ background: "var(--bg)", minHeight: "100vh" }}
+        style={{ background: "var(--void)", minHeight: "100vh" }}
       >
         <div
           className="text-sm"
-          style={{ color: "var(--text-dim)" }}
+          style={{ color: "var(--text-tertiary)" }}
         >
           Loading...
         </div>
@@ -38,12 +38,13 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen" style={{ background: "var(--void)" }}>
       <Sidebar />
       <main
-        className="flex-1 md:ml-[260px] p-6 md:p-8"
-        style={{ background: "var(--bg)", minHeight: "100vh" }}
+        className="main-content flex-1 md:ml-[220px]"
+        style={{ background: "var(--void)", minHeight: "100vh", position: "relative" }}
       >
+        <div className="accent-line" />
         {children}
       </main>
     </div>

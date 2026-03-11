@@ -63,6 +63,12 @@ model Employee {
   department  String
   location    String?
   email       String?
+  phone       String?
+  telegram    String?
+  whatsapp    String?
+  timezone    String?
+  workHours   String?
+  entity      String?
   avatarColor String
   managerId   String?
   manager     Employee?  @relation("Management", fields: [managerId], references: [id])
@@ -71,6 +77,37 @@ model Employee {
   isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+}
+
+// ─── Tasks (Kanban) ───
+
+model Task {
+  id        String    @id @default(cuid())
+  title     String
+  tag       String
+  priority  String    @default("medium")
+  assignee  String?
+  deadline  DateTime?
+  column    String    @default("todo")
+  order     Int       @default(0)
+  createdBy String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// ─── Organigramme (Legal Structure) ───
+
+model OrgEntity {
+  id           String      @id @default(cuid())
+  name         String
+  jurisdiction String?
+  type         String      @default("Operating Entity")
+  parentId     String?
+  parent       OrgEntity?  @relation("OrgStructure", fields: [parentId], references: [id])
+  children     OrgEntity[] @relation("OrgStructure")
+  order        Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
 
 // ─── Wiki ───

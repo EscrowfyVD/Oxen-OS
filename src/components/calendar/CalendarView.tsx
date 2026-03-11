@@ -97,8 +97,8 @@ export default function CalendarView({
               <div
                 style={{
                   fontSize: 20,
-                  fontWeight: 700,
-                  fontFamily: "'Playfair Display', serif",
+                  fontWeight: 400,
+                  fontFamily: "'Bellfair', serif",
                   color: isToday ? "var(--rose)" : "var(--text)",
                   marginTop: 2,
                 }}

@@ -70,8 +70,8 @@ export default function CrmPage() {
             <h2
               style={{
                 fontSize: 22,
-                fontWeight: 700,
-                fontFamily: "'Playfair Display', serif",
+                fontWeight: 400,
+                fontFamily: "'Bellfair', serif",
                 color: "var(--text)",
                 marginBottom: 8,
               }}

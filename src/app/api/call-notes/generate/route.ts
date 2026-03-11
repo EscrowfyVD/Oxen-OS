@@ -9,23 +9,23 @@ COMPLETE CSS DESIGN SYSTEM (you MUST include all of this in the generated HTML):
 
 \`\`\`css
 :root {
-  --bg: #0F1419;
-  --bg-elevated: #141A20;
-  --bg-card: #171E25;
-  --bg-card-hover: #1C242C;
-  --bg-input: #111820;
+  --bg: #060709;
+  --bg-elevated: #0D0F14;
+  --bg-card: #0F1118;
+  --bg-card-hover: #141620;
+  --bg-input: #0A0C10;
   --rose: #C08B88;
   --rose-light: #D4A5A2;
   --rose-dim: rgba(192,139,136,0.12);
   --rose-glow: rgba(192,139,136,0.06);
-  --text: #E8E4E0;
-  --text-dim: #6E7681;
-  --text-mid: #9CA3AB;
-  --border: rgba(192,139,136,0.10);
+  --text: #F0F0F2;
+  --text-dim: rgba(240,240,242,0.3);
+  --text-mid: rgba(240,240,242,0.55);
+  --border: rgba(255,255,255,0.06);
   --border-active: rgba(192,139,136,0.30);
-  --green: #5CB868;
-  --yellow: #E5C453;
-  --blue: #5B9BBF;
+  --green: #34D399;
+  --yellow: #FBBF24;
+  --blue: #818CF8;
   --purple: #9B7FD4;
   --orange: #D4885B;
   --teal: #5BB8A8;
@@ -41,6 +41,8 @@ body {
   min-height: 100vh;
   display: flex;
 }
+
+body::before { content:''; position:fixed; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(ellipse at 20% 20%, rgba(192,139,136,0.04) 0%, transparent 50%); pointer-events:none; z-index:0; }
 
 /* SIDEBAR */
 .sidebar {
@@ -71,7 +73,7 @@ body {
   justify-content: center;
   font-weight: 700;
   font-size: 18px;
-  color: #0F1419;
+  color: #060709;
 }
 
 .sidebar-brand .brand-text h1 { font-size: 14px; font-weight: 600; color: var(--text); }
@@ -118,7 +120,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(15,20,25,0.88);
+  background: rgba(6,7,9,0.88);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-bottom: 1px solid var(--border);
@@ -130,23 +132,26 @@ body {
 
 .page-header h2 { font-size: 18px; font-weight: 600; font-family: 'DM Sans', sans-serif; }
 .page-header .page-num {
-  font-family: 'Playfair Display', serif;
+  font-family: 'Bellfair', serif;
   font-size: 14px;
   color: var(--rose);
-  font-weight: 600;
+  font-weight: 400;
   margin-right: 10px;
 }
 
 /* CARDS */
 .card {
+  position: relative;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  transition: border-color 0.2s;
+  transition: all 0.2s;
   margin-bottom: 16px;
 }
 
-.card:hover { border-color: var(--border-active); }
+.card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent); }
+
+.card:hover { border-color: var(--border-active); transform: translateY(-1px); box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
 
 .card-header {
   padding: 14px 20px;
@@ -227,7 +232,7 @@ input::placeholder, textarea::placeholder {
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  color: #0F1419;
+  color: #060709;
   font-weight: 700;
 }
 
@@ -237,7 +242,7 @@ input::placeholder, textarea::placeholder {
 /* BUTTONS */
 .btn-primary {
   background: linear-gradient(135deg, #C08B88, #D4A5A2);
-  color: #0F1419;
+  color: #060709;
   font-weight: 600;
   border: none;
   border-radius: 10px;
@@ -301,21 +306,21 @@ input::placeholder, textarea::placeholder {
 }
 \`\`\`
 
-FONTS: Import both 'DM Sans' and 'Playfair Display' from Google Fonts.
-- Playfair Display: page numbers, section numbers, large decorative numbers
+FONTS: Import both 'DM Sans' and 'Bellfair' from Google Fonts.
+- Bellfair: page numbers, section numbers, large decorative numbers
 - DM Sans: everything else
 
 STRUCTURE:
 - Fixed sidebar (260px) with brand mark "O" (square with border-radius 9px, gradient background, bold O), date info, and page navigation
 - Multiple pages based on meeting topics (use the agenda to determine sections)
-- Each page has: sticky header with page number (Playfair Display) + title, cards with content, checklists with custom checkboxes, and textareas for notes
+- Each page has: sticky header with page number (Bellfair) + title, cards with content, checklists with custom checkboxes, and textareas for notes
 - First page = Agenda overview with clickable tiles for each topic
 - Last page = Summary & Action Items (decision textareas + action items textarea)
 - Navigation: sidebar click, arrow buttons, keyboard arrows
 
 INTERACTIVITY:
 - Custom checkboxes: rose gold gradient when checked, checkmark icon, strikethrough on label
-- Textareas: dark input background (#111820), rose glow on focus
+- Textareas: dark input background (#0A0C10), rose glow on focus
 - Auto-save to localStorage with 500ms debounce (key: 'oxen-call-notes-[ID]')
 - Toast notification "\\u2713 Sauvegard\\u00e9" on save (slides up from bottom right)
 - Export All Notes button \\u2192 markdown file download

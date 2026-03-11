@@ -44,10 +44,10 @@ function LoginContent() {
                 width: 64,
                 height: 64,
                 borderRadius: 14,
-                background: "linear-gradient(135deg, #C08B88, #D4A5A2)",
-                color: "#0F1419",
+                background: "var(--logo-gradient, linear-gradient(135deg, #C08B88, #D4A5A2))",
+                color: "#060709",
                 fontSize: 28,
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: "'Bellfair', serif",
               }}
             >
               O

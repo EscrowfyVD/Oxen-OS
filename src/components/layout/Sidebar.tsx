@@ -2,15 +2,17 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { signOut, useSession } from "next-auth/react"
+import { useSession } from "next-auth/react"
 import { useState } from "react"
 
 const navItems = [
-  { label: "Dashboard", href: "/", icon: "📊", badge: null },
-  { label: "Calendar", href: "/calendar", icon: "📅", badge: null },
-  { label: "Wiki", href: "/wiki", icon: "📝", badge: null },
-  { label: "Organigramme", href: "/org", icon: "👥", badge: null },
-  { label: "CRM", href: "/crm", icon: "🔄", badge: "Soon" },
+  { label: "Dashboard", href: "/", icon: "\u25C6", badge: null, count: null },
+  { label: "Tasks", href: "/tasks", icon: "\u2610", badge: null, count: 12 },
+  { label: "Calendar", href: "/calendar", icon: "\u25F7", badge: null, count: null },
+  { label: "Wiki", href: "/wiki", icon: "\u2630", badge: null, count: null },
+  { label: "Organigramme", href: "/org", icon: "\u2B21", badge: null, count: null },
+  { label: "Team", href: "/team", icon: "\u2687", badge: null, count: null },
+  { label: "CRM", href: "/crm", icon: "\u25CE", badge: "Soon", count: null },
 ]
 
 export default function Sidebar() {
@@ -23,6 +25,15 @@ export default function Sidebar() {
     return pathname.startsWith(href)
   }
 
+  const userInitials = session?.user?.name
+    ? session.user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "?"
+
   return (
     <>
       {/* Mobile toggle */}
@@ -31,13 +42,13 @@ export default function Sidebar() {
         className="fixed top-4 left-4 z-50 md:hidden"
         style={{
           padding: "8px 10px",
-          background: "var(--bg-card)",
-          border: "1px solid var(--border)",
+          background: "var(--card-bg)",
+          border: "1px solid var(--card-border)",
           borderRadius: 10,
           cursor: "pointer",
         }}
       >
-        <span style={{ color: "var(--text)", fontSize: 18 }}>
+        <span style={{ color: "var(--text-primary)", fontSize: 18 }}>
           {mobileOpen ? "\u2715" : "\u2630"}
         </span>
       </button>
@@ -57,71 +68,68 @@ export default function Sidebar() {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{
-          width: 260,
-          background: "var(--bg-elevated)",
-          borderRight: "1px solid var(--border)",
+          width: 220,
+          background: "linear-gradient(180deg, var(--subtle-dark) 0%, var(--void) 100%)",
+          borderRight: "1px solid var(--card-border)",
           transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+          padding: "28px 0",
         }}
       >
-        {/* Brand */}
+        {/* Brand / Logo */}
         <div
           style={{
-            padding: "20px 22px",
-            borderBottom: "1px solid var(--border)",
+            padding: "0 24px 28px",
           }}
         >
           <div className="flex items-center gap-3">
             <div
-              className="flex items-center justify-center font-bold"
+              className="flex items-center justify-center"
               style={{
-                width: 38,
-                height: 38,
-                borderRadius: 9,
-                background: "linear-gradient(135deg, #C08B88, #D4A5A2)",
-                color: "#0F1419",
-                fontSize: 18,
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: "var(--logo-gradient)",
+                flexShrink: 0,
               }}
             >
-              O
-            </div>
-            <div>
-              <div
+              <span
                 style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "var(--text)",
-                  fontFamily: "'DM Sans', sans-serif",
+                  fontFamily: "'Bellfair', serif",
+                  fontSize: 18,
+                  color: "var(--void)",
+                  fontWeight: 400,
+                  lineHeight: 1,
                 }}
               >
-                Oxen OS
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "var(--text-dim)",
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
-              >
-                Internal Dashboard
-              </div>
+                O
+              </span>
             </div>
+            <span
+              style={{
+                fontFamily: "'Bellfair', serif",
+                fontSize: 22,
+                letterSpacing: "3px",
+                background: "var(--logo-gradient)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                lineHeight: 1,
+              }}
+            >
+              OXEN
+            </span>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto" style={{ padding: "12px 10px" }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.1em",
-              color: "var(--text-dim)",
-              padding: "8px 14px 6px",
-            }}
-          >
-            NAVIGATION
-          </div>
+        {/* Nav section label */}
+        <div
+          className="nav-section-label"
+        >
+          Navigation
+        </div>
 
+        {/* Nav items */}
+        <nav className="flex-1 overflow-y-auto" style={{ padding: 0 }}>
           {navItems.map((item) => {
             const active = isActive(item.href)
             return (
@@ -129,43 +137,26 @@ export default function Sidebar() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 no-underline"
+                className={`nav-item${active ? " active" : ""}`}
                 style={{
-                  padding: "9px 14px",
-                  marginBottom: 2,
-                  borderRadius: active ? "0 8px 8px 0" : 8,
-                  fontSize: 13,
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: active ? 500 : 400,
-                  color: active ? "var(--rose)" : "var(--text-mid)",
-                  background: active ? "rgba(192,139,136,0.12)" : "transparent",
-                  borderLeft: active ? "3px solid var(--rose)" : "3px solid transparent",
-                  transition: "all 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  if (!active) {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.04)"
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!active) {
-                    e.currentTarget.style.background = "transparent"
-                  }
+                  textDecoration: "none",
                 }}
               >
-                <span style={{ fontSize: 15 }}>{item.icon}</span>
+                <span className="nav-icon">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
-                {item.badge && (
+                {item.count !== null && (
                   <span
                     style={{
+                      marginLeft: "auto",
                       fontSize: 10,
-                      padding: "2px 8px",
-                      borderRadius: 999,
-                      background: "rgba(255,255,255,0.06)",
-                      color: "var(--text-dim)",
-                      fontWeight: 500,
+                      color: "var(--text-tertiary)",
                     }}
                   >
+                    {item.count}
+                  </span>
+                )}
+                {item.badge && (
+                  <span className="nav-badge">
                     {item.badge}
                   </span>
                 )}
@@ -178,70 +169,54 @@ export default function Sidebar() {
         {session?.user && (
           <div
             style={{
-              padding: "16px 18px",
-              borderTop: "1px solid var(--border)",
+              padding: "16px 24px 0",
+              borderTop: "1px solid var(--card-border)",
+              paddingTop: 20,
             }}
           >
             <div className="flex items-center gap-3">
-              {session.user.image ? (
-                <img
-                  src={session.user.image}
-                  alt=""
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #C08B88, #8B6B68)",
+                  flexShrink: 0,
+                }}
+              >
+                <span
                   style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: "50%",
-                    border: "2px solid var(--border)",
-                  }}
-                />
-              ) : (
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: "50%",
-                    background: "var(--rose-dim)",
-                    color: "var(--rose)",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "#FFFFFF",
+                    lineHeight: 1,
                   }}
                 >
-                  {session.user.name?.[0] ?? "?"}
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
+                  {userInitials}
+                </span>
+              </div>
+              <div className="min-w-0">
                 <div
                   className="truncate"
                   style={{
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: 500,
-                    color: "var(--text)",
+                    color: "var(--text-primary)",
+                    lineHeight: 1.3,
                   }}
                 >
                   {session.user.name}
                 </div>
-                <button
-                  onClick={() => signOut()}
+                <div
                   style={{
-                    fontSize: 11,
-                    color: "var(--text-dim)",
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    fontFamily: "'DM Sans', sans-serif",
-                    transition: "color 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "var(--rose)"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = "var(--text-dim)"
+                    fontSize: 10,
+                    color: "var(--text-tertiary)",
+                    lineHeight: 1.3,
                   }}
                 >
-                  Sign out
-                </button>
+                  CEO
+                </div>
               </div>
             </div>
           </div>

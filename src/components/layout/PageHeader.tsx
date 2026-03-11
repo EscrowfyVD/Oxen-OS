@@ -9,17 +9,27 @@ interface PageHeaderProps {
 export default function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <div
-      className="sticky-header -mx-6 md:-mx-8 px-6 md:px-8 mb-6 flex items-center justify-between"
-      style={{ padding: "16px 24px" }}
+      className="sticky-header flex items-center justify-between"
+      style={{
+        padding: "16px 32px",
+        background: "rgba(6,7,9,0.88)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        borderBottom: "1px solid var(--card-border)",
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+      }}
     >
       <div>
         <h1
           style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: "var(--text)",
-            fontFamily: "'DM Sans', sans-serif",
-            lineHeight: 1.3,
+            fontFamily: "'Bellfair', serif",
+            fontSize: 28,
+            fontWeight: 400,
+            color: "#FFFFFF",
+            lineHeight: 1.2,
+            margin: 0,
           }}
         >
           {title}
@@ -28,9 +38,10 @@ export default function PageHeader({ title, description, actions }: PageHeaderPr
           <p
             style={{
               fontSize: 12,
-              color: "var(--text-dim)",
-              marginTop: 2,
+              color: "var(--text-tertiary)",
+              marginTop: 4,
               fontFamily: "'DM Sans', sans-serif",
+              lineHeight: 1.4,
             }}
           >
             {description}

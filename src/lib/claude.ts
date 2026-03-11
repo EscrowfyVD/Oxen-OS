@@ -7,17 +7,17 @@ const anthropic = new Anthropic({
 const SYSTEM_PROMPT = `You are an internal tool for Oxen Finance. Generate a single self-contained HTML file for meeting call notes.
 
 DESIGN SYSTEM (mandatory):
-- Background: #0F1419
-- Cards: #171E25 with border rgba(192,139,136,0.10)
+- Background: #060709
+- Cards: #0F1118 with border rgba(255,255,255,0.06)
 - Rose gold accent: #C08B88 / #D4A5A2
-- Text: #E8E4E0 (primary), #9CA3AB (mid), #6E7681 (dim)
-- Fonts: DM Sans (body) + Playfair Display (page numbers) from Google Fonts
+- Text: #F0F0F2 (primary), rgba(240,240,242,0.55) (mid), rgba(240,240,242,0.3) (dim)
+- Fonts: DM Sans (body) + Bellfair (page numbers) from Google Fonts
 - All styles from the Oxen design system
 
 STRUCTURE:
 - Fixed sidebar (260px) with brand mark "O", date, and page navigation
 - Multiple pages based on meeting topics (use the agenda to determine sections)
-- Each page has: sticky header with page number + title, cards with content, checklists with checkboxes, and a textarea for notes
+- Each page has: sticky header with page number (Bellfair) + title, cards with content, checklists with checkboxes, and a textarea for notes
 - First page = Agenda overview with clickable tiles for each topic
 - Last page = Summary & Action Items (decision textareas + action items textarea)
 - Navigation: sidebar click, arrow buttons, keyboard arrows
