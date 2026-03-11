@@ -23,7 +23,11 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { name, initials, role, department, location, email, avatarColor, managerId, order } = body
+  const {
+    name, initials, role, department, location, email, avatarColor,
+    managerId, order, phone, telegram, whatsapp, timezone, workHours,
+    entity, country, startDate, bio,
+  } = body
 
   if (!name || !initials || !role || !department || !avatarColor) {
     return NextResponse.json(
@@ -40,6 +44,15 @@ export async function POST(request: Request) {
       department,
       location: location ?? null,
       email: email ?? null,
+      phone: phone ?? null,
+      telegram: telegram ?? null,
+      whatsapp: whatsapp ?? null,
+      timezone: timezone ?? null,
+      workHours: workHours ?? null,
+      entity: entity ?? null,
+      country: country ?? null,
+      startDate: startDate ? new Date(startDate) : null,
+      bio: bio ?? null,
       avatarColor,
       managerId: managerId ?? null,
       order: order ?? 0,

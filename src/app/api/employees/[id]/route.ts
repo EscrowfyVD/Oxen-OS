@@ -14,22 +14,9 @@ export async function PATCH(
   const { id } = await params
   const body = await request.json()
   const {
-    name,
-    initials,
-    role,
-    department,
-    location,
-    email,
-    phone,
-    telegram,
-    whatsapp,
-    timezone,
-    workHours,
-    entity,
-    avatarColor,
-    managerId,
-    order,
-    isActive,
+    name, initials, role, department, location, email, phone,
+    telegram, whatsapp, timezone, workHours, entity, country,
+    startDate, bio, avatarColor, managerId, order, isActive,
   } = body
 
   const existing = await prisma.employee.findUnique({ where: { id } })
@@ -52,6 +39,9 @@ export async function PATCH(
       ...(timezone !== undefined && { timezone }),
       ...(workHours !== undefined && { workHours }),
       ...(entity !== undefined && { entity }),
+      ...(country !== undefined && { country }),
+      ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
+      ...(bio !== undefined && { bio }),
       ...(avatarColor !== undefined && { avatarColor }),
       ...(managerId !== undefined && { managerId }),
       ...(order !== undefined && { order }),
