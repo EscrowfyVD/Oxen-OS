@@ -1,8 +1,23 @@
 "use client"
 
 import { signIn } from "next-auth/react"
+import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams()
+  const error = searchParams.get("error")
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/"
+
+  const errorMessages: Record<string, string> = {
+    OAuthCallbackError: "OAuth callback failed — check Google Cloud Console redirect URIs",
+    OAuthSignin: "Could not start OAuth flow — check Google Client ID/Secret",
+    OAuthAccountNotLinked: "This email is already linked to another account",
+    AccessDenied: "Access denied — only @oxen.finance accounts allowed",
+    Callback: "Callback error — check server logs",
+    Default: "Authentication error — please try again",
+  }
+
   return (
     <div
       className="min-h-screen flex items-center justify-center"
@@ -36,8 +51,25 @@ export default function LoginPage() {
           Internal Dashboard — Sign in with your @oxen.finance account
         </p>
 
+        {error && (
+          <div
+            className="mb-4 p-3 rounded-lg text-xs text-left"
+            style={{
+              background: "rgba(239, 68, 68, 0.1)",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              color: "#ef4444",
+            }}
+          >
+            <div className="font-semibold mb-1">Sign-in error</div>
+            <div>{errorMessages[error] ?? errorMessages.Default}</div>
+            <div className="mt-1" style={{ color: "var(--text-dim)" }}>
+              Code: {error}
+            </div>
+          </div>
+        )}
+
         <button
-          onClick={() => signIn("google", { callbackUrl: "/" })}
+          onClick={() => signIn("google", { callbackUrl })}
           className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
           style={{ padding: "12px 20px" }}
         >
@@ -67,5 +99,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }
