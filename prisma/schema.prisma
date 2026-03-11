@@ -278,3 +278,31 @@ model Deal {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
+
+// ─── Finance ───
+
+model FinanceEntry {
+  id          String   @id @default(cuid())
+  type        String   // "revenue", "expense", "budget"
+  category    String
+  description String?
+  amount      Float
+  currency    String   @default("EUR")
+  date        DateTime
+  entity      String   @default("oxen")
+  recurring   Boolean  @default(false)
+  notes       String?  @db.Text
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FinanceGoal {
+  id        String   @id @default(cuid())
+  metric    String   // "monthly_revenue", "monthly_expense", "profit_margin", "runway_months"
+  target    Float
+  entity    String   @default("oxen")
+  period    String   // "2026-Q1", "2026-03", etc.
+  createdBy String
+  createdAt DateTime @default(now())
+}

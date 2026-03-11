@@ -1,0 +1,78 @@
+import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+
+const VALID_TYPES = ["revenue", "expense", "budget"]
+
+export async function POST(request: Request) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const body = await request.json()
+  const { rows } = body as { rows: Array<Record<string, string>> }
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return NextResponse.json({ error: "rows array is required" }, { status: 400 })
+  }
+
+  const userId = session.user?.id ?? session.user?.email ?? "unknown"
+  const errors: Array<{ row: number; error: string }> = []
+  const valid: Array<{
+    type: string
+    category: string
+    description: string | null
+    amount: number
+    currency: string
+    date: Date
+    entity: string
+    recurring: boolean
+    notes: string | null
+    createdBy: string
+  }> = []
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    const type = (r.type || "").toLowerCase().trim()
+    const category = (r.category || "").trim()
+    const amount = parseFloat(r.amount)
+    const date = r.date ? new Date(r.date) : null
+
+    if (!VALID_TYPES.includes(type)) {
+      errors.push({ row: i + 1, error: `Invalid type: ${r.type}` })
+      continue
+    }
+    if (!category) {
+      errors.push({ row: i + 1, error: "Missing category" })
+      continue
+    }
+    if (isNaN(amount)) {
+      errors.push({ row: i + 1, error: `Invalid amount: ${r.amount}` })
+      continue
+    }
+    if (!date || isNaN(date.getTime())) {
+      errors.push({ row: i + 1, error: `Invalid date: ${r.date}` })
+      continue
+    }
+
+    valid.push({
+      type,
+      category,
+      description: r.description || null,
+      amount,
+      currency: r.currency || "EUR",
+      date,
+      entity: r.entity || "oxen",
+      recurring: r.recurring === "true",
+      notes: r.notes || null,
+      createdBy: userId,
+    })
+  }
+
+  let created = 0
+  if (valid.length > 0) {
+    const result = await prisma.financeEntry.createMany({ data: valid })
+    created = result.count
+  }
+
+  return NextResponse.json({ created, errors, total: rows.length }, { status: 201 })
+}
