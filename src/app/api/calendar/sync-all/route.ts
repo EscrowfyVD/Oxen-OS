@@ -16,7 +16,6 @@ interface GoogleCalendarEvent {
 
 interface GoogleCalendarResponse {
   items?: GoogleCalendarEvent[]
-  error?: { message: string; code: number }
 }
 
 async function fetchCalendarEvents(accessToken: string, timeMin: string, timeMax: string) {
@@ -36,83 +35,61 @@ async function fetchCalendarEvents(accessToken: string, timeMin: string, timeMax
   return { response: res, status: res.status }
 }
 
-export async function POST() {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  const userId = session.user.id
-  const userEmail = session.user.email ?? userId
-
-  // Look up the user's Google account for stored tokens
-  const account = await prisma.account.findFirst({
-    where: { userId, provider: "google" },
-  })
-
-  if (!account) {
-    return NextResponse.json(
-      { error: "No Google account linked. Please sign out and sign in again." },
-      { status: 400 }
-    )
-  }
-
-  if (!account.access_token && !account.refresh_token) {
-    return NextResponse.json(
-      { error: "No tokens stored. Please sign out and sign in again to grant calendar access." },
-      { status: 400 }
-    )
-  }
-
+async function syncUserCalendar(
+  account: { userId: string; providerAccountId: string; access_token: string | null; refresh_token: string | null; expires_at: number | null },
+  userEmail: string
+): Promise<{ synced: number; error?: string }> {
   let accessToken = account.access_token
 
-  // Calculate time range: 1 month ago to 3 months ahead
-  const now = new Date()
-  const timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
-  const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString()
-
-  // Check if token is likely expired (expires_at is seconds since epoch)
+  // Check if token is expired
   const tokenExpired = account.expires_at
     ? account.expires_at * 1000 < Date.now()
-    : true // If no expires_at, assume expired and refresh
+    : true
 
-  // Refresh the token if expired or if we don't have an access_token
+  // Refresh if needed
   if ((tokenExpired || !accessToken) && account.refresh_token) {
     const newToken = await refreshAccessToken(account.refresh_token)
     if (newToken) {
       accessToken = newToken
       await prisma.account.update({
-        where: { provider_providerAccountId: { provider: "google", providerAccountId: account.providerAccountId } },
+        where: {
+          provider_providerAccountId: {
+            provider: "google",
+            providerAccountId: account.providerAccountId,
+          },
+        },
         data: {
           access_token: newToken,
-          expires_at: Math.floor(Date.now() / 1000) + 3600, // Google tokens last 1 hour
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
         },
       })
     } else {
-      return NextResponse.json(
-        { error: "Failed to refresh Google token. Please sign out and sign in again." },
-        { status: 401 }
-      )
+      return { synced: 0, error: `Token refresh failed for ${userEmail}` }
     }
   }
 
   if (!accessToken) {
-    return NextResponse.json(
-      { error: "No valid access token. Please sign out and sign in again." },
-      { status: 401 }
-    )
+    return { synced: 0, error: `No valid token for ${userEmail}` }
   }
 
-  // Fetch events from Google Calendar API
+  const now = new Date()
+  const timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString()
+
   let { response, status } = await fetchCalendarEvents(accessToken, timeMin, timeMax)
 
-  // If 401, try refreshing the token one more time
+  // Retry on 401
   if (status === 401 && account.refresh_token) {
     const newToken = await refreshAccessToken(account.refresh_token)
     if (newToken) {
       accessToken = newToken
       await prisma.account.update({
-        where: { provider_providerAccountId: { provider: "google", providerAccountId: account.providerAccountId } },
+        where: {
+          provider_providerAccountId: {
+            provider: "google",
+            providerAccountId: account.providerAccountId,
+          },
+        },
         data: {
           access_token: newToken,
           expires_at: Math.floor(Date.now() / 1000) + 3600,
@@ -125,12 +102,7 @@ export async function POST() {
   }
 
   if (!response.ok) {
-    const errorText = await response.text()
-    console.error("Google Calendar API error:", status, errorText)
-    return NextResponse.json(
-      { error: "Failed to fetch Google Calendar events", status, details: errorText },
-      { status: 502 }
-    )
+    return { synced: 0, error: `Google API error ${status} for ${userEmail}` }
   }
 
   const calendarData: GoogleCalendarResponse = await response.json()
@@ -139,7 +111,6 @@ export async function POST() {
   let synced = 0
   for (const event of events) {
     if (!event.id || !event.start) continue
-
     const startTime = event.start.dateTime ?? event.start.date
     const endTime = event.end?.dateTime ?? event.end?.date
     if (!startTime || !endTime) continue
@@ -175,5 +146,45 @@ export async function POST() {
     synced++
   }
 
-  return NextResponse.json({ success: true, synced })
+  return { synced }
+}
+
+export async function POST() {
+  const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  // Find all users with Google accounts
+  const accounts = await prisma.account.findMany({
+    where: { provider: "google" },
+    include: { user: { select: { email: true } } },
+  })
+
+  const results: { email: string; synced: number; error?: string }[] = []
+
+  for (const account of accounts) {
+    const email = account.user.email ?? account.userId
+    const result = await syncUserCalendar(
+      {
+        userId: account.userId,
+        providerAccountId: account.providerAccountId,
+        access_token: account.access_token,
+        refresh_token: account.refresh_token,
+        expires_at: account.expires_at,
+      },
+      email
+    )
+    results.push({ email, ...result })
+  }
+
+  const totalSynced = results.reduce((sum, r) => sum + r.synced, 0)
+  const errors = results.filter((r) => r.error)
+
+  return NextResponse.json({
+    success: true,
+    synced: totalSynced,
+    users: results.length,
+    errors: errors.length > 0 ? errors : undefined,
+  })
 }

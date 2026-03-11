@@ -13,6 +13,7 @@ export async function GET(request: Request) {
   const upcoming = searchParams.get("upcoming")
   const start = searchParams.get("start")
   const end = searchParams.get("end")
+  const owners = searchParams.get("owners") // comma-separated emails
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {}
@@ -23,6 +24,14 @@ export async function GET(request: Request) {
     where.startTime = {}
     if (start) where.startTime.gte = new Date(start)
     if (end) where.startTime.lte = new Date(end)
+  }
+
+  // Filter by calendar owners if specified
+  if (owners) {
+    const ownerList = owners.split(",").map((o) => o.trim()).filter(Boolean)
+    if (ownerList.length > 0) {
+      where.calendarOwner = { in: ownerList }
+    }
   }
 
   const dbEvents = await prisma.calendarEvent.findMany({

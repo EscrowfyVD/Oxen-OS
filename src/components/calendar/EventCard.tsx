@@ -9,6 +9,7 @@ export interface CalendarEvent {
   color?: string
   attendees?: string[]
   location?: string
+  calendarOwner?: string
   callNoteId?: string
 }
 
@@ -16,30 +17,11 @@ interface EventCardProps {
   event: CalendarEvent
   onClick: (event: CalendarEvent) => void
   style?: React.CSSProperties
+  ownerColor?: string
 }
 
-const EVENT_COLORS = [
-  "var(--blue)",
-  "var(--green)",
-  "var(--purple)",
-  "var(--orange)",
-  "var(--teal)",
-  "var(--yellow)",
-  "var(--rose)",
-]
-
-function getEventColor(event: CalendarEvent): string {
-  if (event.color) return event.color
-  // Deterministic color from title
-  let hash = 0
-  for (let i = 0; i < event.title.length; i++) {
-    hash = event.title.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return EVENT_COLORS[Math.abs(hash) % EVENT_COLORS.length]
-}
-
-export default function EventCard({ event, onClick, style }: EventCardProps) {
-  const color = getEventColor(event)
+export default function EventCard({ event, onClick, style, ownerColor }: EventCardProps) {
+  const color = ownerColor ?? event.color ?? "var(--rose)"
   const startTime = new Date(event.start).toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
@@ -68,10 +50,18 @@ export default function EventCard({ event, onClick, style }: EventCardProps) {
         {event.title}
       </div>
       <div
-        className="text-[10px] mt-0.5"
+        className="text-[10px] mt-0.5 flex items-center gap-1"
         style={{ color: "var(--text-dim)" }}
       >
-        {startTime} - {endTime}
+        <span>{startTime} - {endTime}</span>
+        {event.calendarOwner && (
+          <>
+            <span style={{ color }}>{"·"}</span>
+            <span className="truncate" style={{ color, maxWidth: 80 }}>
+              {event.calendarOwner.split("@")[0]}
+            </span>
+          </>
+        )}
       </div>
     </button>
   )

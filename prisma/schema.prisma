@@ -101,7 +101,7 @@ model WikiVersion {
 
 model CalendarEvent {
   id            String    @id @default(cuid())
-  googleEventId String    @unique
+  googleEventId String
   title         String
   description   String?
   startTime     DateTime
@@ -113,6 +113,8 @@ model CalendarEvent {
   callNote      CallNote?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  @@unique([googleEventId, calendarOwner])
 }
 
 // ─── Call Notes ───

@@ -8,6 +8,7 @@ interface CalendarViewProps {
   viewMode: "week" | "day"
   currentDate: Date
   onEventClick: (event: CalendarEvent) => void
+  ownerColors?: Record<string, string>
 }
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7) // 7 AM to 8 PM
@@ -40,6 +41,7 @@ export default function CalendarView({
   viewMode,
   currentDate,
   onEventClick,
+  ownerColors,
 }: CalendarViewProps) {
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate])
   const displayDates = viewMode === "week" ? weekDates : [currentDate]
@@ -160,6 +162,11 @@ export default function CalendarView({
                       key={event.id}
                       event={event}
                       onClick={onEventClick}
+                      ownerColor={
+                        event.calendarOwner && ownerColors
+                          ? ownerColors[event.calendarOwner]
+                          : undefined
+                      }
                     />
                   ))}
                 </div>
