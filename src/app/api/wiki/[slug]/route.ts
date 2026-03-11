@@ -16,12 +16,43 @@ export async function GET(
 
   const page = await prisma.wikiPage.findUnique({
     where: { slug },
-    include: { versions: { orderBy: { createdAt: "desc" }, take: 5 } },
+    include: {
+      versions: { orderBy: { createdAt: "desc" }, take: 20 },
+      children: {
+        where: { archived: false },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          icon: true,
+          category: true,
+          updatedAt: true,
+          updatedBy: true,
+        },
+        orderBy: [{ order: "asc" }, { updatedAt: "desc" }],
+      },
+      parent: {
+        select: {
+          id: true, title: true, slug: true, icon: true,
+          parent: { select: { id: true, title: true, slug: true, icon: true } },
+        },
+      },
+    },
   })
 
   if (!page) {
     return NextResponse.json({ error: "Page not found" }, { status: 404 })
   }
+
+  // Increment view count
+  const userId = session.user?.id ?? session.user?.email ?? "unknown"
+  await prisma.wikiPage.update({
+    where: { slug },
+    data: {
+      viewCount: { increment: 1 },
+      lastViewedBy: userId,
+    },
+  })
 
   return NextResponse.json({ page })
 }
@@ -37,7 +68,7 @@ export async function PATCH(
 
   const { slug } = await params
   const body = await request.json()
-  const { title, content, category } = body
+  const { title, content, category, icon, pinned, parentId, order, archived } = body
 
   const existing = await prisma.wikiPage.findUnique({ where: { slug } })
   if (!existing) {
@@ -46,14 +77,27 @@ export async function PATCH(
 
   const userId = session.user?.id ?? session.user?.email ?? "unknown"
 
-  // Create a version snapshot of the current content before updating
-  await prisma.wikiVersion.create({
-    data: {
-      pageId: existing.id,
-      content: existing.content as Prisma.InputJsonValue,
-      editedBy: userId,
-    },
-  })
+  // Create version snapshot if content changed (throttle: max 1 per minute)
+  if (content !== undefined) {
+    const lastVersion = await prisma.wikiVersion.findFirst({
+      where: { pageId: existing.id },
+      orderBy: { createdAt: "desc" },
+    })
+
+    const shouldCreateVersion =
+      !lastVersion ||
+      Date.now() - new Date(lastVersion.createdAt).getTime() > 60000
+
+    if (shouldCreateVersion) {
+      await prisma.wikiVersion.create({
+        data: {
+          pageId: existing.id,
+          content: existing.content as Prisma.InputJsonValue,
+          editedBy: userId,
+        },
+      })
+    }
+  }
 
   const page = await prisma.wikiPage.update({
     where: { slug },
@@ -61,6 +105,11 @@ export async function PATCH(
       ...(title !== undefined && { title }),
       ...(content !== undefined && { content }),
       ...(category !== undefined && { category }),
+      ...(icon !== undefined && { icon }),
+      ...(pinned !== undefined && { pinned }),
+      ...(parentId !== undefined && { parentId }),
+      ...(order !== undefined && { order }),
+      ...(archived !== undefined && { archived }),
       updatedBy: userId,
     },
   })
@@ -84,7 +133,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Page not found" }, { status: 404 })
   }
 
-  await prisma.wikiPage.delete({ where: { slug } })
+  // Soft delete: archive instead of hard delete
+  await prisma.wikiPage.update({
+    where: { slug },
+    data: { archived: true },
+  })
 
   return NextResponse.json({ success: true })
 }

@@ -3,9 +3,9 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
-const navItems = [
+const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: "\u25C6", badge: null, count: null },
   { label: "Tasks", href: "/tasks", icon: "\u2610", badge: null, count: 12 },
   { label: "Calendar", href: "/calendar", icon: "\u25F7", badge: null, count: null },
@@ -19,6 +19,20 @@ export default function Sidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [wikiCount, setWikiCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetch("/api/wiki?limit=1")
+      .then((r) => r.json())
+      .then((data) => { if (data.total != null) setWikiCount(data.total) })
+      .catch(() => {})
+  }, [])
+
+  const navItems = NAV_ITEMS.map((item) =>
+    item.label === "Wiki" && wikiCount !== null
+      ? { ...item, count: wikiCount }
+      : item
+  )
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/"

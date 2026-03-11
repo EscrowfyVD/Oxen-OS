@@ -21,8 +21,10 @@ export async function GET(request: Request) {
   const search = searchParams.get("search")
   const category = searchParams.get("category")
   const limit = searchParams.get("limit")
+  const tree = searchParams.get("tree")
 
-  const where: Record<string, unknown> = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: Record<string, any> = { archived: false }
 
   if (search) {
     where.OR = [
@@ -35,13 +37,52 @@ export async function GET(request: Request) {
     where.category = category
   }
 
+  if (tree === "true") {
+    const pages = await prisma.wikiPage.findMany({
+      where: { archived: false },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        icon: true,
+        category: true,
+        parentId: true,
+        pinned: true,
+        order: true,
+        updatedAt: true,
+        updatedBy: true,
+        viewCount: true,
+      },
+      orderBy: [{ pinned: "desc" }, { order: "asc" }, { updatedAt: "desc" }],
+    })
+    return NextResponse.json({ pages })
+  }
+
   const pages = await prisma.wikiPage.findMany({
     where,
-    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      icon: true,
+      category: true,
+      parentId: true,
+      pinned: true,
+      archived: true,
+      order: true,
+      viewCount: true,
+      createdBy: true,
+      updatedBy: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
     ...(limit ? { take: parseInt(limit, 10) } : {}),
   })
 
-  return NextResponse.json({ pages })
+  const total = await prisma.wikiPage.count({ where: { archived: false } })
+
+  return NextResponse.json({ pages, total })
 }
 
 export async function POST(request: Request) {
@@ -51,18 +92,17 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { title, content, category } = body
+  const { title, content, category, icon, parentId, pinned } = body
 
-  if (!title || !content) {
+  if (!title) {
     return NextResponse.json(
-      { error: "Missing required fields: title, content" },
+      { error: "Missing required field: title" },
       { status: 400 }
     )
   }
 
   let slug = generateSlug(title)
 
-  // Ensure slug uniqueness
   const existing = await prisma.wikiPage.findUnique({ where: { slug } })
   if (existing) {
     slug = `${slug}-${Date.now()}`
@@ -74,8 +114,11 @@ export async function POST(request: Request) {
     data: {
       title,
       slug,
-      content,
+      content: content ?? { type: "doc", content: [{ type: "paragraph" }] },
       category: category ?? null,
+      icon: icon ?? null,
+      parentId: parentId ?? null,
+      pinned: pinned ?? false,
       createdBy: userId,
       updatedBy: userId,
     },

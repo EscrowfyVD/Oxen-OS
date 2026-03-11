@@ -6,8 +6,15 @@ export interface WikiPage {
   id: string
   title: string
   slug: string
-  category: string
+  icon: string | null
+  category: string | null
+  parentId: string | null
+  pinned: boolean
+  archived?: boolean
+  order: number
+  viewCount: number
   createdBy: string
+  updatedBy: string
   createdAt: string
   updatedAt: string
 }
@@ -17,86 +24,78 @@ interface WikiPageCardProps {
 }
 
 const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
-  Process: { bg: "rgba(91,155,191,0.15)", text: "var(--blue)" },
-  Legal: { bg: "rgba(212,136,91,0.15)", text: "var(--orange)" },
-  Product: { bg: "rgba(155,127,212,0.15)", text: "var(--purple)" },
-  HR: { bg: "rgba(92,184,104,0.15)", text: "var(--green)" },
-  General: { bg: "rgba(229,196,83,0.15)", text: "var(--yellow)" },
+  Process: { bg: "rgba(91,155,191,0.15)", text: "#5B9BBF" },
+  Legal: { bg: "rgba(212,136,91,0.15)", text: "#D4885B" },
+  Product: { bg: "rgba(155,127,212,0.15)", text: "#9B7FD4" },
+  HR: { bg: "rgba(92,184,104,0.15)", text: "#5CB868" },
+  Finance: { bg: "rgba(251,191,36,0.15)", text: "#FBBF24" },
+  Compliance: { bg: "rgba(248,113,113,0.15)", text: "#F87171" },
+  General: { bg: "rgba(229,196,83,0.15)", text: "#E5C453" },
 }
 
-function getDefaultCategoryColor() {
-  return { bg: "var(--rose-dim)", text: "var(--rose)" }
+export function getCategoryColor(cat: string | null) {
+  if (!cat) return { bg: "rgba(192,139,136,0.1)", text: "#C08B88" }
+  return CATEGORY_COLORS[cat] ?? { bg: "rgba(192,139,136,0.1)", text: "#C08B88" }
 }
 
 export default function WikiPageCard({ page }: WikiPageCardProps) {
-  const catColors = CATEGORY_COLORS[page.category] ?? getDefaultCategoryColor()
+  const catColors = getCategoryColor(page.category)
 
   const formattedDate = new Date(page.updatedAt).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
   })
 
   return (
     <Link
       href={`/wiki/${page.slug}`}
-      className="card block no-underline interactive-card"
-      style={{ overflow: "hidden" }}
+      style={{
+        display: "block",
+        textDecoration: "none",
+        background: "#0F1118",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 12,
+        overflow: "hidden",
+        transition: "all 0.25s ease",
+        position: "relative",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "rgba(192,139,136,0.15)"
+        e.currentTarget.style.transform = "translateY(-1px)"
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"
+        e.currentTarget.style.transform = "translateY(0)"
+      }}
     >
-      {/* Card header with category */}
-      <div
-        className="flex items-center justify-between"
-        style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid rgba(255,255,255,0.03)",
-          background: "rgba(192,139,136,0.02)",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            padding: "3px 10px",
-            borderRadius: 999,
-            background: catColors.bg,
-            color: catColors.text,
-          }}
-        >
-          {page.category}
-        </span>
-        <span
-          style={{
-            fontSize: 10,
-            color: "var(--text-dim)",
-            fontFamily: "'DM Sans', sans-serif",
-          }}
-        >
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent 0%, rgba(192,139,136,0.15) 50%, transparent 100%)" }} />
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {page.pinned && <span style={{ fontSize: 10, color: "#FBBF24" }} title="Pinned">{"\uD83D\uDCCC"}</span>}
+          {page.category && (
+            <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 8px", borderRadius: 999, background: catColors.bg, color: catColors.text, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: 0.5 }}>
+              {page.category}
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: 10, color: "rgba(240,240,242,0.3)", fontFamily: "'DM Sans', sans-serif" }}>
           {formattedDate}
         </span>
       </div>
 
-      {/* Card body */}
+      {/* Body */}
       <div style={{ padding: "14px 16px" }}>
-        <h3
-          className="truncate"
-          style={{
-            fontSize: 14,
-            fontWeight: 600,
-            color: "var(--text)",
-            fontFamily: "'DM Sans', sans-serif",
-            marginBottom: 6,
-          }}
-        >
-          {page.title}
-        </h3>
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--text-dim)",
-            fontFamily: "'DM Sans', sans-serif",
-          }}
-        >
-          by {page.createdBy}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 18 }}>{page.icon || "\uD83D\uDCDD"}</span>
+          <h3 style={{ fontSize: 14, fontWeight: 500, color: "#F0F0F2", fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>
+            {page.title}
+          </h3>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10, color: "rgba(240,240,242,0.3)", fontFamily: "'DM Sans', sans-serif" }}>
+          <span>by {page.updatedBy}</span>
+          {page.viewCount > 0 && <span>{page.viewCount} views</span>}
         </div>
       </div>
     </Link>
