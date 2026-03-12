@@ -7,7 +7,7 @@ import { useState, useEffect } from "react"
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/", icon: "\u25C6", badge: null, count: null },
-  { label: "AI Agent", href: "/ai", icon: "\uD83E\uDD16", badge: null, count: null },
+  { label: "Sentinel", href: "/ai", icon: "\uD83D\uDEE1\uFE0F", badge: null, count: null },
   { label: "Tasks", href: "/tasks", icon: "\u2610", badge: null, count: 12 },
   { label: "Calendar", href: "/calendar", icon: "\u25F7", badge: null, count: null },
   { label: "Wiki", href: "/wiki", icon: "\u2630", badge: null, count: null },
@@ -155,13 +155,13 @@ export default function Sidebar() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className={`nav-item${active ? " active" : ""}${item.label === "AI Agent" ? " ai-agent-nav" : ""}`}
+                className={`nav-item${active ? " active" : ""}${item.label === "Sentinel" ? " ai-agent-nav" : ""}`}
                 style={{
                   textDecoration: "none",
                 }}
               >
-                <span className={`nav-icon${item.label === "AI Agent" ? " ai-pulse" : ""}`}>{item.icon}</span>
-                <span className="flex-1" style={item.label === "AI Agent" ? { background: "linear-gradient(90deg, #C08B88, #E8C4C0)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" } : undefined}>{item.label}</span>
+                <span className={`nav-icon${item.label === "Sentinel" ? " ai-pulse" : ""}`}>{item.icon}</span>
+                <span className="flex-1" style={item.label === "Sentinel" ? { background: "linear-gradient(90deg, #C08B88, #E8C4C0)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" } : undefined}>{item.label}</span>
                 {item.count !== null && (
                   <span
                     style={{

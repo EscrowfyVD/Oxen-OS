@@ -78,6 +78,7 @@ model Employee {
   manager     Employee?  @relation("Management", fields: [managerId], references: [id])
   reports     Employee[] @relation("Management")
   order       Int        @default(0)
+  isAdmin     Boolean    @default(false)
   isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt

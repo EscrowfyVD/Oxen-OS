@@ -8,11 +8,9 @@ import BriefModal from "@/components/ai/BriefModal"
 import type { AIInsight, MeetingBrief, CalendarEvent } from "@/components/ai/types"
 
 const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
 const ROSE_GOLD = "#C08B88"
-const AMBER = "#FBBF24"
 
 export default function AIPage() {
   const [insights, setInsights] = useState<AIInsight[]>([])
@@ -23,6 +21,18 @@ export default function AIPage() {
   const [viewingBrief, setViewingBrief] = useState<MeetingBrief | null>(null)
   const [digest, setDigest] = useState<string | null>(null)
   const [loadingDigest, setLoadingDigest] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [teamView, setTeamView] = useState(false)
+
+  // Check admin status
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.employee?.isAdmin) setIsAdmin(true)
+      })
+      .catch(() => {})
+  }, [])
 
   const fetchInsights = useCallback(() => {
     fetch("/api/ai/insights")
@@ -31,15 +41,19 @@ export default function AIPage() {
       .catch(() => {})
   }, [])
 
-  const fetchBriefs = useCallback(() => {
-    fetch("/api/ai/briefs")
+  const fetchBriefs = useCallback((tv?: boolean) => {
+    const tvParam = tv !== undefined ? tv : teamView
+    const qs = tvParam ? "?teamView=true" : ""
+    fetch(`/api/ai/briefs${qs}`)
       .then((r) => r.json())
       .then((data) => setBriefs(data.briefs ?? []))
       .catch(() => {})
-  }, [])
+  }, [teamView])
 
-  const fetchEvents = useCallback(() => {
-    fetch("/api/calendar/events?upcoming=true")
+  const fetchEvents = useCallback((tv?: boolean) => {
+    const tvParam = tv !== undefined ? tv : teamView
+    const qs = tvParam ? "&teamView=true" : ""
+    fetch(`/api/calendar/events?upcoming=true${qs}`)
       .then((r) => r.json())
       .then((data) => {
         const evts = (data.events ?? []).map((e: Record<string, unknown>) => ({
@@ -52,13 +66,20 @@ export default function AIPage() {
         setEvents(evts)
       })
       .catch(() => {})
-  }, [])
+  }, [teamView])
 
   useEffect(() => {
     fetchInsights()
     fetchBriefs()
     fetchEvents()
   }, [fetchInsights, fetchBriefs, fetchEvents])
+
+  const toggleTeamView = () => {
+    const newVal = !teamView
+    setTeamView(newVal)
+    fetchBriefs(newVal)
+    fetchEvents(newVal)
+  }
 
   /* ── Handlers ── */
   const runInsightAnalysis = async () => {
@@ -67,7 +88,7 @@ export default function AIPage() {
       const r = await fetch("/api/ai/auto-insights", { method: "POST" })
       const data = await r.json()
       if (data.insights) {
-        fetchInsights() // Refresh the full list
+        fetchInsights()
       }
     } catch { /* silent */ }
     setLoadingInsights(false)
@@ -151,7 +172,7 @@ export default function AIPage() {
                 background: "linear-gradient(90deg, #C08B88, #E8C4C0, #C08B88)",
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               }}>
-                AI Agent
+                Sentinel
               </h1>
               <span style={{
                 padding: "2px 10px", borderRadius: 20, fontSize: 9, fontWeight: 500,
@@ -159,26 +180,45 @@ export default function AIPage() {
                 border: "1px solid rgba(192,139,136,0.2)", color: ROSE_GOLD,
                 fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.5,
               }}>
-                PREMIUM
+                AI SALES INTELLIGENCE
               </span>
             </div>
             <p style={{ fontSize: 12, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", marginTop: 6 }}>
-              Your AI-powered sales intelligence assistant — powered by Claude
+              Sentinel — your AI-powered sales intelligence engine, powered by Claude
             </p>
           </div>
 
-          <button
-            onClick={generateDigest}
-            disabled={loadingDigest}
-            style={{
-              padding: "7px 16px", borderRadius: 8, fontSize: 11, fontWeight: 500,
-              fontFamily: "'DM Sans', sans-serif", cursor: loadingDigest ? "wait" : "pointer",
-              background: "rgba(255,255,255,0.04)", border: `1px solid ${CARD_BORDER}`,
-              color: TEXT_SECONDARY,
-            }}
-          >
-            {loadingDigest ? "Generating..." : "\uD83D\uDCCB Daily Digest"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* Admin Team View toggle */}
+            {isAdmin && (
+              <button
+                onClick={toggleTeamView}
+                style={{
+                  padding: "7px 14px", borderRadius: 8, fontSize: 11, fontWeight: 500,
+                  fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+                  background: teamView ? "rgba(192,139,136,0.12)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${teamView ? "rgba(192,139,136,0.3)" : CARD_BORDER}`,
+                  color: teamView ? ROSE_GOLD : TEXT_SECONDARY,
+                  transition: "all 0.2s",
+                }}
+              >
+                {teamView ? "\uD83D\uDC41 Team View" : "\uD83D\uDC64 My View"}
+              </button>
+            )}
+
+            <button
+              onClick={generateDigest}
+              disabled={loadingDigest}
+              style={{
+                padding: "7px 16px", borderRadius: 8, fontSize: 11, fontWeight: 500,
+                fontFamily: "'DM Sans', sans-serif", cursor: loadingDigest ? "wait" : "pointer",
+                background: "rgba(255,255,255,0.04)", border: `1px solid ${CARD_BORDER}`,
+                color: TEXT_SECONDARY,
+              }}
+            >
+              {loadingDigest ? "Generating..." : "\uD83D\uDCCB Daily Digest"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -209,7 +249,7 @@ export default function AIPage() {
           </div>
         )}
 
-        {/* Section 1: AI Chat */}
+        {/* Section 1: Sentinel Chat */}
         <ChatSection onRefresh={() => { fetchInsights(); fetchBriefs() }} />
 
         {/* Section 2: Insights */}

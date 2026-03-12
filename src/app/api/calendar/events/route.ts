@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   const start = searchParams.get("start")
   const end = searchParams.get("end")
   const owners = searchParams.get("owners") // comma-separated emails
+  const teamView = searchParams.get("teamView") // admin: show all team events
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {}
@@ -31,6 +32,26 @@ export async function GET(request: Request) {
     const ownerList = owners.split(",").map((o) => o.trim()).filter(Boolean)
     if (ownerList.length > 0) {
       where.calendarOwner = { in: ownerList }
+    }
+  }
+
+  // User-scoped visibility: show own calendar + events where user is attendee
+  // Admin with teamView=true bypasses this filter
+  const userEmail = session.user?.email
+  if (userEmail && teamView !== "true") {
+    // Check if user is admin
+    const employee = await prisma.employee.findFirst({
+      where: { email: { equals: userEmail, mode: "insensitive" } },
+      select: { isAdmin: true },
+    })
+    const isAdmin = employee?.isAdmin === true
+
+    if (!isAdmin) {
+      // Non-admin: only see own calendar or events where they're an attendee
+      where.OR = [
+        { calendarOwner: { equals: userEmail, mode: "insensitive" } },
+        { attendees: { has: userEmail } },
+      ]
     }
   }
 

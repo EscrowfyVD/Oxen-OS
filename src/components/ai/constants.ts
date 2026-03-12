@@ -38,10 +38,10 @@ export const SEVERITY_COLORS: Record<string, { dot: string; text: string }> = {
 
 /* ── Quick action chips ── */
 export const QUICK_ACTIONS = [
-  { label: "Prepare next meeting", prompt: "What's my next meeting? Generate a brief for it." },
-  { label: "Show at-risk clients", prompt: "Which clients are at risk of churning or need immediate attention?" },
-  { label: "Weekly digest", prompt: "Give me a weekly digest of pipeline activity, key meetings, and action items." },
-  { label: "Research a company", prompt: "Research " },
+  { label: "Prepare next meeting", prompt: "Sentinel, prepare a brief for my next upcoming meeting." },
+  { label: "Show at-risk clients", prompt: "Sentinel, which clients are at risk of churning or need immediate attention?" },
+  { label: "Weekly digest", prompt: "Sentinel, give me a weekly digest of pipeline activity, key meetings, and action items." },
+  { label: "Research a company", prompt: "Sentinel, research " },
 ]
 
 /* ── Brief sections ── */

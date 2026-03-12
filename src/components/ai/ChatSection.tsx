@@ -218,13 +218,13 @@ export default function ChatSection({ onRefresh }: ChatSectionProps) {
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 16 }}>{"\uD83E\uDD16"}</span>
+          <span style={{ fontSize: 16 }}>{"\uD83D\uDEE1\uFE0F"}</span>
           <span style={{
             fontSize: 13, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
             background: "linear-gradient(90deg, #C08B88, #E8C4C0)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>
-            AI Sales Assistant
+            Sentinel
           </span>
         </div>
         {messages.length > 0 && (
@@ -242,9 +242,9 @@ export default function ChatSection({ onRefresh }: ChatSectionProps) {
       <div style={{ flex: 1, overflow: "auto", padding: "14px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
         {messages.length === 0 && !sending && (
           <div style={{ textAlign: "center", padding: "40px 20px", color: TEXT_TERTIARY }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>{"\uD83E\uDD16"}</div>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>{"\uD83D\uDEE1\uFE0F"}</div>
             <div style={{ fontSize: 14, fontFamily: "'Bellfair', serif", color: TEXT_SECONDARY, marginBottom: 6 }}>
-              Oxen AI Assistant
+              Sentinel
             </div>
             <div style={{ fontSize: 11, lineHeight: 1.6, maxWidth: 340, margin: "0 auto" }}>
               Research companies, prepare meetings, identify opportunities, and manage your pipeline — all powered by your CRM data.
@@ -356,7 +356,7 @@ export default function ChatSection({ onRefresh }: ChatSectionProps) {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage() }
             }}
-            placeholder="Ask anything... research a company, prepare a meeting, find opportunities"
+            placeholder="Ask Sentinel anything... research a company, prepare a meeting, find opportunities"
             rows={1}
             style={{
               flex: 1, background: "transparent", border: "none", outline: "none",
