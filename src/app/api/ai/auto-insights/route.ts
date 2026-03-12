@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
+import { sendTelegramNotification } from "@/lib/telegram"
 
 const anthropic = new Anthropic()
 
@@ -141,6 +142,49 @@ Return the top 10 most important insights, ordered by severity. Be specific and 
         include: { contact: { select: { id: true, name: true, company: true } } },
       })
       savedInsights.push(saved)
+    }
+
+    // Notify via Telegram for critical/high severity insights
+    try {
+      for (const insight of savedInsights) {
+        if (insight.severity === "critical" || insight.severity === "high") {
+          // Find the assignee/owner for the related contact's deals
+          let assigneeEmployee = null
+          if (insight.contactId) {
+            const relatedDeal = await prisma.deal.findFirst({
+              where: { contactId: insight.contactId, stage: { notIn: ["closed_won", "closed_lost"] } },
+              select: { assignedTo: true },
+            })
+            if (relatedDeal?.assignedTo) {
+              assigneeEmployee = await prisma.employee.findFirst({
+                where: { name: { contains: relatedDeal.assignedTo, mode: "insensitive" }, telegramChatId: { not: null } },
+                select: { id: true, name: true },
+              })
+            }
+          }
+
+          // If no specific assignee, notify all sales team members
+          const recipients = assigneeEmployee
+            ? [assigneeEmployee]
+            : await prisma.employee.findMany({
+                where: {
+                  department: { in: ["Sales", "Leadership"] },
+                  telegramChatId: { not: null },
+                },
+                select: { id: true, name: true },
+                take: 5,
+              })
+
+          const emoji = insight.severity === "critical" ? "🚨" : "⚠️"
+          const msg = `${emoji} *${insight.severity.toUpperCase()} Insight — Oxen OS*\n\n*${insight.title}*\n${insight.summary}\n\n${insight.contact ? `Contact: ${insight.contact.name} (${insight.contact.company || "?"})` : ""}`
+
+          for (const r of recipients) {
+            await sendTelegramNotification(r.id, msg)
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Telegram insight notification error:", err)
     }
 
     return NextResponse.json({ insights: savedInsights })

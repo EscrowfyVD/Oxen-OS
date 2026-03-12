@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
+import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
 
 const anthropic = new Anthropic()
 
@@ -149,7 +150,43 @@ Be specific, actionable, and reference real data. If no data available for a sec
       include: { contact: { select: { id: true, name: true, company: true } } },
     })
 
-    return NextResponse.json({ brief })
+    // Auto-send via Telegram to relevant team members
+    const telegramSentTo: string[] = []
+    try {
+      for (const att of (attendees || [])) {
+        const employee = await prisma.employee.findFirst({
+          where: {
+            OR: [
+              { email: { equals: att, mode: "insensitive" } },
+              { name: { contains: att.split("@")[0], mode: "insensitive" } },
+            ],
+            telegramChatId: { not: null },
+          },
+          select: { name: true, telegramChatId: true },
+        })
+        if (!employee?.telegramChatId) continue
+
+        const formatted = formatBriefForTelegram({
+          title,
+          meetingDate: new Date(meetingDate),
+          attendees: attendees || [],
+          briefContent,
+        })
+        const result = await sendTelegramMessage(employee.telegramChatId, formatted)
+        if (result.ok) telegramSentTo.push(employee.name)
+      }
+
+      if (telegramSentTo.length > 0) {
+        await prisma.meetingBrief.update({
+          where: { id: brief.id },
+          data: { sentVia: `telegram:${telegramSentTo.join(",")}` },
+        })
+      }
+    } catch (err) {
+      console.error("Telegram auto-send error:", err)
+    }
+
+    return NextResponse.json({ brief, telegramSentTo })
   } catch (error) {
     console.error("Brief generation error:", error)
     return NextResponse.json({ error: "Failed to generate brief" }, { status: 500 })

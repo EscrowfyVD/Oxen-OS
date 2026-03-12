@@ -64,8 +64,9 @@ model Employee {
   location    String?
   email       String?
   phone       String?
-  telegram    String?
-  whatsapp    String?
+  telegram       String?
+  telegramChatId String?
+  whatsapp       String?
   timezone    String?
   workHours   String?
   entity      String?
