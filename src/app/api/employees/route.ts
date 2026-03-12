@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const body = await request.json()
   const {
     name, initials, role, department, location, email, avatarColor,
-    managerId, order, phone, telegram, whatsapp, timezone, workHours,
+    managerId, order, phone, telegram, telegramChatId, whatsapp, timezone, workHours,
     entity, country, startDate, bio,
   } = body
 
@@ -46,6 +46,7 @@ export async function POST(request: Request) {
       email: email ?? null,
       phone: phone ?? null,
       telegram: telegram ?? null,
+      telegramChatId: telegramChatId ?? null,
       whatsapp: whatsapp ?? null,
       timezone: timezone ?? null,
       workHours: workHours ?? null,

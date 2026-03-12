@@ -15,7 +15,7 @@ export async function PATCH(
   const body = await request.json()
   const {
     name, initials, role, department, location, email, phone,
-    telegram, whatsapp, timezone, workHours, entity, country,
+    telegram, telegramChatId, whatsapp, timezone, workHours, entity, country,
     startDate, bio, avatarColor, managerId, order, isActive,
   } = body
 
@@ -35,6 +35,7 @@ export async function PATCH(
       ...(email !== undefined && { email }),
       ...(phone !== undefined && { phone }),
       ...(telegram !== undefined && { telegram }),
+      ...(telegramChatId !== undefined && { telegramChatId }),
       ...(whatsapp !== undefined && { whatsapp }),
       ...(timezone !== undefined && { timezone }),
       ...(workHours !== undefined && { workHours }),

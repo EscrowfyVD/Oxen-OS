@@ -26,6 +26,7 @@ interface Employee {
   email: string | null
   phone: string | null
   telegram: string | null
+  telegramChatId: string | null
   whatsapp: string | null
   timezone: string | null
   workHours: string | null
@@ -48,6 +49,7 @@ interface MemberForm {
   email: string
   phone: string
   telegram: string
+  telegramChatId: string
   whatsapp: string
   timezone: string
   workHours: string
@@ -65,6 +67,7 @@ const emptyForm = (): MemberForm => ({
   email: "",
   phone: "",
   telegram: "",
+  telegramChatId: "",
   whatsapp: "",
   timezone: "",
   workHours: "",
@@ -231,6 +234,7 @@ export default function TeamPage() {
       email: emp.email ?? "",
       phone: emp.phone ?? "",
       telegram: emp.telegram ?? "",
+      telegramChatId: emp.telegramChatId ?? "",
       whatsapp: emp.whatsapp ?? "",
       timezone: emp.timezone ?? "",
       workHours: emp.workHours ?? "",
@@ -260,6 +264,7 @@ export default function TeamPage() {
             email: form.email || null,
             phone: form.phone || null,
             telegram: form.telegram || null,
+            telegramChatId: form.telegramChatId || null,
             whatsapp: form.whatsapp || null,
             timezone: form.timezone || null,
             workHours: form.workHours || null,
@@ -282,6 +287,7 @@ export default function TeamPage() {
             email: form.email || null,
             phone: form.phone || null,
             telegram: form.telegram || null,
+            telegramChatId: form.telegramChatId || null,
             whatsapp: form.whatsapp || null,
             timezone: form.timezone || null,
             workHours: form.workHours || null,
@@ -902,6 +908,20 @@ export default function TeamPage() {
                     placeholder="+971 50 123 4567"
                   />
                 </div>
+              </div>
+
+              {/* Row 5b: Telegram Chat ID */}
+              <div>
+                <label style={labelStyle}>Telegram Chat ID</label>
+                <input
+                  className="oxen-input"
+                  value={form.telegramChatId}
+                  onChange={(e) => setForm({ ...form, telegramChatId: e.target.value })}
+                  placeholder="Numeric chat ID"
+                />
+                <span style={{ fontSize: 9, color: TEXT_TERTIARY, marginTop: 2, display: "block" }}>
+                  Send /start to @Oxen_deal_info_bot on Telegram to get your ID
+                </span>
               </div>
 
               {/* Row 6: Timezone, Working Hours */}
