@@ -176,14 +176,19 @@ export default function TeamPage() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [form, setForm] = useState<MemberForm>(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [, setTick] = useState(0)
   const [onLeaveToday, setOnLeaveToday] = useState<Set<string>>(new Set())
 
-  const fetchEmployees = () => {
-    fetch("/api/employees")
-      .then((r) => r.json())
-      .then((data) => setEmployees(data.employees ?? []))
-      .catch(() => {})
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch("/api/employees", { cache: "no-store" })
+      if (!res.ok) return
+      const data = await res.json()
+      setEmployees(data.employees ?? [])
+    } catch {
+      /* network error */
+    }
   }
 
   useEffect(() => {
@@ -230,11 +235,13 @@ export default function TeamPage() {
   const openNew = () => {
     setEditingEmployee(null)
     setForm(emptyForm())
+    setError(null)
     setShowModal(true)
   }
 
   const openEdit = (emp: Employee) => {
     setEditingEmployee(emp)
+    setError(null)
     setForm({
       name: emp.name,
       role: emp.role,
@@ -258,10 +265,12 @@ export default function TeamPage() {
   const handleSave = async () => {
     if (!form.name.trim() || !form.role.trim()) return
     setSaving(true)
+    setError(null)
 
     try {
+      let res: Response
       if (editingEmployee) {
-        await fetch(`/api/employees/${editingEmployee.id}`, {
+        res = await fetch(`/api/employees/${editingEmployee.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -284,7 +293,7 @@ export default function TeamPage() {
           }),
         })
       } else {
-        await fetch("/api/employees", {
+        res = await fetch("/api/employees", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -308,10 +317,19 @@ export default function TeamPage() {
           }),
         })
       }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        setError(errData.error || `Save failed (${res.status})`)
+        return
+      }
+
       setShowModal(false)
-      fetchEmployees()
-    } catch {
-      /* silent */
+      setError(null)
+      await fetchEmployees()
+    } catch (err) {
+      console.error("Failed to save employee:", err)
+      setError("Network error — please try again")
     } finally {
       setSaving(false)
     }
@@ -320,12 +338,19 @@ export default function TeamPage() {
   const handleDelete = async () => {
     if (!editingEmployee) return
     setSaving(true)
+    setError(null)
     try {
-      await fetch(`/api/employees/${editingEmployee.id}`, { method: "DELETE" })
+      const res = await fetch(`/api/employees/${editingEmployee.id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        setError(errData.error || `Delete failed (${res.status})`)
+        return
+      }
       setShowModal(false)
-      fetchEmployees()
-    } catch {
-      /* silent */
+      await fetchEmployees()
+    } catch (err) {
+      console.error("Failed to delete employee:", err)
+      setError("Network error — please try again")
     } finally {
       setSaving(false)
     }
@@ -991,6 +1016,24 @@ export default function TeamPage() {
                 />
               </div>
             </div>
+
+            {/* Error message */}
+            {error && (
+              <div
+                style={{
+                  margin: "0 20px 12px",
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: "rgba(248,113,113,0.08)",
+                  border: "1px solid rgba(248,113,113,0.2)",
+                  color: RED,
+                  fontSize: 12,
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
+                {error}
+              </div>
+            )}
 
             {/* Footer */}
             <div
