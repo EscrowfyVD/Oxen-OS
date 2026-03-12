@@ -10,6 +10,7 @@ import {
   labelStyle,
 } from "@/components/crm/constants"
 import type { Contact, Interaction, Employee, Deal } from "@/components/crm/types"
+import CompanyIntelPanel from "@/components/ai/CompanyIntelPanel"
 
 export default function ContactDetailPage() {
   const params = useParams()
@@ -614,7 +615,15 @@ export default function ContactDetailPage() {
           </div>
         </div>
 
-        {/* ── Right Column: Timeline ── */}
+        {/* ── Right Column ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+        {/* AI Company Intel */}
+        <div className="fade-in" style={{ animationDelay: "0.1s" }}>
+          <CompanyIntelPanel contactId={id} />
+        </div>
+
+        {/* Timeline */}
         <div className="card fade-in" style={{ padding: 20, animationDelay: "0.15s" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <span style={{ fontSize: 13, fontFamily: "'Bellfair', serif", color: FROST }}>Timeline</span>
@@ -701,6 +710,7 @@ export default function ContactDetailPage() {
               </div>
             ))}
           </div>
+        </div>
         </div>
       </div>
     </div>

@@ -235,6 +235,9 @@ model Contact {
   metrics         CustomerMetrics[]
   deals           Deal[]
   supportTickets  SupportTicket[]
+  companyIntel    CompanyIntel[]    @relation("ContactIntel")
+  meetingBriefs   MeetingBrief[]   @relation("ContactBriefs")
+  aiInsights      AIInsight[]      @relation("ContactInsights")
 }
 
 model Interaction {
@@ -386,4 +389,65 @@ model SupportMessage {
   content    String        @db.Text
   isInternal Boolean       @default(false)
   createdAt  DateTime      @default(now())
+}
+
+// ─── AI Sales Intelligence Module ───
+
+model CompanyIntel {
+  id             String    @id @default(cuid())
+  contactId      String
+  contact        Contact   @relation("ContactIntel", fields: [contactId], references: [id], onDelete: Cascade)
+  companyName    String
+  website        String?
+  description    String?   @db.Text
+  industry       String?
+  employeeCount  String?
+  revenue        String?
+  headquarters   String?
+  keyPeople      Json?     // [{name, title, linkedin, email}]
+  recentNews     Json?     // [{title, source, url, date, summary, sentiment}]
+  ownership      Json?
+  creditRating   String?
+  lastResearched DateTime?
+  dataSource     String?   // "claude", "manual", "apollo", "clearbit"
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model MeetingBrief {
+  id           String    @id @default(cuid())
+  eventId      String?   @unique
+  contactId    String?
+  contact      Contact?  @relation("ContactBriefs", fields: [contactId], references: [id])
+  title        String
+  meetingDate  DateTime
+  attendees    String[]
+  briefContent Json      // {company_context, relationship_history, recent_news, deal_status, talking_points, risks, opportunities, suggested_ask}
+  status       String    @default("generated")
+  sentVia      String?
+  createdBy    String    @default("ai")
+  createdAt    DateTime  @default(now())
+}
+
+model AIInsight {
+  id           String   @id @default(cuid())
+  type         String   // "opportunity", "risk", "buying_signal", "churn_warning", "upsell", "news_alert", "follow_up_needed", "deal_stuck"
+  title        String
+  summary      String   @db.Text
+  contactId    String?
+  contact      Contact? @relation("ContactInsights", fields: [contactId], references: [id])
+  severity     String   @default("medium")
+  actionable   Boolean  @default(true)
+  dismissed    Boolean  @default(false)
+  actionTaken  String?
+  linkedTaskId String?
+  createdAt    DateTime @default(now())
+}
+
+model AIConversation {
+  id        String   @id @default(cuid())
+  messages  Json     // [{role, content, timestamp}]
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
