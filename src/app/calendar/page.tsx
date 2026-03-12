@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
+import { useRouter } from "next/navigation"
 import PageHeader from "@/components/layout/PageHeader"
 import CalendarView from "@/components/calendar/CalendarView"
+import CallNotesModal from "@/components/calendar/CallNotesModal"
 import type { CalendarEvent } from "@/components/calendar/EventCard"
 import Link from "next/link"
 
@@ -14,24 +16,72 @@ interface TeamMember {
   image: string | null
 }
 
+interface CallNoteItem {
+  id: string
+  title: string
+  date: string
+  createdBy: string
+  createdAt: string
+  eventId: string | null
+  event?: {
+    id: string
+    title: string
+    startTime: string
+    attendees: string[]
+  } | null
+}
+
 const TEAM_COLORS = [
   "#C08B88", "#6BA3D6", "#7BC47F", "#B07CD8",
   "#E0A458", "#5CB8B2", "#D4C75A", "#D87CA3",
 ]
 
 export default function CalendarPage() {
+  const router = useRouter()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>("week")
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
-  const [generatingNotes, setGeneratingNotes] = useState<string | null>(null)
 
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [selectedOwners, setSelectedOwners] = useState<Set<string>>(new Set())
   const [ownerColors, setOwnerColors] = useState<Record<string, string>>({})
   const [absences, setAbsences] = useState<Array<{ id: string; employee: { name: string; initials: string }; type: string; startDate: string; endDate: string }>>([])
+
+  // Admin + Call Notes state
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [callNotes, setCallNotes] = useState<CallNoteItem[]>([])
+  const [showCallNotesModal, setShowCallNotesModal] = useState(false)
+  const [modalEvent, setModalEvent] = useState<{ id: string; title: string; start: string; attendees?: string[]; description?: string } | null>(null)
+  const [searchCallNotes, setSearchCallNotes] = useState("")
+  const uploadRef = useRef<HTMLInputElement>(null)
+
+  // Check admin status
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.employee?.isAdmin) {
+          setIsAdmin(true)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Fetch call notes (admin only)
+  const fetchCallNotes = useCallback(() => {
+    if (!isAdmin) return
+    fetch("/api/call-notes")
+      .then((r) => r.json())
+      .then((data) => setCallNotes(data.notes ?? []))
+      .catch(() => {})
+  }, [isAdmin])
+
+  useEffect(() => {
+    fetchCallNotes()
+  }, [fetchCallNotes])
 
   useEffect(() => {
     fetch("/api/calendar/owners")
@@ -140,25 +190,43 @@ export default function CalendarPage() {
     setTimeout(() => setSyncMessage(null), 5000)
   }
 
-  const handleGenerateCallNotes = async (event: CalendarEvent) => {
-    setGeneratingNotes(event.id)
+  const handleUploadHTML = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
     try {
-      const res = await fetch("/api/call-notes/generate", {
+      const htmlContent = await file.text()
+      const res = await fetch("/api/call-notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId: event.id }),
+        body: JSON.stringify({
+          title: file.name.replace(/\.html?$/i, ""),
+          date: new Date().toISOString(),
+          htmlContent,
+        }),
       })
-      const data = await res.json()
       if (res.ok) {
-        fetchEvents()
-        if (data.callNoteId) {
-          setSelectedEvent({ ...event, callNoteId: data.callNoteId })
-        }
+        fetchCallNotes()
       }
     } catch {
-      // handle error silently
+      // silent
     }
-    setGeneratingNotes(null)
+    // Reset file input
+    if (uploadRef.current) uploadRef.current.value = ""
+  }
+
+  const openPrepareModal = (event?: CalendarEvent) => {
+    if (event) {
+      setModalEvent({
+        id: event.id,
+        title: event.title,
+        start: event.start,
+        attendees: event.attendees,
+        description: event.description,
+      })
+    } else {
+      setModalEvent(null)
+    }
+    setShowCallNotesModal(true)
   }
 
   const navigateDate = (direction: number) => {
@@ -214,6 +282,10 @@ export default function CalendarPage() {
     (e) => !e.calendarOwner || selectedOwners.has(e.calendarOwner)
   )
 
+  const filteredCallNotes = callNotes.filter((n) =>
+    !searchCallNotes || n.title.toLowerCase().includes(searchCallNotes.toLowerCase())
+  )
+
   return (
     <div className="page-content">
       <PageHeader
@@ -231,6 +303,36 @@ export default function CalendarPage() {
               >
                 {syncMessage}
               </span>
+            )}
+            {isAdmin && (
+              <>
+                <button
+                  className="btn-secondary"
+                  onClick={() => openPrepareModal()}
+                  style={{ fontSize: 12 }}
+                >
+                  {"\uD83D\uDCCB"} New Call Notes
+                </button>
+                <label
+                  className="btn-secondary"
+                  style={{
+                    fontSize: 12,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  {"\u2B06"} Upload HTML
+                  <input
+                    ref={uploadRef}
+                    type="file"
+                    accept=".html,.htm"
+                    onChange={handleUploadHTML}
+                    style={{ display: "none" }}
+                  />
+                </label>
+              </>
             )}
             <button
               className="btn-primary"
@@ -527,16 +629,13 @@ export default function CalendarPage() {
                 )}
 
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14 }}>
-                  {!selectedEvent.callNoteId && (
+                  {!selectedEvent.callNoteId && isAdmin && (
                     <button
-                      onClick={() => handleGenerateCallNotes(selectedEvent)}
-                      disabled={generatingNotes === selectedEvent.id}
+                      onClick={() => openPrepareModal(selectedEvent)}
                       className="btn-primary w-full"
                       style={{ fontSize: 12 }}
                     >
-                      {generatingNotes === selectedEvent.id
-                        ? "Generating..."
-                        : "Generate Call Notes"}
+                      Prepare Call Notes
                     </button>
                   )}
 
@@ -564,6 +663,139 @@ export default function CalendarPage() {
           </div>
         )}
       </div>
+
+      {/* Call Notes List (admin only) */}
+      {isAdmin && callNotes.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
+            <h2
+              style={{
+                fontSize: 16,
+                fontWeight: 400,
+                fontFamily: "'Bellfair', serif",
+                color: "var(--text)",
+                margin: 0,
+              }}
+            >
+              Call Notes
+            </h2>
+            <input
+              type="text"
+              value={searchCallNotes}
+              onChange={(e) => setSearchCallNotes(e.target.value)}
+              placeholder="Search call notes..."
+              style={{
+                padding: "7px 14px",
+                background: "var(--bg-input, #0A0C10)",
+                border: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+                borderRadius: 8,
+                color: "var(--text)",
+                fontSize: 12,
+                fontFamily: "'DM Sans', sans-serif",
+                width: 220,
+                outline: "none",
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {filteredCallNotes.map((note) => (
+              <Link
+                key={note.id}
+                href={`/calendar/${note.id}`}
+                className="card no-underline"
+                style={{
+                  display: "block",
+                  overflow: "hidden",
+                  transition: "all 0.2s",
+                  cursor: "pointer",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "14px 16px",
+                    borderBottom: "1px solid rgba(255,255,255,0.03)",
+                    background: "rgba(192,139,136,0.02)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "var(--text)",
+                      fontFamily: "'DM Sans', sans-serif",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {note.title}
+                  </div>
+                </div>
+                <div style={{ padding: "12px 16px" }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-tertiary, rgba(240,240,242,0.3))",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span>
+                      {new Date(note.date).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                    <span style={{ opacity: 0.4 }}>{"\u2022"}</span>
+                    <span>{note.createdBy}</span>
+                  </div>
+                  {note.event && note.event.attendees && note.event.attendees.length > 0 && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "var(--text-dim, rgba(240,240,242,0.3))",
+                        marginTop: 6,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {note.event.attendees.slice(0, 3).join(", ")}
+                      {note.event.attendees.length > 3 && ` +${note.event.attendees.length - 3}`}
+                    </div>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Call Notes Modal */}
+      {showCallNotesModal && (
+        <CallNotesModal
+          event={modalEvent}
+          onClose={() => {
+            setShowCallNotesModal(false)
+            setModalEvent(null)
+          }}
+          onSuccess={(callNoteId) => {
+            setShowCallNotesModal(false)
+            setModalEvent(null)
+            fetchCallNotes()
+            router.push(`/calendar/${callNoteId}`)
+          }}
+        />
+      )}
     </div>
   )
 }

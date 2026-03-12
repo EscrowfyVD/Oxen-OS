@@ -9,8 +9,8 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const router = useRouter()
   const { status } = useSession()
 
-  // Don't show sidebar on login page
-  if (pathname === "/login") {
+  // Don't show sidebar on login page or call note viewer pages
+  if (pathname === "/login" || (pathname.startsWith("/calendar/") && pathname !== "/calendar")) {
     return <>{children}</>
   }
 

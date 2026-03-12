@@ -13,9 +13,11 @@ interface BriefsSectionProps {
   onGenerateBrief: (event: CalendarEvent) => void
   onViewBrief: (brief: MeetingBrief) => void
   generatingId: string | null
+  onPrepareCallNotes?: (event: CalendarEvent) => void
+  isAdmin?: boolean
 }
 
-export default function BriefsSection({ briefs, events, onGenerateBrief, onViewBrief, generatingId }: BriefsSectionProps) {
+export default function BriefsSection({ briefs, events, onGenerateBrief, onViewBrief, generatingId, onPrepareCallNotes, isAdmin }: BriefsSectionProps) {
   // Match events with briefs
   const eventBriefMap: Record<string, MeetingBrief> = {}
   for (const b of briefs) {
@@ -89,7 +91,7 @@ export default function BriefsSection({ briefs, events, onGenerateBrief, onViewB
               </div>
 
               {/* Brief status / action */}
-              <div style={{ flexShrink: 0 }}>
+              <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6 }}>
                 {brief ? (
                   <button
                     onClick={() => onViewBrief(brief)}
@@ -117,6 +119,20 @@ export default function BriefsSection({ briefs, events, onGenerateBrief, onViewB
                     }}
                   >
                     {isGenerating ? "Generating..." : "Generate Brief"}
+                  </button>
+                )}
+                {isAdmin && onPrepareCallNotes && (
+                  <button
+                    onClick={() => onPrepareCallNotes(event)}
+                    style={{
+                      padding: "6px 14px", borderRadius: 8, fontSize: 10, fontWeight: 500,
+                      fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+                      background: "rgba(192,139,136,0.06)",
+                      border: "1px solid rgba(192,139,136,0.15)",
+                      color: ROSE_GOLD,
+                    }}
+                  >
+                    {"\uD83D\uDCCB"} Call Notes
                   </button>
                 )}
               </div>

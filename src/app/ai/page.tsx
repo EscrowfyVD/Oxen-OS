@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import ChatSection from "@/components/ai/ChatSection"
 import InsightsSection from "@/components/ai/InsightsSection"
 import BriefsSection from "@/components/ai/BriefsSection"
 import BriefModal from "@/components/ai/BriefModal"
+import CallNotesModal from "@/components/calendar/CallNotesModal"
 import type { AIInsight, MeetingBrief, CalendarEvent } from "@/components/ai/types"
 
 const CARD_BORDER = "rgba(255,255,255,0.06)"
@@ -22,6 +23,7 @@ export default function AIPage() {
 }
 
 function AIPageInner() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const contactId = searchParams.get("contactId")
   const contactName = searchParams.get("contactName")
@@ -40,6 +42,8 @@ function AIPageInner() {
   const [loadingDigest, setLoadingDigest] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [teamView, setTeamView] = useState(false)
+  const [showCallNotesModal, setShowCallNotesModal] = useState(false)
+  const [callNotesModalEvent, setCallNotesModalEvent] = useState<{ id: string; title: string; start: string; attendees?: string[]; description?: string } | null>(null)
 
   // Check admin status
   useEffect(() => {
@@ -285,6 +289,16 @@ function AIPageInner() {
           onGenerateBrief={generateBrief}
           onViewBrief={setViewingBrief}
           generatingId={generatingBriefId}
+          isAdmin={isAdmin}
+          onPrepareCallNotes={(event) => {
+            setCallNotesModalEvent({
+              id: event.id,
+              title: event.title,
+              start: event.start,
+              attendees: event.attendees,
+            })
+            setShowCallNotesModal(true)
+          }}
         />
       </div>
 
@@ -293,6 +307,22 @@ function AIPageInner() {
         <BriefModal
           brief={viewingBrief}
           onClose={() => setViewingBrief(null)}
+        />
+      )}
+
+      {/* Call Notes Modal */}
+      {showCallNotesModal && (
+        <CallNotesModal
+          event={callNotesModalEvent}
+          onClose={() => {
+            setShowCallNotesModal(false)
+            setCallNotesModalEvent(null)
+          }}
+          onSuccess={(callNoteId) => {
+            setShowCallNotesModal(false)
+            setCallNotesModalEvent(null)
+            router.push(`/calendar/${callNoteId}`)
+          }}
         />
       )}
     </div>

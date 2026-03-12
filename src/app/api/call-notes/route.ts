@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { requireAdmin } from "@/lib/admin"
 import { prisma } from "@/lib/prisma"
 
 export async function GET() {
-  const session = await auth()
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const { error } = await requireAdmin()
+  if (error) return error
 
   const notes = await prisma.callNote.findMany({
     orderBy: { date: "desc" },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      date: true,
+      createdBy: true,
+      createdAt: true,
+      eventId: true,
       event: {
         select: {
           id: true,
           title: true,
           startTime: true,
           attendees: true,
-          meetLink: true,
         },
       },
     },
@@ -27,10 +30,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const { error, session } = await requireAdmin()
+  if (error) return error
 
   const body = await request.json()
   const { title, date, htmlContent, noteData, eventId } = body
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const userId = session.user?.id ?? session.user?.email ?? "unknown"
+  const userId = session!.user?.id ?? session!.user?.email ?? "unknown"
 
   const note = await prisma.callNote.create({
     data: {

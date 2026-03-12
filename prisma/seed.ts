@@ -5,7 +5,7 @@ const prisma = new PrismaClient()
 const employees = [
   { name: "Cyril", initials: "C", role: "Advisor", department: "Advisory", location: null, avatarColor: "c-adv", order: 0, timezone: "CET", workHours: "Flexible" },
   { name: "Arthur", initials: "A", role: "Shareholder", department: "Shareholders", location: null, avatarColor: "c-sh", order: 0, entity: "Green Nation SARL" },
-  { name: "Vernon", initials: "V", role: "CEO / Shareholder", department: "Shareholders", location: "Dubai", avatarColor: "c-sh", order: 1, email: "vernon@oxen.finance", phone: "+971 50 000 0000", telegram: "@vernon_oxen", timezone: "GST", workHours: "Mon-Fri 09:00-18:00", entity: "Oxen Finance" },
+  { name: "Vernon", initials: "V", role: "CEO / Shareholder", department: "Shareholders", location: "Dubai", avatarColor: "c-sh", order: 1, email: "vernon@oxen.finance", phone: "+971 50 000 0000", telegram: "@vernon_oxen", timezone: "GST", workHours: "Mon-Fri 09:00-18:00", entity: "Oxen Finance", isAdmin: true },
   { name: "Paul Louis", initials: "PL", role: "Shareholder", department: "Shareholders", location: "Dubai", avatarColor: "c-sh", order: 2, entity: "Green Nation SARL" },
   { name: "Aleks", initials: "A", role: "Operations", department: "Operations", location: "Dubai", avatarColor: "c-ops", order: 0, timezone: "GST", workHours: "Mon-Fri 09:00-18:00", entity: "Oxen Finance" },
   { name: "Luiza", initials: "L", role: "Account Client Manager", department: "Account Management", location: "Dubai", avatarColor: "c-sales", order: 0, timezone: "GST", entity: "Oxen Finance" },
