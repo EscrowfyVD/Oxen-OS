@@ -4,20 +4,35 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { useState, useEffect } from "react"
+import {
+  LayoutDashboard,
+  Shield,
+  CheckSquare,
+  CalendarDays,
+  BookOpen,
+  Building2,
+  Users,
+  Palmtree,
+  Wallet,
+  Megaphone,
+  Headphones,
+  Handshake,
+  type LucideIcon,
+} from "lucide-react"
 
-const NAV_ITEMS = [
-  { label: "Dashboard", href: "/", icon: "\u25C6", badge: null, count: null },
-  { label: "Sentinel", href: "/ai", icon: "\uD83D\uDEE1\uFE0F", badge: null, count: null },
-  { label: "Tasks", href: "/tasks", icon: "\u2610", badge: null, count: 12 },
-  { label: "Calendar", href: "/calendar", icon: "\u25F7", badge: null, count: null },
-  { label: "Wiki", href: "/wiki", icon: "\u2630", badge: null, count: null },
-  { label: "Organigramme", href: "/org", icon: "\u2B21", badge: null, count: null },
-  { label: "Team", href: "/team", icon: "\u2687", badge: null, count: null },
-  { label: "Absences", href: "/absences", icon: "\uD83C\uDFD6\uFE0F", badge: null, count: null },
-  { label: "Finance", href: "/finance", icon: "\u25C8", badge: null, count: null },
-  { label: "Marketing", href: "/marketing", icon: "\u25D0", badge: null, count: null },
-  { label: "Support", href: "/support", icon: "\uD83C\uDFA7", badge: null, count: null },
-  { label: "CRM", href: "/crm", icon: "\u25CE", badge: null, count: null },
+const NAV_ITEMS: Array<{ label: string; href: string; icon: LucideIcon; badge: string | null; count: number | null }> = [
+  { label: "Dashboard", href: "/", icon: LayoutDashboard, badge: null, count: null },
+  { label: "Sentinel", href: "/ai", icon: Shield, badge: null, count: null },
+  { label: "Tasks", href: "/tasks", icon: CheckSquare, badge: null, count: 12 },
+  { label: "Calendar", href: "/calendar", icon: CalendarDays, badge: null, count: null },
+  { label: "Wiki", href: "/wiki", icon: BookOpen, badge: null, count: null },
+  { label: "Organigramme", href: "/org", icon: Building2, badge: null, count: null },
+  { label: "Team", href: "/team", icon: Users, badge: null, count: null },
+  { label: "Absences", href: "/absences", icon: Palmtree, badge: null, count: null },
+  { label: "Finance", href: "/finance", icon: Wallet, badge: null, count: null },
+  { label: "Marketing", href: "/marketing", icon: Megaphone, badge: null, count: null },
+  { label: "Support", href: "/support", icon: Headphones, badge: null, count: null },
+  { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null },
 ]
 
 export default function Sidebar() {
@@ -161,7 +176,9 @@ export default function Sidebar() {
                   textDecoration: "none",
                 }}
               >
-                <span className={`nav-icon${item.label === "Sentinel" ? " ai-pulse" : ""}`}>{item.icon}</span>
+                <span className={`nav-icon${item.label === "Sentinel" ? " ai-pulse" : ""}`}>
+                  <item.icon size={16} strokeWidth={1.8} />
+                </span>
                 <span className="flex-1" style={item.label === "Sentinel" ? { background: "linear-gradient(90deg, #C08B88, #E8C4C0)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" } : undefined}>{item.label}</span>
                 {item.count !== null && (
                   <span
