@@ -3,12 +3,27 @@
 import { useMemo } from "react"
 import EventCard, { CalendarEvent } from "./EventCard"
 
+interface AbsenceBlock {
+  id: string
+  employee: { name: string; initials: string }
+  type: string
+  startDate: string
+  endDate: string
+}
+
 interface CalendarViewProps {
   events: CalendarEvent[]
   viewMode: "week" | "day"
   currentDate: Date
   onEventClick: (event: CalendarEvent) => void
   ownerColors?: Record<string, string>
+  absences?: AbsenceBlock[]
+}
+
+const ABSENCE_COLORS: Record<string, { bg: string; text: string }> = {
+  vacation: { bg: "rgba(74,222,128,0.15)", text: "#4ade80" },
+  sick: { bg: "rgba(248,113,113,0.15)", text: "#f87171" },
+  ooo: { bg: "rgba(129,140,248,0.15)", text: "#818cf8" },
 }
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7) // 7 AM to 8 PM
@@ -42,6 +57,7 @@ export default function CalendarView({
   currentDate,
   onEventClick,
   ownerColors,
+  absences,
 }: CalendarViewProps) {
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate])
   const displayDates = viewMode === "week" ? weekDates : [currentDate]
@@ -109,6 +125,78 @@ export default function CalendarView({
           )
         })}
       </div>
+
+      {/* All-day absences row */}
+      {absences && absences.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              viewMode === "week" ? "56px repeat(7, 1fr)" : "56px 1fr",
+            borderBottom: "1px solid var(--border)",
+            background: "rgba(255,255,255,0.01)",
+          }}
+        >
+          <div
+            style={{
+              padding: "4px 6px",
+              textAlign: "right",
+              color: "var(--text-dim)",
+              fontSize: 8,
+              fontFamily: "'DM Sans', sans-serif",
+              borderRight: "1px solid var(--border)",
+              fontWeight: 500,
+            }}
+          >
+            ALL DAY
+          </div>
+          {displayDates.map((date, i) => {
+            const dayAbsences = absences.filter((a) => {
+              const start = new Date(a.startDate)
+              start.setHours(0, 0, 0, 0)
+              const end = new Date(a.endDate)
+              end.setHours(23, 59, 59, 999)
+              return date >= start && date <= end
+            })
+            return (
+              <div
+                key={i}
+                style={{
+                  padding: 2,
+                  borderRight: i < displayDates.length - 1 ? "1px solid var(--border)" : "none",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                }}
+              >
+                {dayAbsences.map((a) => {
+                  const colors = ABSENCE_COLORS[a.type] || ABSENCE_COLORS.vacation
+                  return (
+                    <div
+                      key={a.id}
+                      style={{
+                        background: colors.bg,
+                        color: colors.text,
+                        fontSize: 8,
+                        fontWeight: 600,
+                        padding: "2px 4px",
+                        borderRadius: 3,
+                        fontFamily: "'DM Sans', sans-serif",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={`${a.employee.name} - ${a.type}`}
+                    >
+                      {a.employee.initials}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Time grid */}
       <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>

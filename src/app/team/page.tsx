@@ -165,6 +165,8 @@ function getCurrentTime(timezone: string | null): string {
   })
 }
 
+const ORANGE = "#D4885B"
+
 export default function TeamPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [search, setSearch] = useState("")
@@ -175,6 +177,7 @@ export default function TeamPage() {
   const [form, setForm] = useState<MemberForm>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [, setTick] = useState(0)
+  const [onLeaveToday, setOnLeaveToday] = useState<Set<string>>(new Set())
 
   const fetchEmployees = () => {
     fetch("/api/employees")
@@ -185,6 +188,13 @@ export default function TeamPage() {
 
   useEffect(() => {
     fetchEmployees()
+    fetch("/api/leaves/who-is-out")
+      .then((r) => r.json())
+      .then((data) => {
+        const ids = new Set<string>((data.today ?? []).map((w: { employee: { id: string } }) => w.employee.id))
+        setOnLeaveToday(ids)
+      })
+      .catch(() => {})
   }, [])
 
   // Update availability every minute
@@ -505,9 +515,9 @@ export default function TeamPage() {
                     </span>
                   </div>
                   {/* Availability dot */}
-                  {emp.timezone && emp.workHours && (
+                  {(emp.timezone && emp.workHours || onLeaveToday.has(emp.id)) && (
                     <div
-                      title={available ? "Currently available" : "Outside working hours"}
+                      title={onLeaveToday.has(emp.id) ? "On leave today" : available ? "Currently available" : "Outside working hours"}
                       style={{
                         position: "absolute",
                         bottom: -1,
@@ -515,7 +525,7 @@ export default function TeamPage() {
                         width: 12,
                         height: 12,
                         borderRadius: "50%",
-                        background: available ? GREEN : "rgba(255,255,255,0.15)",
+                        background: onLeaveToday.has(emp.id) ? ORANGE : available ? GREEN : "rgba(255,255,255,0.15)",
                         border: `2px solid ${CARD_BG}`,
                         boxShadow: available ? `0 0 6px ${GREEN}40` : "none",
                       }}
@@ -549,9 +559,17 @@ export default function TeamPage() {
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
                     }}
                   >
                     {emp.role}
+                    {onLeaveToday.has(emp.id) && (
+                      <span style={{ fontSize: 8, padding: "1px 6px", borderRadius: 6, background: "rgba(212,136,91,0.15)", color: ORANGE, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        On Leave
+                      </span>
+                    )}
                   </div>
                 </div>
 

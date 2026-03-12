@@ -82,6 +82,9 @@ model Employee {
   isActive    Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+  leaveRequests   LeaveRequest[]  @relation("EmployeeLeaveRequests")
+  reviewedLeaves  LeaveRequest[]  @relation("ReviewerLeaveRequests")
+  leaveBalances   LeaveBalance[]
 }
 
 // ─── Tasks (Kanban) ───
@@ -454,6 +457,46 @@ model AIConversation {
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Leave / Absence Management ───
+
+model LeaveRequest {
+  id            String    @id @default(cuid())
+  employeeId    String
+  employee      Employee  @relation("EmployeeLeaveRequests", fields: [employeeId], references: [id], onDelete: Cascade)
+  type          String    // "vacation" | "sick" | "ooo"
+  startDate     DateTime
+  endDate       DateTime
+  halfDay       Boolean   @default(false)
+  halfDayPeriod String?   // "morning" | "afternoon"
+  reason        String?   @db.Text
+  status        String    @default("pending") // "pending" | "approved" | "rejected"
+  reviewedById  String?
+  reviewedBy    Employee? @relation("ReviewerLeaveRequests", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  reviewNote    String?   @db.Text
+  totalDays     Float     @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model LeaveBalance {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  year            Int
+  vacationTotal   Int      @default(25)
+  vacationUsed    Float    @default(0)
+  vacationPending Float    @default(0)
+  sickTotal       Int      @default(10)
+  sickUsed        Float    @default(0)
+  oooTotal        Int      @default(15)
+  oooUsed         Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([employeeId, year])
 }
 
 // ─── Email Sync ───

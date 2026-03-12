@@ -31,6 +31,7 @@ export default function CalendarPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [selectedOwners, setSelectedOwners] = useState<Set<string>>(new Set())
   const [ownerColors, setOwnerColors] = useState<Record<string, string>>({})
+  const [absences, setAbsences] = useState<Array<{ id: string; employee: { name: string; initials: string }; type: string; startDate: string; endDate: string }>>([])
 
   useEffect(() => {
     fetch("/api/calendar/owners")
@@ -72,6 +73,27 @@ export default function CalendarPage() {
   useEffect(() => {
     fetchEvents()
   }, [fetchEvents])
+
+  // Fetch approved absences for the visible date range
+  useEffect(() => {
+    const start = new Date(currentDate)
+    start.setDate(start.getDate() - 14)
+    const end = new Date(currentDate)
+    end.setDate(end.getDate() + 14)
+    fetch(`/api/leaves?all=true&status=approved&startDate=${start.toISOString()}&endDate=${end.toISOString()}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const reqs = data.requests ?? []
+        setAbsences(reqs.map((r: { id: string; employee: { name: string; initials: string }; type: string; startDate: string; endDate: string }) => ({
+          id: r.id,
+          employee: { name: r.employee.name, initials: r.employee.initials },
+          type: r.type,
+          startDate: r.startDate,
+          endDate: r.endDate,
+        })))
+      })
+      .catch(() => {})
+  }, [currentDate])
 
   const handleSync = async () => {
     setSyncing(true)
@@ -362,6 +384,7 @@ export default function CalendarPage() {
             currentDate={currentDate}
             onEventClick={(event) => setSelectedEvent(event)}
             ownerColors={ownerColors}
+            absences={absences}
           />
         </div>
 

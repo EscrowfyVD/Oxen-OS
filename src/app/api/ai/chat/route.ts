@@ -215,6 +215,39 @@ async function gatherContext(message: string): Promise<string> {
     } catch { /* calendar may not exist */ }
   }
 
+  // Leave / absence context
+  if (msgLower.includes("leave") || msgLower.includes("absence") || msgLower.includes("vacation") || msgLower.includes("sick") || msgLower.includes("ooo") || msgLower.includes("who is out") || msgLower.includes("available") || msgLower.includes("assign") || msgLower.includes("digest")) {
+    try {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const activeLeaves = await prisma.leaveRequest.findMany({
+        where: {
+          status: "approved",
+          startDate: { lte: new Date() },
+          endDate: { gte: today },
+        },
+        include: { employee: { select: { name: true, department: true } } },
+      })
+      if (activeLeaves.length > 0) {
+        parts.push("## Currently On Leave")
+        for (const l of activeLeaves) {
+          parts.push(`- ${l.employee.name} (${l.employee.department}): ${l.type} from ${new Date(l.startDate).toLocaleDateString()} to ${new Date(l.endDate).toLocaleDateString()}`)
+        }
+      }
+      const pendingLeaves = await prisma.leaveRequest.findMany({
+        where: { status: "pending" },
+        include: { employee: { select: { name: true } } },
+        take: 10,
+      })
+      if (pendingLeaves.length > 0) {
+        parts.push("## Pending Leave Requests")
+        for (const l of pendingLeaves) {
+          parts.push(`- ${l.employee.name}: ${l.type} ${new Date(l.startDate).toLocaleDateString()}-${new Date(l.endDate).toLocaleDateString()} (${l.totalDays} days)`)
+        }
+      }
+    } catch { /* leave tables may not exist yet */ }
+  }
+
   // Search for specific contact/company mentioned
   const words = message.split(/\s+/).filter((w) => w.length > 3)
   for (const word of words.slice(0, 5)) {

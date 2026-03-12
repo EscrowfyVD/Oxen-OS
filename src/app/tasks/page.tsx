@@ -84,7 +84,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 /* ── TaskCard (inline component) ── */
-function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
+function TaskCard({ task, onClick, onLeaveNames }: { task: Task; onClick: () => void; onLeaveNames?: Set<string> }) {
   const tagStyle = TAG_COLORS[task.tag] || { bg: "rgba(255,255,255,0.06)", text: TEXT_SECONDARY }
   const priorityColor = PRIORITY_COLORS[task.priority] || TEXT_TERTIARY
 
@@ -198,8 +198,14 @@ function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
               fontSize: 10,
               color: TEXT_TERTIARY,
               fontFamily: "'DM Sans', sans-serif",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
             }}
           >
+            {onLeaveNames?.has(task.assignee) && (
+              <span title="On leave today" style={{ color: AMBER, fontSize: 11 }}>{"\u26A0"}</span>
+            )}
             {task.assignee}
           </span>
         )}
@@ -229,6 +235,7 @@ export default function TasksPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
+  const [onLeaveNames, setOnLeaveNames] = useState<Set<string>>(new Set())
 
   /* Form state */
   const [form, setForm] = useState<TaskFormData>({
@@ -259,6 +266,13 @@ export default function TasksPage() {
   useEffect(() => {
     fetchTasks()
     fetchEmployees()
+    fetch("/api/leaves/who-is-out")
+      .then((r) => r.json())
+      .then((data) => {
+        const names = new Set<string>((data.today ?? []).map((w: { employee: { name: string } }) => w.employee.name))
+        setOnLeaveNames(names)
+      })
+      .catch(() => {})
   }, [fetchTasks, fetchEmployees])
 
   /* ── Filtered tasks ── */
@@ -579,6 +593,7 @@ export default function TasksPage() {
                         key={task.id}
                         task={task}
                         onClick={() => openEdit(task)}
+                        onLeaveNames={onLeaveNames}
                       />
                     ))}
                     {colTasks.length === 0 && (

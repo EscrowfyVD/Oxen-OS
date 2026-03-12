@@ -112,8 +112,15 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   meeting: INDIGO,
 }
 
+const LEAVE_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  vacation: { bg: "rgba(52,211,153,0.12)", text: GREEN },
+  sick: { bg: "rgba(248,113,113,0.12)", text: RED },
+  ooo: { bg: "rgba(129,140,248,0.12)", text: INDIGO },
+}
+
 export default function DashboardPage() {
   const [clock, setClock] = useState("")
+  const [whoIsOut, setWhoIsOut] = useState<Array<{ id: string; employee: { name: string; initials: string; avatarColor: string }; type: string }>>([])
 
   useEffect(() => {
     const tick = () => {
@@ -130,6 +137,13 @@ export default function DashboardPage() {
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/leaves/who-is-out")
+      .then((r) => r.json())
+      .then((data) => setWhoIsOut(data.today ?? []))
+      .catch(() => {})
   }, [])
 
   return (
@@ -289,6 +303,112 @@ export default function DashboardPage() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* ── Who's Out Today ── */}
+        <div
+          className="card fade-in"
+          style={{ marginBottom: 20, animationDelay: "0.12s", overflow: "hidden" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 20px",
+              borderBottom: "1px solid rgba(255,255,255,0.03)",
+              background: "rgba(255,255,255,0.01)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: TEXT_PRIMARY,
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              {"\uD83C\uDFD6\uFE0F"} Who&apos;s Out Today
+            </span>
+            <a
+              href="/absences"
+              style={{
+                fontSize: 11,
+                color: ROSE_GOLD,
+                cursor: "pointer",
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 500,
+                textDecoration: "none",
+              }}
+            >
+              View All &rarr;
+            </a>
+          </div>
+          <div style={{ padding: "12px 20px" }}>
+            {whoIsOut.length === 0 ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: GREEN, boxShadow: `0 0 6px ${GREEN}` }} />
+                <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif" }}>
+                  Everyone&apos;s in today
+                </span>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {whoIsOut.map((w) => {
+                  const lc = LEAVE_TYPE_COLORS[w.type] || LEAVE_TYPE_COLORS.vacation
+                  return (
+                    <div
+                      key={w.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        background: "rgba(255,255,255,0.02)",
+                        border: `1px solid ${CARD_BORDER}`,
+                        borderRadius: 8,
+                        padding: "6px 12px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: "50%",
+                          background: w.employee.avatarColor,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 8,
+                          fontWeight: 600,
+                          color: "#fff",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {w.employee.initials}
+                      </div>
+                      <span style={{ fontSize: 11, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>
+                        {w.employee.name}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 8,
+                          padding: "1px 6px",
+                          borderRadius: 6,
+                          background: lc.bg,
+                          color: lc.text,
+                          fontWeight: 500,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        {w.type}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 

@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { label: "Wiki", href: "/wiki", icon: "\u2630", badge: null, count: null },
   { label: "Organigramme", href: "/org", icon: "\u2B21", badge: null, count: null },
   { label: "Team", href: "/team", icon: "\u2687", badge: null, count: null },
+  { label: "Absences", href: "/absences", icon: "\uD83C\uDFD6\uFE0F", badge: null, count: null },
   { label: "Finance", href: "/finance", icon: "\u25C8", badge: null, count: null },
   { label: "Marketing", href: "/marketing", icon: "\u25D0", badge: null, count: null },
   { label: "Support", href: "/support", icon: "\uD83C\uDFA7", badge: null, count: null },
