@@ -1,5 +1,7 @@
 /* ── CRO Revenue Intelligence Shared Types ── */
 
+import type { AIInsight, MeetingBrief } from "@/components/ai/types"
+
 export interface Contact {
   id: string
   name: string
@@ -30,6 +32,11 @@ export interface Contact {
   interactions: Interaction[]
   metrics?: CustomerMetrics[]
   deals?: Deal[]
+  // AI relations (populated when extended includes are used)
+  aiInsights?: AIInsight[]
+  meetingBriefs?: MeetingBrief[]
+  companyIntel?: Array<Record<string, unknown>>
+  emails?: Array<{ id: string; subject: string; snippet: string | null; from: string; to: string[]; date: string; direction: string; bodyText: string | null }>
 }
 
 export interface Interaction {
@@ -220,4 +227,10 @@ export interface CrmStats {
   bySector: Array<{ sector: string; count: number }>
   monthlyNew: Array<{ month: string; count: number }>
   topDeals: Contact[]
+  sentinelStats?: {
+    totalInsights: number
+    activeInsights: number
+    briefCoverage: number
+    revenueAtRisk: number
+  }
 }

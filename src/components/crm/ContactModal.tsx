@@ -43,6 +43,9 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
   const [form, setForm] = useState<ContactFormData>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [showCro, setShowCro] = useState(false)
+  const [showResearchPrompt, setShowResearchPrompt] = useState(false)
+  const [newContactId, setNewContactId] = useState<string | null>(null)
+  const [researchingCompany, setResearchingCompany] = useState(false)
 
   useEffect(() => {
     if (contact) {
@@ -84,6 +87,16 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
   const set = (key: keyof ContactFormData, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }))
 
+  const doResearchCompany = async (cId: string) => {
+    setResearchingCompany(true)
+    try {
+      await fetch(`/api/ai/research/${cId}`, { method: "POST" })
+    } catch { /* silent */ }
+    setResearchingCompany(false)
+    setShowResearchPrompt(false)
+    onSaved()
+  }
+
   const handleSave = async () => {
     if (!form.name.trim()) return
     setSaving(true)
@@ -92,7 +105,7 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
       const url = contact ? `/api/contacts/${contact.id}` : "/api/contacts"
       const method = contact ? "PATCH" : "POST"
 
-      await fetch(url, {
+      const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -119,6 +132,18 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           projectedVolume: form.projectedVolume || null,
         }),
       })
+
+      /* If new contact with a company name, offer auto-research */
+      if (!contact && form.company.trim()) {
+        const data = await res.json()
+        if (data.contact?.id) {
+          setNewContactId(data.contact.id)
+          setShowResearchPrompt(true)
+          setSaving(false)
+          return
+        }
+      }
+
       onSaved()
     } catch {
       /* silent */
@@ -383,7 +408,54 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           </div>
         </div>
 
+        {/* Research Prompt */}
+        {showResearchPrompt && newContactId && (
+          <div style={{
+            margin: "0 20px 16px",
+            padding: 16,
+            background: "linear-gradient(135deg, rgba(192,139,136,0.08), rgba(15,17,24,1))",
+            border: "1px solid rgba(192,139,136,0.2)",
+            borderRadius: 10,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 14 }}>{"\uD83D\uDEE1\uFE0F"}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "#C08B88", fontFamily: "'DM Sans', sans-serif" }}>
+                Research {form.company}?
+              </span>
+            </div>
+            <p style={{ fontSize: 11, color: "rgba(240,240,242,0.55)", fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5, margin: "0 0 12px" }}>
+              Sentinel can research this company to find key people, recent news, industry data, and more.
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => doResearchCompany(newContactId)}
+                disabled={researchingCompany}
+                style={{
+                  padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 500,
+                  fontFamily: "'DM Sans', sans-serif", cursor: researchingCompany ? "wait" : "pointer",
+                  background: "linear-gradient(135deg, rgba(192,139,136,0.2), rgba(192,139,136,0.1))",
+                  border: "1px solid rgba(192,139,136,0.3)", color: "#C08B88",
+                }}
+              >
+                {researchingCompany ? "Researching..." : "\uD83D\uDD0D Research Company"}
+              </button>
+              <button
+                onClick={() => { setShowResearchPrompt(false); onSaved() }}
+                style={{
+                  padding: "6px 14px", borderRadius: 6, fontSize: 11,
+                  fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+                  background: "none", border: `1px solid ${CARD_BORDER}`,
+                  color: TEXT_TERTIARY,
+                }}
+              >
+                Skip
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
+        {!showResearchPrompt && (
         <div
           style={{
             display: "flex",
@@ -430,6 +502,7 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
             </button>
           </div>
         </div>
+        )}
       </div>
     </div>
   )

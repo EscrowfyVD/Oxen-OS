@@ -78,6 +78,45 @@ export async function PATCH(
     },
   })
 
+  // Auto-generate insight when deal stage changes
+  if (stage !== undefined && stage !== existing.stage) {
+    try {
+      const stageLabel = stage.replace(/_/g, " ")
+      const prevLabel = existing.stage.replace(/_/g, " ")
+      const companyName = deal.contact?.company || deal.contact?.name || "unknown"
+
+      let insightType = "buying_signal"
+      let severity = "low"
+      let title = `Deal "${deal.name}" moved to ${stageLabel}`
+      let summary = `Deal "${deal.name}" for ${companyName} moved from ${prevLabel} to ${stageLabel}. Expected revenue: EUR${deal.expectedRevenue?.toLocaleString() || "?"}. Probability: ${deal.probability || "?"}%.`
+
+      if (stage === "closed_won" || stage === "commit" || stage === "volume_ramp") {
+        insightType = "opportunity"
+        severity = "medium"
+        title = `Deal won: "${deal.name}"`
+        summary = `Deal "${deal.name}" for ${companyName} has reached ${stageLabel}. Expected revenue: EUR${deal.expectedRevenue?.toLocaleString() || "?"}. Time to celebrate and plan onboarding.`
+      } else if (stage === "closed_lost") {
+        insightType = "risk"
+        severity = "high"
+        title = `Deal lost: "${deal.name}"`
+        summary = `Deal "${deal.name}" for ${companyName} was marked as lost. Expected revenue was EUR${deal.expectedRevenue?.toLocaleString() || "?"}. Review what happened and document lessons learned.`
+      }
+
+      await prisma.aIInsight.create({
+        data: {
+          type: insightType,
+          title,
+          summary,
+          contactId: deal.contactId,
+          severity,
+          source: "deal_stage_change",
+        },
+      })
+    } catch (e) {
+      console.error("Failed to create deal stage insight:", e)
+    }
+  }
+
   return NextResponse.json({ deal })
 }
 

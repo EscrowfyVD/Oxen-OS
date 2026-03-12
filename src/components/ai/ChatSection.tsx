@@ -10,6 +10,7 @@ import type { ChatMessage, ActionBlock } from "./types"
 
 interface ChatSectionProps {
   onRefresh: () => void
+  initialPrompt?: string
 }
 
 /* ── Markdown-lite renderer for AI responses ── */
@@ -106,12 +107,13 @@ function renderInline(text: string): React.ReactNode {
   })
 }
 
-export default function ChatSection({ onRefresh }: ChatSectionProps) {
+export default function ChatSection({ onRefresh, initialPrompt }: ChatSectionProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
+  const [initialSent, setInitialSent] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -127,6 +129,15 @@ export default function ChatSection({ onRefresh }: ChatSectionProps) {
       })
       .catch(() => {})
   }, [])
+
+  // Auto-send initial prompt from CRM "Ask Sentinel" button
+  useEffect(() => {
+    if (initialPrompt && !initialSent && messages.length === 0 && !sending) {
+      setInitialSent(true)
+      sendMessage(initialPrompt)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, initialSent, messages.length])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -201,6 +212,27 @@ export default function ChatSection({ onRefresh }: ChatSectionProps) {
             priority: action.data.priority || "medium",
             status: "todo",
           }),
+        })
+        onRefresh()
+      } else if (action.action === "add_note" && action.data.contactId) {
+        await fetch(`/api/contacts/${action.data.contactId}/interactions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "note",
+            content: action.data.content || action.data.note || "",
+          }),
+        })
+        onRefresh()
+      } else if (action.action === "update_deal" && action.data.dealId) {
+        const body: Record<string, unknown> = {}
+        if (action.data.stage) body.stage = action.data.stage
+        if (action.data.probability) body.probability = action.data.probability
+        if (action.data.notes) body.notes = action.data.notes
+        await fetch(`/api/deals/${action.data.dealId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
         })
         onRefresh()
       }
@@ -286,9 +318,9 @@ export default function ChatSection({ onRefresh }: ChatSectionProps) {
                               background: "rgba(192,139,136,0.08)", color: ROSE_GOLD,
                             }}
                           >
-                            {a.action === "create_task" ? `Create Task: ${(a.data.title as string)?.substring(0, 30)}...` :
-                             a.action === "add_note" ? "Add Note" :
-                             a.action === "update_deal" ? "Update Deal" : a.action}
+                            {a.action === "create_task" ? `\u2705 Create Task: ${(a.data.title as string)?.substring(0, 30)}` :
+                             a.action === "add_note" ? `\uD83D\uDCDD Add Note to Contact` :
+                             a.action === "update_deal" ? `\uD83D\uDCC8 Update Deal${a.data.stage ? ` \u2192 ${a.data.stage}` : ""}` : a.action}
                           </button>
                         ))}
                       </div>

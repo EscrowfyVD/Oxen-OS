@@ -207,6 +207,65 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
         </div>
       </div>
 
+      {/* ── Sentinel Intelligence ── */}
+      {stats.sentinelStats && (
+        <div
+          className="fade-in"
+          style={{
+            marginBottom: 24,
+            animationDelay: "0.12s",
+          }}
+        >
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 12,
+          }}>
+            <span style={{ fontSize: 14 }}>{"\uD83D\uDEE1\uFE0F"}</span>
+            <span style={{
+              fontSize: 13, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+              background: "linear-gradient(90deg, #C08B88, #E8C4C0)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            }}>
+              Sentinel Intelligence
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+            {/* AI Insights */}
+            <div className="kpi-card" style={{ padding: 20, background: "linear-gradient(135deg, rgba(192,139,136,0.04), rgba(15,17,24,1))", border: "1px solid rgba(192,139,136,0.12)" }}>
+              <div style={kpiLabel}>AI Insights</div>
+              <div style={kpiValue}>
+                <Counter target={stats.sentinelStats.activeInsights} />
+              </div>
+              <div style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>
+                {stats.sentinelStats.totalInsights} total generated
+              </div>
+            </div>
+
+            {/* Brief Coverage */}
+            <div className="kpi-card" style={{ padding: 20, background: "linear-gradient(135deg, rgba(192,139,136,0.04), rgba(15,17,24,1))", border: "1px solid rgba(192,139,136,0.12)" }}>
+              <div style={kpiLabel}>Brief Coverage</div>
+              <div style={kpiValue}>
+                <Counter target={stats.sentinelStats.briefCoverage} />
+                <span style={{ fontSize: 18, color: TEXT_SECONDARY }}>%</span>
+              </div>
+              <div style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>
+                of meetings with briefs
+              </div>
+            </div>
+
+            {/* Revenue at Risk */}
+            <div className="kpi-card" style={{ padding: 20, background: "linear-gradient(135deg, rgba(192,139,136,0.04), rgba(15,17,24,1))", border: "1px solid rgba(192,139,136,0.12)" }}>
+              <div style={kpiLabel}>Revenue at Risk</div>
+              <div style={kpiValue}>
+                <Counter target={stats.sentinelStats.revenueAtRisk} prefix={"\u20AC"} />
+              </div>
+              <div style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>
+                linked to risk/churn insights
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Bottom row: Monthly + Top Deals ── */}
       <div
         className="fade-in"

@@ -240,6 +240,7 @@ model Contact {
   companyIntel    CompanyIntel[]    @relation("ContactIntel")
   meetingBriefs   MeetingBrief[]   @relation("ContactBriefs")
   aiInsights      AIInsight[]      @relation("ContactInsights")
+  emails          Email[]          @relation("ContactEmails")
 }
 
 model Interaction {
@@ -443,6 +444,7 @@ model AIInsight {
   dismissed    Boolean  @default(false)
   actionTaken  String?
   linkedTaskId String?
+  source       String?  // "auto_analysis", "deal_stage_change", "system"
   createdAt    DateTime @default(now())
 }
 
@@ -452,4 +454,26 @@ model AIConversation {
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Email Sync ───
+
+model Email {
+  id            String   @id @default(cuid())
+  contactId     String?
+  contact       Contact? @relation("ContactEmails", fields: [contactId], references: [id])
+  gmailId       String   @unique
+  threadId      String?
+  from          String
+  to            String[]
+  cc            String[]
+  subject       String
+  snippet       String?
+  bodyText      String?  @db.Text
+  date          DateTime
+  labelIds      String[]
+  hasAttachment Boolean  @default(false)
+  direction     String   @default("inbound")
+  syncedBy      String
+  createdAt     DateTime @default(now())
 }

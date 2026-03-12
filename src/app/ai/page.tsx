@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import ChatSection from "@/components/ai/ChatSection"
 import InsightsSection from "@/components/ai/InsightsSection"
 import BriefsSection from "@/components/ai/BriefsSection"
@@ -13,6 +14,22 @@ const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
 const ROSE_GOLD = "#C08B88"
 
 export default function AIPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: "60px 32px", textAlign: "center", color: TEXT_TERTIARY }}>Loading...</div>}>
+      <AIPageInner />
+    </Suspense>
+  )
+}
+
+function AIPageInner() {
+  const searchParams = useSearchParams()
+  const contactId = searchParams.get("contactId")
+  const contactName = searchParams.get("contactName")
+
+  /* Build initial prompt if navigated from CRM contact page */
+  const initialPrompt = contactId && contactName
+    ? `Tell me about ${contactName} \u2014 deal status, recent interactions, risks, and opportunities.`
+    : undefined
   const [insights, setInsights] = useState<AIInsight[]>([])
   const [briefs, setBriefs] = useState<MeetingBrief[]>([])
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -250,7 +267,7 @@ export default function AIPage() {
         )}
 
         {/* Section 1: Sentinel Chat */}
-        <ChatSection onRefresh={() => { fetchInsights(); fetchBriefs() }} />
+        <ChatSection onRefresh={() => { fetchInsights(); fetchBriefs() }} initialPrompt={initialPrompt} />
 
         {/* Section 2: Insights */}
         <InsightsSection

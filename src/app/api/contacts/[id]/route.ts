@@ -25,6 +25,23 @@ export async function GET(
       deals: {
         orderBy: { createdAt: "desc" },
       },
+      aiInsights: {
+        where: { dismissed: false },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      },
+      meetingBriefs: {
+        orderBy: { meetingDate: "desc" },
+        take: 10,
+      },
+      companyIntel: {
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
+      emails: {
+        orderBy: { date: "desc" },
+        take: 20,
+      },
     },
   })
 

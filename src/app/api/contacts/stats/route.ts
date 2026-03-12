@@ -71,6 +71,47 @@ export async function GET() {
     take: 10,
   })
 
+  // Sentinel stats
+  let sentinelStats = null
+  try {
+    const now = new Date()
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 86400000)
+
+    const [totalInsightsCount, activeInsightsCount, totalBriefsCount, upcomingMeetingsCount] = await Promise.all([
+      prisma.aIInsight.count(),
+      prisma.aIInsight.count({ where: { dismissed: false } }),
+      prisma.meetingBrief.count(),
+      prisma.calendarEvent.count({
+        where: { startTime: { gte: now, lte: sevenDaysFromNow } },
+      }),
+    ])
+
+    const briefCoverage = upcomingMeetingsCount > 0
+      ? Math.round((totalBriefsCount / upcomingMeetingsCount) * 100)
+      : 0
+
+    const riskInsights = await prisma.aIInsight.findMany({
+      where: { type: { in: ["risk", "churn_warning"] }, dismissed: false, contactId: { not: null } },
+      select: { contactId: true },
+    })
+    const riskIds = [...new Set(riskInsights.map((i) => i.contactId).filter(Boolean))] as string[]
+    let revenueAtRisk = 0
+    if (riskIds.length > 0) {
+      const agg = await prisma.deal.aggregate({
+        where: { contactId: { in: riskIds }, stage: { notIn: ["closed_won", "closed_lost"] } },
+        _sum: { expectedRevenue: true },
+      })
+      revenueAtRisk = agg._sum.expectedRevenue ?? 0
+    }
+
+    sentinelStats = {
+      totalInsights: totalInsightsCount,
+      activeInsights: activeInsightsCount,
+      briefCoverage,
+      revenueAtRisk,
+    }
+  } catch { /* sentinel stats optional */ }
+
   return NextResponse.json({
     stats: {
       totalContacts,
@@ -91,6 +132,7 @@ export async function GET() {
         })),
       monthlyNew,
       topDeals,
+      sentinelStats,
     },
   })
 }

@@ -50,13 +50,13 @@ export default function CompanyIntelPanel({ contactId }: CompanyIntelPanelProps)
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 14 }}>{"\uD83E\uDD16"}</span>
+          <span style={{ fontSize: 14 }}>{"\uD83D\uDEE1\uFE0F"}</span>
           <span style={{
             fontSize: 11, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
             background: "linear-gradient(90deg, #C08B88, #E8C4C0)",
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
           }}>
-            AI Company Intel
+            Sentinel Company Intel
           </span>
         </div>
         <button
