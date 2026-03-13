@@ -16,23 +16,49 @@ interface GoogleCalendarEvent {
 
 interface GoogleCalendarResponse {
   items?: GoogleCalendarEvent[]
+  nextPageToken?: string
 }
 
-async function fetchCalendarEvents(accessToken: string, timeMin: string, timeMax: string) {
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-      new URLSearchParams({
-        timeMin,
-        timeMax,
-        singleEvents: "true",
-        orderBy: "startTime",
-        maxResults: "250",
-      }),
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
+// Fetch ALL calendar events with pagination (Google limits to 250 per page)
+async function fetchAllCalendarEvents(
+  accessToken: string,
+  timeMin: string,
+  timeMax: string
+): Promise<{ events: GoogleCalendarEvent[]; error?: string; status?: number }> {
+  const allEvents: GoogleCalendarEvent[] = []
+  let pageToken: string | undefined
+
+  for (let page = 0; page < 10; page++) {
+    const params: Record<string, string> = {
+      timeMin,
+      timeMax,
+      singleEvents: "true",
+      orderBy: "startTime",
+      maxResults: "250",
     }
-  )
-  return { response: res, status: res.status }
+    if (pageToken) params.pageToken = pageToken
+
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+        new URLSearchParams(params),
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    )
+
+    if (!res.ok) {
+      const errorBody = await res.text()
+      return { events: allEvents, error: errorBody, status: res.status }
+    }
+
+    const data: GoogleCalendarResponse = await res.json()
+    if (data.items) allEvents.push(...data.items)
+
+    if (!data.nextPageToken) break
+    pageToken = data.nextPageToken
+  }
+
+  return { events: allEvents }
 }
 
 async function syncUserCalendar(
@@ -84,10 +110,10 @@ async function syncUserCalendar(
   const timeMin = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString()
 
-  let { response, status } = await fetchCalendarEvents(accessToken, timeMin, timeMax)
+  let result = await fetchAllCalendarEvents(accessToken, timeMin, timeMax)
 
   // Retry on 401
-  if (status === 401 && account.refresh_token) {
+  if (result.status === 401 && account.refresh_token) {
     const newToken = await refreshAccessToken(account.refresh_token)
     if (newToken) {
       accessToken = newToken
@@ -103,20 +129,16 @@ async function syncUserCalendar(
           expires_at: Math.floor(Date.now() / 1000) + 3600,
         },
       })
-      const retry = await fetchCalendarEvents(accessToken, timeMin, timeMax)
-      response = retry.response
-      status = retry.status
+      result = await fetchAllCalendarEvents(accessToken, timeMin, timeMax)
     }
   }
 
-  if (!response.ok) {
-    const errorBody = await response.text()
-    console.error(`[SYNC] Google API error ${status} for ${userEmail}:`, errorBody)
-    return { synced: 0, error: `Google API error ${status} for ${userEmail}. Try signing out and back in.` }
+  if (result.error && result.events.length === 0) {
+    console.error(`[SYNC] Google API error ${result.status} for ${userEmail}:`, result.error)
+    return { synced: 0, error: `Google API error ${result.status} for ${userEmail}. Try signing out and back in.` }
   }
 
-  const calendarData: GoogleCalendarResponse = await response.json()
-  const events = calendarData.items ?? []
+  const events = result.events
   console.log(`[SYNC] Got ${events.length} events from Google for ${userEmail}`)
 
   let synced = 0
