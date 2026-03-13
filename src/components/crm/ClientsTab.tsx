@@ -4,8 +4,9 @@ import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
-  FROST, SECTOR_COLORS, STATUS_COLORS, HEALTH_COLORS,
-  SECTORS, STATUSES, SEGMENTS,
+  FROST, ROSE_GOLD, GREEN, INDIGO,
+  SECTOR_COLORS, STATUS_COLORS, HEALTH_COLORS, OUTREACH_STATUS_COLORS, AGENT_TYPE_COLORS,
+  SECTORS, STATUSES, SEGMENTS, OUTREACH_STATUSES,
 } from "./constants"
 import type { Contact, Employee } from "./types"
 
@@ -14,7 +15,7 @@ interface ClientsTabProps {
   employees: Employee[]
 }
 
-type SortKey = "name" | "company" | "sector" | "status" | "value" | "assignedTo" | "createdAt" | "healthStatus" | "monthlyGtv" | "monthlyRevenue" | "takeRate" | "segment"
+type SortKey = "name" | "company" | "sector" | "status" | "value" | "assignedTo" | "createdAt" | "healthStatus" | "monthlyGtv" | "monthlyRevenue" | "takeRate" | "segment" | "priorityScore" | "outreachStatus"
 
 export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
   const router = useRouter()
@@ -24,6 +25,8 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
   const [assigneeFilter, setAssigneeFilter] = useState("all")
   const [healthFilter, setHealthFilter] = useState("all")
   const [segmentFilter, setSegmentFilter] = useState("all")
+  const [agentFilter, setAgentFilter] = useState("all")
+  const [outreachFilter, setOutreachFilter] = useState("all")
   const [sortBy, setSortBy] = useState<SortKey>("createdAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
 
@@ -32,7 +35,7 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
       setSortDir(sortDir === "asc" ? "desc" : "asc")
     } else {
       setSortBy(key)
-      setSortDir(key === "monthlyGtv" || key === "monthlyRevenue" || key === "value" ? "desc" : "asc")
+      setSortDir(key === "monthlyGtv" || key === "monthlyRevenue" || key === "value" || key === "priorityScore" ? "desc" : "asc")
     }
   }
 
@@ -53,6 +56,14 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
     if (assigneeFilter !== "all") result = result.filter((c) => c.assignedTo === assigneeFilter)
     if (healthFilter !== "all") result = result.filter((c) => c.healthStatus === healthFilter)
     if (segmentFilter !== "all") result = result.filter((c) => c.segment === segmentFilter)
+    if (agentFilter !== "all") {
+      if (agentFilter === "none") {
+        result = result.filter((c) => !c.agentId)
+      } else {
+        result = result.filter((c) => c.agentId === agentFilter)
+      }
+    }
+    if (outreachFilter !== "all") result = result.filter((c) => c.outreachStatus === outreachFilter)
 
     result.sort((a, b) => {
       let aVal: string | number = ""
@@ -71,6 +82,8 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
         case "monthlyRevenue": aVal = a.monthlyRevenue ?? 0; bVal = b.monthlyRevenue ?? 0; break
         case "takeRate": aVal = a.takeRate ?? 0; bVal = b.takeRate ?? 0; break
         case "segment": aVal = (a.segment || "").toLowerCase(); bVal = (b.segment || "").toLowerCase(); break
+        case "priorityScore": aVal = a.priorityScore ?? 0; bVal = b.priorityScore ?? 0; break
+        case "outreachStatus": aVal = a.outreachStatus || ""; bVal = b.outreachStatus || ""; break
       }
 
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1
@@ -79,7 +92,7 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
     })
 
     return result
-  }, [contacts, search, statusFilter, sectorFilter, assigneeFilter, healthFilter, segmentFilter, sortBy, sortDir])
+  }, [contacts, search, statusFilter, sectorFilter, assigneeFilter, healthFilter, segmentFilter, agentFilter, outreachFilter, sortBy, sortDir])
 
   const formatValue = (val: number | null, prefix = "€") => {
     if (val == null) return "—"
@@ -112,6 +125,13 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
   }
 
   const uniqueAssignees = [...new Set(contacts.map((c) => c.assignedTo).filter(Boolean))] as string[]
+  const uniqueAgents = useMemo(() => {
+    const map = new Map<string, string>()
+    contacts.forEach((c) => {
+      if (c.agent && c.agentId) map.set(c.agentId, c.agent.name)
+    })
+    return Array.from(map.entries())
+  }, [contacts])
 
   const thStyle: React.CSSProperties = {
     fontSize: 10,
@@ -220,6 +240,31 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
           ))}
         </select>
 
+        <select
+          className="oxen-input"
+          value={agentFilter}
+          onChange={(e) => setAgentFilter(e.target.value)}
+          style={{ width: 130, appearance: "none" }}
+        >
+          <option value="all">All Agents</option>
+          <option value="none">No Agent</option>
+          {uniqueAgents.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
+
+        <select
+          className="oxen-input"
+          value={outreachFilter}
+          onChange={(e) => setOutreachFilter(e.target.value)}
+          style={{ width: 130, appearance: "none" }}
+        >
+          <option value="all">All Outreach</option>
+          {OUTREACH_STATUSES.map((s) => (
+            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+          ))}
+        </select>
+
         <span
           style={{
             fontSize: 11,
@@ -255,6 +300,15 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
                 </th>
                 <th style={thStyle} onClick={() => toggleSort("status")}>
                   Status{sortIcon("status")}
+                </th>
+                <th style={{ ...thStyle, textAlign: "center" }} onClick={() => toggleSort("priorityScore")}>
+                  Priority{sortIcon("priorityScore")}
+                </th>
+                <th style={thStyle}>
+                  Agent
+                </th>
+                <th style={thStyle} onClick={() => toggleSort("outreachStatus")}>
+                  Outreach{sortIcon("outreachStatus")}
                 </th>
                 <th style={{ ...thStyle, textAlign: "right" }} onClick={() => toggleSort("monthlyGtv")}>
                   Monthly GTV{sortIcon("monthlyGtv")}
@@ -346,6 +400,35 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
                         {contact.status}
                       </span>
                     </td>
+                    <td style={{ ...tdStyle, textAlign: "center" }}>
+                      {contact.priorityScore != null && contact.priorityScore > 0 ? (
+                        <span style={{
+                          fontSize: 11, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+                          color: contact.priorityScore >= 70 ? ROSE_GOLD : contact.priorityScore >= 40 ? INDIGO : TEXT_SECONDARY,
+                        }}>
+                          {contact.priorityScore}
+                        </span>
+                      ) : (
+                        <span style={{ color: TEXT_TERTIARY }}>{"\u2014"}</span>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: 11, color: TEXT_SECONDARY }}>
+                      {contact.agent ? contact.agent.name : "\u2014"}
+                    </td>
+                    <td style={tdStyle}>
+                      {contact.outreachStatus ? (
+                        <span style={{
+                          fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 500,
+                          padding: "2px 6px", borderRadius: 8,
+                          background: OUTREACH_STATUS_COLORS[contact.outreachStatus]?.bg || "rgba(255,255,255,0.06)",
+                          color: OUTREACH_STATUS_COLORS[contact.outreachStatus]?.text || TEXT_SECONDARY,
+                        }}>
+                          {contact.outreachStatus}
+                        </span>
+                      ) : (
+                        <span style={{ color: TEXT_TERTIARY }}>{"\u2014"}</span>
+                      )}
+                    </td>
                     <td style={{ ...tdStyle, textAlign: "right", fontFamily: "'Bellfair', serif", fontSize: 13 }}>
                       {formatValue(contact.monthlyGtv)}
                     </td>
@@ -367,7 +450,7 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={14}
                     style={{
                       ...tdStyle,
                       textAlign: "center",
@@ -375,7 +458,7 @@ export default function ClientsTab({ contacts, employees }: ClientsTabProps) {
                       color: TEXT_TERTIARY,
                     }}
                   >
-                    {search || statusFilter !== "all" || sectorFilter !== "all" || healthFilter !== "all"
+                    {search || statusFilter !== "all" || sectorFilter !== "all" || healthFilter !== "all" || agentFilter !== "all" || outreachFilter !== "all"
                       ? "No contacts match your filters"
                       : "No contacts yet — click \"+ New Contact\" to add one"}
                   </td>

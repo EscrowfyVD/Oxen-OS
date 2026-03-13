@@ -4,8 +4,9 @@ import { useState, useEffect } from "react"
 import {
   CARD_BG, CARD_BORDER, TEXT_TERTIARY, RED, FROST,
   SECTORS, STATUSES, SOURCES, SEGMENTS, labelStyle,
+  LEAD_SOURCES, CLIENT_TYPES, OUTREACH_STATUSES,
 } from "./constants"
-import type { Contact, Employee, ContactFormData } from "./types"
+import type { Contact, Employee, ContactFormData, Agent } from "./types"
 
 interface ContactModalProps {
   show: boolean
@@ -37,15 +38,31 @@ const emptyForm: ContactFormData = {
   takeRate: "",
   segment: "",
   projectedVolume: "",
+  clientType: "",
+  vertical: "",
+  leadSource: "",
+  outreachStatus: "",
+  agentId: "",
 }
 
 export default function ContactModal({ show, onClose, contact, employees, onSaved }: ContactModalProps) {
   const [form, setForm] = useState<ContactFormData>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [showCro, setShowCro] = useState(false)
+  const [showGtm, setShowGtm] = useState(false)
   const [showResearchPrompt, setShowResearchPrompt] = useState(false)
   const [newContactId, setNewContactId] = useState<string | null>(null)
   const [researchingCompany, setResearchingCompany] = useState(false)
+  const [agents, setAgents] = useState<Agent[]>([])
+
+  useEffect(() => {
+    if (show) {
+      fetch("/api/agents?status=active")
+        .then((r) => r.json())
+        .then((data) => setAgents(data.agents ?? []))
+        .catch(() => {})
+    }
+  }, [show])
 
   useEffect(() => {
     if (contact) {
@@ -71,14 +88,22 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
         takeRate: contact.takeRate != null ? String(contact.takeRate) : "",
         segment: contact.segment || "",
         projectedVolume: contact.projectedVolume != null ? String(contact.projectedVolume) : "",
+        clientType: contact.clientType || "",
+        vertical: contact.vertical || "",
+        leadSource: contact.leadSource || "",
+        outreachStatus: contact.outreachStatus || "",
+        agentId: contact.agentId || "",
       })
-      // Show CRO section if any CRO fields are filled
       if (contact.monthlyGtv || contact.monthlyRevenue || contact.takeRate || contact.segment) {
         setShowCro(true)
+      }
+      if (contact.clientType || contact.leadSource || contact.outreachStatus || contact.agentId || contact.vertical) {
+        setShowGtm(true)
       }
     } else {
       setForm(emptyForm)
       setShowCro(false)
+      setShowGtm(false)
     }
   }, [contact, show])
 
@@ -130,6 +155,11 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           takeRate: form.takeRate || null,
           segment: form.segment || null,
           projectedVolume: form.projectedVolume || null,
+          clientType: form.clientType || null,
+          vertical: form.vertical?.trim() || null,
+          leadSource: form.leadSource || null,
+          outreachStatus: form.outreachStatus || null,
+          agentId: form.agentId || null,
         }),
       })
 
@@ -390,6 +420,73 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
                   <label style={labelStyle}>Projected Volume (€)</label>
                   <input className="oxen-input" type="number" value={form.projectedVolume} onChange={(e) => set("projectedVolume", e.target.value)} placeholder="0" />
                 </div>
+              </div>
+            </>
+          )}
+
+          {/* ── GTM Section Toggle ── */}
+          <div
+            onClick={() => setShowGtm(!showGtm)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+              padding: "6px 0",
+              borderTop: "1px solid rgba(255,255,255,0.03)",
+              marginTop: 4,
+            }}
+          >
+            <span style={{ fontSize: 12, color: TEXT_TERTIARY, transition: "transform 0.2s", transform: showGtm ? "rotate(180deg)" : "rotate(0)" }}>
+              {"\u25BE"}
+            </span>
+            <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+              GTM &amp; Outreach
+            </span>
+          </div>
+
+          {showGtm && (
+            <>
+              {/* GTM Row 1: Agent, Client Type */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Agent / Referrer</label>
+                  <select className="oxen-input" value={form.agentId} onChange={(e) => set("agentId", e.target.value)} style={{ appearance: "none" }}>
+                    <option value="">No agent</option>
+                    {agents.map((a) => (<option key={a.id} value={a.id}>{a.name}{a.company ? ` (${a.company})` : ""}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Client Type</label>
+                  <select className="oxen-input" value={form.clientType} onChange={(e) => set("clientType", e.target.value)} style={{ appearance: "none" }}>
+                    <option value="">Select type...</option>
+                    {CLIENT_TYPES.map((t) => (<option key={t} value={t}>{t.replace(/_/g, " ")}</option>))}
+                  </select>
+                </div>
+              </div>
+
+              {/* GTM Row 2: Lead Source, Outreach Status */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Lead Source</label>
+                  <select className="oxen-input" value={form.leadSource} onChange={(e) => set("leadSource", e.target.value)} style={{ appearance: "none" }}>
+                    <option value="">Select source...</option>
+                    {LEAD_SOURCES.map((s) => (<option key={s} value={s}>{s}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Outreach Status</label>
+                  <select className="oxen-input" value={form.outreachStatus} onChange={(e) => set("outreachStatus", e.target.value)} style={{ appearance: "none" }}>
+                    <option value="">Select status...</option>
+                    {OUTREACH_STATUSES.map((s) => (<option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>))}
+                  </select>
+                </div>
+              </div>
+
+              {/* GTM Row 3: Vertical */}
+              <div>
+                <label style={labelStyle}>Vertical</label>
+                <input className="oxen-input" value={form.vertical} onChange={(e) => set("vertical", e.target.value)} placeholder="e.g. Payments, SaaS..." />
               </div>
             </>
           )}

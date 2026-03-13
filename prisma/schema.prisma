@@ -233,6 +233,19 @@ model Contact {
   takeRate        Float?
   segment         String?
   projectedVolume Float?
+  // GTM fields
+  clientType        String?
+  vertical          String?
+  icpScore          Int?              @default(0)
+  intentScore       Int?              @default(0)
+  priorityScore     Int?              @default(0)
+  leadSource        String?
+  outreachStatus    String?           @default("new")
+  lemlistCampaignId String?
+  lastContactedAt   DateTime?
+  lastRepliedAt     DateTime?
+  agentId           String?
+  agent             Agent?            @relation(fields: [agentId], references: [id])
   createdBy       String
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
@@ -244,6 +257,8 @@ model Contact {
   meetingBriefs   MeetingBrief[]   @relation("ContactBriefs")
   aiInsights      AIInsight[]      @relation("ContactInsights")
   emails          Email[]          @relation("ContactEmails")
+  signals         IntentSignal[]
+  outreachSequences OutreachSequence[]
 }
 
 model Interaction {
@@ -519,4 +534,60 @@ model Email {
   direction     String   @default("inbound")
   syncedBy      String
   createdAt     DateTime @default(now())
+}
+
+// ─── Agent / Referral Partner ───
+
+model Agent {
+  id                  String    @id @default(cuid())
+  name                String
+  company             String?
+  type                String    @default("broker")
+  email               String?
+  phone               String?
+  telegram            String?
+  whatsapp            String?
+  country             String?
+  website             String?
+  commissionDirect    Float     @default(15)
+  commissionIndirect  Float     @default(5)
+  status              String    @default("prospect")
+  onboardedAt         DateTime?
+  notes               String?   @db.Text
+  createdBy           String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  referredClients     Contact[]
+}
+
+// ─── Intent Signals ───
+
+model IntentSignal {
+  id          String    @id @default(cuid())
+  contactId   String
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  source      String
+  signalType  String
+  title       String
+  detail      String?   @db.Text
+  score       Int       @default(0)
+  expiresAt   DateTime?
+  raw         Json?
+  createdAt   DateTime  @default(now())
+}
+
+// ─── Outreach Sequences ───
+
+model OutreachSequence {
+  id              String   @id @default(cuid())
+  contactId       String
+  contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  platform        String
+  campaignName    String?
+  status          String   @default("active")
+  stepsCompleted  Int      @default(0)
+  totalSteps      Int      @default(0)
+  lastStepAt      DateTime?
+  enqueuedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

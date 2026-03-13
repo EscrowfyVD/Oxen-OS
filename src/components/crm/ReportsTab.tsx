@@ -5,9 +5,9 @@ import Sparkline from "@/components/dashboard/Sparkline"
 import DonutChart from "@/components/dashboard/DonutChart"
 import RevenueChart from "@/components/dashboard/RevenueChart"
 import {
-  CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
-  FROST, GREEN, AMBER, INDIGO, RED, ROSE_GOLD, PURPLE,
-  STATUS_COLORS, SECTOR_COLORS,
+  CARD_BG, CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
+  FROST, GREEN, AMBER, INDIGO, RED, ROSE_GOLD, PURPLE, TEAL, CYAN,
+  STATUS_COLORS, SECTOR_COLORS, AGENT_TYPE_COLORS,
 } from "./constants"
 import type { CrmStats } from "./types"
 
@@ -261,6 +261,122 @@ export default function ReportsTab({ stats }: ReportsTabProps) {
               <div style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>
                 linked to risk/churn insights
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Referral Performance ── */}
+      {stats.agentStats && (stats.agentStats.revenueByAgent.length > 0 || stats.agentStats.referralsByType.length > 0) && (
+        <div
+          className="fade-in"
+          style={{ marginBottom: 24, animationDelay: "0.13s" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 14 }}>{"\uD83E\uDD1D"}</span>
+            <span style={{
+              fontSize: 13, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+              background: "linear-gradient(90deg, #C08B88, #E8C4C0)",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            }}>
+              Referral Performance
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            {/* Revenue by Agent */}
+            <div className="card" style={{ padding: 20 }}>
+              <div style={sectionTitle}>Revenue by Agent</div>
+              {stats.agentStats.revenueByAgent.length > 0 ? (
+                <RevenueChart
+                  data={stats.agentStats.revenueByAgent.slice(0, 8).map((a) => ({
+                    label: a.agentName.split(" ")[0],
+                    value: a.revenue,
+                  }))}
+                />
+              ) : (
+                <div style={{ color: TEXT_TERTIARY, fontSize: 12, textAlign: "center", padding: "20px 0" }}>No data yet</div>
+              )}
+            </div>
+
+            {/* Referrals by Agent Type */}
+            <div className="card" style={{ padding: 20 }}>
+              <div style={sectionTitle}>Referrals by Agent Type</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+                <DonutChart
+                  segments={
+                    stats.agentStats.referralsByType.length > 0
+                      ? stats.agentStats.referralsByType.map((r) => ({
+                          value: r.count,
+                          color: AGENT_TYPE_COLORS[r.type]?.text || TEXT_SECONDARY,
+                        }))
+                      : [{ value: 1, color: "rgba(255,255,255,0.06)" }]
+                  }
+                  size={120}
+                />
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                  {stats.agentStats.referralsByType.map((r) => {
+                    const color = AGENT_TYPE_COLORS[r.type]?.text || TEXT_SECONDARY
+                    return (
+                      <div key={r.type} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", flex: 1, textTransform: "capitalize" }}>
+                          {r.type.replace(/_/g, " ")}
+                        </span>
+                        <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+                          {r.count}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            {/* Monthly Referral Trend */}
+            <div className="card" style={{ padding: 20 }}>
+              <div style={sectionTitle}>Monthly Referrals</div>
+              {stats.agentStats.monthlyReferrals.length > 0 ? (
+                <RevenueChart
+                  data={stats.agentStats.monthlyReferrals.map((m) => ({
+                    label: m.month.substring(5),
+                    value: m.count,
+                  }))}
+                />
+              ) : (
+                <div style={{ color: TEXT_TERTIARY, fontSize: 12, textAlign: "center", padding: "20px 0" }}>No data yet</div>
+              )}
+            </div>
+
+            {/* Conversion Rate by Agent Type */}
+            <div className="card" style={{ padding: 20 }}>
+              <div style={sectionTitle}>Conversion by Type</div>
+              {stats.agentStats.conversionByType.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {stats.agentStats.conversionByType.map((c) => {
+                    const color = AGENT_TYPE_COLORS[c.type]?.text || TEXT_SECONDARY
+                    return (
+                      <div key={c.type}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                          <span style={{ fontSize: 11, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", textTransform: "capitalize" }}>
+                            {c.type.replace(/_/g, " ")}
+                          </span>
+                          <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+                            {c.rate.toFixed(0)}%
+                          </span>
+                        </div>
+                        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.04)", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.min(c.rate, 100)}%`, borderRadius: 3, background: color, transition: "width 0.6s ease" }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div style={{ color: TEXT_TERTIARY, fontSize: 12, textAlign: "center", padding: "20px 0" }}>No data yet</div>
+              )}
             </div>
           </div>
         </div>

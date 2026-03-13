@@ -121,6 +121,7 @@ const LEAVE_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
 export default function DashboardPage() {
   const [clock, setClock] = useState("")
   const [whoIsOut, setWhoIsOut] = useState<Array<{ id: string; employee: { name: string; initials: string; avatarColor: string }; type: string }>>([])
+  const [topAgents, setTopAgents] = useState<Array<{ name: string; totalRevenue: number; type: string; _count?: { referredClients: number } }>>([])
 
   useEffect(() => {
     const tick = () => {
@@ -143,6 +144,15 @@ export default function DashboardPage() {
     fetch("/api/leaves/who-is-out")
       .then((r) => r.json())
       .then((data) => setWhoIsOut(data.today ?? []))
+      .catch(() => {})
+    fetch("/api/agents?status=active")
+      .then((r) => r.json())
+      .then((data) => {
+        const sorted = (data.agents ?? [])
+          .sort((a: { totalRevenue: number }, b: { totalRevenue: number }) => (b.totalRevenue ?? 0) - (a.totalRevenue ?? 0))
+          .slice(0, 3)
+        setTopAgents(sorted)
+      })
       .catch(() => {})
   }, [])
 
@@ -764,6 +774,54 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Top Agents ── */}
+        {topAgents.length > 0 && (
+          <div
+            className="card fade-in"
+            style={{ marginTop: 16, overflow: "hidden", animationDelay: "0.25s" }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 20px",
+                borderBottom: "1px solid rgba(255,255,255,0.03)",
+                background: "rgba(255,255,255,0.01)",
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>
+                Top Agents
+              </span>
+              <a href="/crm" style={{ fontSize: 11, color: ROSE_GOLD, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 500, textDecoration: "none" }}>
+                View All &rarr;
+              </a>
+            </div>
+            <div style={{ padding: "8px 20px 12px" }}>
+              {topAgents.map((agent, i) => {
+                const medals = ["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"]
+                return (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
+                    borderBottom: i < topAgents.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none",
+                  }}>
+                    <span style={{ fontSize: 20, width: 28, textAlign: "center" }}>{medals[i]}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>{agent.name}</div>
+                      <div style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+                        {agent.type?.replace(/_/g, " ")} {agent._count?.referredClients ? `\u00B7 ${agent._count.referredClients} clients` : ""}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 14, color: GREEN, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
+                      {"\u20AC"}{(agent.totalRevenue ?? 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

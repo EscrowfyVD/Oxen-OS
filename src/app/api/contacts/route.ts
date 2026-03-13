@@ -42,6 +42,9 @@ export async function GET(request: Request) {
         orderBy: { createdAt: "desc" },
         take: 1,
       },
+      agent: {
+        select: { id: true, name: true, company: true, type: true },
+      },
     },
     orderBy: { [sortBy]: sortDir },
   })
@@ -61,6 +64,7 @@ export async function POST(request: Request) {
     value, currency, notes, assignedTo, telegram, whatsapp,
     website, country, healthStatus, monthlyGtv, monthlyRevenue,
     takeRate, segment, projectedVolume,
+    clientType, vertical, leadSource, outreachStatus, agentId,
   } = body
 
   if (!name) {
@@ -95,6 +99,11 @@ export async function POST(request: Request) {
       takeRate: takeRate ? parseFloat(takeRate) : null,
       segment: segment ?? null,
       projectedVolume: projectedVolume ? parseFloat(projectedVolume) : null,
+      clientType: clientType ?? null,
+      vertical: vertical ?? null,
+      leadSource: leadSource ?? null,
+      outreachStatus: outreachStatus ?? "new",
+      agentId: agentId ?? null,
       createdBy: userId,
     },
   })

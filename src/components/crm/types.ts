@@ -26,6 +26,20 @@ export interface Contact {
   takeRate: number | null
   segment: string | null
   projectedVolume: number | null
+  // GTM fields
+  clientType: string | null
+  vertical: string | null
+  icpScore: number | null
+  intentScore: number | null
+  priorityScore: number | null
+  leadSource: string | null
+  outreachStatus: string | null
+  lemlistCampaignId: string | null
+  lastContactedAt: string | null
+  lastRepliedAt: string | null
+  agentId: string | null
+  agent?: Agent | null
+  signals?: IntentSignal[]
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -111,6 +125,12 @@ export interface ContactFormData {
   takeRate: string
   segment: string
   projectedVolume: string
+  // GTM fields
+  clientType: string
+  vertical: string
+  leadSource: string
+  outreachStatus: string
+  agentId: string
 }
 
 export interface DealFormData {
@@ -124,6 +144,75 @@ export interface DealFormData {
   closeDate: string
   assignedTo: string
   notes: string
+}
+
+/* ── Agent / Referral Partner ── */
+
+export interface Agent {
+  id: string
+  name: string
+  company: string | null
+  type: string
+  email: string | null
+  phone: string | null
+  telegram: string | null
+  whatsapp: string | null
+  country: string | null
+  website: string | null
+  commissionDirect: number
+  commissionIndirect: number
+  status: string
+  onboardedAt: string | null
+  notes: string | null
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  referredClients?: Contact[]
+  _count?: { referredClients: number }
+}
+
+export interface AgentFormData {
+  name: string
+  company: string
+  type: string
+  email: string
+  phone: string
+  telegram: string
+  whatsapp: string
+  country: string
+  website: string
+  commissionDirect: string
+  commissionIndirect: string
+  status: string
+  notes: string
+}
+
+/* ── Intent Signals ── */
+
+export interface IntentSignal {
+  id: string
+  contactId: string
+  source: string
+  signalType: string
+  title: string
+  detail: string | null
+  score: number
+  expiresAt: string | null
+  createdAt: string
+}
+
+/* ── Outreach Sequences ── */
+
+export interface OutreachSequence {
+  id: string
+  contactId: string
+  platform: string
+  campaignName: string | null
+  status: string
+  stepsCompleted: number
+  totalSteps: number
+  lastStepAt: string | null
+  enqueuedAt: string
 }
 
 /* ── CRO Dashboard Types ── */
@@ -232,5 +321,11 @@ export interface CrmStats {
     activeInsights: number
     briefCoverage: number
     revenueAtRisk: number
+  }
+  agentStats?: {
+    revenueByAgent: Array<{ agentId: string; agentName: string; revenue: number }>
+    referralsByType: Array<{ type: string; count: number }>
+    monthlyReferrals: Array<{ month: string; count: number }>
+    conversionByType: Array<{ type: string; rate: number }>
   }
 }

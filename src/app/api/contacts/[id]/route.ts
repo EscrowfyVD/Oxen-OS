@@ -42,6 +42,17 @@ export async function GET(
         orderBy: { date: "desc" },
         take: 20,
       },
+      agent: {
+        select: { id: true, name: true, company: true, type: true },
+      },
+      signals: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      },
+      outreachSequences: {
+        orderBy: { updatedAt: "desc" },
+        take: 5,
+      },
     },
   })
 
@@ -68,6 +79,7 @@ export async function PATCH(
     value, currency, notes, assignedTo, telegram, whatsapp,
     website, country, healthStatus, monthlyGtv, monthlyRevenue,
     takeRate, segment, projectedVolume,
+    clientType, vertical, leadSource, outreachStatus, agentId,
   } = body
 
   const existing = await prisma.contact.findUnique({ where: { id } })
@@ -99,6 +111,11 @@ export async function PATCH(
       ...(takeRate !== undefined && { takeRate: takeRate !== null ? parseFloat(takeRate) : null }),
       ...(segment !== undefined && { segment: segment || null }),
       ...(projectedVolume !== undefined && { projectedVolume: projectedVolume !== null ? parseFloat(projectedVolume) : null }),
+      ...(clientType !== undefined && { clientType: clientType || null }),
+      ...(vertical !== undefined && { vertical: vertical || null }),
+      ...(leadSource !== undefined && { leadSource: leadSource || null }),
+      ...(outreachStatus !== undefined && { outreachStatus: outreachStatus || null }),
+      ...(agentId !== undefined && { agentId: agentId || null }),
     },
   })
 

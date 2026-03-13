@@ -109,6 +109,48 @@ export const INTERACTION_ICONS: Record<string, string> = {
   telegram: "✈",
 }
 
+/* ── Agent types ── */
+export const AGENT_TYPES = ["fiduciary", "csp", "lawyer", "family_office", "relocation", "luxury", "broker", "other"]
+
+export const AGENT_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  fiduciary:     { bg: "rgba(129,140,248,0.12)", text: INDIGO },
+  csp:           { bg: "rgba(52,211,153,0.12)", text: GREEN },
+  lawyer:        { bg: "rgba(192,139,136,0.12)", text: ROSE_GOLD },
+  family_office: { bg: "rgba(251,191,36,0.12)", text: AMBER },
+  relocation:    { bg: "rgba(34,211,238,0.12)", text: CYAN },
+  luxury:        { bg: "rgba(167,139,250,0.12)", text: PURPLE },
+  broker:        { bg: "rgba(45,212,191,0.12)", text: TEAL },
+  other:         { bg: "rgba(255,255,255,0.06)", text: TEXT_SECONDARY },
+}
+
+export const AGENT_STATUSES = ["prospect", "active", "inactive"]
+
+/* ── GTM outreach & lead ── */
+export const OUTREACH_STATUSES = ["new", "enriched", "sequenced", "replied", "converted", "disqualified"]
+export const LEAD_SOURCES = [...SOURCES, "Trigify", "Clay", "n8n", "Agent Referral"]
+export const CLIENT_TYPES = ["direct", "agent_referred", "partner"]
+
+/* ── Signal type colors ── */
+export const SIGNAL_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  job_change:       { bg: "rgba(129,140,248,0.12)", text: INDIGO },
+  funding:          { bg: "rgba(52,211,153,0.12)", text: GREEN },
+  expansion:        { bg: "rgba(251,191,36,0.12)", text: AMBER },
+  tech_install:     { bg: "rgba(34,211,238,0.12)", text: CYAN },
+  hiring:           { bg: "rgba(167,139,250,0.12)", text: PURPLE },
+  web_visit:        { bg: "rgba(192,139,136,0.12)", text: ROSE_GOLD },
+  content_download: { bg: "rgba(45,212,191,0.12)", text: TEAL },
+}
+
+/* ── Outreach status colors ── */
+export const OUTREACH_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  new:           { bg: "rgba(240,240,242,0.06)", text: TEXT_SECONDARY },
+  enriched:      { bg: "rgba(129,140,248,0.12)", text: INDIGO },
+  sequenced:     { bg: "rgba(251,191,36,0.12)", text: AMBER },
+  replied:       { bg: "rgba(192,139,136,0.12)", text: ROSE_GOLD },
+  converted:     { bg: "rgba(52,211,153,0.12)", text: GREEN },
+  disqualified:  { bg: "rgba(248,113,113,0.12)", text: RED },
+}
+
 /* ── Shared label style ── */
 export const labelStyle: React.CSSProperties = {
   display: "block",

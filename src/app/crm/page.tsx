@@ -7,10 +7,12 @@ import CroPipelineTab from "@/components/crm/CroPipelineTab"
 import RevenueTab from "@/components/crm/RevenueTab"
 import ForecastTab from "@/components/crm/ForecastTab"
 import ReportsTab from "@/components/crm/ReportsTab"
+import AgentsTab from "@/components/crm/AgentsTab"
 import ContactModal from "@/components/crm/ContactModal"
 import DealModal from "@/components/crm/DealModal"
+import AgentModal from "@/components/crm/AgentModal"
 import type {
-  Contact, Employee, CrmStats,
+  Contact, Employee, Agent, CrmStats,
   OverviewData, PipelineData, ForecastData, MetricsData,
 } from "@/components/crm/types"
 
@@ -21,7 +23,7 @@ const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
 const FROST = "#FFFFFF"
 
-type TabId = "overview" | "clients" | "pipeline" | "revenue" | "forecast" | "reports"
+type TabId = "overview" | "clients" | "pipeline" | "revenue" | "forecast" | "reports" | "agents"
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -30,6 +32,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "revenue", label: "Revenue" },
   { id: "forecast", label: "Forecast" },
   { id: "reports", label: "Reports" },
+  { id: "agents", label: "Agents" },
 ]
 
 export default function CrmPage() {
@@ -44,6 +47,9 @@ export default function CrmPage() {
   const [showContactModal, setShowContactModal] = useState(false)
   const [showDealModal, setShowDealModal] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [showAgentModal, setShowAgentModal] = useState(false)
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
 
   /* ── Fetchers ── */
   const fetchContacts = useCallback(() => {
@@ -95,6 +101,13 @@ export default function CrmPage() {
       .catch(() => {})
   }, [])
 
+  const fetchAgents = useCallback(() => {
+    fetch("/api/agents")
+      .then((r) => r.json())
+      .then((data) => setAgents(data.agents ?? []))
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     fetchContacts()
     fetchEmployees()
@@ -103,7 +116,8 @@ export default function CrmPage() {
     fetchPipeline()
     fetchForecast()
     fetchMetrics()
-  }, [fetchContacts, fetchEmployees, fetchStats, fetchOverview, fetchPipeline, fetchForecast, fetchMetrics])
+    fetchAgents()
+  }, [fetchContacts, fetchEmployees, fetchStats, fetchOverview, fetchPipeline, fetchForecast, fetchMetrics, fetchAgents])
 
   const refreshAll = () => {
     fetchContacts()
@@ -112,6 +126,7 @@ export default function CrmPage() {
     fetchPipeline()
     fetchForecast()
     fetchMetrics()
+    fetchAgents()
   }
 
   /* ── Handlers ── */
@@ -156,6 +171,7 @@ export default function CrmPage() {
       ? `${formatCurrency(forecastData.currentMonthlyRevenue)}/mo base revenue`
       : "Revenue forecast & projections",
     reports: "Analytics & conversion metrics",
+    agents: `${agents.length} agent${agents.length !== 1 ? "s" : ""} in network`,
   }
 
   return (
@@ -244,6 +260,11 @@ export default function CrmPage() {
               + New Deal
             </button>
           )}
+          {activeTab === "agents" && (
+            <button className="header-btn" onClick={() => { setEditingAgent(null); setShowAgentModal(true) }}>
+              + New Agent
+            </button>
+          )}
           <button className="header-btn" onClick={openNewContact}>
             + New Contact
           </button>
@@ -275,6 +296,14 @@ export default function CrmPage() {
         {activeTab === "reports" && (
           <ReportsTab stats={stats} />
         )}
+
+        {activeTab === "agents" && (
+          <AgentsTab
+            agents={agents}
+            onNewAgent={() => { setEditingAgent(null); setShowAgentModal(true) }}
+            onEditAgent={(a) => { setEditingAgent(a); setShowAgentModal(true) }}
+          />
+        )}
       </div>
 
       {/* ── Contact Modal ── */}
@@ -297,6 +326,14 @@ export default function CrmPage() {
         contacts={contacts}
         employees={employees}
         onSaved={handleDealSaved}
+      />
+
+      {/* ── Agent Modal ── */}
+      <AgentModal
+        show={showAgentModal}
+        onClose={() => { setShowAgentModal(false); setEditingAgent(null) }}
+        agent={editingAgent}
+        onSaved={() => { setShowAgentModal(false); setEditingAgent(null); fetchAgents() }}
       />
     </div>
   )

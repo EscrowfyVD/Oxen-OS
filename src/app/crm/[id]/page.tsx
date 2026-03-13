@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
   CARD_BORDER, TEXT_SECONDARY, TEXT_TERTIARY,
-  FROST, RED, AMBER, ROSE_GOLD,
-  SECTOR_COLORS, STATUS_COLORS, HEALTH_COLORS,
+  FROST, RED, AMBER, ROSE_GOLD, GREEN, INDIGO,
+  SECTOR_COLORS, STATUS_COLORS, HEALTH_COLORS, AGENT_TYPE_COLORS,
 } from "@/components/crm/constants"
 import type { Contact, Employee } from "@/components/crm/types"
 
@@ -14,12 +14,14 @@ import TimelineTab from "@/components/crm/detail/TimelineTab"
 import EmailsTab from "@/components/crm/detail/EmailsTab"
 import DealsTab from "@/components/crm/detail/DealsTab"
 import SentinelTab from "@/components/crm/detail/SentinelTab"
+import SignalsTab from "@/components/crm/detail/SignalsTab"
 
 const TABS = [
   { id: "overview", label: "Overview", icon: "\uD83D\uDCCB" },
   { id: "timeline", label: "Timeline", icon: "\uD83D\uDD52" },
   { id: "emails", label: "Emails", icon: "\u2709\uFE0F" },
   { id: "deals", label: "Deals", icon: "\uD83D\uDCCA" },
+  { id: "signals", label: "Signals", icon: "\uD83D\uDCE1" },
   { id: "sentinel", label: "Sentinel", icon: "\uD83D\uDEE1\uFE0F" },
 ] as const
 
@@ -37,6 +39,7 @@ export default function ContactDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [researching, setResearching] = useState(false)
   const [generatingBrief, setGeneratingBrief] = useState(false)
+  const [classifying, setClassifying] = useState(false)
 
   const fetchContact = useCallback(() => {
     fetch(`/api/contacts/${id}`)
@@ -91,6 +94,19 @@ export default function ContactDetailPage() {
       fetchContact()
     } catch { /* silent */ }
     setGeneratingBrief(false)
+  }
+
+  const classifyLead = async () => {
+    setClassifying(true)
+    try {
+      await fetch("/api/ai/classify-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactId: id }),
+      })
+      fetchContact()
+    } catch { /* silent */ }
+    setClassifying(false)
   }
 
   const handleDelete = async () => {
@@ -167,7 +183,39 @@ export default function ContactDetailPage() {
               {contact.company && (
                 <p style={{ fontSize: 12, color: TEXT_TERTIARY, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
                   {contact.name} {contact.segment && `\u00B7 ${contact.segment}`}
+                  {contact.agent && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); router.push(`/crm/agents/${contact.agent!.id}`) }}
+                      style={{
+                        marginLeft: 8, padding: "1px 6px", borderRadius: 4, fontSize: 9, cursor: "pointer",
+                        background: AGENT_TYPE_COLORS[contact.agent.type]?.bg ?? "rgba(255,255,255,0.06)",
+                        color: AGENT_TYPE_COLORS[contact.agent.type]?.text ?? TEXT_SECONDARY,
+                      }}
+                    >
+                      Agent: {contact.agent.name}
+                    </span>
+                  )}
                 </p>
+              )}
+              {/* Score badges */}
+              {(contact.icpScore || contact.intentScore || contact.priorityScore) && (
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  {contact.priorityScore != null && contact.priorityScore > 0 && (
+                    <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: "rgba(192,139,136,0.12)", color: ROSE_GOLD, fontFamily: "'DM Sans', sans-serif" }}>
+                      Priority: {contact.priorityScore}
+                    </span>
+                  )}
+                  {contact.icpScore != null && contact.icpScore > 0 && (
+                    <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: "rgba(129,140,248,0.12)", color: INDIGO, fontFamily: "'DM Sans', sans-serif" }}>
+                      ICP: {contact.icpScore}
+                    </span>
+                  )}
+                  {contact.intentScore != null && contact.intentScore > 0 && (
+                    <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: "rgba(52,211,153,0.12)", color: GREEN, fontFamily: "'DM Sans', sans-serif" }}>
+                      Intent: {contact.intentScore}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -230,6 +278,19 @@ export default function ContactDetailPage() {
             {generatingBrief ? "Generating..." : "\uD83D\uDCCB Generate Brief"}
           </button>
           <button
+            onClick={classifyLead}
+            disabled={classifying}
+            style={{
+              padding: "6px 14px", borderRadius: 8, fontSize: 10, fontWeight: 500,
+              fontFamily: "'DM Sans', sans-serif", cursor: classifying ? "wait" : "pointer",
+              background: classifying ? "rgba(129,140,248,0.08)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${classifying ? "rgba(129,140,248,0.2)" : CARD_BORDER}`,
+              color: classifying ? INDIGO : TEXT_SECONDARY,
+            }}
+          >
+            {classifying ? "Classifying..." : "\uD83C\uDFAF Classify Lead"}
+          </button>
+          <button
             onClick={() => setActiveTab("timeline")}
             style={{
               padding: "6px 14px", borderRadius: 8, fontSize: 10, fontWeight: 500,
@@ -284,6 +345,9 @@ export default function ContactDetailPage() {
         )}
         {activeTab === "deals" && (
           <DealsTab deals={contact.deals || []} contactId={id} employees={employees} onRefresh={fetchContact} />
+        )}
+        {activeTab === "signals" && (
+          <SignalsTab contactId={id} signals={contact.signals || []} onRefresh={fetchContact} />
         )}
         {activeTab === "sentinel" && (
           <SentinelTab

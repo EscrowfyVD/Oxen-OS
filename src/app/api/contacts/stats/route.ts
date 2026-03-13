@@ -112,6 +112,61 @@ export async function GET() {
     }
   } catch { /* sentinel stats optional */ }
 
+  // Agent / referral stats
+  let agentStats = null
+  try {
+    const agents = await prisma.agent.findMany({
+      include: {
+        referredClients: {
+          select: { monthlyRevenue: true, status: true, createdAt: true },
+        },
+      },
+    })
+
+    const revenueByAgent = agents
+      .map((a) => ({
+        agentId: a.id,
+        agentName: a.name,
+        revenue: a.referredClients.reduce((sum, c) => sum + (c.monthlyRevenue ?? 0), 0),
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10)
+
+    const typeMap = new Map<string, number>()
+    for (const a of agents) {
+      typeMap.set(a.type, (typeMap.get(a.type) ?? 0) + a.referredClients.length)
+    }
+    const referralsByType = Array.from(typeMap.entries()).map(([type, count]) => ({ type, count }))
+
+    // Monthly referral trend (last 6 months)
+    const monthlyRefMap = new Map<string, number>()
+    for (const a of agents) {
+      for (const c of a.referredClients) {
+        const m = new Date(c.createdAt).toISOString().slice(0, 7)
+        monthlyRefMap.set(m, (monthlyRefMap.get(m) ?? 0) + 1)
+      }
+    }
+    const monthlyReferrals = Array.from(monthlyRefMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([month, count]) => ({ month, count }))
+
+    // Conversion by type
+    const typeConvMap = new Map<string, { total: number; won: number }>()
+    for (const a of agents) {
+      const entry = typeConvMap.get(a.type) ?? { total: 0, won: 0 }
+      entry.total += a.referredClients.length
+      entry.won += a.referredClients.filter((c) => c.status === "won").length
+      typeConvMap.set(a.type, entry)
+    }
+    const conversionByType = Array.from(typeConvMap.entries()).map(([type, { total, won }]) => ({
+      type,
+      rate: total > 0 ? Math.round((won / total) * 100) : 0,
+    }))
+
+    agentStats = { revenueByAgent, referralsByType, monthlyReferrals, conversionByType }
+  } catch { /* agent stats optional */ }
+
   return NextResponse.json({
     stats: {
       totalContacts,
@@ -133,6 +188,7 @@ export async function GET() {
       monthlyNew,
       topDeals,
       sentinelStats,
+      agentStats,
     },
   })
 }
