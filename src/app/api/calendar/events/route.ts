@@ -56,12 +56,16 @@ export async function GET(request: Request) {
     }
   }
 
+  console.log("[CALENDAR EVENTS] Query where:", JSON.stringify(where, null, 2))
+
   const dbEvents = await prisma.calendarEvent.findMany({
     where,
     orderBy: { startTime: "asc" },
     include: { callNote: { select: { id: true, title: true } } },
     ...(limit ? { take: parseInt(limit, 10) } : {}),
   })
+
+  console.log(`[CALENDAR EVENTS] Found ${dbEvents.length} events`)
 
   // Map DB fields to the shape the frontend expects
   const events = dbEvents.map((e) => ({

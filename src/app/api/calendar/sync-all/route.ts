@@ -39,6 +39,8 @@ async function syncUserCalendar(
   account: { userId: string; providerAccountId: string; access_token: string | null; refresh_token: string | null; expires_at: number | null },
   userEmail: string
 ): Promise<{ synced: number; error?: string }> {
+  console.log(`[SYNC] Starting sync for ${userEmail}`)
+  console.log(`[SYNC] Has access_token: ${!!account.access_token}, Has refresh_token: ${!!account.refresh_token}, expires_at: ${account.expires_at}`)
   let accessToken = account.access_token
 
   // Check if token is expired
@@ -46,8 +48,11 @@ async function syncUserCalendar(
     ? account.expires_at * 1000 < Date.now()
     : true
 
+  console.log(`[SYNC] Token expired: ${tokenExpired}`)
+
   // Refresh if needed
   if ((tokenExpired || !accessToken) && account.refresh_token) {
+    console.log(`[SYNC] Refreshing token for ${userEmail}`)
     const newToken = await refreshAccessToken(account.refresh_token)
     if (newToken) {
       accessToken = newToken
@@ -63,13 +68,16 @@ async function syncUserCalendar(
           expires_at: Math.floor(Date.now() / 1000) + 3600,
         },
       })
+      console.log(`[SYNC] Token refreshed successfully for ${userEmail}`)
     } else {
-      return { synced: 0, error: `Token refresh failed for ${userEmail}` }
+      console.error(`[SYNC] Token refresh FAILED for ${userEmail}`)
+      return { synced: 0, error: `Token refresh failed for ${userEmail}. Please sign out and sign in again.` }
     }
   }
 
   if (!accessToken) {
-    return { synced: 0, error: `No valid token for ${userEmail}` }
+    console.error(`[SYNC] No valid token for ${userEmail}`)
+    return { synced: 0, error: `No valid token for ${userEmail}. Please sign out and sign in again.` }
   }
 
   const now = new Date()
@@ -102,11 +110,14 @@ async function syncUserCalendar(
   }
 
   if (!response.ok) {
-    return { synced: 0, error: `Google API error ${status} for ${userEmail}` }
+    const errorBody = await response.text()
+    console.error(`[SYNC] Google API error ${status} for ${userEmail}:`, errorBody)
+    return { synced: 0, error: `Google API error ${status} for ${userEmail}. Try signing out and back in.` }
   }
 
   const calendarData: GoogleCalendarResponse = await response.json()
   const events = calendarData.items ?? []
+  console.log(`[SYNC] Got ${events.length} events from Google for ${userEmail}`)
 
   let synced = 0
   for (const event of events) {
@@ -150,6 +161,7 @@ async function syncUserCalendar(
     synced++
   }
 
+  console.log(`[SYNC] Synced ${synced} events for ${userEmail}`)
   return { synced }
 }
 

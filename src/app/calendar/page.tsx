@@ -158,12 +158,16 @@ export default function CalendarPage() {
       const data = await res.json()
       if (res.ok) {
         const errCount = data.errors?.length ?? 0
-        setSyncMessage(
-          errCount > 0
-            ? `Synced ${data.synced} events from ${data.users} calendars (${errCount} error${errCount > 1 ? "s" : ""})`
-            : `Synced ${data.synced} events from ${data.users} calendars`
-        )
-        // Refresh owners first, THEN fetch events (so owner filter is up-to-date)
+        const errDetail = data.errors?.map((e: { email: string; error: string }) => e.error).join("; ") ?? ""
+        if (data.synced === 0 && errCount > 0) {
+          setSyncMessage(`Sync failed: ${errDetail}`)
+        } else if (errCount > 0) {
+          setSyncMessage(`Synced ${data.synced} events (${errCount} error: ${errDetail})`)
+        } else {
+          setSyncMessage(`Synced ${data.synced} events from ${data.users} calendar${data.users > 1 ? "s" : ""}`)
+        }
+
+        // Refresh owners
         try {
           const ownersRes = await fetch("/api/calendar/owners")
           const ownersData = await ownersRes.json()
@@ -184,6 +188,21 @@ export default function CalendarPage() {
             return colors
           })
         } catch { /* silent */ }
+
+        // Always re-fetch events directly after sync (don't rely on state cascade)
+        const start = new Date(currentDate)
+        start.setDate(start.getDate() - 14)
+        const end = new Date(currentDate)
+        end.setDate(end.getDate() + 14)
+        const evParams = new URLSearchParams({
+          start: start.toISOString(),
+          end: end.toISOString(),
+        })
+        try {
+          const evRes = await fetch(`/api/calendar/events?${evParams}`)
+          const evData = await evRes.json()
+          setEvents(evData.events ?? [])
+        } catch { /* silent */ }
       } else {
         setSyncMessage(data.error ?? "Sync failed")
       }
@@ -191,7 +210,7 @@ export default function CalendarPage() {
       setSyncMessage("Network error")
     }
     setSyncing(false)
-    setTimeout(() => setSyncMessage(null), 5000)
+    setTimeout(() => setSyncMessage(null), 8000)
   }
 
   const handleUploadHTML = async (e: React.ChangeEvent<HTMLInputElement>) => {
