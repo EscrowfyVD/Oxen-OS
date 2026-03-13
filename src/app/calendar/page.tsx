@@ -50,35 +50,20 @@ export default function CalendarPage() {
   const [ownerColors, setOwnerColors] = useState<Record<string, string>>({})
   const [absences, setAbsences] = useState<Array<{ id: string; employee: { name: string; initials: string }; type: string; startDate: string; endDate: string }>>([])
 
-  // Admin + Call Notes state
-  const [isAdmin, setIsAdmin] = useState(false)
+  // Call Notes state
   const [callNotes, setCallNotes] = useState<CallNoteItem[]>([])
   const [showCallNotesModal, setShowCallNotesModal] = useState(false)
   const [modalEvent, setModalEvent] = useState<{ id: string; title: string; start: string; attendees?: string[]; description?: string } | null>(null)
   const [searchCallNotes, setSearchCallNotes] = useState("")
   const uploadRef = useRef<HTMLInputElement>(null)
 
-  // Check admin status via roleLevel
-  useEffect(() => {
-    fetch("/api/me")
-      .then((r) => r.json())
-      .then((data) => {
-        const rl = data.employee?.roleLevel ?? "member"
-        if (rl === "super_admin" || rl === "admin") {
-          setIsAdmin(true)
-        }
-      })
-      .catch(() => {})
-  }, [])
-
-  // Fetch call notes (admin only)
+  // Fetch call notes (scoped by API: admin sees all, others see own)
   const fetchCallNotes = useCallback(() => {
-    if (!isAdmin) return
     fetch("/api/call-notes")
       .then((r) => r.json())
       .then((data) => setCallNotes(data.notes ?? []))
       .catch(() => {})
-  }, [isAdmin])
+  }, [])
 
   useEffect(() => {
     fetchCallNotes()
@@ -332,36 +317,32 @@ export default function CalendarPage() {
                 {syncMessage}
               </span>
             )}
-            {isAdmin && (
-              <>
-                <button
-                  className="btn-secondary"
-                  onClick={() => openPrepareModal()}
-                  style={{ fontSize: 12 }}
-                >
-                  {"\uD83D\uDCCB"} New Call Notes
-                </button>
-                <label
-                  className="btn-secondary"
-                  style={{
-                    fontSize: 12,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  {"\u2B06"} Upload HTML
-                  <input
-                    ref={uploadRef}
-                    type="file"
-                    accept=".html,.htm"
-                    onChange={handleUploadHTML}
-                    style={{ display: "none" }}
-                  />
-                </label>
-              </>
-            )}
+            <button
+              className="btn-secondary"
+              onClick={() => openPrepareModal()}
+              style={{ fontSize: 12 }}
+            >
+              {"\uD83D\uDCCB"} New Call Notes
+            </button>
+            <label
+              className="btn-secondary"
+              style={{
+                fontSize: 12,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              {"\u2B06"} Upload HTML
+              <input
+                ref={uploadRef}
+                type="file"
+                accept=".html,.htm"
+                onChange={handleUploadHTML}
+                style={{ display: "none" }}
+              />
+            </label>
             <button
               className="btn-primary"
               onClick={handleSync}
@@ -657,7 +638,7 @@ export default function CalendarPage() {
                 )}
 
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14 }}>
-                  {!selectedEvent.callNoteId && isAdmin && (
+                  {!selectedEvent.callNoteId && (
                     <button
                       onClick={() => openPrepareModal(selectedEvent)}
                       className="btn-primary w-full"
@@ -692,8 +673,8 @@ export default function CalendarPage() {
         )}
       </div>
 
-      {/* Call Notes List (admin only) */}
-      {isAdmin && callNotes.length > 0 && (
+      {/* Call Notes List */}
+      {callNotes.length > 0 && (
         <div style={{ marginTop: 32 }}>
           <div className="flex items-center justify-between" style={{ marginBottom: 14 }}>
             <h2

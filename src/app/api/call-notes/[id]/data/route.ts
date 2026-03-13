@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/admin"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin()
-  if (error) return error
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
 
@@ -27,8 +27,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin()
-  if (error) return error
+  const session2 = await auth()
+  if (!session2?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
   const body = await request.json()

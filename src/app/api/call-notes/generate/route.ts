@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/admin"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
 
@@ -162,8 +162,8 @@ The HTML will be embedded in an iframe. The PRIMARY persistence mechanism is pos
 Produce ONLY the complete HTML file content. No explanation, no markdown wrapping, no code fences.`
 
 export async function POST(request: Request) {
-  const { error, session } = await requireAdmin()
-  if (error) return error
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = await request.json()
   let { title, description, attendees, date, context, eventId, agenda, questions, participants, previousDecisions } = body

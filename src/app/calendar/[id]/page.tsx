@@ -24,18 +24,6 @@ export default function CallNotePage() {
   const [savedData, setSavedData] = useState<Record<string, unknown> | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  // Admin check — redirect non-admins
-  useEffect(() => {
-    fetch("/api/me")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.employee?.isAdmin) {
-          router.replace("/calendar")
-        }
-      })
-      .catch(() => router.replace("/calendar"))
-  }, [router])
-
   // Fetch call note
   useEffect(() => {
     if (!id) return

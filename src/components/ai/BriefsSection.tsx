@@ -14,10 +14,9 @@ interface BriefsSectionProps {
   onViewBrief: (brief: MeetingBrief) => void
   generatingId: string | null
   onPrepareCallNotes?: (event: CalendarEvent) => void
-  isAdmin?: boolean
 }
 
-export default function BriefsSection({ briefs, events, onGenerateBrief, onViewBrief, generatingId, onPrepareCallNotes, isAdmin }: BriefsSectionProps) {
+export default function BriefsSection({ briefs, events, onGenerateBrief, onViewBrief, generatingId, onPrepareCallNotes }: BriefsSectionProps) {
   // Match events with briefs
   const eventBriefMap: Record<string, MeetingBrief> = {}
   for (const b of briefs) {
@@ -121,7 +120,7 @@ export default function BriefsSection({ briefs, events, onGenerateBrief, onViewB
                     {isGenerating ? "Generating..." : "Generate Brief"}
                   </button>
                 )}
-                {isAdmin && onPrepareCallNotes && (
+                {onPrepareCallNotes && (
                   <button
                     onClick={() => onPrepareCallNotes(event)}
                     style={{

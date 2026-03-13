@@ -290,7 +290,6 @@ function AIPageInner() {
           onGenerateBrief={generateBrief}
           onViewBrief={setViewingBrief}
           generatingId={generatingBriefId}
-          isAdmin={isAdmin}
           onPrepareCallNotes={(event) => {
             setCallNotesModalEvent({
               id: event.id,
