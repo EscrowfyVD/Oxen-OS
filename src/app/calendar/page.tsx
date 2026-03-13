@@ -157,29 +157,35 @@ export default function CalendarPage() {
       }
       const data = await res.json()
       if (res.ok) {
-        setSyncMessage(`Synced ${data.synced} events from ${data.users} calendars`)
-        fetchEvents()
-        fetch("/api/calendar/owners")
-          .then((r) => r.json())
-          .then((d) => {
-            const members: TeamMember[] = d.owners ?? []
-            setTeamMembers(members)
-            setSelectedOwners((prev) => {
-              const next = new Set(prev)
-              members.forEach((m) => next.add(m.email))
-              return next
-            })
-            setOwnerColors((prev) => {
-              const colors = { ...prev }
-              members.forEach((m, i) => {
-                if (!colors[m.email]) {
-                  colors[m.email] = TEAM_COLORS[i % TEAM_COLORS.length]
-                }
-              })
-              return colors
-            })
+        const errCount = data.errors?.length ?? 0
+        setSyncMessage(
+          errCount > 0
+            ? `Synced ${data.synced} events from ${data.users} calendars (${errCount} error${errCount > 1 ? "s" : ""})`
+            : `Synced ${data.synced} events from ${data.users} calendars`
+        )
+        // Refresh owners first, THEN fetch events (so owner filter is up-to-date)
+        try {
+          const ownersRes = await fetch("/api/calendar/owners")
+          const ownersData = await ownersRes.json()
+          const members: TeamMember[] = ownersData.owners ?? []
+          setTeamMembers(members)
+          setSelectedOwners((prev) => {
+            const next = new Set(prev)
+            members.forEach((m) => next.add(m.email))
+            return next
           })
-          .catch(() => {})
+          setOwnerColors((prev) => {
+            const colors = { ...prev }
+            members.forEach((m, i) => {
+              if (!colors[m.email]) {
+                colors[m.email] = TEAM_COLORS[i % TEAM_COLORS.length]
+              }
+            })
+            return colors
+          })
+        } catch { /* silent */ }
+        // Now fetch events with updated owner data
+        fetchEvents()
       } else {
         setSyncMessage(data.error ?? "Sync failed")
       }

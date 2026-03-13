@@ -115,11 +115,15 @@ async function syncUserCalendar(
     const endTime = event.end?.dateTime ?? event.end?.date
     if (!startTime || !endTime) continue
 
+    // Normalize emails to lowercase for consistent matching
+    const normalizedOwner = userEmail.toLowerCase()
+    const normalizedAttendees = event.attendees?.map((a) => a.email.toLowerCase()) ?? []
+
     await prisma.calendarEvent.upsert({
       where: {
         googleEventId_calendarOwner: {
           googleEventId: event.id,
-          calendarOwner: userEmail,
+          calendarOwner: normalizedOwner,
         },
       },
       update: {
@@ -127,7 +131,7 @@ async function syncUserCalendar(
         description: event.description ?? null,
         startTime: new Date(startTime),
         endTime: new Date(endTime),
-        attendees: event.attendees?.map((a) => a.email) ?? [],
+        attendees: normalizedAttendees,
         location: event.location ?? null,
         meetLink: event.hangoutLink ?? null,
       },
@@ -137,8 +141,8 @@ async function syncUserCalendar(
         description: event.description ?? null,
         startTime: new Date(startTime),
         endTime: new Date(endTime),
-        attendees: event.attendees?.map((a) => a.email) ?? [],
-        calendarOwner: userEmail,
+        attendees: normalizedAttendees,
+        calendarOwner: normalizedOwner,
         location: event.location ?? null,
         meetLink: event.hangoutLink ?? null,
       },

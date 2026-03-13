@@ -27,9 +27,9 @@ export async function GET(request: Request) {
     if (end) where.startTime.lte = new Date(end)
   }
 
-  // Filter by calendar owners if specified
+  // Filter by calendar owners if specified (case-insensitive)
   if (owners) {
-    const ownerList = owners.split(",").map((o) => o.trim()).filter(Boolean)
+    const ownerList = owners.split(",").map((o) => o.trim().toLowerCase()).filter(Boolean)
     if (ownerList.length > 0) {
       where.calendarOwner = { in: ownerList }
     }
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
 
   // User-scoped visibility: show own calendar + events where user is attendee
   // Admin with teamView=true bypasses this filter
-  const userEmail = session.user?.email
+  const userEmail = session.user?.email?.toLowerCase()
   if (userEmail && teamView !== "true") {
     // Check if user is admin
     const employee = await prisma.employee.findFirst({
@@ -48,6 +48,7 @@ export async function GET(request: Request) {
 
     if (!isAdmin) {
       // Non-admin: only see own calendar or events where they're an attendee
+      // Attendees are stored as lowercase, so we match with lowercase email
       where.OR = [
         { calendarOwner: { equals: userEmail, mode: "insensitive" } },
         { attendees: { has: userEmail } },

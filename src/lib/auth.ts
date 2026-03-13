@@ -3,6 +3,10 @@ import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "./prisma"
 
+// Only require secure cookies when served over HTTPS (production / Railway)
+// On http://localhost, secure:true causes browsers to reject the cookies → auth fails
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://") ?? false
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   trustHost: true,
@@ -10,13 +14,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   cookies: {
     // Fix PKCE cookie parsing behind Railway reverse proxy
     // Remove __Secure- prefix that can fail when TLS is terminated at the proxy
+    // Use secure:false on localhost (http) to avoid cookie rejection
     pkceCodeVerifier: {
       name: "authjs.pkce.code_verifier",
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: true,
+        secure: useSecureCookies,
         maxAge: 60 * 15, // 15 minutes
       },
     },
@@ -26,7 +31,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: true,
+        secure: useSecureCookies,
         maxAge: 60 * 15,
       },
     },
@@ -36,7 +41,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: true,
+        secure: useSecureCookies,
       },
     },
     sessionToken: {
@@ -45,7 +50,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: true,
+        secure: useSecureCookies,
       },
     },
   },
