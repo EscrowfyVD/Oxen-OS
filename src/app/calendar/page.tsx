@@ -58,12 +58,13 @@ export default function CalendarPage() {
   const [searchCallNotes, setSearchCallNotes] = useState("")
   const uploadRef = useRef<HTMLInputElement>(null)
 
-  // Check admin status
+  // Check admin status via roleLevel
   useEffect(() => {
     fetch("/api/me")
       .then((r) => r.json())
       .then((data) => {
-        if (data.employee?.isAdmin) {
+        const rl = data.employee?.roleLevel ?? "member"
+        if (rl === "super_admin" || rl === "admin") {
           setIsAdmin(true)
         }
       })

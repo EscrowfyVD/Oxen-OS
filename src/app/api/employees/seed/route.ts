@@ -21,6 +21,8 @@ const TEAM_MEMBERS = [
     bio: "Founder & CEO of Oxen Finance. Leading payment infrastructure across iGaming, crypto and luxury sectors.",
     avatarColor: "rgba(192,139,136,0.4)",
     order: 0,
+    isAdmin: true,
+    roleLevel: "super_admin",
   },
   {
     name: "Arthur Flam",
@@ -40,6 +42,8 @@ const TEAM_MEMBERS = [
     bio: "CEO of Escrowfy. Overseeing escrow and compliance operations across European markets.",
     avatarColor: "rgba(129,140,248,0.4)",
     order: 1,
+    isAdmin: true,
+    roleLevel: "admin",
   },
   {
     name: "Paul Louis Dessy",
@@ -56,6 +60,7 @@ const TEAM_MEMBERS = [
     bio: "Shareholder and strategic advisor. Supporting the group's expansion in the Middle East.",
     avatarColor: "rgba(251,191,36,0.4)",
     order: 2,
+    roleLevel: "manager",
   },
   {
     name: "Mickael Music",

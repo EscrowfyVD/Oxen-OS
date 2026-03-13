@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import PageHeader from "@/components/layout/PageHeader"
+import { ROLE_COLORS, ROLE_LABELS, type RoleLevel } from "@/lib/permissions"
 
 /* ── Design tokens ── */
 const FROST = "#FFFFFF"
@@ -38,6 +39,8 @@ interface Employee {
   managerId: string | null
   order: number
   isActive: boolean
+  roleLevel?: string
+  isAdmin?: boolean
 }
 
 interface MemberForm {
@@ -559,7 +562,7 @@ export default function TeamPage() {
                 </div>
 
                 {/* Name + Role */}
-                <div style={{ minWidth: 0, flex: "0 0 180px" }}>
+                <div style={{ minWidth: 0, flex: "0 0 200px" }}>
                   <div
                     style={{
                       fontSize: 13,
@@ -570,9 +573,32 @@ export default function TeamPage() {
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
                     }}
                   >
                     {emp.name}
+                    {emp.roleLevel && emp.roleLevel !== "member" && (() => {
+                      const rl = emp.roleLevel as RoleLevel
+                      const rc = ROLE_COLORS[rl]
+                      return (
+                        <span
+                          style={{
+                            fontSize: 8,
+                            padding: "1px 6px",
+                            borderRadius: 4,
+                            fontWeight: 600,
+                            letterSpacing: "0.3px",
+                            background: rc.bg,
+                            color: rc.text,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {ROLE_LABELS[rl]}
+                        </span>
+                      )
+                    })()}
                   </div>
                   <div
                     style={{

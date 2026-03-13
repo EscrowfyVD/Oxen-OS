@@ -23,6 +23,7 @@ export async function GET() {
       department: true,
       entity: true,
       isAdmin: true,
+      roleLevel: true,
       telegramChatId: true,
     },
   })

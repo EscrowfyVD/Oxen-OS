@@ -140,7 +140,13 @@ export default function AbsencesPage() {
   useEffect(() => {
     fetch("/api/me")
       .then((r) => r.json())
-      .then((data) => setMe(data.employee ?? null))
+      .then((data) => {
+        if (data.employee) {
+          const rl = data.employee.roleLevel ?? "member"
+          // Derive isAdmin from roleLevel for UI checks
+          setMe({ ...data.employee, isAdmin: rl === "super_admin" || rl === "admin" })
+        }
+      })
       .catch(() => {})
   }, [])
 

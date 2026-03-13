@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramNotification } from "@/lib/telegram"
+import { canAccess, type RoleLevel } from "@/lib/permissions"
 
 /* ── PATCH: approve / reject / cancel ── */
 export async function PATCH(
@@ -32,11 +33,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Can only approve/reject pending requests" }, { status: 400 })
   }
 
-  // Find reviewer
+  // Find reviewer — must be admin+
   const reviewer = await prisma.employee.findFirst({
     where: { email: { equals: session.user.email, mode: "insensitive" } },
   })
-  if (!reviewer?.isAdmin) {
+  const reviewerRole = (reviewer?.roleLevel ?? "member") as RoleLevel
+  if (!reviewer || !canAccess(reviewerRole, "admin")) {
     return NextResponse.json({ error: "Admin access required" }, { status: 403 })
   }
 
@@ -135,10 +137,12 @@ export async function DELETE(
   }
 
   const isOwn = existing.employeeId === me.id
-  if (!me.isAdmin && !isOwn) {
+  const meRole = (me.roleLevel ?? "member") as RoleLevel
+  const meIsAdmin = canAccess(meRole, "admin")
+  if (!meIsAdmin && !isOwn) {
     return NextResponse.json({ error: "Not authorized" }, { status: 403 })
   }
-  if (!me.isAdmin && existing.status !== "pending") {
+  if (!meIsAdmin && existing.status !== "pending") {
     return NextResponse.json({ error: "Can only cancel pending requests" }, { status: 400 })
   }
 

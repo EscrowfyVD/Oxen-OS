@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { canAccess, type RoleLevel } from "@/lib/permissions"
 
 export async function GET(request: Request) {
   const session = await auth()
@@ -17,9 +18,10 @@ export async function GET(request: Request) {
   if (userEmail && teamView !== "true") {
     const employee = await prisma.employee.findFirst({
       where: { email: { equals: userEmail, mode: "insensitive" } },
-      select: { isAdmin: true, name: true },
+      select: { roleLevel: true, name: true },
     })
-    const isAdmin = employee?.isAdmin === true
+    const userRole = (employee?.roleLevel ?? "member") as RoleLevel
+    const isAdmin = canAccess(userRole, "admin")
 
     if (!isAdmin) {
       // Non-admin: only briefs where user email or name is in attendees

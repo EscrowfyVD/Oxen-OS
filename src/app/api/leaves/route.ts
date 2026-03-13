@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramNotification } from "@/lib/telegram"
+import { canAccess, type RoleLevel } from "@/lib/permissions"
 
 /* ── Helper: count business days between two dates ── */
 function calculateBusinessDays(start: Date, end: Date, halfDay: boolean): number {
@@ -42,9 +43,11 @@ export async function GET(request: Request) {
   const where: Record<string, unknown> = {}
 
   // Non-admin can only see their own unless specific employeeId given by admin
+  const meRole = (me?.roleLevel ?? "member") as RoleLevel
+  const meIsAdmin = canAccess(meRole, "admin")
   if (employeeId) {
     where.employeeId = employeeId
-  } else if (!me?.isAdmin || all !== "true") {
+  } else if (!meIsAdmin || all !== "true") {
     if (me) where.employeeId = me.id
   }
 

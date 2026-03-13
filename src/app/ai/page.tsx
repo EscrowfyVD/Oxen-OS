@@ -45,12 +45,13 @@ function AIPageInner() {
   const [showCallNotesModal, setShowCallNotesModal] = useState(false)
   const [callNotesModalEvent, setCallNotesModalEvent] = useState<{ id: string; title: string; start: string; attendees?: string[]; description?: string } | null>(null)
 
-  // Check admin status
+  // Check admin status via roleLevel
   useEffect(() => {
     fetch("/api/me")
       .then((r) => r.json())
       .then((data) => {
-        if (data.employee?.isAdmin) setIsAdmin(true)
+        const rl = data.employee?.roleLevel ?? "member"
+        if (rl === "super_admin" || rl === "admin") setIsAdmin(true)
       })
       .catch(() => {})
   }, [])

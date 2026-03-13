@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useSession } from "next-auth/react"
+import { useSession, signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
 import {
   LayoutDashboard,
@@ -17,10 +17,23 @@ import {
   Megaphone,
   Headphones,
   Handshake,
+  Settings,
+  LogOut,
   type LucideIcon,
 } from "lucide-react"
+import { ROLE_COLORS, ROLE_LABELS, type RoleLevel } from "@/lib/permissions"
+import { canAccess } from "@/lib/permissions"
 
-const NAV_ITEMS: Array<{ label: string; href: string; icon: LucideIcon; badge: string | null; count: number | null }> = [
+type NavItem = {
+  label: string
+  href: string
+  icon: LucideIcon
+  badge: string | null
+  count: number | null
+  minRole?: RoleLevel
+}
+
+const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, badge: null, count: null },
   { label: "Sentinel", href: "/ai", icon: Shield, badge: null, count: null },
   { label: "Tasks", href: "/tasks", icon: CheckSquare, badge: null, count: 12 },
@@ -29,7 +42,7 @@ const NAV_ITEMS: Array<{ label: string; href: string; icon: LucideIcon; badge: s
   { label: "Organigramme", href: "/org", icon: Building2, badge: null, count: null },
   { label: "Team", href: "/team", icon: Users, badge: null, count: null },
   { label: "Absences", href: "/absences", icon: Palmtree, badge: null, count: null },
-  { label: "Finance", href: "/finance", icon: Wallet, badge: null, count: null },
+  { label: "Finance", href: "/finance", icon: Wallet, badge: null, count: null, minRole: "admin" },
   { label: "Marketing", href: "/marketing", icon: Megaphone, badge: null, count: null },
   { label: "Support", href: "/support", icon: Headphones, badge: null, count: null },
   { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null },
@@ -40,6 +53,9 @@ export default function Sidebar() {
   const { data: session } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [wikiCount, setWikiCount] = useState<number | null>(null)
+  const [userRole, setUserRole] = useState<RoleLevel>("member")
+  const [userJobTitle, setUserJobTitle] = useState<string | null>(null)
+  const [signOutHover, setSignOutHover] = useState(false)
 
   useEffect(() => {
     fetch("/api/wiki?limit=1")
@@ -48,11 +64,32 @@ export default function Sidebar() {
       .catch(() => {})
   }, [])
 
-  const navItems = NAV_ITEMS.map((item) =>
-    item.label === "Wiki" && wikiCount !== null
-      ? { ...item, count: wikiCount }
-      : item
-  )
+  useEffect(() => {
+    if (!session?.user?.email) return
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.employee) {
+          setUserRole((data.employee.roleLevel ?? "member") as RoleLevel)
+          setUserJobTitle(data.employee.role ?? null)
+        }
+      })
+      .catch(() => {})
+  }, [session?.user?.email])
+
+  const navItems = NAV_ITEMS
+    .filter((item) => {
+      if (item.minRole && !canAccess(userRole, item.minRole)) return false
+      return true
+    })
+    .map((item) =>
+      item.label === "Wiki" && wikiCount !== null
+        ? { ...item, count: wikiCount }
+        : item
+    )
+
+  // Settings visible for admin+
+  const showSettings = canAccess(userRole, "admin")
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/"
@@ -67,6 +104,8 @@ export default function Sidebar() {
         .toUpperCase()
         .slice(0, 2)
     : "?"
+
+  const roleStyle = ROLE_COLORS[userRole]
 
   return (
     <>
@@ -201,6 +240,23 @@ export default function Sidebar() {
           })}
         </nav>
 
+        {/* Settings link (admin+) */}
+        {showSettings && (
+          <div style={{ padding: "0 0 4px" }}>
+            <Link
+              href="/settings"
+              onClick={() => setMobileOpen(false)}
+              className={`nav-item${isActive("/settings") ? " active" : ""}`}
+              style={{ textDecoration: "none" }}
+            >
+              <span className="nav-icon">
+                <Settings size={16} strokeWidth={1.8} />
+              </span>
+              <span className="flex-1">Settings</span>
+            </Link>
+          </div>
+        )}
+
         {/* Footer / User */}
         {session?.user && (
           <div
@@ -232,7 +288,7 @@ export default function Sidebar() {
                   {userInitials}
                 </span>
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div
                   className="truncate"
                   style={{
@@ -244,17 +300,62 @@ export default function Sidebar() {
                 >
                   {session.user.name}
                 </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-tertiary)",
-                    lineHeight: 1.3,
-                  }}
-                >
-                  CEO
+                <div className="flex items-center gap-2" style={{ marginTop: 2 }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "1px 6px",
+                      borderRadius: 4,
+                      fontSize: 9,
+                      fontWeight: 600,
+                      letterSpacing: "0.3px",
+                      lineHeight: "16px",
+                      ...(roleStyle.gradient
+                        ? { background: roleStyle.bg, color: roleStyle.text }
+                        : { background: roleStyle.bg, color: roleStyle.text }
+                      ),
+                    }}
+                  >
+                    {ROLE_LABELS[userRole]}
+                  </span>
+                  {userJobTitle && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        color: "var(--text-tertiary)",
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {userJobTitle}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
+
+            {/* Sign out */}
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              onMouseEnter={() => setSignOutHover(true)}
+              onMouseLeave={() => setSignOutHover(false)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginTop: 12,
+                padding: 0,
+                border: "none",
+                background: "none",
+                cursor: "pointer",
+                fontSize: 11,
+                color: signOutHover ? "#C08B88" : "var(--text-tertiary)",
+                transition: "color 0.2s ease",
+              }}
+            >
+              <LogOut size={13} strokeWidth={1.8} />
+              Sign out
+            </button>
           </div>
         )}
       </aside>

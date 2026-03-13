@@ -37,6 +37,30 @@ export default function FinancePage() {
   const [editingEntry, setEditingEntry] = useState<FinanceEntry | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [cashBalance, setCashBalance] = useState(850000) // Manual for now
+  const [accessChecked, setAccessChecked] = useState(false)
+  const [hasAccess, setHasAccess] = useState(false)
+
+  // Check access (admin+ only)
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        const rl = data.employee?.roleLevel ?? "member"
+        setHasAccess(rl === "super_admin" || rl === "admin")
+        setAccessChecked(true)
+      })
+      .catch(() => setAccessChecked(true))
+  }, [])
+
+  if (!accessChecked) return null
+  if (!hasAccess) {
+    return (
+      <div style={{ padding: "80px 32px", textAlign: "center" }}>
+        <h2 style={{ color: TEXT_PRIMARY, fontSize: 20, marginBottom: 8 }}>Access Denied</h2>
+        <p style={{ color: TEXT_SECONDARY, fontSize: 14 }}>You need admin access to view finance data.</p>
+      </div>
+    )
+  }
 
   /* ── Fetchers ── */
   const fetchEntries = useCallback(() => {

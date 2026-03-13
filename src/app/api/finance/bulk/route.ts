@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { requireRole } from "@/lib/admin"
 
 const VALID_TYPES = ["revenue", "expense", "budget"]
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error, session } = await requireRole("admin")
+  if (error) return error
 
   const body = await request.json()
   const { rows } = body as { rows: Array<Record<string, string>> }
