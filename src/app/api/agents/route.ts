@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { requirePageAccess } from "@/lib/admin"
 
 export async function GET(request: Request) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error } = await requirePageAccess("crm")
+  if (error) return error
 
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
@@ -38,8 +38,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error: pageErr, session } = await requirePageAccess("crm")
+  if (pageErr) return pageErr
 
   const body = await request.json()
   const { name, type, ...rest } = body

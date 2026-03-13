@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { requireRole } from "@/lib/admin"
+import { requirePageAccess } from "@/lib/admin"
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireRole("admin")
+  const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { id } = await params
@@ -38,7 +38,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireRole("admin")
+  const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { id } = await params

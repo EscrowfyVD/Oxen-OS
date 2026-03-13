@@ -50,6 +50,30 @@ export default function CrmPage() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [showAgentModal, setShowAgentModal] = useState(false)
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
+  const [accessChecked, setAccessChecked] = useState(false)
+  const [hasAccess, setHasAccess] = useState(false)
+
+  // Check access (everyone except Compliance department)
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        const dept = (data.employee?.department ?? "").toLowerCase()
+        setHasAccess(dept !== "compliance")
+        setAccessChecked(true)
+      })
+      .catch(() => setAccessChecked(true))
+  }, [])
+
+  if (!accessChecked) return null
+  if (!hasAccess) {
+    return (
+      <div style={{ padding: "80px 32px", textAlign: "center" }}>
+        <h2 style={{ color: TEXT_PRIMARY, fontSize: 20, marginBottom: 8 }}>Access Denied</h2>
+        <p style={{ color: TEXT_SECONDARY, fontSize: 14 }}>Compliance department does not have access to CRM.</p>
+      </div>
+    )
+  }
 
   /* ── Fetchers ── */
   const fetchContacts = useCallback(() => {

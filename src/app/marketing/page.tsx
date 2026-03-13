@@ -42,6 +42,32 @@ export default function MarketingPage() {
   const [showIntelModal, setShowIntelModal] = useState(false)
   const [editingIntel, setEditingIntel] = useState<MarketingIntel | null>(null)
 
+  const [accessChecked, setAccessChecked] = useState(false)
+  const [hasAccess, setHasAccess] = useState(false)
+
+  // Check access (admin+ OR Marketing department)
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        const rl = data.employee?.roleLevel ?? "member"
+        const dept = (data.employee?.department ?? "").toLowerCase()
+        setHasAccess(rl === "super_admin" || rl === "admin" || dept === "marketing")
+        setAccessChecked(true)
+      })
+      .catch(() => setAccessChecked(true))
+  }, [])
+
+  if (!accessChecked) return null
+  if (!hasAccess) {
+    return (
+      <div style={{ padding: "80px 32px", textAlign: "center" }}>
+        <h2 style={{ color: TEXT_PRIMARY, fontSize: 20, marginBottom: 8 }}>Access Denied</h2>
+        <p style={{ color: TEXT_SECONDARY, fontSize: 14 }}>You need admin access or be part of the Marketing team to view this page.</p>
+      </div>
+    )
+  }
+
   /* ── Fetchers ── */
   const fetchSummary = useCallback(() => {
     fetch("/api/marketing/metrics/summary")

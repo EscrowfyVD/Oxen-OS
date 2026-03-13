@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
-import { type RoleLevel, canAccess } from "@/lib/permissions"
+import { type RoleLevel, canAccess, canAccessPage } from "@/lib/permissions"
 
 /**
  * Require the current user to be an admin (isAdmin === true on their Employee record).
@@ -67,12 +67,53 @@ export async function requireRole(minRole: RoleLevel) {
 
   const employee = await prisma.employee.findFirst({
     where: { email: { equals: userEmail, mode: "insensitive" } },
-    select: { id: true, name: true, email: true, isAdmin: true, roleLevel: true, managerId: true },
+    select: { id: true, name: true, email: true, isAdmin: true, roleLevel: true, managerId: true, department: true },
   })
 
   const userRole = (employee?.roleLevel ?? "member") as RoleLevel
 
   if (!canAccess(userRole, minRole)) {
+    return {
+      error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      session,
+      employee: null,
+    }
+  }
+
+  return { error: null, session, employee }
+}
+
+/**
+ * Require the current user to have access to a page/feature based on role + department rules.
+ */
+export async function requirePageAccess(pageKey: string) {
+  const session = await auth()
+  if (!session?.user) {
+    return {
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      session: null,
+      employee: null,
+    }
+  }
+
+  const userEmail = session.user.email
+  if (!userEmail) {
+    return {
+      error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+      session,
+      employee: null,
+    }
+  }
+
+  const employee = await prisma.employee.findFirst({
+    where: { email: { equals: userEmail, mode: "insensitive" } },
+    select: { id: true, name: true, email: true, isAdmin: true, roleLevel: true, managerId: true, department: true },
+  })
+
+  const userRole = (employee?.roleLevel ?? "member") as RoleLevel
+  const userDept = employee?.department ?? null
+
+  if (!canAccessPage(userRole, userDept, pageKey)) {
     return {
       error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
       session,
@@ -94,7 +135,7 @@ export async function getUserRole() {
 
   const employee = await prisma.employee.findFirst({
     where: { email: { equals: session.user.email, mode: "insensitive" } },
-    select: { id: true, name: true, email: true, isAdmin: true, roleLevel: true, managerId: true },
+    select: { id: true, name: true, email: true, isAdmin: true, roleLevel: true, managerId: true, department: true },
   })
 
   return {

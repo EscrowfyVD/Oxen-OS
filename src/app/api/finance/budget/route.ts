@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { requireRole } from "@/lib/admin"
+import { requirePageAccess } from "@/lib/admin"
 
 export async function GET(request: Request) {
-  const { error } = await requireRole("admin")
+  const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { error, session } = await requireRole("admin")
+  const { error, session } = await requirePageAccess("finance")
   if (error) return error
 
   const body = await request.json()

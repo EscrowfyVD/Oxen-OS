@@ -21,8 +21,7 @@ import {
   LogOut,
   type LucideIcon,
 } from "lucide-react"
-import { ROLE_COLORS, ROLE_LABELS, type RoleLevel } from "@/lib/permissions"
-import { canAccess } from "@/lib/permissions"
+import { ROLE_COLORS, ROLE_LABELS, canAccess, canAccessPage, type RoleLevel } from "@/lib/permissions"
 
 type NavItem = {
   label: string
@@ -30,7 +29,7 @@ type NavItem = {
   icon: LucideIcon
   badge: string | null
   count: number | null
-  minRole?: RoleLevel
+  pageKey?: string
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -42,10 +41,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Organigramme", href: "/org", icon: Building2, badge: null, count: null },
   { label: "Team", href: "/team", icon: Users, badge: null, count: null },
   { label: "Absences", href: "/absences", icon: Palmtree, badge: null, count: null },
-  { label: "Finance", href: "/finance", icon: Wallet, badge: null, count: null, minRole: "admin" },
-  { label: "Marketing", href: "/marketing", icon: Megaphone, badge: null, count: null },
+  { label: "Finance", href: "/finance", icon: Wallet, badge: null, count: null, pageKey: "finance" },
+  { label: "Marketing", href: "/marketing", icon: Megaphone, badge: null, count: null, pageKey: "marketing" },
   { label: "Support", href: "/support", icon: Headphones, badge: null, count: null },
-  { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null },
+  { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null, pageKey: "crm" },
 ]
 
 export default function Sidebar() {
@@ -54,6 +53,7 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [wikiCount, setWikiCount] = useState<number | null>(null)
   const [userRole, setUserRole] = useState<RoleLevel>("member")
+  const [userDepartment, setUserDepartment] = useState<string | null>(null)
   const [userJobTitle, setUserJobTitle] = useState<string | null>(null)
   const [signOutHover, setSignOutHover] = useState(false)
 
@@ -71,6 +71,7 @@ export default function Sidebar() {
       .then((data) => {
         if (data.employee) {
           setUserRole((data.employee.roleLevel ?? "member") as RoleLevel)
+          setUserDepartment(data.employee.department ?? null)
           setUserJobTitle(data.employee.role ?? null)
         }
       })
@@ -79,7 +80,7 @@ export default function Sidebar() {
 
   const navItems = NAV_ITEMS
     .filter((item) => {
-      if (item.minRole && !canAccess(userRole, item.minRole)) return false
+      if (item.pageKey && !canAccessPage(userRole, userDepartment, item.pageKey)) return false
       return true
     })
     .map((item) =>

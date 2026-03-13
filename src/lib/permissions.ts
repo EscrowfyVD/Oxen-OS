@@ -19,10 +19,61 @@ export const PERMISSIONS = {
   manage_roles: "super_admin" as RoleLevel,
   approve_leaves: "admin" as RoleLevel,
   delete_employees: "super_admin" as RoleLevel,
+  create_employees: "admin" as RoleLevel,
   view_agent_commissions: "admin" as RoleLevel,
   view_all_emails: "admin" as RoleLevel,
   team_view_toggle: "admin" as RoleLevel,
   manage_integrations: "admin" as RoleLevel,
+}
+
+/**
+ * Department-based access rules (hybrid with role).
+ * Each rule defines: who can access based on role OR department membership.
+ */
+export type DeptAccessRule = {
+  minRole?: RoleLevel
+  allowDepartments?: string[]
+  denyDepartments?: string[]
+}
+
+export const PAGE_ACCESS: Record<string, DeptAccessRule> = {
+  finance: { minRole: "admin", allowDepartments: ["Finance"] },
+  marketing: { minRole: "admin", allowDepartments: ["Marketing"] },
+  crm: { denyDepartments: ["Compliance"] },
+}
+
+/**
+ * Check if a user can access a page/feature based on hybrid role + department rules.
+ */
+export function canAccessPage(
+  userRole: RoleLevel,
+  userDepartment: string | null | undefined,
+  pageKey: string
+): boolean {
+  const rule = PAGE_ACCESS[pageKey]
+  if (!rule) return true
+
+  // Deny-list check: if user's department is denied, block access
+  if (rule.denyDepartments && userDepartment) {
+    if (rule.denyDepartments.some((d) => d.toLowerCase() === userDepartment.toLowerCase())) {
+      return false
+    }
+  }
+
+  // If no minRole required and no deny hit, allow
+  if (!rule.minRole) return true
+
+  // Allow if user has sufficient role
+  if (canAccess(userRole, rule.minRole)) return true
+
+  // Allow if user's department is in the allow list
+  if (rule.allowDepartments && userDepartment) {
+    if (rule.allowDepartments.some((d) => d.toLowerCase() === userDepartment.toLowerCase())) {
+      return true
+    }
+  }
+
+  return false
 }
 
 export const ROLE_COLORS: Record<RoleLevel, { bg: string; text: string; gradient?: boolean }> = {

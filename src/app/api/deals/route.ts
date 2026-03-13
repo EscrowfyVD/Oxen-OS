@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { requirePageAccess } from "@/lib/admin"
 
 export async function GET() {
-  const session = await auth()
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const { error } = await requirePageAccess("crm")
+  if (error) return error
 
   const deals = await prisma.deal.findMany({
     include: {
@@ -27,10 +25,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const { error: pageErr, session } = await requirePageAccess("crm")
+  if (pageErr) return pageErr
 
   const body = await request.json()
   const {

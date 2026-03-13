@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import PageHeader from "@/components/layout/PageHeader"
-import { ROLE_COLORS, ROLE_LABELS, type RoleLevel } from "@/lib/permissions"
+import { ROLE_COLORS, ROLE_LABELS, canAccess, type RoleLevel } from "@/lib/permissions"
 
 /* ── Design tokens ── */
 const FROST = "#FFFFFF"
@@ -182,6 +182,18 @@ export default function TeamPage() {
   const [error, setError] = useState<string | null>(null)
   const [, setTick] = useState(0)
   const [onLeaveToday, setOnLeaveToday] = useState<Set<string>>(new Set())
+  const [myRole, setMyRole] = useState<RoleLevel>("member")
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.employee) setMyRole((data.employee.roleLevel ?? "member") as RoleLevel)
+      })
+      .catch(() => {})
+  }, [])
+
+  const canCreateMembers = canAccess(myRole, "admin")
 
   const fetchEmployees = async () => {
     try {
@@ -403,9 +415,11 @@ export default function TeamPage() {
                 e.currentTarget.style.borderColor = CARD_BORDER
               }}
             />
-            <button className="header-btn" onClick={openNew}>
-              + Add Member
-            </button>
+            {canCreateMembers && (
+              <button className="header-btn" onClick={openNew}>
+                + Add Member
+              </button>
+            )}
           </div>
         }
       />

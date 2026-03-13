@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { requirePageAccess } from "@/lib/admin"
 
 export async function GET() {
-  const session = await auth()
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const { error } = await requirePageAccess("crm")
+  if (error) return error
 
   // All active deals
   const deals = await prisma.deal.findMany({

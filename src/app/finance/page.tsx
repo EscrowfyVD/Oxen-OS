@@ -40,13 +40,14 @@ export default function FinancePage() {
   const [accessChecked, setAccessChecked] = useState(false)
   const [hasAccess, setHasAccess] = useState(false)
 
-  // Check access (admin+ only)
+  // Check access (admin+ OR Finance department)
   useEffect(() => {
     fetch("/api/me")
       .then((r) => r.json())
       .then((data) => {
         const rl = data.employee?.roleLevel ?? "member"
-        setHasAccess(rl === "super_admin" || rl === "admin")
+        const dept = (data.employee?.department ?? "").toLowerCase()
+        setHasAccess(rl === "super_admin" || rl === "admin" || dept === "finance")
         setAccessChecked(true)
       })
       .catch(() => setAccessChecked(true))
