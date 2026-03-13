@@ -9,7 +9,7 @@ const TEAM_MEMBERS = [
     role: "CEO",
     department: "Management",
     location: "Dubai, UAE",
-    email: "vernon@oxen.finance",
+    email: "vd@oxen.finance",
     phone: "+971 50 123 4567",
     telegram: "@vernondessy",
     whatsapp: "+971 50 123 4567",
