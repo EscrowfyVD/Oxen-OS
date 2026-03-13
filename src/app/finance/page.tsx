@@ -53,17 +53,7 @@ export default function FinancePage() {
       .catch(() => setAccessChecked(true))
   }, [])
 
-  if (!accessChecked) return null
-  if (!hasAccess) {
-    return (
-      <div style={{ padding: "80px 32px", textAlign: "center" }}>
-        <h2 style={{ color: TEXT_PRIMARY, fontSize: 20, marginBottom: 8 }}>Access Denied</h2>
-        <p style={{ color: TEXT_SECONDARY, fontSize: 14 }}>You need admin access to view finance data.</p>
-      </div>
-    )
-  }
-
-  /* ── Fetchers ── */
+  /* ── Fetchers (must be before early returns to satisfy React hooks rules) ── */
   const fetchEntries = useCallback(() => {
     const params = new URLSearchParams()
     if (selectedEntity !== "all") params.set("entity", selectedEntity)
@@ -101,11 +91,22 @@ export default function FinancePage() {
   }, [selectedMonth, selectedEntity])
 
   useEffect(() => {
+    if (!hasAccess) return
     fetchEntries()
     fetchSummary()
     fetchBudgets()
     fetchGoals()
-  }, [fetchEntries, fetchSummary, fetchBudgets, fetchGoals])
+  }, [hasAccess, fetchEntries, fetchSummary, fetchBudgets, fetchGoals])
+
+  if (!accessChecked) return null
+  if (!hasAccess) {
+    return (
+      <div style={{ padding: "80px 32px", textAlign: "center" }}>
+        <h2 style={{ color: TEXT_PRIMARY, fontSize: 20, marginBottom: 8 }}>Access Denied</h2>
+        <p style={{ color: TEXT_SECONDARY, fontSize: 14 }}>You need admin access to view finance data.</p>
+      </div>
+    )
+  }
 
   const refreshAll = () => {
     fetchEntries()

@@ -65,17 +65,7 @@ export default function CrmPage() {
       .catch(() => setAccessChecked(true))
   }, [])
 
-  if (!accessChecked) return null
-  if (!hasAccess) {
-    return (
-      <div style={{ padding: "80px 32px", textAlign: "center" }}>
-        <h2 style={{ color: TEXT_PRIMARY, fontSize: 20, marginBottom: 8 }}>Access Denied</h2>
-        <p style={{ color: TEXT_SECONDARY, fontSize: 14 }}>Compliance department does not have access to CRM.</p>
-      </div>
-    )
-  }
-
-  /* ── Fetchers ── */
+  /* ── Fetchers (must be before early returns to satisfy React hooks rules) ── */
   const fetchContacts = useCallback(() => {
     fetch("/api/contacts")
       .then((r) => r.json())
@@ -133,6 +123,7 @@ export default function CrmPage() {
   }, [])
 
   useEffect(() => {
+    if (!hasAccess) return
     fetchContacts()
     fetchEmployees()
     fetchStats()
@@ -141,7 +132,17 @@ export default function CrmPage() {
     fetchForecast()
     fetchMetrics()
     fetchAgents()
-  }, [fetchContacts, fetchEmployees, fetchStats, fetchOverview, fetchPipeline, fetchForecast, fetchMetrics, fetchAgents])
+  }, [hasAccess, fetchContacts, fetchEmployees, fetchStats, fetchOverview, fetchPipeline, fetchForecast, fetchMetrics, fetchAgents])
+
+  if (!accessChecked) return null
+  if (!hasAccess) {
+    return (
+      <div style={{ padding: "80px 32px", textAlign: "center" }}>
+        <h2 style={{ color: TEXT_PRIMARY, fontSize: 20, marginBottom: 8 }}>Access Denied</h2>
+        <p style={{ color: TEXT_SECONDARY, fontSize: 14 }}>Compliance department does not have access to CRM.</p>
+      </div>
+    )
+  }
 
   const refreshAll = () => {
     fetchContacts()

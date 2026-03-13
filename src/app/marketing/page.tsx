@@ -58,17 +58,7 @@ export default function MarketingPage() {
       .catch(() => setAccessChecked(true))
   }, [])
 
-  if (!accessChecked) return null
-  if (!hasAccess) {
-    return (
-      <div style={{ padding: "80px 32px", textAlign: "center" }}>
-        <h2 style={{ color: TEXT_PRIMARY, fontSize: 20, marginBottom: 8 }}>Access Denied</h2>
-        <p style={{ color: TEXT_SECONDARY, fontSize: 14 }}>You need admin access or be part of the Marketing team to view this page.</p>
-      </div>
-    )
-  }
-
-  /* ── Fetchers ── */
+  /* ── Fetchers (must be before early returns to satisfy React hooks rules) ── */
   const fetchSummary = useCallback(() => {
     fetch("/api/marketing/metrics/summary")
       .then((r) => r.json())
@@ -113,12 +103,23 @@ export default function MarketingPage() {
   }, [])
 
   useEffect(() => {
+    if (!hasAccess) return
     fetchSummary()
     fetchIdeas()
     fetchMetrics()
     fetchIntel()
     fetchEmployees()
-  }, [fetchSummary, fetchIdeas, fetchMetrics, fetchIntel, fetchEmployees])
+  }, [hasAccess, fetchSummary, fetchIdeas, fetchMetrics, fetchIntel, fetchEmployees])
+
+  if (!accessChecked) return null
+  if (!hasAccess) {
+    return (
+      <div style={{ padding: "80px 32px", textAlign: "center" }}>
+        <h2 style={{ color: TEXT_PRIMARY, fontSize: 20, marginBottom: 8 }}>Access Denied</h2>
+        <p style={{ color: TEXT_SECONDARY, fontSize: 14 }}>You need admin access or be part of the Marketing team to view this page.</p>
+      </div>
+    )
+  }
 
   const refreshAll = () => {
     fetchSummary()
