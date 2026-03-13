@@ -184,8 +184,6 @@ export default function CalendarPage() {
             return colors
           })
         } catch { /* silent */ }
-        // Now fetch events with updated owner data
-        fetchEvents()
       } else {
         setSyncMessage(data.error ?? "Sync failed")
       }
@@ -284,9 +282,13 @@ export default function CalendarPage() {
     }
   }
 
-  const filteredEvents = events.filter(
-    (e) => !e.calendarOwner || selectedOwners.has(e.calendarOwner)
-  )
+  // If no team members loaded yet (owners haven't been fetched), show all events
+  // Otherwise filter by selected owners
+  const filteredEvents = teamMembers.length === 0
+    ? events
+    : events.filter(
+        (e) => !e.calendarOwner || selectedOwners.has(e.calendarOwner)
+      )
 
   const filteredCallNotes = callNotes.filter((n) =>
     !searchCallNotes || n.title.toLowerCase().includes(searchCallNotes.toLowerCase())

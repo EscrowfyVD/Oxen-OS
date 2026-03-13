@@ -17,14 +17,14 @@ export async function GET() {
   // Get user info for each owner
   const ownerEmails = owners.map((o) => o.calendarOwner)
   const users = await prisma.user.findMany({
-    where: { email: { in: ownerEmails } },
+    where: { email: { in: ownerEmails, mode: "insensitive" } },
     select: { email: true, name: true, image: true },
   })
 
-  const userMap = new Map(users.map((u) => [u.email, u]))
+  const userMap = new Map(users.map((u) => [u.email?.toLowerCase() ?? "", u]))
 
   const result = ownerEmails.map((email) => {
-    const user = userMap.get(email)
+    const user = userMap.get(email.toLowerCase())
     return {
       email,
       name: user?.name ?? email.split("@")[0],
