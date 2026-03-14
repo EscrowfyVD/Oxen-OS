@@ -78,28 +78,41 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       console.log("[AUTH] Domain check:", allowed ? "ALLOWED" : "REJECTED")
       if (!allowed) return false
 
-      // Update stored account with fresh tokens & scopes from Google
-      // The PrismaAdapter doesn't do this on re-login, so old scopes persist
+      // Force-update the stored account with fresh tokens & scopes from Google.
+      // PrismaAdapter does NOT update existing accounts on re-login,
+      // so without this, old scopes (missing drive.readonly) persist forever.
       if (account && profile.email) {
+        console.log("[AUTH] Account from Google - scope:", account.scope)
+        console.log("[AUTH] Account from Google - has access_token:", !!account.access_token)
+        console.log("[AUTH] Account from Google - has refresh_token:", !!account.refresh_token)
         try {
           const existingAccount = await prisma.account.findFirst({
-            where: { provider: "google", user: { email: profile.email } },
+            where: {
+              provider: "google",
+              providerAccountId: account.providerAccountId,
+            },
             select: { id: true, scope: true },
           })
           if (existingAccount) {
-            console.log("[AUTH] Updating account tokens. Old scope:", existingAccount.scope, "New scope:", account.scope)
+            console.log("[AUTH] Found existing account:", existingAccount.id, "Old scope:", existingAccount.scope)
+            const updateData: Record<string, unknown> = {
+              access_token: account.access_token,
+              expires_at: account.expires_at,
+              scope: account.scope,
+              id_token: account.id_token,
+              token_type: account.token_type,
+            }
+            // Only update refresh_token if Google sent a new one
+            if (account.refresh_token) {
+              updateData.refresh_token = account.refresh_token
+            }
             await prisma.account.update({
               where: { id: existingAccount.id },
-              data: {
-                access_token: account.access_token,
-                refresh_token: account.refresh_token ?? undefined,
-                expires_at: account.expires_at,
-                scope: account.scope,
-                id_token: account.id_token,
-                token_type: account.token_type,
-              },
+              data: updateData,
             })
-            console.log("[AUTH] Account tokens updated successfully")
+            console.log("[AUTH] Account tokens updated successfully. New scope:", account.scope)
+          } else {
+            console.log("[AUTH] No existing account found for providerAccountId:", account.providerAccountId)
           }
         } catch (e) {
           console.error("[AUTH] Failed to update account tokens:", e)
