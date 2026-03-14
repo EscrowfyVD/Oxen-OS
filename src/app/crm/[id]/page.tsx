@@ -15,12 +15,14 @@ import EmailsTab from "@/components/crm/detail/EmailsTab"
 import DealsTab from "@/components/crm/detail/DealsTab"
 import SentinelTab from "@/components/crm/detail/SentinelTab"
 import SignalsTab from "@/components/crm/detail/SignalsTab"
+import DriveDocuments from "@/components/drive/DriveDocuments"
 
 const TABS = [
   { id: "overview", label: "Overview", icon: "\uD83D\uDCCB" },
   { id: "timeline", label: "Timeline", icon: "\uD83D\uDD52" },
   { id: "emails", label: "Emails", icon: "\u2709\uFE0F" },
   { id: "deals", label: "Deals", icon: "\uD83D\uDCCA" },
+  { id: "documents", label: "Documents", icon: "\uD83D\uDCC1" },
   { id: "signals", label: "Signals", icon: "\uD83D\uDCE1" },
   { id: "sentinel", label: "Sentinel", icon: "\uD83D\uDEE1\uFE0F" },
 ] as const
@@ -345,6 +347,9 @@ export default function ContactDetailPage() {
         )}
         {activeTab === "deals" && (
           <DealsTab deals={contact.deals || []} contactId={id} employees={employees} onRefresh={fetchContact} />
+        )}
+        {activeTab === "documents" && (
+          <DriveDocuments linkType="contactId" linkId={id} title="Client Documents" />
         )}
         {activeTab === "signals" && (
           <SignalsTab contactId={id} signals={contact.signals || []} onRefresh={fetchContact} />

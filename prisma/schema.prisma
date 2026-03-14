@@ -123,6 +123,7 @@ model OrgEntity {
   parent       OrgEntity?  @relation("OrgStructure", fields: [parentId], references: [id])
   children     OrgEntity[] @relation("OrgStructure")
   employees    Employee[]
+  driveLinks   DriveLink[]
   order        Int         @default(0)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -150,6 +151,7 @@ model WikiPage {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   versions     WikiVersion[]
+  driveLinks   DriveLink[]
 }
 
 model WikiVersion {
@@ -295,6 +297,7 @@ model Contact {
   signals         IntentSignal[]
   outreachSequences OutreachSequence[]
   tasks           Task[]
+  driveLinks      DriveLink[]       @relation("ContactDriveLinks")
 }
 
 model Interaction {
@@ -614,6 +617,7 @@ model Agent {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   referredClients     Contact[]
+  driveLinks          DriveLink[]
 }
 
 // ─── Intent Signals ───
@@ -646,4 +650,26 @@ model OutreachSequence {
   lastStepAt      DateTime?
   enqueuedAt      DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ─── Drive Links (Google Drive integration) ───
+
+model DriveLink {
+  id          String     @id @default(cuid())
+  driveFileId String
+  fileName    String
+  fileUrl     String     // webViewLink to open in Drive
+  mimeType    String
+  iconUrl     String?
+  category    String?    // "contract", "kyc", "invoice", "proposal", "legal", "compliance", "process", "other"
+  contactId   String?
+  contact     Contact?   @relation("ContactDriveLinks", fields: [contactId], references: [id])
+  agentId     String?
+  agent       Agent?     @relation(fields: [agentId], references: [id])
+  wikiPageId  String?
+  wikiPage    WikiPage?  @relation(fields: [wikiPageId], references: [id])
+  entityId    String?
+  entity      OrgEntity? @relation(fields: [entityId], references: [id])
+  createdBy   String
+  createdAt   DateTime   @default(now())
 }

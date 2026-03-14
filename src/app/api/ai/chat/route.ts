@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
+import { getAccessTokenForUser, readDriveFileContent } from "@/lib/google-drive"
 
 const anthropic = new Anthropic()
 
@@ -48,7 +49,8 @@ export async function POST(request: Request) {
 
   try {
     // Gather DB context based on message intent
-    const context = await gatherContext(message)
+    const userEmail = session.user?.email ?? ""
+    const context = await gatherContext(message, userEmail)
 
     // Load or create conversation
     let conversation: { id: string; messages: Array<{ role: string; content: string; timestamp: string }> }
@@ -134,7 +136,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function gatherContext(message: string): Promise<string> {
+async function gatherContext(message: string, userEmail: string): Promise<string> {
   const parts: string[] = []
   const msgLower = message.toLowerCase()
 
@@ -286,6 +288,47 @@ async function gatherContext(message: string): Promise<string> {
       }
     }
   }
+
+  // Linked Drive documents for contacts in context
+  try {
+    const contactIds = contacts.slice(0, 5).map((c) => c.id)
+    if (contactIds.length > 0) {
+      const driveLinks = await prisma.driveLink.findMany({
+        where: { contactId: { in: contactIds } },
+        take: 10,
+      })
+      if (driveLinks.length > 0) {
+        const accessToken = userEmail ? await getAccessTokenForUser(userEmail) : null
+        if (accessToken) {
+          const readableMimes = [
+            "application/vnd.google-apps.document",
+            "application/vnd.google-apps.spreadsheet",
+            "application/vnd.google-apps.presentation",
+          ]
+          const readableLinks = driveLinks.filter((l) => readableMimes.includes(l.mimeType)).slice(0, 3)
+          if (readableLinks.length > 0) {
+            parts.push("\n## Linked Drive Documents")
+            for (const link of readableLinks) {
+              const content = await readDriveFileContent(accessToken, link.driveFileId, link.mimeType)
+              if (content) {
+                parts.push(`### ${link.fileName} (${link.category || "uncategorized"})`)
+                parts.push(content.substring(0, 2000))
+              } else {
+                parts.push(`- ${link.fileName} (${link.category || "uncategorized"}) — content not readable`)
+              }
+            }
+          }
+          const otherLinks = driveLinks.filter((l) => !readableMimes.includes(l.mimeType))
+          if (otherLinks.length > 0) {
+            parts.push("\n## Other Linked Files (metadata only)")
+            for (const link of otherLinks) {
+              parts.push(`- ${link.fileName} (${link.category || "uncategorized"}, ${link.mimeType})`)
+            }
+          }
+        }
+      }
+    }
+  } catch { /* drive context is best-effort */ }
 
   return parts.join("\n")
 }

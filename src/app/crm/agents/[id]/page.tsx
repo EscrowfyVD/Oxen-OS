@@ -12,6 +12,7 @@ import {
   CHART_COLORS, labelStyle,
 } from "@/components/crm/constants"
 import type { Agent } from "@/components/crm/types"
+import DriveDocuments from "@/components/drive/DriveDocuments"
 
 interface AgentStats {
   totalClients: number
@@ -240,6 +241,9 @@ export default function AgentDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Drive Documents */}
+        <DriveDocuments linkType="agentId" linkId={id} title="Agent Documents" />
       </div>
 
       <AgentModal

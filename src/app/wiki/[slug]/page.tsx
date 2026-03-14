@@ -17,6 +17,7 @@ import TableHeader from "@tiptap/extension-table-header"
 import Highlight from "@tiptap/extension-highlight"
 import Underline from "@tiptap/extension-underline"
 import { getCategoryColor } from "@/components/wiki/WikiPageCard"
+import DriveDocuments from "@/components/drive/DriveDocuments"
 
 const FROST = "#F0F0F2"
 const CARD_BG = "#0F1118"
@@ -356,6 +357,11 @@ export default function WikiViewPage() {
           .wiki-content mark { background: rgba(192,139,136,0.2); border-radius: 2px; padding: 1px 3px; }
         `}</style>
         <div className="wiki-content" dangerouslySetInnerHTML={{ __html: html }} />
+      </div>
+
+      {/* Drive Documents */}
+      <div className="fade-in" style={{ animationDelay: "0.12s" }}>
+        <DriveDocuments linkType="wikiPageId" linkId={page.id} />
       </div>
 
       {/* Child Pages */}
