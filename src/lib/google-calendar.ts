@@ -36,7 +36,7 @@ export async function getAccessTokenForUser(userEmail: string): Promise<string |
       provider: "google",
       user: { email: userEmail },
     },
-    select: { access_token: true, refresh_token: true, expires_at: true },
+    select: { id: true, access_token: true, refresh_token: true, expires_at: true },
   })
 
   if (!account) return null
@@ -47,7 +47,24 @@ export async function getAccessTokenForUser(userEmail: string): Promise<string |
   }
 
   if (!account.refresh_token) return null
-  return refreshAccessToken(account.refresh_token)
+  const newToken = await refreshAccessToken(account.refresh_token)
+
+  // Persist the refreshed token so subsequent calls use it
+  if (newToken) {
+    try {
+      await prisma.account.update({
+        where: { id: account.id },
+        data: {
+          access_token: newToken,
+          expires_at: Math.floor(Date.now() / 1000) + 3600, // Google tokens last ~1 hour
+        },
+      })
+    } catch (e) {
+      console.error("[Auth] Failed to persist refreshed token:", e)
+    }
+  }
+
+  return newToken
 }
 
 interface GoogleEventData {

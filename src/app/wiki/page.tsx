@@ -184,18 +184,27 @@ function DriveBrowser() {
   const [folderStack, setFolderStack] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<"list" | "grid">("list")
+  const [error, setError] = useState<string | null>(null)
 
   const currentFolderId = folderStack.length > 0 ? folderStack[folderStack.length - 1].id : undefined
 
   const fetchFiles = useCallback(() => {
     setLoading(true)
+    setError(null)
     const params = new URLSearchParams()
     if (currentFolderId) params.set("folderId", currentFolderId)
     if (search) params.set("q", search)
 
     fetch(`/api/drive/files?${params}`)
       .then((r) => r.json())
-      .then((data) => setFiles(data.files ?? []))
+      .then((data) => {
+        if (data.error) {
+          setError(data.error)
+          setFiles([])
+        } else {
+          setFiles(data.files ?? [])
+        }
+      })
       .catch(() => setFiles([]))
       .finally(() => setLoading(false))
   }, [currentFolderId, search])
@@ -350,7 +359,19 @@ function DriveBrowser() {
         </div>
       )}
 
-      {!loading && files.length === 0 && (
+      {!loading && error && (
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }}>{"\uD83D\uDD12"}</div>
+          <div style={{ fontSize: 13, color: "#F87171", fontFamily: "'DM Sans', sans-serif", marginBottom: 8 }}>
+            {error}
+          </div>
+          <div style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+            Go to Settings, sign out, and sign back in to grant Google Drive access.
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && files.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px 0", color: TEXT_TERTIARY, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
           {search ? "No files match your search" : "This folder is empty"}
         </div>
