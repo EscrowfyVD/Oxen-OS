@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import EventCard, { CalendarEvent } from "./EventCard"
+import EventCard, { CalendarEvent, EVENT_TYPE_COLORS } from "./EventCard"
 
 interface AbsenceBlock {
   id: string
@@ -13,9 +13,10 @@ interface AbsenceBlock {
 
 interface CalendarViewProps {
   events: CalendarEvent[]
-  viewMode: "week" | "day"
+  viewMode: "week" | "day" | "month"
   currentDate: Date
   onEventClick: (event: CalendarEvent) => void
+  onDayClick?: (date: Date) => void
   ownerColors?: Record<string, string>
   absences?: AbsenceBlock[]
 }
@@ -41,6 +42,35 @@ function getWeekDates(date: Date): Date[] {
   })
 }
 
+function getMonthDates(date: Date): Date[][] {
+  const year = date.getFullYear()
+  const month = date.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+
+  // Start from Monday
+  let startDay = firstDay.getDay() - 1
+  if (startDay < 0) startDay = 6
+
+  const startDate = new Date(firstDay)
+  startDate.setDate(startDate.getDate() - startDay)
+
+  const weeks: Date[][] = []
+  const current = new Date(startDate)
+
+  while (current <= lastDay || weeks.length < 5) {
+    const week: Date[] = []
+    for (let i = 0; i < 7; i++) {
+      week.push(new Date(current))
+      current.setDate(current.getDate() + 1)
+    }
+    weeks.push(week)
+    if (weeks.length >= 6) break
+  }
+
+  return weeks
+}
+
 function isSameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -56,12 +86,191 @@ export default function CalendarView({
   viewMode,
   currentDate,
   onEventClick,
+  onDayClick,
   ownerColors,
   absences,
 }: CalendarViewProps) {
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate])
-  const displayDates = viewMode === "week" ? weekDates : [currentDate]
+  const monthWeeks = useMemo(() => getMonthDates(currentDate), [currentDate])
   const today = new Date()
+
+  if (viewMode === "month") {
+    return (
+      <div className="card" style={{ overflow: "hidden" }}>
+        {/* Month day headers */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, 1fr)",
+            borderBottom: "1px solid var(--border)",
+            background: "rgba(192,139,136,0.02)",
+          }}
+        >
+          {DAY_LABELS.map((label, i) => (
+            <div
+              key={label}
+              style={{
+                padding: "10px 8px",
+                textAlign: "center",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.05em",
+                color: "var(--text-dim)",
+                fontFamily: "'DM Sans', sans-serif",
+                borderRight: i < 6 ? "1px solid var(--border)" : "none",
+              }}
+            >
+              {label}
+            </div>
+          ))}
+        </div>
+
+        {/* Month grid */}
+        {monthWeeks.map((week, wi) => (
+          <div
+            key={wi}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              borderBottom: wi < monthWeeks.length - 1 ? "1px solid var(--border)" : "none",
+              minHeight: 100,
+            }}
+          >
+            {week.map((date, di) => {
+              const isCurrentMonth = date.getMonth() === currentDate.getMonth()
+              const isToday = isSameDay(date, today)
+              const dayEvents = events.filter((e) => isSameDay(new Date(e.start), date))
+              const dayAbsences = (absences ?? []).filter((a) => {
+                const start = new Date(a.startDate)
+                start.setHours(0, 0, 0, 0)
+                const end = new Date(a.endDate)
+                end.setHours(23, 59, 59, 999)
+                return date >= start && date <= end
+              })
+              const maxVisible = 3
+              const totalItems = dayEvents.length + dayAbsences.length
+              const overflow = totalItems - maxVisible
+
+              return (
+                <div
+                  key={di}
+                  onClick={() => onDayClick?.(date)}
+                  style={{
+                    padding: 4,
+                    borderRight: di < 6 ? "1px solid var(--border)" : "none",
+                    cursor: onDayClick ? "pointer" : "default",
+                    borderLeft: isToday ? "3px solid var(--rose)" : "3px solid transparent",
+                    background: isToday ? "rgba(192,139,136,0.04)" : "transparent",
+                    transition: "background 0.15s",
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: 100,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (onDayClick) e.currentTarget.style.background = "rgba(255,255,255,0.02)"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = isToday ? "rgba(192,139,136,0.04)" : "transparent"
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: isToday ? 700 : 400,
+                      color: isToday
+                        ? "var(--rose)"
+                        : isCurrentMonth
+                          ? "var(--text)"
+                          : "var(--text-dim)",
+                      fontFamily: "'DM Sans', sans-serif",
+                      marginBottom: 4,
+                      padding: "2px 4px",
+                      opacity: isCurrentMonth ? 1 : 0.4,
+                    }}
+                  >
+                    {date.getDate()}
+                  </div>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+                    {/* Absence bars */}
+                    {dayAbsences.slice(0, maxVisible).map((a) => {
+                      const colors = ABSENCE_COLORS[a.type] || ABSENCE_COLORS.vacation
+                      return (
+                        <div
+                          key={`abs-${a.id}`}
+                          style={{
+                            background: colors.bg,
+                            color: colors.text,
+                            fontSize: 8,
+                            fontWeight: 600,
+                            padding: "1px 4px",
+                            borderRadius: 3,
+                            fontFamily: "'DM Sans', sans-serif",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={`${a.employee.name} - ${a.type}`}
+                        >
+                          {a.employee.initials} {a.type}
+                        </div>
+                      )
+                    })}
+                    {/* Event bars */}
+                    {dayEvents.slice(0, Math.max(0, maxVisible - dayAbsences.length)).map((evt) => {
+                      const typeColor = evt.type ? EVENT_TYPE_COLORS[evt.type] : undefined
+                      const barColor = ownerColors?.[evt.calendarOwner ?? ""] ?? typeColor ?? evt.color ?? "var(--rose)"
+                      return (
+                        <div
+                          key={evt.id}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onEventClick(evt)
+                          }}
+                          style={{
+                            background: `${barColor}20`,
+                            borderLeft: `2px solid ${barColor}`,
+                            fontSize: 8,
+                            fontWeight: 600,
+                            padding: "1px 4px",
+                            borderRadius: 3,
+                            fontFamily: "'DM Sans', sans-serif",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            color: "var(--text)",
+                            cursor: "pointer",
+                          }}
+                          title={evt.title}
+                        >
+                          {evt.title}
+                        </div>
+                      )
+                    })}
+                    {overflow > 0 && (
+                      <div
+                        style={{
+                          fontSize: 8,
+                          color: "var(--text-dim)",
+                          fontFamily: "'DM Sans', sans-serif",
+                          padding: "0 4px",
+                          fontWeight: 500,
+                        }}
+                      >
+                        +{overflow} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // ── Week / Day view ──
+  const displayDates = viewMode === "week" ? weekDates : [currentDate]
 
   const getEventsForDateAndHour = (date: Date, hour: number) => {
     return events.filter((e) => {

@@ -177,19 +177,43 @@ model CalendarEvent {
   @@unique([googleEventId, calendarOwner])
 }
 
+// ─── Internal Events (user-created meetings) ───
+
+model InternalEvent {
+  id             String    @id @default(cuid())
+  title          String
+  description    String?   @db.Text
+  startTime      DateTime
+  endTime        DateTime
+  location       String?
+  meetLink       String?
+  attendees      String[]
+  color          String?
+  type           String    @default("meeting")
+  recurring      String?
+  recurringUntil DateTime?
+  googleEventId  String?
+  createdBy      String
+  callNote       CallNote?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
 // ─── Call Notes ───
 
 model CallNote {
-  id          String         @id @default(cuid())
-  title       String
-  date        DateTime
-  htmlContent String         @db.Text
-  noteData    Json?
-  eventId     String?        @unique
-  event       CalendarEvent? @relation(fields: [eventId], references: [id])
-  createdBy   String
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id              String          @id @default(cuid())
+  title           String
+  date            DateTime
+  htmlContent     String          @db.Text
+  noteData        Json?
+  eventId         String?         @unique
+  event           CalendarEvent?  @relation(fields: [eventId], references: [id])
+  internalEventId String?         @unique
+  internalEvent   InternalEvent?  @relation(fields: [internalEventId], references: [id])
+  createdBy       String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 }
 
 // ─── Dashboard / KPIs ───

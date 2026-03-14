@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation"
 import PageHeader from "@/components/layout/PageHeader"
 import CalendarView from "@/components/calendar/CalendarView"
 import CallNotesModal from "@/components/calendar/CallNotesModal"
+import EventModal, { type EventFormData } from "@/components/calendar/EventModal"
 import type { CalendarEvent } from "@/components/calendar/EventCard"
 import Link from "next/link"
 
-type ViewMode = "week" | "day"
+type ViewMode = "week" | "day" | "month"
 
 interface TeamMember {
   email: string
@@ -50,6 +51,11 @@ export default function CalendarPage() {
   const [ownerColors, setOwnerColors] = useState<Record<string, string>>({})
   const [absences, setAbsences] = useState<Array<{ id: string; employee: { name: string; initials: string }; type: string; startDate: string; endDate: string }>>([])
 
+  // Event Modal state
+  const [showEventModal, setShowEventModal] = useState(false)
+  const [eventModalMode, setEventModalMode] = useState<"create" | "edit" | "view">("create")
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+
   // Call Notes state
   const [callNotes, setCallNotes] = useState<CallNoteItem[]>([])
   const [showCallNotesModal, setShowCallNotesModal] = useState(false)
@@ -57,7 +63,7 @@ export default function CalendarPage() {
   const [searchCallNotes, setSearchCallNotes] = useState("")
   const uploadRef = useRef<HTMLInputElement>(null)
 
-  // Fetch call notes (scoped by API: admin sees all, others see own)
+  // Fetch call notes
   const fetchCallNotes = useCallback(() => {
     fetch("/api/call-notes")
       .then((r) => r.json())
@@ -87,9 +93,16 @@ export default function CalendarPage() {
 
   const fetchEvents = useCallback(() => {
     const start = new Date(currentDate)
-    start.setDate(start.getDate() - 14)
     const end = new Date(currentDate)
-    end.setDate(end.getDate() + 14)
+
+    if (viewMode === "month") {
+      start.setDate(1)
+      start.setDate(start.getDate() - 7) // padding
+      end.setMonth(end.getMonth() + 1, 7) // padding
+    } else {
+      start.setDate(start.getDate() - 14)
+      end.setDate(end.getDate() + 14)
+    }
 
     const params = new URLSearchParams({
       start: start.toISOString(),
@@ -100,22 +113,28 @@ export default function CalendarPage() {
       params.set("owners", Array.from(selectedOwners).join(","))
     }
 
-    fetch(`/api/calendar/events?${params}`)
+    fetch(`/api/events?${params}`)
       .then((r) => r.json())
       .then((data) => setEvents(data.events ?? []))
       .catch(() => {})
-  }, [currentDate, selectedOwners, teamMembers.length])
+  }, [currentDate, selectedOwners, teamMembers.length, viewMode])
 
   useEffect(() => {
     fetchEvents()
   }, [fetchEvents])
 
-  // Fetch approved absences for the visible date range
+  // Fetch approved absences
   useEffect(() => {
     const start = new Date(currentDate)
-    start.setDate(start.getDate() - 14)
     const end = new Date(currentDate)
-    end.setDate(end.getDate() + 14)
+    if (viewMode === "month") {
+      start.setDate(1)
+      start.setDate(start.getDate() - 7)
+      end.setMonth(end.getMonth() + 1, 7)
+    } else {
+      start.setDate(start.getDate() - 14)
+      end.setDate(end.getDate() + 14)
+    }
     fetch(`/api/leaves?all=true&status=approved&startDate=${start.toISOString()}&endDate=${end.toISOString()}`)
       .then((r) => r.json())
       .then((data) => {
@@ -129,7 +148,7 @@ export default function CalendarPage() {
         })))
       })
       .catch(() => {})
-  }, [currentDate])
+  }, [currentDate, viewMode])
 
   const handleSync = async () => {
     setSyncing(true)
@@ -175,20 +194,7 @@ export default function CalendarPage() {
           })
         } catch { /* silent */ }
 
-        // Always re-fetch events directly after sync (don't rely on state cascade)
-        const start = new Date(currentDate)
-        start.setDate(start.getDate() - 14)
-        const end = new Date(currentDate)
-        end.setDate(end.getDate() + 14)
-        const evParams = new URLSearchParams({
-          start: start.toISOString(),
-          end: end.toISOString(),
-        })
-        try {
-          const evRes = await fetch(`/api/calendar/events?${evParams}`)
-          const evData = await evRes.json()
-          setEvents(evData.events ?? [])
-        } catch { /* silent */ }
+        fetchEvents()
       } else {
         setSyncMessage(data.error ?? "Sync failed")
       }
@@ -213,13 +219,8 @@ export default function CalendarPage() {
           htmlContent,
         }),
       })
-      if (res.ok) {
-        fetchCallNotes()
-      }
-    } catch {
-      // silent
-    }
-    // Reset file input
+      if (res.ok) fetchCallNotes()
+    } catch { /* silent */ }
     if (uploadRef.current) uploadRef.current.value = ""
   }
 
@@ -238,9 +239,59 @@ export default function CalendarPage() {
     setShowCallNotesModal(true)
   }
 
+  const handleEventClick = (event: CalendarEvent) => {
+    if (event.source === "internal") {
+      setEditingEvent(event)
+      setEventModalMode("edit")
+      setShowEventModal(true)
+    } else {
+      setEditingEvent(event)
+      setEventModalMode("view")
+      setShowEventModal(true)
+    }
+  }
+
+  const handleCreateEvent = async (data: EventFormData) => {
+    const res = await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error("Failed to create")
+    setShowEventModal(false)
+    setEditingEvent(null)
+    fetchEvents()
+  }
+
+  const handleUpdateEvent = async (data: EventFormData) => {
+    if (!editingEvent) return
+    const res = await fetch(`/api/events/${editingEvent.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error("Failed to update")
+    setShowEventModal(false)
+    setEditingEvent(null)
+    setSelectedEvent(null)
+    fetchEvents()
+  }
+
+  const handleDeleteEvent = async () => {
+    if (!editingEvent) return
+    const res = await fetch(`/api/events/${editingEvent.id}`, { method: "DELETE" })
+    if (!res.ok) throw new Error("Failed to delete")
+    setShowEventModal(false)
+    setEditingEvent(null)
+    setSelectedEvent(null)
+    fetchEvents()
+  }
+
   const navigateDate = (direction: number) => {
     const newDate = new Date(currentDate)
-    if (viewMode === "week") {
+    if (viewMode === "month") {
+      newDate.setMonth(newDate.getMonth() + direction)
+    } else if (viewMode === "week") {
       newDate.setDate(newDate.getDate() + direction * 7)
     } else {
       newDate.setDate(newDate.getDate() + direction)
@@ -250,7 +301,15 @@ export default function CalendarPage() {
 
   const goToToday = () => setCurrentDate(new Date())
 
+  const handleDayClick = (date: Date) => {
+    setCurrentDate(date)
+    setViewMode("day")
+  }
+
   const formatDateRange = () => {
+    if (viewMode === "month") {
+      return currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    }
     if (viewMode === "day") {
       return currentDate.toLocaleDateString("en-US", {
         weekday: "long",
@@ -287,8 +346,6 @@ export default function CalendarPage() {
     }
   }
 
-  // If no team members loaded yet (owners haven't been fetched), show all events
-  // Otherwise filter by selected owners
   const filteredEvents = teamMembers.length === 0
     ? events
     : events.filter(
@@ -318,11 +375,22 @@ export default function CalendarPage() {
               </span>
             )}
             <button
+              className="btn-primary"
+              onClick={() => {
+                setEditingEvent(null)
+                setEventModalMode("create")
+                setShowEventModal(true)
+              }}
+              style={{ fontSize: 12 }}
+            >
+              + New Meeting
+            </button>
+            <button
               className="btn-secondary"
               onClick={() => openPrepareModal()}
               style={{ fontSize: 12 }}
             >
-              {"\uD83D\uDCCB"} New Call Notes
+              {"\uD83D\uDCCB"} Call Notes
             </button>
             <label
               className="btn-secondary"
@@ -334,7 +402,7 @@ export default function CalendarPage() {
                 gap: 4,
               }}
             >
-              {"\u2B06"} Upload HTML
+              {"\u2B06"} Upload
               <input
                 ref={uploadRef}
                 type="file"
@@ -344,11 +412,12 @@ export default function CalendarPage() {
               />
             </label>
             <button
-              className="btn-primary"
+              className="btn-secondary"
               onClick={handleSync}
               disabled={syncing}
+              style={{ fontSize: 12 }}
             >
-              {syncing ? "Syncing..." : "Sync All Calendars"}
+              {syncing ? "Syncing..." : "Sync"}
             </button>
           </div>
         }
@@ -392,18 +461,15 @@ export default function CalendarPage() {
         </div>
 
         <div className="toggle-group">
-          <button
-            onClick={() => setViewMode("week")}
-            className={`toggle-btn ${viewMode === "week" ? "active" : ""}`}
-          >
-            Week
-          </button>
-          <button
-            onClick={() => setViewMode("day")}
-            className={`toggle-btn ${viewMode === "day" ? "active" : ""}`}
-          >
-            Day
-          </button>
+          {(["day", "week", "month"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`toggle-btn ${viewMode === mode ? "active" : ""}`}
+            >
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -493,19 +559,19 @@ export default function CalendarPage() {
             events={filteredEvents}
             viewMode={viewMode}
             currentDate={currentDate}
-            onEventClick={(event) => setSelectedEvent(event)}
+            onEventClick={handleEventClick}
+            onDayClick={handleDayClick}
             ownerColors={ownerColors}
             absences={absences}
           />
         </div>
 
-        {/* Event detail side panel */}
-        {selectedEvent && (
+        {/* Event detail side panel (quick view for week/day) */}
+        {selectedEvent && !showEventModal && (
           <div
             className="w-80 shrink-0 card self-start animate-slideIn"
             style={{ overflow: "hidden" }}
           >
-            {/* Panel header */}
             <div
               className="flex items-start justify-between"
               style={{
@@ -556,6 +622,29 @@ export default function CalendarPage() {
 
             <div style={{ padding: 16 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {/* Source badge */}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 600,
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: selectedEvent.source === "google"
+                        ? "rgba(255,255,255,0.06)"
+                        : "rgba(155,127,212,0.12)",
+                      color: selectedEvent.source === "google"
+                        ? "var(--text-dim)"
+                        : "#9B7FD4",
+                      fontFamily: "'DM Sans', sans-serif",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    {selectedEvent.source === "google" ? "Google" : "Internal"}
+                  </span>
+                </div>
+
                 <div>
                   <div className="section-label" style={{ marginBottom: 4 }}>TIME</div>
                   <div style={{ fontSize: 12, color: "var(--text)" }}>
@@ -637,7 +726,18 @@ export default function CalendarPage() {
                   </div>
                 )}
 
-                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {/* Edit button for internal events */}
+                  {selectedEvent.source === "internal" && (
+                    <button
+                      onClick={() => handleEventClick(selectedEvent)}
+                      className="btn-secondary w-full"
+                      style={{ fontSize: 12 }}
+                    >
+                      Edit Meeting
+                    </button>
+                  )}
+
                   {!selectedEvent.callNoteId && (
                     <button
                       onClick={() => openPrepareModal(selectedEvent)}
@@ -803,6 +903,20 @@ export default function CalendarPage() {
             fetchCallNotes()
             router.push(`/calendar/${callNoteId}`)
           }}
+        />
+      )}
+
+      {/* Event Modal */}
+      {showEventModal && (
+        <EventModal
+          mode={eventModalMode}
+          event={editingEvent}
+          onClose={() => {
+            setShowEventModal(false)
+            setEditingEvent(null)
+          }}
+          onSave={eventModalMode === "create" ? handleCreateEvent : handleUpdateEvent}
+          onDelete={eventModalMode === "edit" ? handleDeleteEvent : undefined}
         />
       )}
     </div>

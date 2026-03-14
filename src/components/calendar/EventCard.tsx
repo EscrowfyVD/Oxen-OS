@@ -1,5 +1,14 @@
 "use client"
 
+export const EVENT_TYPE_COLORS: Record<string, string> = {
+  team_call: "#C08B88",
+  client_call: "#5CB868",
+  internal: "#5B9BBF",
+  meeting: "#9B7FD4",
+  reminder: "#E5C453",
+  google_synced: "rgba(255,255,255,0.15)",
+}
+
 export interface CalendarEvent {
   id: string
   title: string
@@ -11,6 +20,11 @@ export interface CalendarEvent {
   location?: string
   calendarOwner?: string
   callNoteId?: string
+  source?: "google" | "internal"
+  type?: string
+  meetLink?: string
+  recurring?: string | null
+  googleEventId?: string
 }
 
 interface EventCardProps {
@@ -21,7 +35,8 @@ interface EventCardProps {
 }
 
 export default function EventCard({ event, onClick, style, ownerColor }: EventCardProps) {
-  const color = ownerColor ?? event.color ?? "var(--rose)"
+  const typeColor = event.type ? EVENT_TYPE_COLORS[event.type] : undefined
+  const color = ownerColor ?? typeColor ?? event.color ?? "var(--rose)"
   const startTime = new Date(event.start).toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
@@ -45,6 +60,7 @@ export default function EventCard({ event, onClick, style, ownerColor }: EventCa
         transition: "all 0.15s ease",
         fontFamily: "'DM Sans', sans-serif",
         marginBottom: 2,
+        position: "relative",
         ...style,
       }}
       onMouseEnter={(e) => {
@@ -60,6 +76,7 @@ export default function EventCard({ event, onClick, style, ownerColor }: EventCa
           fontSize: 11,
           fontWeight: 600,
           color: "var(--text)",
+          paddingRight: 14,
         }}
       >
         {event.title}
@@ -81,6 +98,26 @@ export default function EventCard({ event, onClick, style, ownerColor }: EventCa
             </span>
           </>
         )}
+        {event.recurring && event.recurring !== "none" && (
+          <span style={{ fontSize: 8, opacity: 0.5, marginLeft: 2 }} title="Recurring">
+            {"\u21BB"}
+          </span>
+        )}
+      </div>
+      {/* Source indicator */}
+      <div
+        style={{
+          position: "absolute",
+          top: 6,
+          right: 6,
+          fontSize: 7,
+          fontWeight: 700,
+          lineHeight: 1,
+          opacity: 0.4,
+        }}
+        title={event.source === "google" ? "Google Calendar" : "Internal"}
+      >
+        {event.source === "google" ? "G" : "\u25CF"}
       </div>
     </button>
   )
