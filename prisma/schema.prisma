@@ -515,6 +515,25 @@ model LeaveBalance {
   @@unique([employeeId, year])
 }
 
+model LeaveRules {
+  id                   String   @id @default(cuid())
+  generalPolicy        String?  @db.Text
+  vacationQuota        Int      @default(25)
+  vacationMinNotice    Int      @default(14)
+  vacationMaxConsecutive Int    @default(15)
+  vacationCarryOver    Int      @default(5)
+  sickQuota            Int      @default(10)
+  sickCertAfterDays    Int      @default(3)
+  oooQuota             Int      @default(15)
+  oooMinNotice         Int      @default(3)
+  oooReasonRequired    Boolean  @default(true)
+  approvalTimeline     Int      @default(2)
+  blackoutPeriods      Json?
+  updatedBy            String?
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+}
+
 // ─── Email Sync ───
 
 model Email {

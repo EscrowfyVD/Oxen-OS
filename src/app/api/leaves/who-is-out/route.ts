@@ -29,7 +29,10 @@ export async function GET() {
     department: true,
   }
 
-  const [todayLeaves, weekLeaves] = await Promise.all([
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+
+  const [todayLeaves, weekLeaves, monthLeaves] = await Promise.all([
     prisma.leaveRequest.findMany({
       where: {
         status: "approved",
@@ -48,26 +51,31 @@ export async function GET() {
       include: { employee: { select: selectEmployee } },
       orderBy: { startDate: "asc" },
     }),
+    prisma.leaveRequest.findMany({
+      where: {
+        status: "approved",
+        startDate: { lte: monthEnd },
+        endDate: { gte: monthStart },
+      },
+      include: { employee: { select: selectEmployee } },
+      orderBy: { startDate: "asc" },
+    }),
   ])
 
+  const mapLeave = (l: typeof todayLeaves[number]) => ({
+    id: l.id,
+    employee: l.employee,
+    type: l.type,
+    startDate: l.startDate,
+    endDate: l.endDate,
+    halfDay: l.halfDay,
+    halfDayPeriod: l.halfDayPeriod,
+    totalDays: l.totalDays,
+  })
+
   return NextResponse.json({
-    today: todayLeaves.map((l) => ({
-      id: l.id,
-      employee: l.employee,
-      type: l.type,
-      startDate: l.startDate,
-      endDate: l.endDate,
-      halfDay: l.halfDay,
-      halfDayPeriod: l.halfDayPeriod,
-    })),
-    thisWeek: weekLeaves.map((l) => ({
-      id: l.id,
-      employee: l.employee,
-      type: l.type,
-      startDate: l.startDate,
-      endDate: l.endDate,
-      halfDay: l.halfDay,
-      halfDayPeriod: l.halfDayPeriod,
-    })),
+    today: todayLeaves.map(mapLeave),
+    thisWeek: weekLeaves.map(mapLeave),
+    thisMonth: monthLeaves.map(mapLeave),
   })
 }

@@ -116,21 +116,14 @@ export async function POST(request: Request) {
   }
 
   // Check available balance
-  const totalKey = `${type}Total` as "vacationTotal" | "sickTotal" | "oooTotal"
-  const usedKey = `${type}Used` as "vacationUsed" | "sickUsed" | "oooUsed"
-  const pendingKey = `${type}Pending` as "vacationPending"
-
   const total = type === "vacation" ? balance.vacationTotal : type === "sick" ? balance.sickTotal : balance.oooTotal
   const used = type === "vacation" ? balance.vacationUsed : type === "sick" ? balance.sickUsed : balance.oooUsed
   const pending = type === "vacation" ? balance.vacationPending : 0
 
   const remaining = total - used - pending
-  if (totalDays > remaining) {
-    return NextResponse.json(
-      { error: `Insufficient balance. ${remaining} ${type} days remaining, requesting ${totalDays}.` },
-      { status: 400 }
-    )
-  }
+  const balanceWarning = totalDays > remaining
+    ? { type: "over_balance", message: `Exceeds balance by ${totalDays - remaining} day(s). ${remaining} ${type} day(s) remaining, requesting ${totalDays}.`, breakdown: { total, used, pending, available: remaining, requested: totalDays, overage: totalDays - remaining } }
+    : null
 
   // Create the request
   const leaveRequest = await prisma.leaveRequest.create({
@@ -188,5 +181,5 @@ export async function POST(request: Request) {
     where: { employeeId_year: { employeeId: employee.id, year } },
   })
 
-  return NextResponse.json({ request: leaveRequest, balance: updatedBalance }, { status: 201 })
+  return NextResponse.json({ request: leaveRequest, balance: updatedBalance, warning: balanceWarning }, { status: 201 })
 }
