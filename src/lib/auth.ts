@@ -68,7 +68,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ profile }) {
+    async signIn({ account, profile }) {
       console.log("[AUTH] signIn callback - email:", profile?.email)
       if (!profile?.email) {
         console.log("[AUTH] No email in profile, rejecting")
@@ -76,7 +76,37 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       const allowed = profile.email.endsWith("@oxen.finance")
       console.log("[AUTH] Domain check:", allowed ? "ALLOWED" : "REJECTED")
-      return allowed
+      if (!allowed) return false
+
+      // Update stored account with fresh tokens & scopes from Google
+      // The PrismaAdapter doesn't do this on re-login, so old scopes persist
+      if (account && profile.email) {
+        try {
+          const existingAccount = await prisma.account.findFirst({
+            where: { provider: "google", user: { email: profile.email } },
+            select: { id: true, scope: true },
+          })
+          if (existingAccount) {
+            console.log("[AUTH] Updating account tokens. Old scope:", existingAccount.scope, "New scope:", account.scope)
+            await prisma.account.update({
+              where: { id: existingAccount.id },
+              data: {
+                access_token: account.access_token,
+                refresh_token: account.refresh_token ?? undefined,
+                expires_at: account.expires_at,
+                scope: account.scope,
+                id_token: account.id_token,
+                token_type: account.token_type,
+              },
+            })
+            console.log("[AUTH] Account tokens updated successfully")
+          }
+        } catch (e) {
+          console.error("[AUTH] Failed to update account tokens:", e)
+        }
+      }
+
+      return true
     },
     async session({ session, user }) {
       session.user.id = user.id
