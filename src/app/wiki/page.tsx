@@ -195,17 +195,29 @@ function DriveBrowser() {
     if (currentFolderId) params.set("folderId", currentFolderId)
     if (search) params.set("q", search)
 
-    fetch(`/api/drive/files?${params}`)
-      .then((r) => r.json())
+    const url = `/api/drive/files?${params}`
+    console.log("[Drive Browser] Fetching:", url)
+
+    fetch(url)
+      .then((r) => {
+        console.log("[Drive Browser] Response status:", r.status)
+        return r.json()
+      })
       .then((data) => {
+        console.log("[Drive Browser] Response data:", data)
         if (data.error) {
+          console.error("[Drive Browser] API error:", data.error)
           setError(data.error)
           setFiles([])
         } else {
+          console.log("[Drive Browser] Files count:", data.files?.length ?? 0)
           setFiles(data.files ?? [])
         }
       })
-      .catch(() => setFiles([]))
+      .catch((err) => {
+        console.error("[Drive Browser] Fetch failed:", err)
+        setFiles([])
+      })
       .finally(() => setLoading(false))
   }, [currentFolderId, search])
 
@@ -215,10 +227,19 @@ function DriveBrowser() {
   }, [fetchFiles, search])
 
   useEffect(() => {
+    console.log("[Drive Browser] Fetching starred files...")
     fetch("/api/drive/starred")
-      .then((r) => r.json())
-      .then((data) => setStarredFiles(data.files ?? []))
-      .catch(() => {})
+      .then((r) => {
+        console.log("[Drive Browser] Starred response status:", r.status)
+        return r.json()
+      })
+      .then((data) => {
+        console.log("[Drive Browser] Starred data:", data)
+        setStarredFiles(data.files ?? [])
+      })
+      .catch((err) => {
+        console.error("[Drive Browser] Starred fetch failed:", err)
+      })
   }, [])
 
   const navigateFolder = (file: DriveFile) => {
