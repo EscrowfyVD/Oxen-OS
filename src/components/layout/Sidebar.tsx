@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { ROLE_COLORS, ROLE_LABELS, canAccess, canAccessPage, type RoleLevel } from "@/lib/permissions"
+import { getAvatarGradient } from "@/lib/avatar"
 
 type NavItem = {
   label: string
@@ -56,6 +57,9 @@ export default function Sidebar() {
   const [userDepartment, setUserDepartment] = useState<string | null>(null)
   const [userJobTitle, setUserJobTitle] = useState<string | null>(null)
   const [signOutHover, setSignOutHover] = useState(false)
+  const [userAvatarColor, setUserAvatarColor] = useState<string | null>(null)
+  const [userIcon, setUserIcon] = useState<string | null>(null)
+  const [userInitialsFromApi, setUserInitialsFromApi] = useState<string | null>(null)
 
   useEffect(() => {
     fetch("/api/wiki?limit=1")
@@ -73,6 +77,9 @@ export default function Sidebar() {
           setUserRole((data.employee.roleLevel ?? "member") as RoleLevel)
           setUserDepartment(data.employee.department ?? null)
           setUserJobTitle(data.employee.role ?? null)
+          setUserAvatarColor(data.employee.avatarColor ?? null)
+          setUserIcon(data.employee.icon ?? null)
+          setUserInitialsFromApi(data.employee.initials ?? null)
         }
       })
       .catch(() => {})
@@ -274,19 +281,19 @@ export default function Sidebar() {
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
-                  background: "linear-gradient(135deg, #C08B88, #8B6B68)",
+                  background: getAvatarGradient(userAvatarColor),
                   flexShrink: 0,
                 }}
               >
                 <span
                   style={{
-                    fontSize: 11,
+                    fontSize: userIcon ? 14 : 11,
                     fontWeight: 600,
                     color: "#FFFFFF",
                     lineHeight: 1,
                   }}
                 >
-                  {userInitials}
+                  {userIcon || userInitialsFromApi || userInitials}
                 </span>
               </div>
               <div className="min-w-0 flex-1">

@@ -2,6 +2,7 @@
 
 import { CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, FROST, GREEN, RED, AMBER, LEAVE_COLORS, LEAVE_LABELS } from "./constants"
 import { formatShortDate } from "./helpers"
+import { getAvatarGradient } from "@/lib/avatar"
 import type { WhoIsOut } from "./types"
 
 interface WhoIsOutPanelProps {
@@ -40,7 +41,7 @@ export default function WhoIsOutPanel({ whoIsOut, isAdmin, pendingRequests, onQu
               backDate.setDate(backDate.getDate() + 1)
               return (
                 <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 24, height: 24, borderRadius: "50%", background: w.employee.avatarColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, color: "#fff", flexShrink: 0 }}>
+                  <div style={{ width: 24, height: 24, borderRadius: "50%", background: getAvatarGradient(w.employee.avatarColor), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, color: "#fff", flexShrink: 0 }}>
                     {w.employee.initials}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -72,7 +73,7 @@ export default function WhoIsOutPanel({ whoIsOut, isAdmin, pendingRequests, onQu
               const lc = LEAVE_COLORS[w.type] || LEAVE_COLORS.vacation
               return (
                 <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: w.employee.avatarColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: "#fff", flexShrink: 0 }}>
+                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: getAvatarGradient(w.employee.avatarColor), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: "#fff", flexShrink: 0 }}>
                     {w.employee.initials}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -109,7 +110,7 @@ export default function WhoIsOutPanel({ whoIsOut, isAdmin, pendingRequests, onQu
                 const lc = LEAVE_COLORS[w.type] || LEAVE_COLORS.vacation
                 return (
                   <div key={w.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: w.employee.avatarColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: "#fff", flexShrink: 0 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: getAvatarGradient(w.employee.avatarColor), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, fontWeight: 600, color: "#fff", flexShrink: 0 }}>
                       {w.employee.initials}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>

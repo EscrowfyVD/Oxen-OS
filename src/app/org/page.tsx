@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import PageHeader from "@/components/layout/PageHeader"
+import { useRouter } from "next/navigation"
+import { getAvatarGradient } from "@/lib/avatar"
 
 /* ── Design tokens ── */
 const FROST = "#FFFFFF"
@@ -16,6 +18,14 @@ const AMBER = "#FBBF24"
 const INDIGO = "#818CF8"
 
 /* ── Types ── */
+interface MiniEmployee {
+  id: string
+  name: string
+  initials: string
+  avatarColor: string
+  icon: string | null
+}
+
 interface OrgEntity {
   id: string
   name: string
@@ -23,6 +33,8 @@ interface OrgEntity {
   type: string
   parentId: string | null
   order: number
+  _count?: { employees: number }
+  employees?: MiniEmployee[]
 }
 
 interface EntityForm {
@@ -47,6 +59,7 @@ const emptyForm = (): EntityForm => ({
 })
 
 export default function OrgPage() {
+  const router = useRouter()
   const [entities, setEntities] = useState<OrgEntity[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<EntityForm>(emptyForm())
@@ -503,6 +516,62 @@ export default function OrgPage() {
           >
             {entity.type}
           </div>
+
+          {/* Employee count + mini avatars */}
+          {(entity._count?.employees ?? 0) > 0 && (
+            <div
+              onClick={(e) => {
+                e.stopPropagation()
+                router.push(`/team?entity=${encodeURIComponent(entity.name)}`)
+              }}
+              style={{
+                marginTop: 10,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                cursor: "pointer",
+                padding: "4px 0",
+              }}
+              title={`View ${entity._count?.employees} team members`}
+            >
+              {/* Mini avatar stack */}
+              <div style={{ display: "flex", marginLeft: 6 }}>
+                {(entity.employees ?? []).map((emp, i) => (
+                  <div
+                    key={emp.id}
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      background: getAvatarGradient(emp.avatarColor),
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: emp.icon ? 10 : 7,
+                      fontWeight: 600,
+                      color: "#fff",
+                      border: `1.5px solid ${CARD_BG}`,
+                      marginLeft: i > 0 ? -6 : 0,
+                      zIndex: 5 - i,
+                      position: "relative",
+                    }}
+                    title={emp.name}
+                  >
+                    {emp.icon || emp.initials}
+                  </div>
+                ))}
+              </div>
+              <span style={{
+                fontSize: 9,
+                color: TEXT_TERTIARY,
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 500,
+              }}>
+                {entity._count?.employees} member{entity._count?.employees !== 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Add child button */}

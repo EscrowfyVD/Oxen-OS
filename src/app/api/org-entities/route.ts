@@ -9,7 +9,16 @@ export async function GET() {
   }
 
   const entities = await prisma.orgEntity.findMany({
-    include: { children: true, parent: true },
+    include: {
+      children: true,
+      parent: true,
+      employees: {
+        select: { id: true, name: true, initials: true, avatarColor: true, icon: true },
+        take: 5,
+        orderBy: { order: "asc" },
+      },
+      _count: { select: { employees: true } },
+    },
     orderBy: { order: "asc" },
   })
 

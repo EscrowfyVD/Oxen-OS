@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/admin"
+import { getLeastUsedTheme } from "@/lib/avatar"
 
 export async function GET() {
   const session = await auth()
@@ -10,7 +11,7 @@ export async function GET() {
   }
 
   const employees = await prisma.employee.findMany({
-    include: { reports: true },
+    include: { reports: true, orgEntity: { select: { id: true, name: true } } },
     orderBy: { order: "asc" },
   })
 
@@ -25,14 +26,21 @@ export async function POST(request: Request) {
   const {
     name, initials, role, department, location, email, avatarColor,
     managerId, order, phone, telegram, telegramChatId, whatsapp, timezone, workHours,
-    entity, country, startDate, bio,
+    entity, entityId, country, startDate, bio, icon,
   } = body
 
-  if (!name || !initials || !role || !department || !avatarColor) {
+  if (!name || !initials || !role || !department) {
     return NextResponse.json(
-      { error: "Missing required fields: name, initials, role, department, avatarColor" },
+      { error: "Missing required fields: name, initials, role, department" },
       { status: 400 }
     )
+  }
+
+  // Auto-assign avatar color if not provided
+  let finalColor = avatarColor
+  if (!finalColor) {
+    const existing = await prisma.employee.findMany({ select: { avatarColor: true } })
+    finalColor = getLeastUsedTheme(existing.map((e) => e.avatarColor))
   }
 
   const employee = await prisma.employee.create({
@@ -50,10 +58,12 @@ export async function POST(request: Request) {
       timezone: timezone ?? null,
       workHours: workHours ?? null,
       entity: entity ?? null,
+      entityId: entityId ?? null,
       country: country ?? null,
       startDate: startDate ? new Date(startDate) : null,
       bio: bio ?? null,
-      avatarColor,
+      avatarColor: finalColor,
+      icon: icon ?? null,
       managerId: managerId ?? null,
       order: order ?? 0,
     },

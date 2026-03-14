@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react"
 import PageHeader from "@/components/layout/PageHeader"
 import { ROLE_COLORS, ROLE_LABELS, canAccess, type RoleLevel } from "@/lib/permissions"
+import { AVATAR_THEMES, AVATAR_THEME_NAMES, getAvatarGradient, getLeastUsedTheme } from "@/lib/avatar"
 
 /* ── Design tokens ── */
 const FROST = "#FFFFFF"
@@ -14,9 +15,13 @@ const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const RED = "#F87171"
-const AMBER = "#FBBF24"
 
 /* ── Types ── */
+interface OrgEntityMini {
+  id: string
+  name: string
+}
+
 interface Employee {
   id: string
   name: string
@@ -32,10 +37,13 @@ interface Employee {
   timezone: string | null
   workHours: string | null
   entity: string | null
+  entityId: string | null
+  orgEntity?: OrgEntityMini | null
   country: string | null
   startDate: string | null
   bio: string | null
   avatarColor: string
+  icon: string | null
   managerId: string | null
   order: number
   isActive: boolean
@@ -47,7 +55,7 @@ interface MemberForm {
   name: string
   role: string
   department: string
-  entity: string
+  entityId: string
   location: string
   email: string
   phone: string
@@ -59,13 +67,15 @@ interface MemberForm {
   country: string
   startDate: string
   bio: string
+  avatarColor: string
+  icon: string
 }
 
-const emptyForm = (): MemberForm => ({
+const emptyForm = (defaultColor: string): MemberForm => ({
   name: "",
   role: "",
   department: "Operations",
-  entity: "",
+  entityId: "",
   location: "",
   email: "",
   phone: "",
@@ -77,77 +87,43 @@ const emptyForm = (): MemberForm => ({
   country: "",
   startDate: "",
   bio: "",
+  avatarColor: defaultColor,
+  icon: "",
 })
 
-const ENTITIES = ["All", "Oxen", "Escrowfy", "Galaktika", "Lapki"]
 const DEPARTMENTS = ["All", "Management", "Sales", "Operations", "Compliance", "Tech", "Finance", "Support"]
-
 const DEPT_OPTIONS = ["Management", "Sales", "Operations", "Compliance", "Tech", "Finance", "Support"]
-const ENTITY_OPTIONS = ["Oxen", "Escrowfy", "Galaktika", "Lapki"]
 
 /* ── Timezone offsets (hours from UTC) ── */
 const TZ_OFFSETS: Record<string, number> = {
-  GST: 4,
-  CET: 1,
-  CEST: 2,
-  EET: 2,
-  EEST: 3,
-  EST: -5,
-  EDT: -4,
-  CST: -6,
-  CDT: -5,
-  MST: -7,
-  MDT: -6,
-  PST: -8,
-  PDT: -7,
-  GMT: 0,
-  UTC: 0,
-  IST: 5.5,
-  JST: 9,
-  AEST: 10,
-  AEDT: 11,
-  WET: 0,
-  BST: 1,
+  GST: 4, CET: 1, CEST: 2, EET: 2, EEST: 3, EST: -5, EDT: -4,
+  CST: -6, CDT: -5, MST: -7, MDT: -6, PST: -8, PDT: -7,
+  GMT: 0, UTC: 0, IST: 5.5, JST: 9, AEST: 10, AEDT: 11, WET: 0, BST: 1,
 }
 
 const getInitials = (name: string): string =>
-  name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
+  name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
 
 /* ── Availability check ── */
 function isAvailable(timezone: string | null, workHours: string | null): boolean {
   if (!timezone || !workHours) return false
-
   const offset = TZ_OFFSETS[timezone.toUpperCase().trim()]
   if (offset === undefined) return false
-
-  // Parse "09:00 - 18:00"
   const match = workHours.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/)
   if (!match) return false
-
   const startH = parseInt(match[1])
   const startM = parseInt(match[2])
   const endH = parseInt(match[3])
   const endM = parseInt(match[4])
-
-  // Get current time in that timezone
   const now = new Date()
   const utcH = now.getUTCHours() + now.getUTCMinutes() / 60
   let localH = utcH + offset
   if (localH < 0) localH += 24
   if (localH >= 24) localH -= 24
-
   const startTime = startH + startM / 60
   const endTime = endH + endM / 60
-
-  // Check if it's a weekday (Mon-Fri)
   const utcDay = now.getUTCDay()
   if (utcDay === 0 || utcDay === 6) return false
-
   return localH >= startTime && localH < endTime
 }
 
@@ -155,29 +131,24 @@ function getCurrentTime(timezone: string | null): string {
   if (!timezone) return ""
   const offset = TZ_OFFSETS[timezone.toUpperCase().trim()]
   if (offset === undefined) return ""
-
   const now = new Date()
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60000
   const localMs = utcMs + offset * 3600000
   const local = new Date(localMs)
-
-  return local.toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
+  return local.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })
 }
 
 const ORANGE = "#D4885B"
 
 export default function TeamPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [orgEntities, setOrgEntities] = useState<OrgEntityMini[]>([])
   const [search, setSearch] = useState("")
   const [entityFilter, setEntityFilter] = useState("All")
   const [deptFilter, setDeptFilter] = useState("All")
   const [showModal, setShowModal] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
-  const [form, setForm] = useState<MemberForm>(emptyForm())
+  const [form, setForm] = useState<MemberForm>(emptyForm("rose"))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [, setTick] = useState(0)
@@ -201,9 +172,7 @@ export default function TeamPage() {
       if (!res.ok) return
       const data = await res.json()
       setEmployees(data.employees ?? [])
-    } catch {
-      /* network error */
-    }
+    } catch { /* network error */ }
   }
 
   useEffect(() => {
@@ -215,28 +184,46 @@ export default function TeamPage() {
         setOnLeaveToday(ids)
       })
       .catch(() => {})
+    fetch("/api/org-entities")
+      .then((r) => r.json())
+      .then((data) => {
+        const ents = (data.entities ?? []).map((e: { id: string; name: string }) => ({ id: e.id, name: e.name }))
+        setOrgEntities(ents)
+      })
+      .catch(() => {})
   }, [])
 
-  // Update availability every minute
+  // Read entity filter from URL query param (for navigation from org page)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const entityParam = params.get("entity")
+    if (entityParam) setEntityFilter(entityParam)
+  }, [])
+
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 60000)
     return () => clearInterval(interval)
   }, [])
 
+  /* ── Entity names for filter buttons ── */
+  const entityFilterOptions = useMemo(() => {
+    return ["All", ...orgEntities.map((e) => e.name)]
+  }, [orgEntities])
+
   /* ── Filtered list ── */
   const filtered = useMemo(() => {
     return employees.filter((emp) => {
-      // Entity filter
-      if (entityFilter !== "All" && (emp.entity ?? "") !== entityFilter) return false
-      // Department filter
+      if (entityFilter !== "All") {
+        const empEntityName = emp.orgEntity?.name ?? emp.entity ?? ""
+        if (empEntityName !== entityFilter) return false
+      }
       if (deptFilter !== "All" && emp.department !== deptFilter) return false
-      // Search
       if (search.trim()) {
         const q = search.toLowerCase()
         return (
           emp.name.toLowerCase().includes(q) ||
           emp.role.toLowerCase().includes(q) ||
-          (emp.entity ?? "").toLowerCase().includes(q) ||
+          (emp.orgEntity?.name ?? emp.entity ?? "").toLowerCase().includes(q) ||
           emp.department.toLowerCase().includes(q) ||
           (emp.country ?? "").toLowerCase().includes(q) ||
           (emp.email ?? "").toLowerCase().includes(q)
@@ -249,7 +236,8 @@ export default function TeamPage() {
   /* ── CRUD handlers ── */
   const openNew = () => {
     setEditingEmployee(null)
-    setForm(emptyForm())
+    const defaultColor = getLeastUsedTheme(employees.map((e) => e.avatarColor))
+    setForm(emptyForm(defaultColor))
     setError(null)
     setShowModal(true)
   }
@@ -261,7 +249,7 @@ export default function TeamPage() {
       name: emp.name,
       role: emp.role,
       department: emp.department,
-      entity: emp.entity ?? "",
+      entityId: emp.entityId ?? "",
       location: emp.location ?? "",
       email: emp.email ?? "",
       phone: emp.phone ?? "",
@@ -273,6 +261,8 @@ export default function TeamPage() {
       country: emp.country ?? "",
       startDate: emp.startDate ? emp.startDate.substring(0, 10) : "",
       bio: emp.bio ?? "",
+      avatarColor: emp.avatarColor,
+      icon: emp.icon ?? "",
     })
     setShowModal(true)
   }
@@ -283,53 +273,40 @@ export default function TeamPage() {
     setError(null)
 
     try {
+      const payload = {
+        name: form.name.trim(),
+        initials: getInitials(form.name.trim()),
+        role: form.role.trim(),
+        department: form.department,
+        entityId: form.entityId || null,
+        entity: form.entityId ? orgEntities.find((e) => e.id === form.entityId)?.name ?? null : null,
+        location: form.location || null,
+        email: form.email || null,
+        phone: form.phone || null,
+        telegram: form.telegram || null,
+        telegramChatId: form.telegramChatId || null,
+        whatsapp: form.whatsapp || null,
+        timezone: form.timezone || null,
+        workHours: form.workHours || null,
+        country: form.country || null,
+        startDate: form.startDate || null,
+        bio: form.bio.trim() || null,
+        avatarColor: form.avatarColor,
+        icon: form.icon || null,
+      }
+
       let res: Response
       if (editingEmployee) {
         res = await fetch(`/api/employees/${editingEmployee.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: form.name.trim(),
-            initials: getInitials(form.name.trim()),
-            role: form.role.trim(),
-            department: form.department,
-            entity: form.entity || null,
-            location: form.location || null,
-            email: form.email || null,
-            phone: form.phone || null,
-            telegram: form.telegram || null,
-            telegramChatId: form.telegramChatId || null,
-            whatsapp: form.whatsapp || null,
-            timezone: form.timezone || null,
-            workHours: form.workHours || null,
-            country: form.country || null,
-            startDate: form.startDate || null,
-            bio: form.bio.trim() || null,
-          }),
+          body: JSON.stringify(payload),
         })
       } else {
         res = await fetch("/api/employees", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: form.name.trim(),
-            initials: getInitials(form.name.trim()),
-            role: form.role.trim(),
-            department: form.department,
-            entity: form.entity || null,
-            location: form.location || null,
-            email: form.email || null,
-            phone: form.phone || null,
-            telegram: form.telegram || null,
-            telegramChatId: form.telegramChatId || null,
-            whatsapp: form.whatsapp || null,
-            timezone: form.timezone || null,
-            workHours: form.workHours || null,
-            country: form.country || null,
-            startDate: form.startDate || null,
-            bio: form.bio.trim() || null,
-            avatarColor: "rgba(192,139,136,0.4)",
-          }),
+          body: JSON.stringify(payload),
         })
       }
 
@@ -432,7 +409,7 @@ export default function TeamPage() {
             <span style={{ fontSize: 9, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, marginRight: 4 }}>
               Entity
             </span>
-            {ENTITIES.map((e) => (
+            {entityFilterOptions.map((e) => (
               <button
                 key={e}
                 onClick={() => setEntityFilter(e)}
@@ -487,6 +464,7 @@ export default function TeamPage() {
           {filtered.map((emp) => {
             const available = isAvailable(emp.timezone, emp.workHours)
             const currentTime = getCurrentTime(emp.timezone)
+            const entityName = emp.orgEntity?.name ?? emp.entity
 
             return (
               <div
@@ -538,7 +516,7 @@ export default function TeamPage() {
                       width: 40,
                       height: 40,
                       borderRadius: "50%",
-                      background: "linear-gradient(135deg, #C08B88, #8B6B68)",
+                      background: getAvatarGradient(emp.avatarColor),
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -546,14 +524,14 @@ export default function TeamPage() {
                   >
                     <span
                       style={{
-                        fontFamily: "'Bellfair', serif",
-                        fontSize: 14,
+                        fontFamily: emp.icon ? "inherit" : "'Bellfair', serif",
+                        fontSize: emp.icon ? 18 : 14,
                         color: FROST,
                         fontWeight: 400,
                         lineHeight: 1,
                       }}
                     >
-                      {emp.initials || getInitials(emp.name)}
+                      {emp.icon || emp.initials || getInitials(emp.name)}
                     </span>
                   </div>
                   {/* Availability dot */}
@@ -639,7 +617,7 @@ export default function TeamPage() {
                 </div>
 
                 {/* Entity badge */}
-                {emp.entity && (
+                {entityName && (
                   <div
                     style={{
                       fontSize: 9,
@@ -655,7 +633,7 @@ export default function TeamPage() {
                       flexShrink: 0,
                     }}
                   >
-                    {emp.entity}
+                    {entityName}
                   </div>
                 )}
 
@@ -689,26 +667,17 @@ export default function TeamPage() {
                     </span>
                   )}
                   {emp.phone && (
-                    <span
-                      title={emp.phone}
-                      style={{ fontSize: 13, color: TEXT_SECONDARY }}
-                    >
+                    <span title={emp.phone} style={{ fontSize: 13, color: TEXT_SECONDARY }}>
                       {"\u260E"}
                     </span>
                   )}
                   {emp.telegram && (
-                    <span
-                      title={emp.telegram}
-                      style={{ fontSize: 13, color: TEXT_SECONDARY }}
-                    >
+                    <span title={emp.telegram} style={{ fontSize: 13, color: TEXT_SECONDARY }}>
                       {"\u2708"}
                     </span>
                   )}
                   {emp.whatsapp && (
-                    <span
-                      title={emp.whatsapp}
-                      style={{ fontSize: 13, color: TEXT_SECONDARY }}
-                    >
+                    <span title={emp.whatsapp} style={{ fontSize: 13, color: TEXT_SECONDARY }}>
                       {"\u25C6"}
                     </span>
                   )}
@@ -872,6 +841,71 @@ export default function TeamPage() {
 
             {/* Body */}
             <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Avatar preview + color selector + icon */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                {/* Preview circle */}
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: "50%",
+                    background: getAvatarGradient(form.avatarColor),
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <span style={{ fontFamily: form.icon ? "inherit" : "'Bellfair', serif", fontSize: form.icon ? 22 : 18, color: FROST, lineHeight: 1 }}>
+                    {form.icon || (form.name ? getInitials(form.name) : "?")}
+                  </span>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  {/* Color swatches */}
+                  <label style={labelStyle}>Avatar Color</label>
+                  <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                    {AVATAR_THEME_NAMES.map((theme) => (
+                      <button
+                        key={theme}
+                        onClick={() => setForm({ ...form, avatarColor: theme })}
+                        title={theme}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: "50%",
+                          background: AVATAR_THEMES[theme].gradient,
+                          border: form.avatarColor === theme ? "2px solid #fff" : "2px solid transparent",
+                          cursor: "pointer",
+                          transition: "all 0.15s",
+                          boxShadow: form.avatarColor === theme ? "0 0 0 1px rgba(255,255,255,0.3)" : "none",
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Icon emoji input */}
+                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Icon</label>
+                    <input
+                      className="oxen-input"
+                      value={form.icon}
+                      onChange={(e) => setForm({ ...form, icon: e.target.value.slice(0, 2) })}
+                      placeholder="e.g. \uD83D\uDE80"
+                      style={{ width: 60, fontSize: 16, textAlign: "center", padding: "4px 8px" }}
+                    />
+                    {form.icon && (
+                      <button
+                        onClick={() => setForm({ ...form, icon: "" })}
+                        style={{ background: "none", border: "none", color: TEXT_TERTIARY, fontSize: 12, cursor: "pointer" }}
+                      >
+                        clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Row 1: Name, Role */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
@@ -914,13 +948,13 @@ export default function TeamPage() {
                   <label style={labelStyle}>Entity</label>
                   <select
                     className="oxen-input"
-                    value={form.entity}
-                    onChange={(e) => setForm({ ...form, entity: e.target.value })}
+                    value={form.entityId}
+                    onChange={(e) => setForm({ ...form, entityId: e.target.value })}
                     style={{ appearance: "none" }}
                   >
                     <option value="">None</option>
-                    {ENTITY_OPTIONS.map((ent) => (
-                      <option key={ent} value={ent}>{ent}</option>
+                    {orgEntities.map((ent) => (
+                      <option key={ent.id} value={ent.id}>{ent.name}</option>
                     ))}
                   </select>
                 </div>

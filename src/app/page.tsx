@@ -5,6 +5,7 @@ import Counter from "@/components/dashboard/Counter"
 import Sparkline from "@/components/dashboard/Sparkline"
 import RevenueChart from "@/components/dashboard/RevenueChart"
 import DonutChart from "@/components/dashboard/DonutChart"
+import { getAvatarGradient } from "@/lib/avatar"
 
 /* ── Design tokens ── */
 const VOID = "#060709"
@@ -385,7 +386,7 @@ export default function DashboardPage() {
                           width: 22,
                           height: 22,
                           borderRadius: "50%",
-                          background: w.employee.avatarColor,
+                          background: getAvatarGradient(w.employee.avatarColor),
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",

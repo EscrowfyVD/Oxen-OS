@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY, FROST, GREEN, RED, AMBER, INDIGO, LEAVE_COLORS, STATUS_COLORS } from "./constants"
 import { formatDate, formatShortDate } from "./helpers"
+import { getAvatarGradient } from "@/lib/avatar"
 import type { LeaveRequest, LeaveBalance, Employee } from "./types"
 
 interface AdminTabProps {
@@ -100,7 +101,7 @@ export default function AdminTab({ pendingRequests, allRequests, allBalances, em
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: r.employee.avatarColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "#fff", flexShrink: 0 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: getAvatarGradient(r.employee.avatarColor), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: "#fff", flexShrink: 0 }}>
                       {r.employee.initials}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>

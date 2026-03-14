@@ -1,5 +1,7 @@
 "use client"
 
+import { getAvatarGradient } from "@/lib/avatar"
+
 export interface Employee {
   id: string
   name: string
@@ -8,6 +10,8 @@ export interface Employee {
   department: string
   location: string
   email: string
+  avatarColor?: string
+  icon?: string | null
 }
 
 interface PersonCardProps {
@@ -18,6 +22,8 @@ interface PersonCardProps {
 }
 
 export default function PersonCard({ employee, color, textColor, onClick }: PersonCardProps) {
+  const avatarBg = employee.avatarColor ? getAvatarGradient(employee.avatarColor) : color
+
   return (
     <button
       onClick={onClick}
@@ -45,14 +51,14 @@ export default function PersonCard({ employee, color, textColor, onClick }: Pers
           width: 32,
           height: 32,
           borderRadius: "50%",
-          background: color,
+          background: avatarBg,
           color: textColor ?? "var(--text)",
-          fontSize: 11,
+          fontSize: employee.icon ? 15 : 11,
           fontWeight: 700,
-          fontFamily: "'DM Sans', sans-serif",
+          fontFamily: employee.icon ? "inherit" : "'DM Sans', sans-serif",
         }}
       >
-        {employee.initials}
+        {employee.icon || employee.initials}
       </div>
       <div className="min-w-0 flex-1">
         <div

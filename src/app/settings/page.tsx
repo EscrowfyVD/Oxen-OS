@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import PageHeader from "@/components/layout/PageHeader"
 import { ROLE_COLORS, ROLE_LABELS, ROLE_LEVELS, type RoleLevel } from "@/lib/permissions"
 import { canAccess } from "@/lib/permissions"
+import { getAvatarGradient } from "@/lib/avatar"
 
 const CARD_BG = "#0F1118"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
@@ -208,7 +209,7 @@ export default function SettingsPage() {
                               width: 28,
                               height: 28,
                               borderRadius: "50%",
-                              background: emp.avatarColor || "rgba(255,255,255,0.1)",
+                              background: getAvatarGradient(emp.avatarColor),
                               flexShrink: 0,
                             }}
                           >

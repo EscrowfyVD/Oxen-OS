@@ -70,10 +70,13 @@ model Employee {
   timezone    String?
   workHours   String?
   entity      String?
+  entityId    String?
+  orgEntity   OrgEntity? @relation(fields: [entityId], references: [id])
   country     String?
   startDate   DateTime?
   bio         String?    @db.Text
   avatarColor String
+  icon        String?
   managerId   String?
   manager     Employee?  @relation("Management", fields: [managerId], references: [id])
   reports     Employee[] @relation("Management")
@@ -115,6 +118,7 @@ model OrgEntity {
   parentId     String?
   parent       OrgEntity?  @relation("OrgStructure", fields: [parentId], references: [id])
   children     OrgEntity[] @relation("OrgStructure")
+  employees    Employee[]
   order        Int         @default(0)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
