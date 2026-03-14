@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
+import { logActivity } from "@/lib/activity"
 
 export async function GET(
   request: Request,
@@ -113,6 +114,10 @@ export async function PATCH(
       updatedBy: userId,
     },
   })
+
+  if (content !== undefined) {
+    logActivity("wiki_updated", `Wiki page updated — ${page.title}`, userId, page.id, `/wiki/${slug}`)
+  }
 
   return NextResponse.json({ page })
 }

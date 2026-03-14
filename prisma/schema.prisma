@@ -209,6 +209,8 @@ model ActivityLog {
   action    String
   detail    String
   userId    String
+  entityId  String?
+  link      String?
   createdAt DateTime @default(now())
 }
 

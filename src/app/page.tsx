@@ -1,15 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import Counter from "@/components/dashboard/Counter"
-import Sparkline from "@/components/dashboard/Sparkline"
-import RevenueChart from "@/components/dashboard/RevenueChart"
-import DonutChart from "@/components/dashboard/DonutChart"
 import { getAvatarGradient } from "@/lib/avatar"
 
 /* ── Design tokens ── */
-const VOID = "#060709"
-const CARD_BG = "#0F1118"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
@@ -18,111 +14,81 @@ const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const AMBER = "#FBBF24"
 const INDIGO = "#818CF8"
-const RED = "#F87171"
 const FROST = "#FFFFFF"
 
-/* ── KPI definitions ── */
-const KPI_CARDS = [
-  {
-    label: "Active Clients",
-    target: 47,
-    prefix: "",
-    change: "\u2191 12% vs last month",
-    up: true,
-    data: [12, 18, 22, 19, 28, 34, 31, 38, 42, 47],
-    color: GREEN,
-  },
-  {
-    label: "Pipeline Value",
-    target: 2400000,
-    prefix: "\u20AC",
-    change: "\u2191 8.3% growth",
-    up: true,
-    data: [800, 950, 1100, 1300, 1500, 1700, 1900, 2100, 2250, 2400],
-    color: ROSE_GOLD,
-  },
-  {
-    label: "Monthly Volume",
-    target: 5600000,
-    prefix: "\u20AC",
-    change: "\u2191 23% vs prev.",
-    up: true,
-    data: [2100, 2400, 2800, 3200, 3100, 3800, 4200, 4600, 5100, 5600],
-    color: INDIGO,
-  },
-  {
-    label: "Open Tasks",
-    target: 7,
-    prefix: "",
-    change: "4 to do \u00B7 3 in progress",
-    up: false,
-    data: [8, 7, 9, 6, 8, 7, 6, 7],
-    color: AMBER,
-  },
-]
-
-/* ── Static data ── */
-const RECENT_ACTIVITY = [
-  { label: "New KYB submitted", client: "Meridian Ventures Ltd", time: "2 min ago", status: "pending" },
-  { label: "SEPA Inbound", client: "\u20AC45,000.00", time: "12 min ago", status: "completed" },
-  { label: "EUR \u2192 BTC", client: "3.2 BTC @ \u20AC21,450", time: "34 min ago", status: "completed" },
-  { label: "EDD Required", client: "Falcon Group SA", time: "1h ago", status: "action" },
-  { label: "LP Settlement", client: "\u20AC128,500.00", time: "2h ago", status: "completed" },
-]
-
-const CALENDAR_EVENTS = [
-  { time: "10:00", title: "Discovery Call \u2014 Vanguard Digital", type: "call" },
-  { time: "11:30", title: "Compliance Review \u2014 Q1 SAR", type: "compliance" },
-  { time: "14:00", title: "Arthur \u00D7 LP Negotiation", type: "meeting" },
-  { time: "16:00", title: "Onboarding Follow-up \u2014 Monaco Client", type: "call" },
-]
-
-const REVENUE_DATA = [
-  { label: "Sep", value: 42000 },
-  { label: "Oct", value: 58000 },
-  { label: "Nov", value: 51000 },
-  { label: "Dec", value: 67000 },
-  { label: "Jan", value: 73000 },
-  { label: "Feb", value: 89000 },
-  { label: "Mar", value: 95000 },
-]
-
-const DONUT_SEGMENTS = [
-  { label: "iGaming", value: 18, color: ROSE_GOLD },
-  { label: "Crypto", value: 12, color: GREEN },
-  { label: "Family Office", value: 9, color: INDIGO },
-  { label: "Luxury", value: 8, color: AMBER },
-]
-
-const QUICK_ACTIONS = [
-  { icon: "\u2B21", label: "Onboard Client" },
-  { icon: "\u2197", label: "Send Payment" },
-  { icon: "\u21CC", label: "Exchange" },
-  { icon: "\u25C8", label: "Generate Report" },
-]
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: AMBER,
-  completed: GREEN,
-  action: RED,
+/* ── Types ── */
+interface ActivityItem {
+  id: string
+  action: string
+  detail: string
+  icon: string
+  color: string
+  link: string | null
+  createdAt: string
 }
 
-const EVENT_TYPE_COLORS: Record<string, string> = {
-  call: GREEN,
-  compliance: AMBER,
-  meeting: INDIGO,
+interface ScheduleAttendee {
+  email: string
+  name: string
+  initials: string
+  avatarColor: string | null
+  icon: string | null
 }
 
-const LEAVE_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
-  vacation: { bg: "rgba(52,211,153,0.12)", text: GREEN },
-  sick: { bg: "rgba(248,113,113,0.12)", text: RED },
-  ooo: { bg: "rgba(129,140,248,0.12)", text: INDIGO },
+interface ScheduleEvent {
+  id: string
+  title: string
+  startTime: string
+  endTime: string
+  location: string | null
+  meetLink: string | null
+  attendees: ScheduleAttendee[]
 }
+
+interface QuickAction {
+  icon: string
+  label: string
+  href: string
+  modal?: string
+}
+
+interface DashboardData {
+  stats: {
+    activeClients: number
+    pipelineValue: number
+    totalDeals: number
+    userOpenTasks: number
+  }
+  activityFeed: ActivityItem[]
+  schedule: ScheduleEvent[]
+  scheduleLabel: string
+  quickActions: QuickAction[]
+}
+
+/* ── Helpers ── */
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins} min ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days === 1) return "yesterday"
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })
+}
+
+const KPI_COLORS = [GREEN, ROSE_GOLD, INDIGO, AMBER]
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [clock, setClock] = useState("")
-  const [whoIsOut, setWhoIsOut] = useState<Array<{ id: string; employee: { name: string; initials: string; avatarColor: string }; type: string }>>([])
-  const [topAgents, setTopAgents] = useState<Array<{ name: string; totalRevenue: number; type: string; _count?: { referredClients: number } }>>([])
+  const [data, setData] = useState<DashboardData | null>(null)
 
   useEffect(() => {
     const tick = () => {
@@ -142,20 +108,30 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    fetch("/api/leaves/who-is-out")
+    fetch("/api/dashboard")
       .then((r) => r.json())
-      .then((data) => setWhoIsOut(data.today ?? []))
-      .catch(() => {})
-    fetch("/api/agents?status=active")
-      .then((r) => r.json())
-      .then((data) => {
-        const sorted = (data.agents ?? [])
-          .sort((a: { totalRevenue: number }, b: { totalRevenue: number }) => (b.totalRevenue ?? 0) - (a.totalRevenue ?? 0))
-          .slice(0, 3)
-        setTopAgents(sorted)
-      })
+      .then((d) => setData(d))
       .catch(() => {})
   }, [])
+
+  const stats = data?.stats
+  const kpiCards = [
+    { label: "Active Clients", value: stats?.activeClients ?? 0, prefix: "", color: KPI_COLORS[0] },
+    { label: "Pipeline Value", value: stats?.pipelineValue ?? 0, prefix: "\u20AC", color: KPI_COLORS[1] },
+    { label: "Total Deals", value: stats?.totalDeals ?? 0, prefix: "", color: KPI_COLORS[2] },
+    { label: "Your Open Tasks", value: stats?.userOpenTasks ?? 0, prefix: "", color: KPI_COLORS[3] },
+  ]
+
+  const handleQuickAction = (action: QuickAction) => {
+    if (action.href !== "#") {
+      router.push(action.href)
+    }
+    // Modal actions (contact, task, agent) would be handled by parent or dedicated pages
+    // For now, navigate to the relevant module page
+    if (action.modal === "contact") router.push("/crm")
+    if (action.modal === "task") router.push("/tasks")
+    if (action.modal === "agent") router.push("/crm")
+  }
 
   return (
     <div className="page-content" style={{ padding: 0 }}>
@@ -201,20 +177,17 @@ export default function DashboardPage() {
             Overview of Oxen Finance operations
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span
-            style={{
-              fontSize: 13,
-              color: TEXT_SECONDARY,
-              fontVariantNumeric: "tabular-nums",
-              letterSpacing: 1,
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            {clock}
-          </span>
-          <button className="header-btn">New Client</button>
-        </div>
+        <span
+          style={{
+            fontSize: 13,
+            color: TEXT_SECONDARY,
+            fontVariantNumeric: "tabular-nums",
+            letterSpacing: 1,
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          {clock}
+        </span>
       </div>
 
       {/* ── Main content ── */}
@@ -230,7 +203,7 @@ export default function DashboardPage() {
             animationDelay: "0.05s",
           }}
         >
-          {KPI_CARDS.map((kpi) => (
+          {kpiCards.map((kpi) => (
             <div
               key={kpi.label}
               className="kpi-card"
@@ -258,28 +231,20 @@ export default function DashboardPage() {
                   marginBottom: 6,
                 }}
               >
-                <Counter target={kpi.target} prefix={kpi.prefix} />
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: kpi.up ? GREEN : TEXT_TERTIARY,
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
-              >
-                {kpi.change}
+                <Counter target={kpi.value} prefix={kpi.prefix} />
               </div>
               <div
                 style={{
                   position: "absolute",
-                  bottom: 12,
+                  top: 16,
                   right: 16,
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: kpi.color,
                   opacity: 0.6,
                 }}
-              >
-                <Sparkline data={kpi.data} color={kpi.color} width={100} height={32} />
-              </div>
+              />
             </div>
           ))}
         </div>
@@ -307,8 +272,12 @@ export default function DashboardPage() {
                 gap: 12,
               }}
             >
-              {QUICK_ACTIONS.map((action) => (
-                <button key={action.label} className="quick-btn">
+              {(data?.quickActions ?? []).map((action) => (
+                <button
+                  key={action.label}
+                  className="quick-btn"
+                  onClick={() => handleQuickAction(action)}
+                >
                   <span style={{ fontSize: 18, opacity: 0.6 }}>{action.icon}</span>
                   <span>{action.label}</span>
                 </button>
@@ -317,120 +286,13 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Who's Out Today ── */}
-        <div
-          className="card fade-in"
-          style={{ marginBottom: 20, animationDelay: "0.12s", overflow: "hidden" }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "14px 20px",
-              borderBottom: "1px solid rgba(255,255,255,0.03)",
-              background: "rgba(255,255,255,0.01)",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: TEXT_PRIMARY,
-                fontFamily: "'DM Sans', sans-serif",
-              }}
-            >
-              {"\uD83C\uDFD6\uFE0F"} Who&apos;s Out Today
-            </span>
-            <a
-              href="/absences"
-              style={{
-                fontSize: 11,
-                color: ROSE_GOLD,
-                cursor: "pointer",
-                fontFamily: "'DM Sans', sans-serif",
-                fontWeight: 500,
-                textDecoration: "none",
-              }}
-            >
-              View All &rarr;
-            </a>
-          </div>
-          <div style={{ padding: "12px 20px" }}>
-            {whoIsOut.length === 0 ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: GREEN, boxShadow: `0 0 6px ${GREEN}` }} />
-                <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif" }}>
-                  Everyone&apos;s in today
-                </span>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {whoIsOut.map((w) => {
-                  const lc = LEAVE_TYPE_COLORS[w.type] || LEAVE_TYPE_COLORS.vacation
-                  return (
-                    <div
-                      key={w.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        background: "rgba(255,255,255,0.02)",
-                        border: `1px solid ${CARD_BORDER}`,
-                        borderRadius: 8,
-                        padding: "6px 12px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: "50%",
-                          background: getAvatarGradient(w.employee.avatarColor),
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 8,
-                          fontWeight: 600,
-                          color: "#fff",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {w.employee.initials}
-                      </div>
-                      <span style={{ fontSize: 11, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>
-                        {w.employee.name}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 8,
-                          padding: "1px 6px",
-                          borderRadius: 6,
-                          background: lc.bg,
-                          color: lc.text,
-                          fontWeight: 500,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.5,
-                        }}
-                      >
-                        {w.type}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* ── Recent Activity + Today's Schedule ── */}
         <div
           className="fade-in"
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            gridTemplateColumns: "3fr 2fr",
             gap: 16,
-            marginBottom: 20,
             animationDelay: "0.15s",
           }}
         >
@@ -456,76 +318,83 @@ export default function DashboardPage() {
               >
                 Recent Activity
               </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: ROSE_GOLD,
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 500,
-                }}
-              >
-                View All &rarr;
-              </span>
             </div>
-            <div style={{ padding: "8px 20px 12px" }}>
-              {RECENT_ACTIVITY.map((item, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "10px 0",
-                    borderBottom:
-                      i < RECENT_ACTIVITY.length - 1
-                        ? "1px solid rgba(255,255,255,0.03)"
-                        : "none",
-                  }}
-                >
+            <div style={{ padding: "4px 20px 12px" }}>
+              {(!data || data.activityFeed.length === 0) ? (
+                <div style={{ padding: "20px 0", textAlign: "center" }}>
+                  <span style={{ fontSize: 12, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+                    No recent activity yet
+                  </span>
+                </div>
+              ) : (
+                data.activityFeed.map((item, i) => (
                   <div
+                    key={item.id}
+                    onClick={() => item.link && router.push(item.link)}
                     style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: STATUS_COLORS[item.status] || TEXT_TERTIARY,
-                      boxShadow: `0 0 6px ${STATUS_COLORS[item.status] || TEXT_TERTIARY}`,
-                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "10px 0",
+                      borderBottom:
+                        i < data.activityFeed.length - 1
+                          ? "1px solid rgba(255,255,255,0.03)"
+                          : "none",
+                      cursor: item.link ? "pointer" : "default",
+                      transition: "background 0.15s",
+                      borderRadius: 6,
+                      marginLeft: -4,
+                      marginRight: -4,
+                      paddingLeft: 4,
+                      paddingRight: 4,
                     }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: TEXT_PRIMARY,
-                        fontFamily: "'DM Sans', sans-serif",
-                      }}
-                    >
-                      {item.label}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: TEXT_TERTIARY,
-                        fontFamily: "'DM Sans', sans-serif",
-                      }}
-                    >
-                      {item.client}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: TEXT_TERTIARY,
-                      fontVariantNumeric: "tabular-nums",
-                      fontFamily: "'DM Sans', sans-serif",
-                      flexShrink: 0,
+                    onMouseEnter={(e) => {
+                      if (item.link) e.currentTarget.style.background = "rgba(255,255,255,0.02)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent"
                     }}
                   >
-                    {item.time}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontSize: 14 }}>{item.icon}</span>
+                      <div
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: item.color,
+                          boxShadow: `0 0 6px ${item.color}`,
+                          flexShrink: 0,
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        className="truncate"
+                        style={{
+                          fontSize: 12,
+                          color: TEXT_PRIMARY,
+                          fontFamily: "'DM Sans', sans-serif",
+                        }}
+                      >
+                        {item.detail}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: TEXT_TERTIARY,
+                        fontVariantNumeric: "tabular-nums",
+                        fontFamily: "'DM Sans', sans-serif",
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {relativeTime(item.createdAt)}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
@@ -549,280 +418,136 @@ export default function DashboardPage() {
                   fontFamily: "'DM Sans', sans-serif",
                 }}
               >
-                Today&apos;s Schedule
+                {data?.scheduleLabel ?? "Today\u2019s Schedule"}
               </span>
             </div>
-            <div style={{ padding: "8px 20px 12px" }}>
-              {CALENDAR_EVENTS.map((evt, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "10px 0",
-                    borderBottom:
-                      i < CALENDAR_EVENTS.length - 1
-                        ? "1px solid rgba(255,255,255,0.03)"
-                        : "none",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: TEXT_TERTIARY,
-                      fontVariantNumeric: "tabular-nums",
-                      fontFamily: "'DM Sans', sans-serif",
-                      width: 44,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {evt.time}
-                  </span>
-                  <div
-                    style={{
-                      width: 2,
-                      height: 24,
-                      borderRadius: 1,
-                      background: EVENT_TYPE_COLORS[evt.type] || TEXT_TERTIARY,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: TEXT_PRIMARY,
-                      fontFamily: "'DM Sans', sans-serif",
-                    }}
-                  >
-                    {evt.title}
+            <div style={{ padding: "4px 20px 12px" }}>
+              {(!data || data.schedule.length === 0) ? (
+                <div style={{ padding: "20px 0", textAlign: "center" }}>
+                  <span style={{ fontSize: 12, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+                    No meetings scheduled today
                   </span>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Revenue + Client Segments ── */}
-        <div
-          className="fade-in"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr",
-            gap: 16,
-            animationDelay: "0.2s",
-          }}
-        >
-          {/* Monthly Revenue */}
-          <div className="card" style={{ overflow: "hidden" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "14px 20px",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
-                background: "rgba(255,255,255,0.01)",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: TEXT_PRIMARY,
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
-              >
-                Monthly Revenue
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: ROSE_GOLD,
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 500,
-                }}
-              >
-                Export &rarr;
-              </span>
-            </div>
-            <div style={{ padding: "20px 20px 16px" }}>
-              <RevenueChart data={REVENUE_DATA} />
-              <div
-                style={{
-                  display: "flex",
-                  gap: 20,
-                  marginTop: 14,
-                  paddingTop: 10,
-                  borderTop: "1px solid rgba(255,255,255,0.03)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              ) : (
+                data.schedule.map((evt, i) => (
                   <div
+                    key={evt.id}
                     style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: 2,
-                      background: "rgba(255,255,255,0.12)",
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: TEXT_TERTIARY,
-                      fontFamily: "'DM Sans', sans-serif",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                      padding: "10px 0",
+                      borderBottom:
+                        i < data.schedule.length - 1
+                          ? "1px solid rgba(255,255,255,0.03)"
+                          : "none",
                     }}
                   >
-                    Previous
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: 2,
-                      background: ROSE_GOLD,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: TEXT_TERTIARY,
-                      fontFamily: "'DM Sans', sans-serif",
-                    }}
-                  >
-                    Current
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Client Segments */}
-          <div className="card" style={{ overflow: "hidden" }}>
-            <div
-              style={{
-                padding: "14px 20px",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
-                background: "rgba(255,255,255,0.01)",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: TEXT_PRIMARY,
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
-              >
-                Client Segments
-              </span>
-            </div>
-            <div
-              style={{
-                padding: "20px",
-                display: "flex",
-                alignItems: "center",
-                gap: 24,
-              }}
-            >
-              <DonutChart
-                segments={DONUT_SEGMENTS.map((s) => ({
-                  value: s.value,
-                  color: s.color,
-                }))}
-                size={110}
-              />
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {DONUT_SEGMENTS.map((seg) => (
-                  <div
-                    key={seg.label}
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 2,
-                        background: seg.color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: TEXT_SECONDARY,
-                        fontFamily: "'DM Sans', sans-serif",
-                      }}
-                    >
-                      {seg.label}
-                    </span>
                     <span
                       style={{
                         fontSize: 11,
                         color: TEXT_TERTIARY,
+                        fontVariantNumeric: "tabular-nums",
                         fontFamily: "'DM Sans', sans-serif",
-                        marginLeft: "auto",
+                        width: 44,
+                        flexShrink: 0,
+                        paddingTop: 2,
                       }}
                     >
-                      {seg.value}
+                      {formatTime(evt.startTime)}
                     </span>
+                    <div
+                      style={{
+                        width: 2,
+                        height: 32,
+                        borderRadius: 1,
+                        background: ROSE_GOLD,
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        className="truncate"
+                        style={{
+                          fontSize: 12,
+                          color: TEXT_PRIMARY,
+                          fontFamily: "'DM Sans', sans-serif",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {evt.title}
+                      </div>
+                      {/* Attendee avatars */}
+                      {evt.attendees.length > 0 && (
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          {evt.attendees.slice(0, 5).map((att, j) => (
+                            <div
+                              key={j}
+                              title={att.name}
+                              style={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: "50%",
+                                background: getAvatarGradient(att.avatarColor),
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 7,
+                                fontWeight: 600,
+                                color: "#fff",
+                                border: "1.5px solid var(--bg-card, #0F1118)",
+                                marginLeft: j > 0 ? -6 : 0,
+                                zIndex: 5 - j,
+                                position: "relative",
+                              }}
+                            >
+                              {att.icon || att.initials}
+                            </div>
+                          ))}
+                          {evt.attendees.length > 5 && (
+                            <span
+                              style={{
+                                fontSize: 9,
+                                color: TEXT_TERTIARY,
+                                marginLeft: 4,
+                                fontFamily: "'DM Sans', sans-serif",
+                              }}
+                            >
+                              +{evt.attendees.length - 5}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))}
+                ))
+              )}
+              {/* View Full Calendar link */}
+              <div
+                style={{
+                  paddingTop: 10,
+                  borderTop: "1px solid rgba(255,255,255,0.03)",
+                  marginTop: 4,
+                }}
+              >
+                <a
+                  href="/calendar"
+                  style={{
+                    fontSize: 11,
+                    color: ROSE_GOLD,
+                    cursor: "pointer",
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 500,
+                    textDecoration: "none",
+                  }}
+                >
+                  View Full Calendar &rarr;
+                </a>
               </div>
             </div>
           </div>
         </div>
-
-        {/* ── Top Agents ── */}
-        {topAgents.length > 0 && (
-          <div
-            className="card fade-in"
-            style={{ marginTop: 16, overflow: "hidden", animationDelay: "0.25s" }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "14px 20px",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
-                background: "rgba(255,255,255,0.01)",
-              }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>
-                Top Agents
-              </span>
-              <a href="/crm" style={{ fontSize: 11, color: ROSE_GOLD, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 500, textDecoration: "none" }}>
-                View All &rarr;
-              </a>
-            </div>
-            <div style={{ padding: "8px 20px 12px" }}>
-              {topAgents.map((agent, i) => {
-                const medals = ["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"]
-                return (
-                  <div key={i} style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: "10px 0",
-                    borderBottom: i < topAgents.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none",
-                  }}>
-                    <span style={{ fontSize: 20, width: 28, textAlign: "center" }}>{medals[i]}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>{agent.name}</div>
-                      <div style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
-                        {agent.type?.replace(/_/g, " ")} {agent._count?.referredClients ? `\u00B7 ${agent._count.referredClients} clients` : ""}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 14, color: GREEN, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
-                      {"\u20AC"}{(agent.totalRevenue ?? 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { logActivity } from "@/lib/activity"
 
 export async function PATCH(
   request: Request,
@@ -35,6 +36,12 @@ export async function PATCH(
       ...(order !== undefined && { order }),
     },
   })
+
+  // Log when task moves to done
+  if (column === "done" && existing.column !== "done") {
+    const userId = session.user?.email ?? "unknown"
+    logActivity("task_completed", `Task completed — ${task.title}`, userId, id, `/tasks`)
+  }
 
   return NextResponse.json({ task })
 }

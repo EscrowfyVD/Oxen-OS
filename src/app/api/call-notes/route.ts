@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getUserRole } from "@/lib/admin"
 import { prisma } from "@/lib/prisma"
 import { canAccess, type RoleLevel } from "@/lib/permissions"
+import { logActivity } from "@/lib/activity"
 
 export async function GET() {
   const { session, employee, roleLevel } = await getUserRole()
@@ -72,6 +73,8 @@ export async function POST(request: Request) {
       createdBy: userId,
     },
   })
+
+  logActivity("meeting_summary", `Team meeting summary available — ${title}`, userId, note.id, `/calendar`)
 
   return NextResponse.json({ note }, { status: 201 })
 }

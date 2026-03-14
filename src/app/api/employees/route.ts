@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { requireRole } from "@/lib/admin"
 import { getLeastUsedTheme } from "@/lib/avatar"
+import { logActivity } from "@/lib/activity"
 
 export async function GET() {
   const session = await auth()
@@ -68,6 +69,8 @@ export async function POST(request: Request) {
       order: order ?? 0,
     },
   })
+
+  logActivity("employee_joined", `New employee joined — ${name}, ${role}`, email ?? "admin", employee.id, `/team`)
 
   return NextResponse.json({ employee }, { status: 201 })
 }

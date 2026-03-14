@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { logActivity } from "@/lib/activity"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("crm")
@@ -65,6 +66,9 @@ export async function POST(request: Request) {
       createdBy: session.user?.email ?? "unknown",
     },
   })
+
+  const userId = session.user?.email ?? "unknown"
+  logActivity("agent_created", `New agent registered — ${name}`, userId, agent.id, `/crm`)
 
   return NextResponse.json({ agent }, { status: 201 })
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { logActivity } from "@/lib/activity"
 
 export async function GET(
   request: Request,
@@ -118,6 +119,13 @@ export async function PATCH(
       ...(agentId !== undefined && { agentId: agentId || null }),
     },
   })
+
+  const userId = session.user?.email ?? "unknown"
+
+  // Log client onboarded when status changes to "won"
+  if (status === "won" && existing.status !== "won") {
+    logActivity("client_onboarded", `New client onboarded — ${contact.company || contact.name}`, userId, id, `/crm`)
+  }
 
   return NextResponse.json({ contact })
 }

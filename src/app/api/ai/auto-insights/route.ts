@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
 import { sendTelegramNotification } from "@/lib/telegram"
+import { logActivity } from "@/lib/activity"
 
 const anthropic = new Anthropic()
 
@@ -142,6 +143,13 @@ Return the top 10 most important insights, ordered by severity. Be specific and 
         include: { contact: { select: { id: true, name: true, company: true } } },
       })
       savedInsights.push(saved)
+    }
+
+    // Log high-priority insights as activity
+    for (const insight of savedInsights) {
+      if (insight.severity === "critical" || insight.severity === "high") {
+        logActivity("sentinel_insight", `Sentinel insight — ${insight.title}`, "system", insight.id, `/crm`)
+      }
     }
 
     // Notify via Telegram for critical/high severity insights
