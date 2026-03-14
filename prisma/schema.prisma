@@ -94,18 +94,22 @@ model Employee {
 // ─── Tasks (Kanban) ───
 
 model Task {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  tag         String
-  priority    String    @default("medium")
-  assignee    String?
-  deadline    DateTime?
-  column      String    @default("todo")
-  order       Int       @default(0)
-  createdBy   String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id               String         @id @default(cuid())
+  title            String
+  description      String?
+  tag              String
+  priority         String         @default("medium")
+  assignee         String?
+  deadline         DateTime?
+  column           String         @default("todo")
+  order            Int            @default(0)
+  supportTicketId  String?
+  supportTicket    SupportTicket? @relation(fields: [supportTicketId], references: [id])
+  contactId        String?
+  contact          Contact?       @relation(fields: [contactId], references: [id])
+  createdBy        String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 }
 
 // ─── Organigramme (Legal Structure) ───
@@ -290,6 +294,7 @@ model Contact {
   emails          Email[]          @relation("ContactEmails")
   signals         IntentSignal[]
   outreachSequences OutreachSequence[]
+  tasks           Task[]
 }
 
 model Interaction {
@@ -426,6 +431,7 @@ model SupportTicket {
   contactId       String?
   contact         Contact?         @relation(fields: [contactId], references: [id])
   messages        SupportMessage[]
+  tasks           Task[]
   resolvedAt      DateTime?
   firstResponseAt DateTime?
   createdBy       String

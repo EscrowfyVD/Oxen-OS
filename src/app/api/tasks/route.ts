@@ -11,6 +11,8 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const tag = searchParams.get("tag")
+  const assignee = searchParams.get("assignee")
+  const view = searchParams.get("view") // "all" | "my" | "support"
 
   const where: Record<string, unknown> = {}
 
@@ -18,8 +20,20 @@ export async function GET(request: Request) {
     where.tag = tag
   }
 
+  if (assignee) {
+    where.assignee = assignee
+  }
+
+  if (view === "support") {
+    where.tag = "support"
+  }
+
   const tasks = await prisma.task.findMany({
     where,
+    include: {
+      supportTicket: { select: { id: true, subject: true, clientName: true, status: true } },
+      contact: { select: { id: true, name: true, company: true } },
+    },
     orderBy: [{ column: "asc" }, { order: "asc" }],
   })
 
@@ -33,7 +47,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { title, description, tag, priority, assignee, deadline, column } = body
+  const { title, description, tag, priority, assignee, deadline, column, supportTicketId, contactId } = body
 
   if (!title || !tag) {
     return NextResponse.json(
@@ -53,6 +67,8 @@ export async function POST(request: Request) {
       assignee: assignee ?? null,
       deadline: deadline ? new Date(deadline) : null,
       column: column ?? "todo",
+      supportTicketId: supportTicketId ?? null,
+      contactId: contactId ?? null,
       createdBy: userId,
     },
   })

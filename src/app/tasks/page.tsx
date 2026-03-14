@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 
 /* ── Design tokens ── */
 const CARD_BG = "#0F1118"
@@ -15,9 +15,10 @@ const INDIGO = "#818CF8"
 const RED = "#F87171"
 const PURPLE = "#A78BFA"
 const YELLOW = "#FDE68A"
+const TEAL = "#5BB8A8"
 const FROST = "#FFFFFF"
 
-/* ── Tag color palette (6 tags) ── */
+/* ── Tag color palette (7 tags) ── */
 const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   compliance: { bg: "rgba(251,191,36,0.12)", text: AMBER },
   onboarding: { bg: "rgba(52,211,153,0.12)", text: GREEN },
@@ -25,6 +26,7 @@ const TAG_COLORS: Record<string, { bg: string; text: string }> = {
   sales:      { bg: "rgba(192,139,136,0.12)", text: ROSE_GOLD },
   legal:      { bg: "rgba(167,139,250,0.12)", text: PURPLE },
   finance:    { bg: "rgba(253,230,138,0.12)", text: YELLOW },
+  support:    { bg: "rgba(91,184,168,0.12)", text: TEAL },
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -33,14 +35,25 @@ const PRIORITY_COLORS: Record<string, string> = {
   low: TEXT_TERTIARY,
 }
 
+const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 }
+
 /* ── Column definitions ── */
-const COLUMNS = [
+const COLUMNS_DEFAULT = [
   { id: "todo", label: "To Do", accent: RED },
   { id: "inprogress", label: "In Progress", accent: AMBER },
   { id: "done", label: "Done", accent: GREEN },
 ]
 
-const FILTER_TAGS = ["all", "compliance", "onboarding", "tech", "sales", "legal", "finance"]
+const COLUMNS_SUPPORT = [
+  { id: "todo", label: "To Do", accent: RED },
+  { id: "inprogress", label: "In Progress", accent: AMBER },
+  { id: "waiting_client", label: "Waiting Client", accent: AMBER },
+  { id: "done", label: "Done", accent: GREEN },
+]
+
+const FILTER_TAGS = ["all", "compliance", "onboarding", "tech", "sales", "legal", "finance", "support"]
+
+type ViewMode = "my" | "all" | "support"
 
 /* ── Types ── */
 interface Task {
@@ -53,6 +66,10 @@ interface Task {
   deadline: string | null
   column: string
   order?: number
+  supportTicketId?: string | null
+  contactId?: string | null
+  supportTicket?: { id: string; subject: string; clientName: string; status: string } | null
+  contact?: { id: string; name: string; company: string | null } | null
 }
 
 interface Employee {
@@ -62,6 +79,18 @@ interface Employee {
   role: string
 }
 
+interface SupportTicketOption {
+  id: string
+  subject: string
+  clientName: string
+}
+
+interface ContactOption {
+  id: string
+  name: string
+  company: string | null
+}
+
 interface TaskFormData {
   title: string
   description: string
@@ -69,6 +98,13 @@ interface TaskFormData {
   priority: string
   assignee: string
   deadline: string
+  supportTicketId: string
+  contactId: string
+}
+
+interface MeData {
+  name: string
+  roleLevel: string
 }
 
 /* ── Shared label style ── */
@@ -83,20 +119,61 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 500,
 }
 
+/* ── Helpers ── */
+function isOverdue(deadline: string | null): boolean {
+  if (!deadline) return false
+  const d = new Date(deadline)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return d < today
+}
+
+function isDueToday(deadline: string | null): boolean {
+  if (!deadline) return false
+  const d = new Date(deadline)
+  const today = new Date()
+  return d.toDateString() === today.toDateString()
+}
+
+function isDueThisWeek(deadline: string | null): boolean {
+  if (!deadline) return false
+  const d = new Date(deadline)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const endOfWeek = new Date(today)
+  endOfWeek.setDate(today.getDate() + (7 - today.getDay()))
+  return d > today && d <= endOfWeek
+}
+
+function formatDeadline(iso: string | null) {
+  if (!iso) return null
+  const d = new Date(iso)
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+}
+
 /* ── TaskCard (inline component) ── */
-function TaskCard({ task, onClick, onLeaveNames }: { task: Task; onClick: () => void; onLeaveNames?: Set<string> }) {
+function TaskCard({
+  task,
+  onClick,
+  onLeaveNames,
+  showOverdueBadge,
+  viewMode,
+}: {
+  task: Task
+  onClick: () => void
+  onLeaveNames?: Set<string>
+  showOverdueBadge?: boolean
+  viewMode?: ViewMode
+}) {
   const tagStyle = TAG_COLORS[task.tag] || { bg: "rgba(255,255,255,0.06)", text: TEXT_SECONDARY }
   const priorityColor = PRIORITY_COLORS[task.priority] || TEXT_TERTIARY
+  const overdue = showOverdueBadge && isOverdue(task.deadline) && task.column !== "done"
+  const dueToday = isDueToday(task.deadline) && task.column !== "done"
+  const dueThisWeek = isDueThisWeek(task.deadline) && task.column !== "done" && !dueToday
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData("text/plain", task.id)
     e.dataTransfer.effectAllowed = "move"
-  }
-
-  const formatDeadline = (iso: string | null) => {
-    if (!iso) return null
-    const d = new Date(iso)
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
   }
 
   return (
@@ -106,13 +183,14 @@ function TaskCard({ task, onClick, onLeaveNames }: { task: Task; onClick: () => 
       onClick={onClick}
       style={{
         background: "rgba(255,255,255,0.02)",
-        border: `1px solid ${CARD_BORDER}`,
+        border: `1px solid ${dueToday ? "rgba(251,191,36,0.35)" : CARD_BORDER}`,
         borderRadius: 8,
         padding: "12px 14px",
         cursor: "grab",
         transition: "all 0.2s ease",
         marginBottom: 8,
         position: "relative",
+        boxShadow: dueToday ? "0 0 12px rgba(251,191,36,0.08)" : "none",
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLDivElement
@@ -122,7 +200,7 @@ function TaskCard({ task, onClick, onLeaveNames }: { task: Task; onClick: () => 
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLDivElement
-        el.style.borderColor = CARD_BORDER
+        el.style.borderColor = dueToday ? "rgba(251,191,36,0.35)" : CARD_BORDER
         el.style.transform = "translateY(0)"
       }}
     >
@@ -138,6 +216,27 @@ function TaskCard({ task, onClick, onLeaveNames }: { task: Task; onClick: () => 
           background: priorityColor,
         }}
       />
+
+      {/* Overdue badge */}
+      {overdue && (
+        <div
+          style={{
+            fontSize: 8,
+            fontWeight: 600,
+            color: RED,
+            background: "rgba(248,113,113,0.12)",
+            padding: "2px 6px",
+            borderRadius: 4,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            fontFamily: "'DM Sans', sans-serif",
+            marginBottom: 6,
+            display: "inline-block",
+          }}
+        >
+          OVERDUE
+        </div>
+      )}
 
       {/* Title */}
       <div
@@ -171,7 +270,7 @@ function TaskCard({ task, onClick, onLeaveNames }: { task: Task; onClick: () => 
         </div>
       )}
 
-      {/* Tag pill */}
+      {/* Tag pill + due this week label */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <span
           style={{
@@ -188,7 +287,53 @@ function TaskCard({ task, onClick, onLeaveNames }: { task: Task; onClick: () => 
         >
           {task.tag}
         </span>
+        {dueThisWeek && (
+          <span
+            style={{
+              fontSize: 8,
+              color: TEXT_TERTIARY,
+              fontFamily: "'DM Sans', sans-serif",
+              fontStyle: "italic",
+            }}
+          >
+            This week
+          </span>
+        )}
       </div>
+
+      {/* Client name for support view */}
+      {viewMode === "support" && task.supportTicket && (
+        <div
+          style={{
+            fontSize: 10,
+            color: TEAL,
+            fontFamily: "'DM Sans', sans-serif",
+            marginBottom: 6,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <span style={{ opacity: 0.7 }}>{"\u{1F464}"}</span>
+          {task.supportTicket.clientName}
+        </div>
+      )}
+      {viewMode === "support" && !task.supportTicket && task.contact && (
+        <div
+          style={{
+            fontSize: 10,
+            color: TEAL,
+            fontFamily: "'DM Sans', sans-serif",
+            marginBottom: 6,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <span style={{ opacity: 0.7 }}>{"\u{1F464}"}</span>
+          {task.contact.name}
+        </div>
+      )}
 
       {/* Assignee + deadline */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -213,7 +358,8 @@ function TaskCard({ task, onClick, onLeaveNames }: { task: Task; onClick: () => 
           <span
             style={{
               fontSize: 10,
-              color: TEXT_TERTIARY,
+              color: overdue ? RED : TEXT_TERTIARY,
+              fontWeight: overdue ? 600 : 400,
               fontFamily: "'DM Sans', sans-serif",
               fontVariantNumeric: "tabular-nums",
               marginLeft: "auto",
@@ -223,6 +369,26 @@ function TaskCard({ task, onClick, onLeaveNames }: { task: Task; onClick: () => 
           </span>
         )}
       </div>
+
+      {/* Support ticket link */}
+      {viewMode === "support" && task.supportTicket && (
+        <div
+          style={{
+            marginTop: 6,
+            fontSize: 9,
+            color: TEAL,
+            fontFamily: "'DM Sans', sans-serif",
+            opacity: 0.7,
+            cursor: "pointer",
+          }}
+          onClick={(e) => {
+            e.stopPropagation()
+            window.location.href = `/support/${task.supportTicket!.id}`
+          }}
+        >
+          {"\u2192"} View ticket
+        </div>
+      )}
     </div>
   )
 }
@@ -236,6 +402,13 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const [onLeaveNames, setOnLeaveNames] = useState<Set<string>>(new Set())
+  const [me, setMe] = useState<MeData | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>("my")
+  const [contacts, setContacts] = useState<ContactOption[]>([])
+  const [supportTickets, setSupportTickets] = useState<SupportTicketOption[]>([])
+
+  const isAdmin = me?.roleLevel === "super_admin" || me?.roleLevel === "admin"
+  const isManager = isAdmin || me?.roleLevel === "manager"
 
   /* Form state */
   const [form, setForm] = useState<TaskFormData>({
@@ -245,7 +418,21 @@ export default function TasksPage() {
     priority: "medium",
     assignee: "",
     deadline: "",
+    supportTicketId: "",
+    contactId: "",
   })
+
+  /* ── Fetch current user ── */
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.employee) {
+          setMe({ name: data.employee.name, roleLevel: data.employee.roleLevel ?? "member" })
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   /* ── Fetch tasks ── */
   const fetchTasks = useCallback(() => {
@@ -263,9 +450,26 @@ export default function TasksPage() {
       .catch(() => {})
   }, [])
 
+  /* ── Fetch contacts + tickets for modal dropdowns ── */
+  const fetchContacts = useCallback(() => {
+    fetch("/api/contacts")
+      .then((r) => r.json())
+      .then((data) => setContacts((data.contacts ?? []).map((c: ContactOption) => ({ id: c.id, name: c.name, company: c.company }))))
+      .catch(() => {})
+  }, [])
+
+  const fetchSupportTickets = useCallback(() => {
+    fetch("/api/support/tickets")
+      .then((r) => r.json())
+      .then((data) => setSupportTickets((data.tickets ?? []).map((t: SupportTicketOption) => ({ id: t.id, subject: t.subject, clientName: t.clientName }))))
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     fetchTasks()
     fetchEmployees()
+    fetchContacts()
+    fetchSupportTickets()
     fetch("/api/leaves/who-is-out")
       .then((r) => r.json())
       .then((data) => {
@@ -273,13 +477,80 @@ export default function TasksPage() {
         setOnLeaveNames(names)
       })
       .catch(() => {})
-  }, [fetchTasks, fetchEmployees])
+  }, [fetchTasks, fetchEmployees, fetchContacts, fetchSupportTickets])
+
+  /* ── Columns based on view ── */
+  const columns = viewMode === "support" ? COLUMNS_SUPPORT : COLUMNS_DEFAULT
 
   /* ── Filtered tasks ── */
-  const filtered =
-    activeFilter === "all" ? tasks : tasks.filter((t) => t.tag === activeFilter)
+  const filtered = useMemo(() => {
+    let result = tasks
 
-  const getColumnTasks = (colId: string) => filtered.filter((t) => t.column === colId)
+    // View filter
+    if (viewMode === "my" && me) {
+      result = result.filter((t) => t.assignee === me.name)
+    } else if (viewMode === "support") {
+      result = result.filter((t) => t.tag === "support")
+    } else if (viewMode === "all") {
+      // show all
+    }
+
+    // Tag filter (only applies to "all" and "my" views)
+    if (viewMode !== "support" && activeFilter !== "all") {
+      result = result.filter((t) => t.tag === activeFilter)
+    }
+
+    return result
+  }, [tasks, viewMode, me, activeFilter])
+
+  /* ── Sort tasks for My Tasks: overdue pinned, then priority, then deadline ── */
+  const getSortedColumnTasks = useCallback((colId: string) => {
+    const colTasks = filtered.filter((t) => t.column === colId)
+
+    if (viewMode === "my") {
+      return colTasks.sort((a, b) => {
+        // Overdue tasks pinned at top of "todo" column
+        if (colId === "todo") {
+          const aOver = isOverdue(a.deadline) ? 0 : 1
+          const bOver = isOverdue(b.deadline) ? 0 : 1
+          if (aOver !== bOver) return aOver - bOver
+        }
+        // Then by priority (high first)
+        const aPri = PRIORITY_ORDER[a.priority] ?? 1
+        const bPri = PRIORITY_ORDER[b.priority] ?? 1
+        if (aPri !== bPri) return aPri - bPri
+        // Then by deadline (soonest first, null last)
+        if (a.deadline && b.deadline) return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+        if (a.deadline) return -1
+        if (b.deadline) return 1
+        return 0
+      })
+    }
+
+    return colTasks
+  }, [filtered, viewMode])
+
+  /* ── My Tasks stats ── */
+  const myStats = useMemo(() => {
+    if (!me) return { todo: 0, inprogress: 0, overdue: 0 }
+    const myTasks = tasks.filter((t) => t.assignee === me.name)
+    return {
+      todo: myTasks.filter((t) => t.column === "todo").length,
+      inprogress: myTasks.filter((t) => t.column === "inprogress").length,
+      overdue: myTasks.filter((t) => t.column !== "done" && isOverdue(t.deadline)).length,
+    }
+  }, [tasks, me])
+
+  /* ── Support stats ── */
+  const supportStats = useMemo(() => {
+    const supportTasks = tasks.filter((t) => t.tag === "support")
+    return {
+      todo: supportTasks.filter((t) => t.column === "todo").length,
+      inprogress: supportTasks.filter((t) => t.column === "inprogress").length,
+      waitingClient: supportTasks.filter((t) => t.column === "waiting_client").length,
+      done: supportTasks.filter((t) => t.column === "done").length,
+    }
+  }, [tasks])
 
   /* ── Reset form ── */
   const resetForm = () => {
@@ -290,6 +561,8 @@ export default function TasksPage() {
       priority: "medium",
       assignee: "",
       deadline: "",
+      supportTicketId: "",
+      contactId: "",
     })
     setEditingTask(null)
   }
@@ -297,6 +570,9 @@ export default function TasksPage() {
   /* ── Open create modal ── */
   const openCreate = () => {
     resetForm()
+    if (viewMode === "support") {
+      setForm((f) => ({ ...f, tag: "support" }))
+    }
     setShowModal(true)
   }
 
@@ -310,6 +586,8 @@ export default function TasksPage() {
       priority: task.priority,
       assignee: task.assignee || "",
       deadline: task.deadline ? task.deadline.split("T")[0] : "",
+      supportTicketId: task.supportTicketId || "",
+      contactId: task.contactId || "",
     })
     setShowModal(true)
   }
@@ -365,6 +643,8 @@ export default function TasksPage() {
           assignee: form.assignee || null,
           deadline: form.deadline || null,
           column: "todo",
+          supportTicketId: form.supportTicketId || null,
+          contactId: form.contactId || null,
         }),
       })
       closeModal()
@@ -389,6 +669,8 @@ export default function TasksPage() {
           priority: form.priority,
           assignee: form.assignee || null,
           deadline: form.deadline || null,
+          supportTicketId: form.supportTicketId || null,
+          contactId: form.contactId || null,
         }),
       })
       closeModal()
@@ -428,9 +710,31 @@ export default function TasksPage() {
     }
   }
 
-  /* ── Column stats ── */
+  /* ── Column stats (adapts to view) ── */
   const getHighPriorityCount = (colId: string) =>
-    tasks.filter((t) => t.column === colId && t.priority === "high").length
+    filtered.filter((t) => t.column === colId && t.priority === "high").length
+
+  /* ── Subtitle based on view ── */
+  const getSubtitle = () => {
+    if (viewMode === "my") {
+      const open = myStats.todo
+      const inProg = myStats.inprogress
+      return `Your tasks \u2014 ${open} open, ${inProg} in progress`
+    }
+    if (viewMode === "support") {
+      const open = supportStats.todo + supportStats.inprogress + supportStats.waitingClient
+      return `Customer Support Tasks \u2014 ${open} open`
+    }
+    return "Kanban board \u2014 drag cards to update status, click to edit"
+  }
+
+  /* ── Available views ── */
+  const availableViews: { id: ViewMode; label: string }[] = useMemo(() => {
+    const views: { id: ViewMode; label: string }[] = [{ id: "my", label: "My Tasks" }]
+    if (isManager) views.push({ id: "all", label: "All Tasks" })
+    views.push({ id: "support", label: "Customer Support" })
+    return views
+  }, [isManager])
 
   return (
     <div className="page-content" style={{ padding: 0 }}>
@@ -451,31 +755,50 @@ export default function TasksPage() {
           zIndex: 100,
         }}
       >
-        <div>
-          <h1
-            style={{
-              fontFamily: "'Bellfair', serif",
-              fontSize: 28,
-              fontWeight: 400,
-              color: FROST,
-              lineHeight: 1.2,
-              margin: 0,
-            }}
-          >
-            Tasks
-          </h1>
-          <p
-            style={{
-              fontSize: 12,
-              color: TEXT_TERTIARY,
-              marginTop: 4,
-              fontFamily: "'DM Sans', sans-serif",
-              lineHeight: 1.4,
-            }}
-          >
-            Kanban board &mdash; drag cards to update status, click to edit
-          </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <div>
+            <h1
+              style={{
+                fontFamily: "'Bellfair', serif",
+                fontSize: 28,
+                fontWeight: 400,
+                color: FROST,
+                lineHeight: 1.2,
+                margin: 0,
+              }}
+            >
+              Tasks
+            </h1>
+            <p
+              style={{
+                fontSize: 12,
+                color: TEXT_TERTIARY,
+                marginTop: 4,
+                fontFamily: "'DM Sans', sans-serif",
+                lineHeight: 1.4,
+              }}
+            >
+              {getSubtitle()}
+            </p>
+          </div>
+
+          {/* View toggle */}
+          <div className="toggle-group">
+            {availableViews.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => {
+                  setViewMode(v.id)
+                  setActiveFilter("all")
+                }}
+                className={`toggle-btn ${viewMode === v.id ? "active" : ""}`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
         </div>
+
         <button className="header-btn" onClick={openCreate}>
           New Task
         </button>
@@ -483,151 +806,224 @@ export default function TasksPage() {
 
       {/* ── Main content ── */}
       <div style={{ padding: "28px 32px" }}>
-        {/* ── Filter row ── */}
-        <div
-          className="fade-in"
-          style={{
-            display: "flex",
-            gap: 8,
-            marginBottom: 20,
-            flexWrap: "wrap",
-            animationDelay: "0.05s",
-          }}
-        >
-          {FILTER_TAGS.map((tag) => (
-            <button
-              key={tag}
-              className={`filter-btn${activeFilter === tag ? " active" : ""}`}
-              onClick={() => setActiveFilter(tag)}
+        {/* ── Personal summary bar (My Tasks view) ── */}
+        {viewMode === "my" && me && (
+          <div
+            className="card fade-in"
+            style={{
+              padding: "14px 20px",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              gap: 24,
+              animationDelay: "0.02s",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 12,
+                fontFamily: "'DM Sans', sans-serif",
+                color: TEXT_SECONDARY,
+              }}
             >
-              {tag.charAt(0).toUpperCase() + tag.slice(1)}
-            </button>
-          ))}
-        </div>
+              You have{" "}
+              <span style={{ color: FROST, fontWeight: 600 }}>{myStats.todo}</span> tasks to do,{" "}
+              <span style={{ color: FROST, fontWeight: 600 }}>{myStats.inprogress}</span> in progress
+              {myStats.overdue > 0 && (
+                <>
+                  ,{" "}
+                  <span style={{ color: RED, fontWeight: 600 }}>{myStats.overdue} overdue</span>
+                </>
+              )}
+            </span>
+          </div>
+        )}
+
+        {/* ── Filter row (not shown in support view) ── */}
+        {viewMode !== "support" && (
+          <div
+            className="fade-in"
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 20,
+              flexWrap: "wrap",
+              animationDelay: "0.05s",
+            }}
+          >
+            {FILTER_TAGS.map((tag) => (
+              <button
+                key={tag}
+                className={`filter-btn${activeFilter === tag ? " active" : ""}`}
+                onClick={() => setActiveFilter(tag)}
+              >
+                {tag.charAt(0).toUpperCase() + tag.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Empty state for My Tasks ── */}
+        {viewMode === "my" && me && filtered.length === 0 && (
+          <div
+            className="card fade-in"
+            style={{
+              padding: "48px 20px",
+              textAlign: "center",
+              animationDelay: "0.1s",
+            }}
+          >
+            <div style={{ fontSize: 32, marginBottom: 12 }}>{"\u2705"}</div>
+            <div
+              style={{
+                fontSize: 14,
+                color: TEXT_PRIMARY,
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 500,
+                marginBottom: 4,
+              }}
+            >
+              You&apos;re all caught up
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: TEXT_TERTIARY,
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              No tasks assigned to you
+            </div>
+          </div>
+        )}
 
         {/* ── Kanban Board ── */}
-        <div
-          className="card fade-in"
-          style={{
-            padding: 16,
-            marginBottom: 20,
-            animationDelay: "0.1s",
-          }}
-        >
-          <div style={{ display: "flex", gap: 16 }}>
-            {COLUMNS.map((col) => {
-              const colTasks = getColumnTasks(col.id)
-              const isDragTarget = dragOverCol === col.id
+        {!(viewMode === "my" && me && filtered.length === 0) && (
+          <div
+            className="card fade-in"
+            style={{
+              padding: 16,
+              marginBottom: 20,
+              animationDelay: "0.1s",
+            }}
+          >
+            <div style={{ display: "flex", gap: 16 }}>
+              {columns.map((col) => {
+                const colTasks = getSortedColumnTasks(col.id)
+                const isDragTarget = dragOverCol === col.id
 
-              return (
-                <div
-                  key={col.id}
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    background: isDragTarget
-                      ? "rgba(192,139,136,0.06)"
-                      : "transparent",
-                    border: isDragTarget
-                      ? "1px dashed rgba(192,139,136,0.3)"
-                      : "1px solid transparent",
-                    borderRadius: 8,
-                    padding: 8,
-                    transition: "all 0.2s ease",
-                    boxShadow: isDragTarget
-                      ? "inset 0 0 20px rgba(192,139,136,0.05)"
-                      : "none",
-                  }}
-                  onDragOver={(e) => handleDragOver(e, col.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, col.id)}
-                >
-                  {/* Column header */}
+                return (
                   <div
+                    key={col.id}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 12,
-                      paddingBottom: 8,
-                      borderBottom: "1px solid rgba(255,255,255,0.03)",
+                      flex: 1,
+                      minWidth: 0,
+                      background: isDragTarget
+                        ? "rgba(192,139,136,0.06)"
+                        : "transparent",
+                      border: isDragTarget
+                        ? "1px dashed rgba(192,139,136,0.3)"
+                        : "1px solid transparent",
+                      borderRadius: 8,
+                      padding: 8,
+                      transition: "all 0.2s ease",
+                      boxShadow: isDragTarget
+                        ? "inset 0 0 20px rgba(192,139,136,0.05)"
+                        : "none",
                     }}
+                    onDragOver={(e) => handleDragOver(e, col.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, col.id)}
                   >
+                    {/* Column header */}
                     <div
                       style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 2,
-                        background: col.accent,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: 11,
-                        color: TEXT_SECONDARY,
-                        textTransform: "uppercase",
-                        letterSpacing: 1.5,
-                        fontFamily: "'DM Sans', sans-serif",
-                        fontWeight: 500,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 12,
+                        paddingBottom: 8,
+                        borderBottom: "1px solid rgba(255,255,255,0.03)",
                       }}
                     >
-                      {col.label}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: TEXT_TERTIARY,
-                        fontFamily: "'DM Sans', sans-serif",
-                        marginLeft: "auto",
-                      }}
-                    >
-                      {colTasks.length}
-                    </span>
-                  </div>
-
-                  {/* Column body */}
-                  <div style={{ minHeight: 100 }}>
-                    {colTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onClick={() => openEdit(task)}
-                        onLeaveNames={onLeaveNames}
-                      />
-                    ))}
-                    {colTasks.length === 0 && (
                       <div
                         style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 2,
+                          background: col.accent,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span
+                        style={{
                           fontSize: 11,
-                          color: TEXT_TERTIARY,
-                          textAlign: "center",
-                          padding: "32px 0",
+                          color: TEXT_SECONDARY,
+                          textTransform: "uppercase",
+                          letterSpacing: 1.5,
                           fontFamily: "'DM Sans', sans-serif",
+                          fontWeight: 500,
                         }}
                       >
-                        Drop tasks here
-                      </div>
-                    )}
+                        {col.label}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: TEXT_TERTIARY,
+                          fontFamily: "'DM Sans', sans-serif",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        {colTasks.length}
+                      </span>
+                    </div>
+
+                    {/* Column body */}
+                    <div style={{ minHeight: 100 }}>
+                      {colTasks.map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onClick={() => openEdit(task)}
+                          onLeaveNames={onLeaveNames}
+                          showOverdueBadge={viewMode === "my"}
+                          viewMode={viewMode}
+                        />
+                      ))}
+                      {colTasks.length === 0 && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: TEXT_TERTIARY,
+                            textAlign: "center",
+                            padding: "32px 0",
+                            fontFamily: "'DM Sans', sans-serif",
+                          }}
+                        >
+                          Drop tasks here
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Column Stats ── */}
         <div
           className="fade-in"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: `repeat(${columns.length}, 1fr)`,
             gap: 16,
             animationDelay: "0.15s",
           }}
         >
-          {COLUMNS.map((col) => {
-            const count = tasks.filter((t) => t.column === col.id).length
+          {columns.map((col) => {
+            const count = filtered.filter((t) => t.column === col.id).length
             const highCount = getHighPriorityCount(col.id)
 
             return (
@@ -799,6 +1195,7 @@ export default function TasksPage() {
                     <option value="sales">Sales</option>
                     <option value="legal">Legal</option>
                     <option value="finance">Finance</option>
+                    <option value="support">Support</option>
                   </select>
                 </div>
                 <div>
@@ -846,12 +1243,50 @@ export default function TasksPage() {
                 />
               </div>
 
+              {/* Linked Contact (optional) */}
+              <div>
+                <label style={labelStyle}>Linked Contact</label>
+                <select
+                  className="oxen-input"
+                  value={form.contactId}
+                  onChange={(e) => setForm({ ...form, contactId: e.target.value })}
+                  style={{ appearance: "none" }}
+                >
+                  <option value="">None</option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.company ? ` — ${c.company}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Linked Support Ticket (only if tag is support) */}
+              {form.tag === "support" && (
+                <div>
+                  <label style={labelStyle}>Linked Support Ticket</label>
+                  <select
+                    className="oxen-input"
+                    value={form.supportTicketId}
+                    onChange={(e) => setForm({ ...form, supportTicketId: e.target.value })}
+                    style={{ appearance: "none" }}
+                  >
+                    <option value="">None</option>
+                    {supportTickets.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.subject} — {t.clientName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Status buttons (only when editing) */}
               {editingTask && (
                 <div>
                   <label style={labelStyle}>Status</label>
                   <div style={{ display: "flex", gap: 8 }}>
-                    {COLUMNS.map((col) => (
+                    {columns.map((col) => (
                       <button
                         key={col.id}
                         onClick={() => handleMoveTask(col.id)}
