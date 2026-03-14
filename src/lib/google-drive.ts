@@ -19,6 +19,7 @@ export interface DriveFile {
 export interface DriveListResult {
   files: DriveFile[]
   nextPageToken?: string
+  error?: string
 }
 
 /**
@@ -55,8 +56,14 @@ export async function listDriveFiles(
   })
 
   if (!res.ok) {
-    console.error("[Drive] List files failed:", res.status, await res.text())
-    return { files: [] }
+    const errorText = await res.text()
+    console.error("[Drive] List files failed:", res.status, errorText)
+    let errorMessage = `Google Drive API error (${res.status})`
+    try {
+      const errorJson = JSON.parse(errorText)
+      errorMessage = errorJson.error?.message || errorMessage
+    } catch { /* use default */ }
+    return { files: [], error: errorMessage }
   }
 
   const data = await res.json()

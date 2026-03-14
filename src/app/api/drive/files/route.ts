@@ -47,7 +47,11 @@ export async function GET(request: Request) {
 
   const result = await listDriveFiles(accessToken, { folderId, query, pageToken, starred })
 
-  console.log("[Drive] Files returned:", result.files.length)
+  console.log("[Drive] Files returned:", result.files.length, result.error ? `Error: ${result.error}` : "")
+
+  if (result.error) {
+    return NextResponse.json({ error: result.error, files: [] }, { status: 502 })
+  }
 
   return NextResponse.json(result)
 }
