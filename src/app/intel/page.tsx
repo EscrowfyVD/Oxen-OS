@@ -86,6 +86,30 @@ const SUBCATEGORIES: Record<string, { value: string; label: string }[]> = {
   ],
 }
 
+const PREFILLED_QUERIES: Record<string, string> = {
+  social_trends: "Analyze the latest social media trends in fintech, payments, and digital banking across LinkedIn and Twitter. What topics get the most engagement? What formats work best (carousel, video, text, polls)? What hashtags are trending? Focus on B2B financial services content.",
+  competitive_intel: "Analyze how our competitors (Mercury, Wise Business, Payoneer, Revolut Business, Relay) market themselves on social media. For each: posting frequency per week, most common topics, best performing posts (highest engagement), posting times, tone of voice, visual style. Provide actionable insights for Oxen to differentiate.",
+  repost_suggestions: "Find 5-10 recent LinkedIn posts from fintech thought leaders, banking innovation pages, or payment industry experts that would be relevant for Oxen Finance to repost or comment on. Posts should align with: multi-currency banking, crypto-friendly payments, iGaming financial services, or compliance innovation.",
+  content_ideas: "Generate 10 content ideas for Oxen Finance's social media (LinkedIn primarily). Topics should cover: crypto-to-fiat solutions, iGaming banking challenges, multi-jurisdictional compliance, Dubai fintech ecosystem, family office banking. Mix formats: thought leadership posts, client success angles, industry data, controversial takes.",
+  trending_tools: "Find the 10 most trending AI tools this week across Twitter, Reddit, and ProductHunt that are relevant for: sales automation, compliance automation, fintech operations, customer support, document processing, or internal tooling. For each: name, what it does, pricing, why it matters for a fintech company.",
+  github_repos: "Find the 10 most starred GitHub repositories from the past month related to: LLM applications, AI agents, fintech tooling, payment processing, compliance automation, or sales intelligence. For each: repo name, stars, description, language, and how Oxen could use it.",
+  google_search: "Search for the latest AI tools and fintech innovations trending on Google. Focus on tools useful for banking operations, compliance, sales intelligence, and payment processing.",
+  news_scraping: "Find the latest AI news from the past week relevant to fintech and banking: new model releases, AI regulation affecting financial services, AI tools for compliance, new AI startups in finance, and breakthroughs in document processing or fraud detection.",
+  business_news: "Find recent news about Mercury, Wise Business, Payoneer, Revolut Business, and Relay Financial. Focus ONLY on: new licenses obtained, new features launched, regulatory fines or issues, layoffs or mass hiring, new countries or markets entered, partnerships announced. Exclude marketing content.",
+  website_changes: "Check for recent changes on competitor websites (Mercury.com, Wise.com/business, Payoneer.com, Revolut.com/business). Look for: new product pages, pricing changes, new features listed, terms and conditions updates, new landing pages, design overhauls.",
+  reviews: "Analyze recent reviews of Mercury, Wise Business, Payoneer, and Revolut Business on Trustpilot, G2, and Reddit. Identify: common complaints, praise, feature requests, service quality trends. Flag any sudden waves of negative reviews that might indicate problems we can capitalize on.",
+  new_regulation: "Find new financial regulations enacted in the past 3 months across: EU (MiCA, PSD3, DORA), UK (FCA), UAE (CBUAE, VARA), Malta (MFSA), Switzerland (FINMA), Luxembourg (CSSF). Focus on regulations affecting: payment services, crypto/VASP, banking licenses, AML/KYC requirements.",
+  regulation_change: "Find any amendments or changes to existing financial regulations that affect payment service providers, VASPs, or banking in: EU, UK, UAE, Malta, Switzerland, Luxembourg. Include effective dates and key impacts.",
+  regulation_removal: "Find any financial regulations being relaxed, removed, or simplified in the EU, UK, Malta, Cyprus, UAE that could benefit payment/banking companies like Oxen. Include potential opportunities.",
+  regulation_news: "Research news and commentary about upcoming regulatory changes in financial services, payments, and crypto that could affect Oxen Finance. Include expert opinions and timeline predictions.",
+  relevant_conferences: "Find upcoming fintech, payments, iGaming, crypto, and banking conferences in the next 6 months. For each provide: name, location, exact dates, main topics, estimated ticket price, key speakers, and a specific reason why Oxen Finance should attend. Focus on: Europe, UAE, Malta, Cyprus, UK. Include SiGMA, Money20/20, Paris Fintech Forum, and similar tier events.",
+  news_mentions: "Search for any news articles, blog posts, or press mentions of Oxen Finance, Escrowfy, Lapki Digital Pay, or Galaktika Pay across news sites, fintech blogs, and industry publications.",
+  social_mentions: "Search for any social media posts mentioning Oxen Finance, Escrowfy, or related brands on LinkedIn, Twitter/X, and Reddit. Include direct mentions, tags, and contextual references.",
+  reviews_oxen: "Find any reviews or mentions of Oxen Finance, Escrowfy on Trustpilot, G2, Reddit, or other review platforms. Categorize as positive, negative, or neutral with key quotes.",
+  financial_news: "Find the most important financial news from the past week affecting: fintech, digital banking, crypto markets, payment processing, and cross-border transactions. Focus on news that directly impacts Oxen's business model or client sectors (iGaming, crypto, family offices, luxury).",
+  fundraisings: "Find recent fundraising rounds (past 30 days) in fintech, payments, crypto, and digital banking. For each: company name, round size, stage (seed/A/B/C), investors, what they do, and relevance to Oxen's market.",
+}
+
 const SOURCE_ICONS: Record<string, React.ReactNode> = {
   linkedin: <Linkedin size={14} />,
   twitter: <span style={{ fontSize: 13, fontWeight: 700 }}>𝕏</span>,
@@ -638,6 +662,33 @@ export default function IntelPage() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {/* Quality indicator */}
+              {results.length > 0 && (() => {
+                const critical = results.filter((r) => r.relevance === "critical").length
+                const high = results.filter((r) => r.relevance === "high").length
+                const medium = results.filter((r) => r.relevance === "medium").length
+                const low = results.filter((r) => r.relevance === "low").length
+                const total = results.length
+                return (
+                  <div style={{
+                    padding: "10px 14px", borderRadius: 8,
+                    background: "rgba(255,255,255,0.02)", border: `1px solid ${CARD_BORDER}`,
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    flexWrap: "wrap", gap: 8,
+                  }}>
+                    <div className="flex items-center gap-3" style={{ fontSize: 11 }}>
+                      <span style={{ color: TEXT_SECONDARY }}>{total} results</span>
+                      {critical > 0 && <span style={{ color: "#EF4444" }}>{critical} critical</span>}
+                      {high > 0 && <span style={{ color: "#F87171" }}>{high} high</span>}
+                      {medium > 0 && <span style={{ color: "#F59E0B" }}>{medium} medium</span>}
+                      {low > 0 && <span style={{ color: TEXT_TERTIARY }}>{low} low</span>}
+                    </div>
+                    <span style={{ fontSize: 10, color: TEXT_TERTIARY, fontStyle: "italic" }}>
+                      Based on AI analysis — not live web data. Perplexity API integration coming soon.
+                    </span>
+                  </div>
+                )
+              })()}
               {results.map((r) => {
                 const catColor = CATEGORY_COLORS[r.research.category] || TEXT_SECONDARY
                 const sentColor = SENTIMENT_COLORS[r.sentiment || "neutral"]
@@ -937,6 +988,87 @@ export default function IntelPage() {
                                 </button>
                               )}
 
+                              {/* Deep Dive → Sentinel */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  window.open(`/ai?contactName=${encodeURIComponent(r.title)}`, "_blank")
+                                }}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 4,
+                                  padding: "4px 10px", borderRadius: 6,
+                                  border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                                  color: "#818CF8", fontSize: 11, cursor: "pointer",
+                                }}
+                              >
+                                <Sparkles size={12} />
+                                Deep Dive
+                              </button>
+
+                              {/* Create Task */}
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  try {
+                                    await fetch("/api/tasks", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        title: `[Intel] ${r.title}`,
+                                        description: r.summary,
+                                        tag: "compliance",
+                                        priority: r.relevance === "critical" ? "urgent" : r.relevance === "high" ? "high" : "medium",
+                                      }),
+                                    })
+                                    alert("Task created!")
+                                  } catch { /* empty */ }
+                                }}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 4,
+                                  padding: "4px 10px", borderRadius: 6,
+                                  border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                                  color: "#F59E0B", fontSize: 11, cursor: "pointer",
+                                }}
+                              >
+                                <CheckCircle size={12} />
+                                Create Task
+                              </button>
+
+                              {/* Add to Wiki */}
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  const slug = r.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 80)
+                                  try {
+                                    await fetch("/api/wiki", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        title: r.title,
+                                        slug,
+                                        content: { type: "doc", content: [
+                                          { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: r.title }] },
+                                          { type: "paragraph", content: [{ type: "text", text: r.summary }] },
+                                          ...(r.source ? [{ type: "paragraph", content: [{ type: "text", text: `Source: ${r.source}` }] }] : []),
+                                        ]},
+                                        category: "Intel",
+                                        icon: CATEGORY_ICONS[r.research.category] || "🔍",
+                                      }),
+                                    })
+                                    alert("Wiki page created!")
+                                  } catch { /* empty */ }
+                                }}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 4,
+                                  padding: "4px 10px", borderRadius: 6,
+                                  border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                                  color: "#5BB8A8", fontSize: 11, cursor: "pointer",
+                                }}
+                              >
+                                <FileText size={12} />
+                                Add to Wiki
+                              </button>
+
                               {/* Read/unread toggle */}
                               <button
                                 onClick={(e) => {
@@ -1069,6 +1201,7 @@ export default function IntelPage() {
                     const val = e.target.value
                     setFormSubcategory(val)
                     if (val && SOURCE_PRESETS[val]) setFormSources(SOURCE_PRESETS[val])
+                    if (val && PREFILLED_QUERIES[val]) setFormQuery(PREFILLED_QUERIES[val])
                   }}
                   style={{
                     width: "100%",
