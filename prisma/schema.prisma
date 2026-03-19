@@ -660,6 +660,11 @@ model IntelResearch {
   category      String        // "marketing", "ai_tools", "competitors", "regulations", "conferences", "oxen", "finance"
   subcategory   String?
   query         String?       @db.Text
+  sources       String[]      // ["linkedin", "twitter", "reddit", "github", etc.]
+  keywords      String[]      // search keywords
+  companies     String[]      // companies to monitor
+  regions       String[]      // geographic focus
+  language      String        @default("english")
   type          String        // "one_time" or "recurring"
   frequency     String?       // "daily", "weekly", "biweekly", "monthly"
   lastRunAt     DateTime?

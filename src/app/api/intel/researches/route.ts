@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = await request.json()
-  const { title, category, subcategory, query, type, frequency } = body
+  const { title, category, subcategory, query, type, frequency, sources, keywords, companies, regions, language } = body
 
   if (!title || !category || !type) {
     return NextResponse.json({ error: "title, category, and type are required" }, { status: 400 })
@@ -63,6 +63,11 @@ export async function POST(request: Request) {
       category,
       subcategory: subcategory || null,
       query: query || null,
+      sources: Array.isArray(sources) ? sources : [],
+      keywords: Array.isArray(keywords) ? keywords : [],
+      companies: Array.isArray(companies) ? companies : [],
+      regions: Array.isArray(regions) ? regions : [],
+      language: language || "english",
       type,
       frequency: type === "recurring" ? frequency : null,
       nextRunAt,

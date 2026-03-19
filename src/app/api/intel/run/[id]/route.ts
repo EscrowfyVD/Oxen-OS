@@ -57,20 +57,53 @@ const SUBCATEGORY_PROMPTS: Record<string, string> = {
   fundraisings: "Research recent fundraising rounds and investments in the fintech, payments, banking infrastructure, and crypto banking space. Include: company name, round size, investors, valuation if known, and what they do. Focus on companies in Oxen's competitive landscape.",
 }
 
-function buildUserMessage(category: string, subcategory: string | null, query: string | null): string {
+type ResearchInput = {
+  category: string
+  subcategory: string | null
+  query: string | null
+  sources: string[]
+  keywords: string[]
+  companies: string[]
+  regions: string[]
+  language: string
+}
+
+function buildUserMessage(research: ResearchInput): string {
   let prompt = ""
 
-  if (subcategory && SUBCATEGORY_PROMPTS[subcategory]) {
-    prompt = SUBCATEGORY_PROMPTS[subcategory]
+  if (research.subcategory && SUBCATEGORY_PROMPTS[research.subcategory]) {
+    prompt = SUBCATEGORY_PROMPTS[research.subcategory]
   } else {
-    prompt = `Research the following topic in the context of ${category} intelligence for Oxen Finance: ${query || category}`
+    prompt = `Research the following topic in the context of ${research.category} intelligence for Oxen Finance: ${research.query || research.category}`
   }
 
-  if (query) {
-    prompt += `\n\nAdditional research instructions: ${query}`
+  // Add structured context
+  const context: string[] = []
+  if (research.sources.length > 0) {
+    context.push(`Sources to search: ${research.sources.join(", ")}`)
+  }
+  if (research.keywords.length > 0) {
+    context.push(`Keywords to monitor: ${research.keywords.join(", ")}`)
+  }
+  if (research.companies.length > 0) {
+    context.push(`Companies to monitor: ${research.companies.join(", ")}`)
+  }
+  if (research.regions.length > 0) {
+    context.push(`Geographic focus: ${research.regions.join(", ")}`)
+  }
+  if (research.language && research.language !== "english") {
+    context.push(`Return results in: ${research.language}`)
   }
 
-  prompt += "\n\nReturn 5-10 results as a JSON array."
+  if (context.length > 0) {
+    prompt += "\n\nResearch context:\n" + context.map((c) => `- ${c}`).join("\n")
+  }
+
+  if (research.query) {
+    prompt += `\n\nAdditional research instructions: ${research.query}`
+  }
+
+  prompt += "\n\nSearch across the specified sources for content matching these keywords and companies. Focus on the geographic regions specified. Return 5-10 results as a JSON array."
   return prompt
 }
 
@@ -84,7 +117,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (!research) return NextResponse.json({ error: "Research not found" }, { status: 404 })
 
   try {
-    const userMessage = buildUserMessage(research.category, research.subcategory, research.query)
+    const userMessage = buildUserMessage({
+      category: research.category,
+      subcategory: research.subcategory,
+      query: research.query,
+      sources: research.sources,
+      keywords: research.keywords,
+      companies: research.companies,
+      regions: research.regions,
+      language: research.language,
+    })
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",

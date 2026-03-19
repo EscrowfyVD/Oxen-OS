@@ -99,6 +99,55 @@ const SOURCE_ICONS: Record<string, React.ReactNode> = {
   conference_site: <Calendar size={14} />,
 }
 
+const ALL_SOURCES = [
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "twitter", label: "Twitter / X" },
+  { value: "reddit", label: "Reddit" },
+  { value: "github", label: "GitHub" },
+  { value: "google", label: "Google Search" },
+  { value: "news", label: "News Sites" },
+  { value: "review_site", label: "Review Sites (Trustpilot, G2)" },
+  { value: "regulatory", label: "Regulatory Registers" },
+  { value: "conference_site", label: "Conference Sites" },
+  { value: "website", label: "Company Websites" },
+]
+
+const SOURCE_PRESETS: Record<string, string[]> = {
+  social_trends: ["linkedin", "twitter", "reddit"],
+  competitive_intel: ["linkedin", "twitter", "website"],
+  repost_suggestions: ["linkedin", "twitter"],
+  content_ideas: ["linkedin", "twitter", "reddit", "news"],
+  trending_tools: ["twitter", "reddit", "github", "google", "news"],
+  github_repos: ["github"],
+  google_search: ["google", "news"],
+  news_scraping: ["news", "google"],
+  business_news: ["news", "google", "linkedin"],
+  website_changes: ["website"],
+  reviews: ["review_site"],
+  new_regulation: ["regulatory", "news", "google"],
+  regulation_change: ["regulatory", "news", "google"],
+  regulation_removal: ["regulatory", "news"],
+  regulation_news: ["news", "google", "regulatory"],
+  relevant_conferences: ["conference_site", "google"],
+  news_mentions: ["news", "google"],
+  social_mentions: ["linkedin", "twitter", "reddit"],
+  reviews_oxen: ["review_site"],
+  financial_news: ["news", "google"],
+  fundraisings: ["news", "google", "linkedin"],
+}
+
+const ALL_REGIONS = [
+  { value: "europe", label: "Europe" },
+  { value: "uae", label: "UAE" },
+  { value: "uk", label: "UK" },
+  { value: "malta", label: "Malta" },
+  { value: "cyprus", label: "Cyprus" },
+  { value: "luxembourg", label: "Luxembourg" },
+  { value: "usa", label: "USA" },
+  { value: "asia", label: "Asia" },
+  { value: "global", label: "Global" },
+]
+
 const SENTIMENT_COLORS: Record<string, { bg: string; text: string }> = {
   positive: { bg: "rgba(34,197,94,0.12)", text: "#22C55E" },
   negative: { bg: "rgba(239,68,68,0.12)", text: "#EF4444" },
@@ -167,6 +216,13 @@ export default function IntelPage() {
   const [formQuery, setFormQuery] = useState("")
   const [formType, setFormType] = useState("one_time")
   const [formFrequency, setFormFrequency] = useState("weekly")
+  const [formSources, setFormSources] = useState<string[]>([])
+  const [formKeywords, setFormKeywords] = useState<string[]>([])
+  const [formKeywordInput, setFormKeywordInput] = useState("")
+  const [formCompanies, setFormCompanies] = useState<string[]>([])
+  const [formCompanyInput, setFormCompanyInput] = useState("")
+  const [formRegions, setFormRegions] = useState<string[]>(["europe", "uae", "uk", "malta", "cyprus"])
+  const [formLanguage, setFormLanguage] = useState("english")
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -260,6 +316,11 @@ export default function IntelPage() {
           category: formCategory,
           subcategory: formSubcategory || null,
           query: formQuery || null,
+          sources: formSources,
+          keywords: formKeywords,
+          companies: formCompanies,
+          regions: formRegions,
+          language: formLanguage,
           type: formType,
           frequency: formType === "recurring" ? formFrequency : null,
         }),
@@ -269,6 +330,13 @@ export default function IntelPage() {
       setFormTitle("")
       setFormQuery("")
       setFormSubcategory("")
+      setFormSources([])
+      setFormKeywords([])
+      setFormKeywordInput("")
+      setFormCompanies([])
+      setFormCompanyInput("")
+      setFormRegions(["europe", "uae", "uk", "malta", "cyprus"])
+      setFormLanguage("english")
       fetchResearches()
 
       // Auto-run the research
@@ -997,7 +1065,11 @@ export default function IntelPage() {
                 <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Subcategory</span>
                 <select
                   value={formSubcategory}
-                  onChange={(e) => setFormSubcategory(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setFormSubcategory(val)
+                    if (val && SOURCE_PRESETS[val]) setFormSources(SOURCE_PRESETS[val])
+                  }}
                   style={{
                     width: "100%",
                     padding: "8px 12px",
@@ -1016,6 +1088,172 @@ export default function IntelPage() {
                 </select>
               </label>
             )}
+
+            {/* Sources */}
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Where to search?</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {ALL_SOURCES.map((src) => {
+                  const checked = formSources.includes(src.value)
+                  return (
+                    <button
+                      key={src.value}
+                      type="button"
+                      onClick={() => {
+                        setFormSources((prev) =>
+                          checked ? prev.filter((s) => s !== src.value) : [...prev, src.value]
+                        )
+                      }}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        border: checked ? `1px solid ${ROSE_GOLD}` : `1px solid ${CARD_BORDER}`,
+                        background: checked ? `${ROSE_GOLD}15` : "transparent",
+                        color: checked ? ROSE_GOLD : TEXT_TERTIARY,
+                        fontSize: 11,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <span style={{ width: 12, height: 12, borderRadius: 3, border: checked ? `1px solid ${ROSE_GOLD}` : `1px solid ${CARD_BORDER}`, background: checked ? ROSE_GOLD : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: VOID }}>
+                        {checked && "✓"}
+                      </span>
+                      {src.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Keywords */}
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Keywords to monitor</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: formKeywords.length > 0 ? 8 : 0 }}>
+                {formKeywords.map((kw, i) => (
+                  <span key={i} style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "2px 8px", borderRadius: 4,
+                    background: `${ROSE_GOLD}15`, color: ROSE_GOLD, fontSize: 11,
+                  }}>
+                    {kw}
+                    <button
+                      type="button"
+                      onClick={() => setFormKeywords((prev) => prev.filter((_, idx) => idx !== i))}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: ROSE_GOLD, fontSize: 12, padding: 0, lineHeight: 1 }}
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+              <input
+                value={formKeywordInput}
+                onChange={(e) => setFormKeywordInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && formKeywordInput.trim()) {
+                    e.preventDefault()
+                    setFormKeywords((prev) => [...prev, formKeywordInput.trim()])
+                    setFormKeywordInput("")
+                  }
+                }}
+                placeholder="Add keywords... (press Enter)"
+                style={{
+                  width: "100%", padding: "8px 12px", borderRadius: 8,
+                  border: `1px solid ${CARD_BORDER}`, background: CARD_BG,
+                  color: TEXT_PRIMARY, fontSize: 13, outline: "none",
+                }}
+              />
+            </div>
+
+            {/* Companies */}
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Companies to monitor</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: formCompanies.length > 0 ? 8 : 0 }}>
+                {formCompanies.map((c, i) => (
+                  <span key={i} style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "2px 8px", borderRadius: 4,
+                    background: "rgba(129,140,248,0.12)", color: "#818CF8", fontSize: 11,
+                  }}>
+                    {c}
+                    <button
+                      type="button"
+                      onClick={() => setFormCompanies((prev) => prev.filter((_, idx) => idx !== i))}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#818CF8", fontSize: 12, padding: 0, lineHeight: 1 }}
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+              <input
+                value={formCompanyInput}
+                onChange={(e) => setFormCompanyInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && formCompanyInput.trim()) {
+                    e.preventDefault()
+                    setFormCompanies((prev) => [...prev, formCompanyInput.trim()])
+                    setFormCompanyInput("")
+                  }
+                }}
+                placeholder="Add company names..."
+                style={{
+                  width: "100%", padding: "8px 12px", borderRadius: 8,
+                  border: `1px solid ${CARD_BORDER}`, background: CARD_BG,
+                  color: TEXT_PRIMARY, fontSize: 13, outline: "none",
+                }}
+              />
+            </div>
+
+            {/* Regions */}
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Geographic focus</span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {ALL_REGIONS.map((reg) => {
+                  const checked = formRegions.includes(reg.value)
+                  return (
+                    <button
+                      key={reg.value}
+                      type="button"
+                      onClick={() => {
+                        setFormRegions((prev) =>
+                          checked ? prev.filter((r) => r !== reg.value) : [...prev, reg.value]
+                        )
+                      }}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        border: checked ? "1px solid #22C55E" : `1px solid ${CARD_BORDER}`,
+                        background: checked ? "rgba(34,197,94,0.1)" : "transparent",
+                        color: checked ? "#22C55E" : TEXT_TERTIARY,
+                        fontSize: 11,
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {reg.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Language */}
+            <label style={{ display: "block", marginBottom: 16 }}>
+              <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Content language</span>
+              <select
+                value={formLanguage}
+                onChange={(e) => setFormLanguage(e.target.value)}
+                style={{
+                  width: "100%", padding: "8px 12px", borderRadius: 8,
+                  border: `1px solid ${CARD_BORDER}`, background: "#0A0C10",
+                  color: TEXT_PRIMARY, fontSize: 13, outline: "none",
+                }}
+              >
+                <option value="english">English</option>
+                <option value="french">French</option>
+                <option value="all">All Languages</option>
+              </select>
+            </label>
 
             {/* Query */}
             <label style={{ display: "block", marginBottom: 16 }}>
