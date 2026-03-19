@@ -47,7 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Marketing", href: "/marketing", icon: Megaphone, badge: null, count: null, pageKey: "marketing" },
   { label: "Support", href: "/support", icon: Headphones, badge: null, count: null },
   { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null, pageKey: "crm" },
-  { label: "Intel", href: "/intel", icon: Search, badge: null, count: null, pageKey: "intel" },
+  { label: "Intel", href: "/intel", icon: Search, badge: null, count: null },
 ]
 
 export default function Sidebar() {
