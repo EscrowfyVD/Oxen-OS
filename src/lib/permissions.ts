@@ -40,6 +40,7 @@ export const PAGE_ACCESS: Record<string, DeptAccessRule> = {
   finance: { minRole: "admin", allowDepartments: ["Finance"] },
   marketing: { minRole: "admin", allowDepartments: ["Marketing"] },
   crm: { denyDepartments: ["Compliance"] },
+  intel: { minRole: "manager" },
 }
 
 /**

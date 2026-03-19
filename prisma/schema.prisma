@@ -652,6 +652,42 @@ model OutreachSequence {
   updatedAt       DateTime @updatedAt
 }
 
+// ─── Intelligence Hub ───
+
+model IntelResearch {
+  id            String        @id @default(cuid())
+  title         String
+  category      String        // "marketing", "ai_tools", "competitors", "regulations", "conferences", "oxen", "finance"
+  subcategory   String?
+  query         String?       @db.Text
+  type          String        // "one_time" or "recurring"
+  frequency     String?       // "daily", "weekly", "biweekly", "monthly"
+  lastRunAt     DateTime?
+  nextRunAt     DateTime?
+  status        String        @default("active") // "active", "paused", "completed"
+  createdBy     String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  results       IntelResult[]
+}
+
+model IntelResult {
+  id            String        @id @default(cuid())
+  researchId    String
+  research      IntelResearch @relation(fields: [researchId], references: [id], onDelete: Cascade)
+  title         String
+  summary       String        @db.Text
+  source        String?
+  sourceType    String?       // "linkedin", "twitter", "reddit", "github", "google", "news", "website", "review_site", "regulatory", "conference_site"
+  sentiment     String?       // "positive", "negative", "neutral"
+  relevance     String        @default("medium") // "critical", "high", "medium", "low"
+  actionable    Boolean       @default(false)
+  read          Boolean       @default(false)
+  starred       Boolean       @default(false)
+  metadata      Json?
+  createdAt     DateTime      @default(now())
+}
+
 // ─── Drive Links (Google Drive integration) ───
 
 model DriveLink {

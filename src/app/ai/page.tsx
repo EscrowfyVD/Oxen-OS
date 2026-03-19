@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import ChatSection from "@/components/ai/ChatSection"
 import InsightsSection from "@/components/ai/InsightsSection"
 import BriefsSection from "@/components/ai/BriefsSection"
@@ -10,6 +11,7 @@ import CallNotesModal from "@/components/calendar/CallNotesModal"
 import type { AIInsight, MeetingBrief, CalendarEvent } from "@/components/ai/types"
 
 const CARD_BORDER = "rgba(255,255,255,0.06)"
+const TEXT_PRIMARY = "rgba(240,240,242,0.92)"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
 const ROSE_GOLD = "#C08B88"
@@ -44,6 +46,7 @@ function AIPageInner() {
   const [teamView, setTeamView] = useState(false)
   const [showCallNotesModal, setShowCallNotesModal] = useState(false)
   const [callNotesModalEvent, setCallNotesModalEvent] = useState<{ id: string; title: string; start: string; attendees?: string[]; description?: string } | null>(null)
+  const [intelHighlights, setIntelHighlights] = useState<{ id: string; title: string; summary: string; relevance: string; research: { category: string } }[]>([])
 
   // Check admin status via roleLevel
   useEffect(() => {
@@ -94,6 +97,11 @@ function AIPageInner() {
     fetchInsights()
     fetchBriefs()
     fetchEvents()
+    // Fetch Intel highlights
+    fetch("/api/intel/results/feed?limit=5")
+      .then((r) => r.json())
+      .then((d) => setIntelHighlights(d.results?.slice(0, 5) || []))
+      .catch(() => {})
   }, [fetchInsights, fetchBriefs, fetchEvents])
 
   const toggleTeamView = () => {
@@ -300,6 +308,72 @@ function AIPageInner() {
             setShowCallNotesModal(true)
           }}
         />
+
+        {/* Section 4: Intel Highlights */}
+        {intelHighlights.length > 0 && (
+          <div className="fade-in" style={{
+            background: "rgba(255,255,255,0.02)",
+            border: `1px solid ${CARD_BORDER}`,
+            borderRadius: 14,
+            padding: 20,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14 }}>🔍</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>Intel Highlights</span>
+              </div>
+              <Link href="/intel" style={{ fontSize: 11, color: ROSE_GOLD, textDecoration: "none" }}>
+                View in Intel →
+              </Link>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {intelHighlights.map((item) => {
+                const catColors: Record<string, string> = {
+                  marketing: "#C08B88", ai_tools: "#818CF8", competitors: "#EF4444",
+                  regulations: "#F59E0B", conferences: "#22C55E", oxen: "#5BB8A8", finance: "#A855F7",
+                }
+                const catIcons: Record<string, string> = {
+                  marketing: "🎯", ai_tools: "🤖", competitors: "⚔️",
+                  regulations: "📜", conferences: "🎪", oxen: "🏛", finance: "💰",
+                }
+                const color = catColors[item.research.category] || TEXT_SECONDARY
+                return (
+                  <div key={item.id} style={{
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    background: "rgba(255,255,255,0.02)",
+                    border: `1px solid ${CARD_BORDER}`,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      <span style={{
+                        fontSize: 9, padding: "1px 6px", borderRadius: 4,
+                        background: `${color}15`, color,
+                      }}>
+                        {catIcons[item.research.category]} {item.research.category.replace("_", " ")}
+                      </span>
+                      {(item.relevance === "critical" || item.relevance === "high") && (
+                        <span style={{
+                          fontSize: 9, padding: "1px 6px", borderRadius: 4,
+                          background: "rgba(239,68,68,0.12)", color: "#EF4444",
+                        }}>
+                          {item.relevance}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: TEXT_PRIMARY }}>{item.title}</div>
+                    <div style={{
+                      fontSize: 12, color: TEXT_SECONDARY, marginTop: 2,
+                      display: "-webkit-box", WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical" as const, overflow: "hidden",
+                    }}>
+                      {item.summary}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Brief Modal */}

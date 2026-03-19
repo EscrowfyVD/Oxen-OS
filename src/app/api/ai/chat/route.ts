@@ -289,6 +289,23 @@ async function gatherContext(message: string, userEmail: string): Promise<string
     }
   }
 
+  // Intel context
+  if (msgLower.includes("competitor") || msgLower.includes("conference") || msgLower.includes("intel") || msgLower.includes("trend") || msgLower.includes("ai tool") || msgLower.includes("regulation") || msgLower.includes("digest")) {
+    try {
+      const intelResults = await prisma.intelResult.findMany({
+        include: { research: { select: { category: true, subcategory: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      })
+      if (intelResults.length > 0) {
+        parts.push("\n## Recent Intel Results")
+        for (const r of intelResults) {
+          parts.push(`- [${r.research.category}/${r.research.subcategory || "general"}] ${r.title} | Relevance: ${r.relevance} | Sentiment: ${r.sentiment} | ${r.summary.substring(0, 200)}`)
+        }
+      }
+    } catch { /* intel tables may not exist yet */ }
+  }
+
   // Linked Drive documents for contacts in context
   try {
     const contactIds = contacts.slice(0, 5).map((c) => c.id)
