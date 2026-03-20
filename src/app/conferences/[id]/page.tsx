@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import {
-  ArrowLeft, Edit2, ExternalLink, Plus, X, Loader2, Copy,
+  ArrowLeft, Edit2, ExternalLink, Plus, X, Loader2, Copy, Trash2,
   Star, Users, FileText, BarChart3, DollarSign, ClipboardList,
 } from "lucide-react"
 
@@ -46,6 +46,11 @@ const FOLLOWUP_OPTIONS = [
   { value: "add_to_sequence", label: "Add to Sequence" },
 ]
 
+const CONF_COLORS = [
+  "#C08B88", "#818CF8", "#5CB868", "#E5C453",
+  "#5BB8A8", "#9B7FD4", "#5B9BBF", "#D4885B",
+]
+
 const TAB_LIST = [
   { key: "overview", label: "Overview", icon: <ClipboardList size={15} /> },
   { key: "budget", label: "Budget", icon: <DollarSign size={15} /> },
@@ -65,6 +70,7 @@ type Conference = {
   description: string | null
   source: string | null
   status: string
+  color: string | null
   budget: { tickets?: number; hotel?: number; flights?: number; meals?: number; other?: number } | null
   ticketCost?: number
   hotelCost?: number
@@ -227,6 +233,16 @@ export default function ConferenceDetailPage() {
   const [roi, setRoi] = useState<ROIData | null>(null)
   const [roiLoading, setRoiLoading] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const deleteConference = async () => {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/conferences/${id}`, { method: "DELETE" })
+      if (res.ok) router.push("/conferences")
+    } catch { /* ignore */ } finally { setDeleting(false) }
+  }
 
   /* ── Fetch conference ── */
   const fetchConference = useCallback(async () => {
@@ -278,6 +294,7 @@ export default function ConferenceDetailPage() {
   }
 
   const statusColor = STATUS_COLORS[conf.status] || STATUS_COLORS.planned
+  const accentColor = conf.color || ROSE_GOLD
 
   return (
     <div style={{ background: VOID, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" }}>
@@ -288,6 +305,7 @@ export default function ConferenceDetailPage() {
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
         borderBottom: `1px solid ${CARD_BORDER}`,
+        borderTop: `3px solid ${accentColor}`,
         position: "sticky",
         top: 0,
         zIndex: 100,
@@ -356,6 +374,12 @@ export default function ConferenceDetailPage() {
             >
               <Edit2 size={14} /> Edit
             </button>
+            <button
+              style={{ ...btnGhost, display: "flex", alignItems: "center", gap: 6, color: "#EF4444", borderColor: "rgba(239,68,68,0.25)" }}
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 size={14} /> Delete
+            </button>
           </div>
         </div>
 
@@ -368,7 +392,7 @@ export default function ConferenceDetailPage() {
               style={{
                 background: activeTab === tab.key ? "rgba(255,255,255,0.06)" : "transparent",
                 border: "none",
-                borderBottom: activeTab === tab.key ? `2px solid ${ROSE_GOLD}` : "2px solid transparent",
+                borderBottom: activeTab === tab.key ? `2px solid ${accentColor}` : "2px solid transparent",
                 color: activeTab === tab.key ? TEXT_PRIMARY : TEXT_TERTIARY,
                 padding: "8px 16px",
                 fontSize: 13,
@@ -396,6 +420,53 @@ export default function ConferenceDetailPage() {
         {activeTab === "report" && <ReportTab conf={conf} onUpdate={fetchConference} />}
         {activeTab === "roi" && <ROITab roi={roi} loading={roiLoading} />}
       </div>
+
+      {/* ── Delete Confirmation Modal ── */}
+      {showDeleteConfirm && conf && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 16, width: "100%", maxWidth: 440, padding: 28 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 20, fontWeight: 400, color: "#fff", margin: "0 0 12px" }}>
+              Delete Conference
+            </h3>
+            <p style={{ fontSize: 13, color: TEXT_SECONDARY, lineHeight: 1.6, margin: "0 0 24px" }}>
+              Delete <strong style={{ color: TEXT_PRIMARY }}>{conf.name}</strong> and all associated data?
+              This includes attendees, contacts, reports, and linked calendar events.
+              <br /><br />
+              <span style={{ color: "#EF4444", fontWeight: 500 }}>This cannot be undone.</span>
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setShowDeleteConfirm(false)} style={btnGhost}>Cancel</button>
+              <button
+                onClick={deleteConference}
+                disabled={deleting}
+                style={{
+                  background: "#EF4444",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "8px 20px",
+                  fontSize: 13,
+                  fontFamily: "'DM Sans', sans-serif",
+                  cursor: deleting ? "not-allowed" : "pointer",
+                  fontWeight: 500,
+                  opacity: deleting ? 0.6 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <Trash2 size={14} /> {deleting ? "Deleting..." : "Delete Conference"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit Modal ── */}
       {showEditModal && conf && (
@@ -437,6 +508,7 @@ function EditConferenceModal({
   const [mealsCost, setMealsCost] = useState(String(conf.mealsCost || 0))
   const [otherCost, setOtherCost] = useState(String(conf.otherCost || 0))
   const [budgetNotes, setBudgetNotes] = useState(conf.budgetNotes || "")
+  const [selectedColor, setSelectedColor] = useState(conf.color || CONF_COLORS[0])
   const [showBudget, setShowBudget] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -475,6 +547,7 @@ function EditConferenceModal({
         website: website || null,
         description: description || null,
         status,
+        color: selectedColor,
         ticketCost: parseFloat(ticketCost) || 0,
         hotelCost: parseFloat(hotelCost) || 0,
         flightCost: parseFloat(flightCost) || 0,
@@ -557,6 +630,31 @@ function EditConferenceModal({
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Description</label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ ...textareaStyle }} />
+          </div>
+
+          {/* Color Picker */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Color</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {CONF_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setSelectedColor(c)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    background: c,
+                    border: selectedColor === c ? "3px solid #fff" : "3px solid transparent",
+                    cursor: "pointer",
+                    outline: selectedColor === c ? `2px solid ${c}` : "none",
+                    outlineOffset: 1,
+                    transition: "all 0.15s ease",
+                  }}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Attendees */}

@@ -731,6 +731,7 @@ model Conference {
   driveLinks      DriveLink[]
   report          ConferenceReport?
 
+  color           String?
   calendarEventId String?
 
   createdBy       String

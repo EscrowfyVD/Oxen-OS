@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     const {
       name, location, startDate, endDate, country, website, description,
       status, attendees, ticketCost, hotelCost, flightCost, mealsCost, otherCost,
-      currency, budgetNotes, source, intelResultId,
+      currency, budgetNotes, source, intelResultId, color,
     } = body
 
     const budget = body.budget
@@ -91,6 +91,7 @@ export async function POST(request: Request) {
         otherCost: parseFloat(otherCost || budget?.otherCost) || 0,
         currency: currency || budget?.currency || "EUR",
         budgetNotes: budgetNotes || budget?.notes || null,
+        color: color ?? null,
         source: source ?? "manual",
         intelResultId: intelResultId ?? null,
         createdBy: userId,

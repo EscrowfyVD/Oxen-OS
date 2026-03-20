@@ -14,6 +14,26 @@ const ROSE = "#C08B88"
 const ROSE_HOVER = "#D4A5A2"
 const ROSE_DIM = "rgba(192,139,136,0.15)"
 
+/* ── Conference color palette ── */
+const CONF_COLORS = [
+  { solid: "#C08B88", dim: "rgba(192,139,136,0.25)", bg: "rgba(192,139,136,0.15)" },   // Rose gold
+  { solid: "#818CF8", dim: "rgba(129,140,248,0.25)", bg: "rgba(129,140,248,0.15)" },   // Indigo
+  { solid: "#5CB868", dim: "rgba(92,184,104,0.25)", bg: "rgba(92,184,104,0.15)" },     // Green
+  { solid: "#E5C453", dim: "rgba(229,196,83,0.25)", bg: "rgba(229,196,83,0.15)" },     // Amber
+  { solid: "#5BB8A8", dim: "rgba(91,184,168,0.25)", bg: "rgba(91,184,168,0.15)" },     // Teal
+  { solid: "#9B7FD4", dim: "rgba(155,127,212,0.25)", bg: "rgba(155,127,212,0.15)" },   // Purple
+  { solid: "#5B9BBF", dim: "rgba(91,155,191,0.25)", bg: "rgba(91,155,191,0.15)" },     // Blue
+  { solid: "#D4885B", dim: "rgba(212,136,91,0.25)", bg: "rgba(212,136,91,0.15)" },     // Orange
+]
+
+function getConfColor(conf: Conference, index: number) {
+  if (conf.color) {
+    const match = CONF_COLORS.find((c) => c.solid === conf.color)
+    if (match) return match
+  }
+  return CONF_COLORS[index % CONF_COLORS.length]
+}
+
 type TabKey = "calendar" | "intel" | "reports"
 type CalView = "day" | "week" | "month" | "year"
 
@@ -43,6 +63,7 @@ interface Conference {
   mealsCost?: number
   otherCost?: number
   currency?: string
+  color?: string
   attendees?: { employeeId: string; employee?: { id: string; name: string }; name?: string; role: string }[]
   report?: { id: string } | null
   _count?: { collectedContacts: number }
@@ -405,6 +426,19 @@ export default function ConferencesPage() {
 
   const pastConferences = conferences.filter((c) => new Date(c.endDate) < new Date())
 
+  /* ── Delete conference ── */
+  const deleteConference = async (confId: string, confName: string) => {
+    if (!confirm(`Delete "${confName}" and all associated data? This cannot be undone.`)) return
+    try {
+      const res = await fetch(`/api/conferences/${confId}`, { method: "DELETE" })
+      if (res.ok) fetchConferences()
+    } catch { /* silent */ }
+  }
+
+  // Build color index map: order conferences by creation and assign rotating colors
+  const confColorMap = new Map<string, typeof CONF_COLORS[0]>()
+  conferences.forEach((c, i) => { confColorMap.set(c.id, getConfColor(c, i)) })
+
   // Sort conferences: upcoming first, past dimmed
   const sortedConferences = [...conferences].sort((a, b) => {
     const now = new Date()
@@ -491,6 +525,7 @@ export default function ConferencesPage() {
                 {sortedConferences.map((c) => {
                   const isPast = new Date(c.endDate) < new Date()
                   const budget = confTotalBudget(c)
+                  const clr = confColorMap.get(c.id) || CONF_COLORS[0]
                   return (
                     <div
                       key={c.id}
@@ -501,12 +536,26 @@ export default function ConferencesPage() {
                         cursor: "pointer",
                         opacity: isPast ? 0.5 : 1,
                         transition: "all 0.15s",
-                        borderLeft: `3px solid ${isPast ? TEXT_TERTIARY : ROSE}`,
+                        borderLeft: `3px solid ${isPast ? TEXT_TERTIARY : clr.solid}`,
+                        position: "relative",
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.opacity = "1" }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = CARD_BG; e.currentTarget.style.opacity = isPast ? "0.5" : "1" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.opacity = "1"; const del = e.currentTarget.querySelector("[data-del]") as HTMLElement; if (del) del.style.opacity = "1" }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = CARD_BG; e.currentTarget.style.opacity = isPast ? "0.5" : "1"; const del = e.currentTarget.querySelector("[data-del]") as HTMLElement; if (del) del.style.opacity = "0" }}
                     >
-                      <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <button
+                        data-del=""
+                        onClick={(e) => { e.stopPropagation(); deleteConference(c.id, c.name) }}
+                        style={{
+                          position: "absolute", top: 8, right: 8, opacity: 0,
+                          background: "rgba(239,68,68,0.12)", border: "none", borderRadius: 4,
+                          padding: "3px 6px", cursor: "pointer", color: "#EF4444", fontSize: 10,
+                          fontFamily: "'DM Sans', sans-serif", fontWeight: 600, transition: "opacity 0.15s",
+                        }}
+                        title="Delete conference"
+                      >
+                        ✕
+                      </button>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 20 }}>
                         {c.name}
                       </div>
                       <div style={{ fontSize: 11, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 2 }}>
@@ -517,7 +566,7 @@ export default function ConferencesPage() {
                           {c.attendees?.length || 0} attendee{(c.attendees?.length || 0) !== 1 ? "s" : ""}
                         </span>
                         {budget > 0 && (
-                          <span style={{ fontSize: 10, color: ROSE, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
+                          <span style={{ fontSize: 10, color: clr.solid, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
                             €{budget.toLocaleString()}
                           </span>
                         )}
@@ -617,6 +666,7 @@ export default function ConferencesPage() {
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                             {confs.map((conf) => {
+                              const clr = confColorMap.get(conf.id) || CONF_COLORS[0]
                               const show = isConfStart(conf, day)
                               const cs = new Date(conf.startDate); cs.setHours(0, 0, 0, 0)
                               const ce = new Date(conf.endDate); ce.setHours(23, 59, 59, 999)
@@ -631,8 +681,8 @@ export default function ConferencesPage() {
                                   key={conf.id}
                                   onClick={(e) => { e.stopPropagation(); router.push(`/conferences/${conf.id}`) }}
                                   style={{
-                                    background: ROSE_DIM,
-                                    borderLeft: (isStart || isWeekStart) ? `3px solid ${ROSE}` : "none",
+                                    background: clr.bg,
+                                    borderLeft: (isStart || isWeekStart) ? `3px solid ${clr.solid}` : "none",
                                     borderTopLeftRadius: (isStart || isWeekStart) ? 4 : 0,
                                     borderBottomLeftRadius: (isStart || isWeekStart) ? 4 : 0,
                                     borderTopRightRadius: isEnd ? 4 : 0,
@@ -645,12 +695,12 @@ export default function ConferencesPage() {
                                     marginLeft: (isStart || isWeekStart) ? 0 : -6,
                                     marginRight: isEnd ? 0 : -6,
                                   }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(192,139,136,0.25)")}
-                                  onMouseLeave={(e) => (e.currentTarget.style.background = ROSE_DIM)}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = clr.dim)}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = clr.bg)}
                                 >
                                   {(show || isWeekStart) ? (
                                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                      <span style={{ fontSize: 10, fontWeight: 600, color: ROSE_HOVER, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                      <span style={{ fontSize: 10, fontWeight: 600, color: clr.solid, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis" }}>
                                         {conf.name}
                                       </span>
                                       {conf.location && (
@@ -662,7 +712,7 @@ export default function ConferencesPage() {
                                         <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
                                           {conf.attendees.slice(0, 3).map((a, idx) => (
                                             <div key={idx} style={{
-                                              width: 14, height: 14, borderRadius: "50%", background: ROSE,
+                                              width: 14, height: 14, borderRadius: "50%", background: clr.solid,
                                               display: "flex", alignItems: "center", justifyContent: "center",
                                               fontSize: 7, fontWeight: 700, color: "#fff",
                                             }}>
@@ -718,12 +768,14 @@ export default function ConferencesPage() {
                           {Array.from({ length: fd }).map((_, i) => <div key={`ye-${i}`} />)}
                           {Array.from({ length: dim }).map((_, di) => {
                             const d = di + 1
-                            const hasConf = mConfs.some((c) => {
+                            const matchedConf = mConfs.find((c) => {
                               const cs = new Date(c.startDate); cs.setHours(0, 0, 0, 0)
                               const ce = new Date(c.endDate); ce.setHours(23, 59, 59, 999)
                               const date = new Date(calYear, mi, d)
                               return date >= cs && date <= ce
                             })
+                            const hasConf = !!matchedConf
+                            const dayClr = matchedConf ? (confColorMap.get(matchedConf.id) || CONF_COLORS[0]).solid : ROSE
                             const today = isSameDay(new Date(calYear, mi, d), new Date())
                             return (
                               <div
@@ -734,7 +786,7 @@ export default function ConferencesPage() {
                                   padding: "1px 0",
                                   borderRadius: 2,
                                   color: hasConf ? "#fff" : today ? ROSE : TEXT_TERTIARY,
-                                  background: hasConf ? ROSE : today ? "rgba(192,139,136,0.15)" : "transparent",
+                                  background: hasConf ? dayClr : today ? "rgba(192,139,136,0.15)" : "transparent",
                                   cursor: hasConf ? "pointer" : "default",
                                   fontWeight: today || hasConf ? 700 : 400,
                                 }}
@@ -754,32 +806,35 @@ export default function ConferencesPage() {
                         {/* Conference bars for this month */}
                         {mConfs.length > 0 && (
                           <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
-                            {mConfs.slice(0, 3).map((c) => (
+                            {mConfs.slice(0, 3).map((c) => {
+                              const clr = confColorMap.get(c.id) || CONF_COLORS[0]
+                              return (
                               <div
                                 key={c.id}
                                 onClick={() => router.push(`/conferences/${c.id}`)}
                                 style={{
                                   display: "flex", alignItems: "center", gap: 4,
                                   padding: "3px 6px", borderRadius: 4,
-                                  background: ROSE_DIM, borderLeft: `2px solid ${ROSE}`,
+                                  background: clr.bg, borderLeft: `2px solid ${clr.solid}`,
                                   cursor: "pointer", overflow: "hidden",
                                 }}
                                 title={`${c.name} — ${c.location || ""} — ${formatDateRange(c.startDate, c.endDate)}`}
                               >
-                                <span style={{ fontSize: 9, fontWeight: 600, color: ROSE_HOVER, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                <span style={{ fontSize: 9, fontWeight: 600, color: clr.solid, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {c.name}
                                 </span>
                                 {c.attendees && c.attendees.length > 0 && (
                                   <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
                                     {c.attendees.slice(0, 2).map((a, idx) => (
-                                      <div key={idx} style={{ width: 10, height: 10, borderRadius: "50%", background: ROSE, fontSize: 6, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                      <div key={idx} style={{ width: 10, height: 10, borderRadius: "50%", background: clr.solid, fontSize: 6, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                         {attName(a).charAt(0)}
                                       </div>
                                     ))}
                                   </div>
                                 )}
                               </div>
-                            ))}
+                              )
+                            })}
                             {mConfs.length > 3 && (
                               <span style={{ fontSize: 9, color: TEXT_TERTIARY, paddingLeft: 6 }}>+{mConfs.length - 3} more</span>
                             )}
@@ -823,6 +878,7 @@ export default function ConferencesPage() {
                         return (
                           <div key={i} style={{ padding: 6, borderRight: i < 6 ? `1px solid ${CARD_BORDER}` : "none", display: "flex", flexDirection: "column", gap: 4 }}>
                             {dayConfs.map((c) => {
+                              const clr = confColorMap.get(c.id) || CONF_COLORS[0]
                               const cs = new Date(c.startDate); cs.setHours(0, 0, 0, 0)
                               const isStart = isSameDay(cs, d) || i === 0
                               return (
@@ -830,19 +886,19 @@ export default function ConferencesPage() {
                                   key={c.id}
                                   onClick={() => router.push(`/conferences/${c.id}`)}
                                   style={{
-                                    background: ROSE_DIM,
-                                    borderLeft: isStart ? `3px solid ${ROSE}` : "none",
+                                    background: clr.bg,
+                                    borderLeft: isStart ? `3px solid ${clr.solid}` : "none",
                                     borderRadius: isStart ? 4 : 0,
                                     padding: "4px 6px",
                                     cursor: "pointer",
                                     overflow: "hidden",
                                     whiteSpace: "nowrap",
                                   }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(192,139,136,0.25)")}
-                                  onMouseLeave={(e) => (e.currentTarget.style.background = ROSE_DIM)}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = clr.dim)}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = clr.bg)}
                                 >
                                   {isStart ? (
-                                    <span style={{ fontSize: 10, fontWeight: 600, color: ROSE_HOVER, fontFamily: "'DM Sans', sans-serif" }}>
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: clr.solid, fontFamily: "'DM Sans', sans-serif" }}>
                                       {c.name}
                                     </span>
                                   ) : (
@@ -878,21 +934,23 @@ export default function ConferencesPage() {
                         <div style={{ fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
                           Conferences
                         </div>
-                        {dayConfs.map((c) => (
+                        {dayConfs.map((c) => {
+                          const clr = confColorMap.get(c.id) || CONF_COLORS[0]
+                          return (
                           <div
                             key={c.id}
                             onClick={() => router.push(`/conferences/${c.id}`)}
                             style={{
                               display: "flex", alignItems: "center", gap: 12,
                               padding: "10px 14px", borderRadius: 8,
-                              background: ROSE_DIM, borderLeft: `3px solid ${ROSE}`,
+                              background: clr.bg, borderLeft: `3px solid ${clr.solid}`,
                               cursor: "pointer", marginBottom: 6,
                             }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(192,139,136,0.2)")}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = ROSE_DIM)}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = clr.dim)}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = clr.bg)}
                           >
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: ROSE_HOVER, fontFamily: "'DM Sans', sans-serif" }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: clr.solid, fontFamily: "'DM Sans', sans-serif" }}>
                                 {c.name}
                               </div>
                               <div style={{ fontSize: 11, color: TEXT_SECONDARY, marginTop: 2 }}>
@@ -903,7 +961,7 @@ export default function ConferencesPage() {
                               <div style={{ display: "flex", gap: 2 }}>
                                 {c.attendees.slice(0, 4).map((a, idx) => (
                                   <div key={idx} style={{
-                                    width: 24, height: 24, borderRadius: "50%", background: ROSE,
+                                    width: 24, height: 24, borderRadius: "50%", background: clr.solid,
                                     display: "flex", alignItems: "center", justifyContent: "center",
                                     fontSize: 10, fontWeight: 700, color: "#fff",
                                   }}>
@@ -913,7 +971,8 @@ export default function ConferencesPage() {
                               </div>
                             )}
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                     {dayConfs.length === 0 && (
@@ -1139,6 +1198,7 @@ function AddConferenceModal({
     currency: "EUR",
     notes: "",
   })
+  const [color, setColor] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [autoFilling, setAutoFilling] = useState(false)
   const [autoFillMsg, setAutoFillMsg] = useState("")
@@ -1202,6 +1262,7 @@ function AddConferenceModal({
         endDate,
         website,
         description,
+        color: color || undefined,
         attendees: attendees.map((a) => ({ id: a.id, role: a.role })),
       }
       if (showBudget) {
@@ -1309,6 +1370,36 @@ function AddConferenceModal({
           <div>
             <label style={labelStyle}>Description</label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Conference details, goals, notes..." rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+          </div>
+
+          {/* Color picker */}
+          <div>
+            <label style={labelStyle}>Color</label>
+            <div className="flex items-center gap-2">
+              {CONF_COLORS.map((c) => (
+                <button
+                  key={c.solid}
+                  onClick={() => setColor(color === c.solid ? "" : c.solid)}
+                  style={{
+                    width: 28, height: 28, borderRadius: 8, background: c.solid, border: color === c.solid ? "2px solid #fff" : "2px solid transparent",
+                    cursor: "pointer", transition: "all 0.15s", opacity: color && color !== c.solid ? 0.4 : 1,
+                    boxShadow: color === c.solid ? `0 0 8px ${c.solid}50` : "none",
+                  }}
+                  title={c.solid}
+                />
+              ))}
+              {color && (
+                <button
+                  onClick={() => setColor("")}
+                  style={{ fontSize: 11, color: TEXT_TERTIARY, background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginLeft: 4 }}
+                >
+                  Auto
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>
+              {color ? "Manual color selected" : "Color will be auto-assigned"}
+            </div>
           </div>
 
           {/* Attendees */}
