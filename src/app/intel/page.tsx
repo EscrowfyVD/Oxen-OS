@@ -5,7 +5,8 @@ import {
   Plus, RefreshCw, Star, ExternalLink, CheckCircle, XCircle,
   Linkedin, Github, Globe, Newspaper, FileText, AlertTriangle,
   ChevronRight, Calendar, Users, X, Loader2, Eye, EyeOff,
-  Megaphone, Sparkles, TrendingUp,
+  Megaphone, Sparkles, TrendingUp, Trash2, Archive, Download,
+  Send, Filter, SortAsc, MoreHorizontal, Check,
 } from "lucide-react"
 
 /* ── Design tokens ── */
@@ -185,6 +186,21 @@ const RELEVANCE_COLORS: Record<string, { bg: string; text: string }> = {
   low: { bg: "rgba(255,255,255,0.06)", text: TEXT_TERTIARY },
 }
 
+const FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "critical", label: "Critical" },
+  { value: "high", label: "High" },
+  { value: "actionable", label: "Actionable" },
+  { value: "starred", label: "Starred" },
+  { value: "unread", label: "Unread" },
+]
+
+const SORT_OPTIONS = [
+  { value: "relevance", label: "Relevance" },
+  { value: "newest", label: "Newest" },
+  { value: "sentiment", label: "Sentiment" },
+]
+
 type Research = {
   id: string
   title: string
@@ -196,6 +212,7 @@ type Research = {
   lastRunAt: string | null
   nextRunAt: string | null
   status: string
+  archived: boolean
   createdAt: string
   resultCount: number
   unreadCount: number
@@ -213,6 +230,7 @@ type Result = {
   actionable: boolean
   read: boolean
   starred: boolean
+  dismissed: boolean
   metadata: Record<string, unknown> | null
   createdAt: string
   research: { title: string; category: string; subcategory: string | null }
@@ -232,6 +250,16 @@ export default function IntelPage() {
   const [employees, setEmployees] = useState<{ id: string; name: string; email: string }[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [runningCron, setRunningCron] = useState(false)
+
+  // New improvement states
+  const [showArchived, setShowArchived] = useState(false)
+  const [bulkSelect, setBulkSelect] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null) // "completed" | researchId | null
+  const [resultFilter, setResultFilter] = useState("all")
+  const [resultSort, setResultSort] = useState("relevance")
+  const [hoveredResult, setHoveredResult] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null)
 
   // New research form state
   const [formTitle, setFormTitle] = useState("")
@@ -263,29 +291,43 @@ export default function IntelPage() {
       .catch(() => {})
   }, [])
 
+  // Close context menu on click outside
+  useEffect(() => {
+    const handler = () => setContextMenu(null)
+    if (contextMenu) window.addEventListener("click", handler)
+    return () => window.removeEventListener("click", handler)
+  }, [contextMenu])
+
   const fetchResearches = useCallback(() => {
-    const qs = category !== "all" ? `?category=${category}` : ""
+    const params = new URLSearchParams()
+    if (category !== "all") params.set("category", category)
+    if (showArchived) params.set("showArchived", "true")
+    const qs = params.toString() ? `?${params.toString()}` : ""
     fetch(`/api/intel/researches${qs}`)
       .then((r) => r.json())
       .then((d) => setResearches(d.researches || []))
       .catch(() => {})
-  }, [category])
+  }, [category, showArchived])
 
   const fetchResults = useCallback(() => {
     setLoading(true)
-    let url = "/api/intel/results/feed?"
+    let url: string
     if (selectedResearch) {
-      url = `/api/intel/results?researchId=${selectedResearch}&`
-    } else if (category !== "all") {
-      url += `category=${category}&`
+      url = `/api/intel/results?researchId=${selectedResearch}&limit=50`
+    } else {
+      const params = new URLSearchParams()
+      if (category !== "all") params.set("category", category)
+      if (resultFilter !== "all") params.set("filter", resultFilter)
+      params.set("sort", resultSort)
+      params.set("limit", "50")
+      url = `/api/intel/results/feed?${params.toString()}`
     }
-    url += "limit=50"
     fetch(url)
       .then((r) => r.json())
       .then((d) => setResults(d.results || []))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [category, selectedResearch])
+  }, [category, selectedResearch, resultFilter, resultSort])
 
   useEffect(() => { fetchResearches() }, [fetchResearches])
   useEffect(() => { fetchResults() }, [fetchResults])
@@ -328,6 +370,15 @@ export default function IntelPage() {
     setResults((prev) => prev.map((r) => (r.id === id ? { ...r, read: true } : r)))
   }
 
+  const dismissResult = async (id: string) => {
+    await fetch(`/api/intel/results/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dismissed: true }),
+    })
+    setResults((prev) => prev.filter((r) => r.id !== id))
+  }
+
   const createResearch = async () => {
     if (!formTitle.trim()) return
     setCreating(true)
@@ -350,6 +401,14 @@ export default function IntelPage() {
         }),
       })
       const data = await res.json()
+
+      if (res.status === 409) {
+        // Duplicate detected
+        alert(data.message || "Duplicate research detected")
+        setCreating(false)
+        return
+      }
+
       setShowModal(false)
       setFormTitle("")
       setFormQuery("")
@@ -376,6 +435,55 @@ export default function IntelPage() {
     if (selectedResearch === id) setSelectedResearch(null)
     fetchResearches()
     fetchResults()
+  }
+
+  const archiveResearch = async (id: string) => {
+    await fetch("/api/intel/researches", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "archive", ids: [id] }),
+    })
+    if (selectedResearch === id) setSelectedResearch(null)
+    fetchResearches()
+  }
+
+  const deleteAllCompleted = async () => {
+    await fetch("/api/intel/researches", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete_completed" }),
+    })
+    setShowDeleteConfirm(null)
+    fetchResearches()
+    fetchResults()
+  }
+
+  const bulkDeleteSelected = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    await fetch("/api/intel/researches", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bulk_delete", ids }),
+    })
+    setSelectedIds(new Set())
+    setBulkSelect(false)
+    if (selectedResearch && ids.includes(selectedResearch)) setSelectedResearch(null)
+    fetchResearches()
+    fetchResults()
+  }
+
+  const bulkArchiveSelected = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    await fetch("/api/intel/researches", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "archive", ids }),
+    })
+    setSelectedIds(new Set())
+    setBulkSelect(false)
+    fetchResearches()
   }
 
   const pauseResearch = async (id: string, currentStatus: string) => {
@@ -409,12 +517,60 @@ export default function IntelPage() {
     fetchResults()
   }
 
+  const exportResults = (format: "csv" | "pdf") => {
+    if (format === "csv") {
+      const header = "Title,Category,Relevance,Sentiment,Actionable,Source,Date,Summary\n"
+      const rows = results.map((r) =>
+        `"${r.title.replace(/"/g, '""')}","${r.research.category}","${r.relevance}","${r.sentiment || ""}","${r.actionable}","${r.source || ""}","${new Date(r.createdAt).toLocaleDateString()}","${r.summary.replace(/"/g, '""').slice(0, 200)}"`
+      ).join("\n")
+      const blob = new Blob([header + rows], { type: "text/csv" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `intel-results-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  }
+
   const formatDate = (d: string | null) => {
     if (!d) return "—"
     return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
   }
 
+  const formatDateShort = (d: string | null) => {
+    if (!d) return ""
+    return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+  }
+
+  // Group results by date
+  const groupResultsByDate = (results: Result[]) => {
+    const groups: { date: string; results: Result[] }[] = []
+    let currentDate = ""
+    for (const r of results) {
+      const d = new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+      if (d !== currentDate) {
+        currentDate = d
+        groups.push({ date: d, results: [r] })
+      } else {
+        groups[groups.length - 1].results.push(r)
+      }
+    }
+    return groups
+  }
+
+  const toggleBulkId = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   const categories = ["all", "marketing", "ai_tools", "competitors", "regulations", "conferences", "oxen", "finance"]
+
+  const resultGroups = groupResultsByDate(results)
 
   return (
     <div style={{ padding: "32px 40px", minHeight: "100vh", background: VOID }}>
@@ -502,6 +658,82 @@ export default function IntelPage() {
       <div className="flex gap-6" style={{ minHeight: "calc(100vh - 200px)" }}>
         {/* Left panel — research list */}
         <div style={{ width: 300, flexShrink: 0 }}>
+          {/* Left panel header */}
+          <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+            <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Researches
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBulkSelect(!bulkSelect)}
+                style={{
+                  fontSize: 10,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  border: `1px solid ${bulkSelect ? ROSE_GOLD : CARD_BORDER}`,
+                  background: bulkSelect ? `${ROSE_GOLD}15` : "transparent",
+                  color: bulkSelect ? ROSE_GOLD : TEXT_TERTIARY,
+                  cursor: "pointer",
+                }}
+              >
+                {bulkSelect ? "Cancel" : "Select"}
+              </button>
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                style={{
+                  fontSize: 10,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  border: `1px solid ${showArchived ? "#818CF8" : CARD_BORDER}`,
+                  background: showArchived ? "rgba(129,140,248,0.1)" : "transparent",
+                  color: showArchived ? "#818CF8" : TEXT_TERTIARY,
+                  cursor: "pointer",
+                }}
+              >
+                <Archive size={10} style={{ display: "inline", verticalAlign: "middle", marginRight: 3 }} />
+                {showArchived ? "Hide archived" : "Archived"}
+              </button>
+            </div>
+          </div>
+
+          {/* Bulk actions bar */}
+          {bulkSelect && selectedIds.size > 0 && (
+            <div className="flex items-center gap-2" style={{ marginBottom: 8, padding: "6px 10px", borderRadius: 6, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <span style={{ fontSize: 11, color: "#F87171" }}>{selectedIds.size} selected</span>
+              <button onClick={bulkDeleteSelected} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, border: "none", background: "rgba(239,68,68,0.15)", color: "#EF4444", cursor: "pointer" }}>
+                <Trash2 size={10} style={{ display: "inline", verticalAlign: "middle", marginRight: 2 }} />Delete
+              </button>
+              <button onClick={bulkArchiveSelected} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, border: "none", background: "rgba(129,140,248,0.15)", color: "#818CF8", cursor: "pointer" }}>
+                <Archive size={10} style={{ display: "inline", verticalAlign: "middle", marginRight: 2 }} />Archive
+              </button>
+            </div>
+          )}
+
+          {/* Delete completed button */}
+          {researches.some((r) => r.status === "completed") && (
+            <button
+              onClick={() => setShowDeleteConfirm("completed")}
+              style={{
+                width: "100%",
+                padding: "6px 10px",
+                borderRadius: 6,
+                border: `1px solid rgba(239,68,68,0.2)`,
+                background: "rgba(239,68,68,0.05)",
+                color: "#EF4444",
+                fontSize: 11,
+                cursor: "pointer",
+                marginBottom: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <Trash2 size={11} />
+              Delete All Completed
+            </button>
+          )}
+
+          {/* All Results button */}
           <div
             onClick={() => setSelectedResearch(null)}
             style={{
@@ -523,12 +755,16 @@ export default function IntelPage() {
             {researches.map((r) => {
               const active = selectedResearch === r.id
               const catColor = CATEGORY_COLORS[r.category] || TEXT_SECONDARY
-              const statusDot = r.status === "active" ? "#22C55E" : r.status === "paused" ? "#F59E0B" : TEXT_TERTIARY
+              const statusDot = r.status === "active" ? "#22C55E" : r.status === "paused" ? "#F59E0B" : r.status === "archived" ? "#818CF8" : TEXT_TERTIARY
 
               return (
                 <div
                   key={r.id}
-                  onClick={() => setSelectedResearch(r.id)}
+                  onClick={() => { if (!bulkSelect) setSelectedResearch(r.id) }}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setContextMenu({ id: r.id, x: e.clientX, y: e.clientY })
+                  }}
                   style={{
                     padding: "10px 14px",
                     borderRadius: 8,
@@ -537,9 +773,24 @@ export default function IntelPage() {
                     cursor: "pointer",
                     marginBottom: 2,
                     transition: "all 0.2s",
+                    opacity: r.archived ? 0.6 : 1,
                   }}
                 >
                   <div className="flex items-center gap-2">
+                    {bulkSelect && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleBulkId(r.id) }}
+                        style={{
+                          width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                          border: selectedIds.has(r.id) ? `1px solid ${ROSE_GOLD}` : `1px solid ${CARD_BORDER}`,
+                          background: selectedIds.has(r.id) ? ROSE_GOLD : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          cursor: "pointer", fontSize: 10, color: VOID,
+                        }}
+                      >
+                        {selectedIds.has(r.id) && <Check size={10} />}
+                      </button>
+                    )}
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusDot, flexShrink: 0 }} />
                     <span style={{
                       fontSize: 13,
@@ -565,7 +816,9 @@ export default function IntelPage() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2" style={{ marginTop: 4 }}>
+
+                  {/* Date + type info */}
+                  <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 4 }}>
                     <span style={{
                       fontSize: 10,
                       padding: "1px 6px",
@@ -576,63 +829,85 @@ export default function IntelPage() {
                       {r.type === "recurring" ? `↻ ${r.frequency}` : "one-time"}
                     </span>
                     <span style={{ fontSize: 10, color: TEXT_TERTIARY }}>{r.resultCount} results</span>
+                    <span style={{ fontSize: 10, color: TEXT_TERTIARY, marginLeft: "auto" }}>
+                      {formatDateShort(r.createdAt)}
+                    </span>
                   </div>
-                  {r.type === "recurring" && (
+
+                  {/* Last run / next run */}
+                  {r.lastRunAt && (
                     <div style={{ fontSize: 10, color: TEXT_TERTIARY, marginTop: 2 }}>
-                      {r.lastRunAt ? `Last: ${formatDate(r.lastRunAt)}` : "Never run"}
-                      {r.nextRunAt && ` · Next: ${formatDate(r.nextRunAt)}`}
+                      Last: {formatDate(r.lastRunAt)}
+                      {r.type === "recurring" && r.nextRunAt && ` · Next: ${formatDate(r.nextRunAt)}`}
                     </div>
                   )}
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-2" style={{ marginTop: 6 }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); runResearch(r.id) }}
-                      disabled={runningId === r.id}
-                      style={{
-                        fontSize: 10,
-                        padding: "2px 8px",
-                        borderRadius: 4,
-                        border: `1px solid ${CARD_BORDER}`,
-                        background: "transparent",
-                        color: runningId === r.id ? ROSE_GOLD : TEXT_TERTIARY,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 3,
-                      }}
-                    >
-                      {runningId === r.id ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
-                      {runningId === r.id ? "Running..." : "Run"}
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); pauseResearch(r.id, r.status) }}
-                      style={{
-                        fontSize: 10,
-                        padding: "2px 8px",
-                        borderRadius: 4,
-                        border: `1px solid ${CARD_BORDER}`,
-                        background: "transparent",
-                        color: TEXT_TERTIARY,
-                        cursor: "pointer",
-                      }}
-                    >
-                      {r.status === "paused" ? "Resume" : "Pause"}
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteResearch(r.id) }}
-                      style={{
-                        fontSize: 10,
-                        padding: "2px 8px",
-                        borderRadius: 4,
-                        border: `1px solid ${CARD_BORDER}`,
-                        background: "transparent",
-                        color: "#EF4444",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
+
+                  {/* Action buttons - only show when not in bulk mode */}
+                  {!bulkSelect && (
+                    <div className="flex items-center gap-2" style={{ marginTop: 6 }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); runResearch(r.id) }}
+                        disabled={runningId === r.id}
+                        style={{
+                          fontSize: 10,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          border: `1px solid ${CARD_BORDER}`,
+                          background: "transparent",
+                          color: runningId === r.id ? ROSE_GOLD : TEXT_TERTIARY,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 3,
+                        }}
+                      >
+                        {runningId === r.id ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                        {runningId === r.id ? "Running..." : "Run"}
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); pauseResearch(r.id, r.status) }}
+                        style={{
+                          fontSize: 10,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          border: `1px solid ${CARD_BORDER}`,
+                          background: "transparent",
+                          color: TEXT_TERTIARY,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {r.status === "paused" ? "Resume" : "Pause"}
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); archiveResearch(r.id) }}
+                        style={{
+                          fontSize: 10,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          border: `1px solid ${CARD_BORDER}`,
+                          background: "transparent",
+                          color: "#818CF8",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Archive
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(r.id) }}
+                        style={{
+                          fontSize: 10,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          border: `1px solid ${CARD_BORDER}`,
+                          background: "transparent",
+                          color: "#EF4444",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -649,6 +924,74 @@ export default function IntelPage() {
 
         {/* Main area — results feed */}
         <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Filter & Sort bar */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 12,
+            padding: "8px 12px",
+            borderRadius: 8,
+            background: "rgba(255,255,255,0.02)",
+            border: `1px solid ${CARD_BORDER}`,
+            flexWrap: "wrap",
+          }}>
+            <Filter size={13} style={{ color: TEXT_TERTIARY }} />
+            {FILTER_OPTIONS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setResultFilter(f.value)}
+                style={{
+                  padding: "3px 10px",
+                  borderRadius: 12,
+                  border: resultFilter === f.value ? `1px solid ${ROSE_GOLD}` : `1px solid transparent`,
+                  background: resultFilter === f.value ? `${ROSE_GOLD}15` : "transparent",
+                  color: resultFilter === f.value ? ROSE_GOLD : TEXT_TERTIARY,
+                  fontSize: 11,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+              <SortAsc size={13} style={{ color: TEXT_TERTIARY }} />
+              <select
+                value={resultSort}
+                onChange={(e) => setResultSort(e.target.value)}
+                style={{
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  border: `1px solid ${CARD_BORDER}`,
+                  background: "#0A0C10",
+                  color: TEXT_SECONDARY,
+                  fontSize: 11,
+                  outline: "none",
+                }}
+              >
+                {SORT_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+
+              {/* Export */}
+              <button
+                onClick={() => exportResults("csv")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 3,
+                  padding: "3px 8px", borderRadius: 6,
+                  border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                  color: TEXT_TERTIARY, fontSize: 10, cursor: "pointer",
+                }}
+              >
+                <Download size={10} />
+                CSV
+              </button>
+            </div>
+          </div>
+
           {loading ? (
             <div style={{ padding: "60px 0", textAlign: "center" }}>
               <Loader2 size={24} className="animate-spin" style={{ color: ROSE_GOLD, margin: "0 auto" }} />
@@ -661,7 +1004,7 @@ export default function IntelPage() {
               <p style={{ fontSize: 12 }}>Launch a research to populate the feed</p>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {/* Quality indicator */}
               {results.length > 0 && (() => {
                 const critical = results.filter((r) => r.relevance === "critical").length
@@ -671,7 +1014,7 @@ export default function IntelPage() {
                 const total = results.length
                 return (
                   <div style={{
-                    padding: "10px 14px", borderRadius: 8,
+                    padding: "10px 14px", borderRadius: 8, marginBottom: 8,
                     background: "rgba(255,255,255,0.02)", border: `1px solid ${CARD_BORDER}`,
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     flexWrap: "wrap", gap: 8,
@@ -689,425 +1032,622 @@ export default function IntelPage() {
                   </div>
                 )
               })()}
-              {results.map((r) => {
-                const catColor = CATEGORY_COLORS[r.research.category] || TEXT_SECONDARY
-                const sentColor = SENTIMENT_COLORS[r.sentiment || "neutral"]
-                const relColor = RELEVANCE_COLORS[r.relevance]
-                const expanded = expandedResult === r.id
-                const meta = r.metadata as Record<string, unknown> | null
-                const isConference = r.research.category === "conferences"
-                const isAccepted = meta?.accepted === true
-                const isRejected = meta?.rejected === true
-                const isMarketing = r.research.category === "marketing"
-                const isCritical = r.relevance === "critical"
 
-                return (
-                  <div
-                    key={r.id}
-                    onClick={() => { if (!r.read) markRead(r.id); setExpandedResult(expanded ? null : r.id) }}
-                    style={{
-                      padding: "14px 18px",
-                      borderRadius: 10,
-                      background: CARD_BG,
-                      border: `1px solid ${isCritical ? "rgba(239,68,68,0.3)" : CARD_BORDER}`,
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                      borderLeft: !r.read ? `3px solid ${catColor}` : `3px solid transparent`,
-                      position: "relative",
-                    }}
-                  >
-                    {/* Critical pulse */}
-                    {isCritical && (
-                      <span style={{
-                        position: "absolute",
-                        top: 14,
-                        right: 14,
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: "#EF4444",
-                        animation: "pulse 2s infinite",
-                      }} />
-                    )}
+              {/* Results grouped by date */}
+              {resultGroups.map((group) => (
+                <div key={group.date}>
+                  {/* Date separator */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    margin: "12px 0 8px",
+                  }}>
+                    <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontWeight: 600, whiteSpace: "nowrap" }}>
+                      {group.date}
+                    </span>
+                    <div style={{ flex: 1, height: 1, background: CARD_BORDER }} />
+                    <span style={{ fontSize: 10, color: TEXT_TERTIARY }}>{group.results.length} items</span>
+                  </div>
 
-                    {/* Top row */}
-                    <div className="flex items-start gap-3">
-                      {/* Source icon */}
-                      <div style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: 6,
-                        background: `${catColor}15`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: catColor,
-                        flexShrink: 0,
-                      }}>
-                        {SOURCE_ICONS[r.sourceType || ""] || <Globe size={14} />}
-                      </div>
+                  {group.results.map((r) => {
+                    const catColor = CATEGORY_COLORS[r.research.category] || TEXT_SECONDARY
+                    const sentColor = SENTIMENT_COLORS[r.sentiment || "neutral"]
+                    const relColor = RELEVANCE_COLORS[r.relevance]
+                    const expanded = expandedResult === r.id
+                    const meta = r.metadata as Record<string, unknown> | null
+                    const isConference = r.research.category === "conferences"
+                    const isAccepted = meta?.accepted === true
+                    const isRejected = meta?.rejected === true
+                    const isMarketing = r.research.category === "marketing"
+                    const isCritical = r.relevance === "critical"
+                    const isHovered = hoveredResult === r.id
 
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="flex items-center gap-2">
+                    return (
+                      <div
+                        key={r.id}
+                        onClick={() => { if (!r.read) markRead(r.id); setExpandedResult(expanded ? null : r.id) }}
+                        onMouseEnter={() => setHoveredResult(r.id)}
+                        onMouseLeave={() => setHoveredResult(null)}
+                        style={{
+                          padding: "14px 18px",
+                          borderRadius: 10,
+                          background: CARD_BG,
+                          border: `1px solid ${isCritical ? "rgba(239,68,68,0.3)" : CARD_BORDER}`,
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          borderLeft: !r.read ? `3px solid ${catColor}` : `3px solid transparent`,
+                          position: "relative",
+                          marginBottom: 8,
+                        }}
+                      >
+                        {/* Critical pulse */}
+                        {isCritical && (
                           <span style={{
-                            fontSize: 14,
-                            fontWeight: r.read ? 400 : 600,
-                            color: TEXT_PRIMARY,
-                            flex: 1,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: expanded ? "normal" : "nowrap",
-                          }}>
-                            {r.title}
-                          </span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleStar(r.id, r.starred) }}
-                            style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                          >
-                            <Star size={14} fill={r.starred ? "#F59E0B" : "none"} color={r.starred ? "#F59E0B" : TEXT_TERTIARY} />
-                          </button>
-                        </div>
+                            position: "absolute",
+                            top: 14,
+                            right: 14,
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: "#EF4444",
+                            animation: "pulse 2s infinite",
+                          }} />
+                        )}
 
-                        {/* Badges row */}
-                        <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 6 }}>
-                          <span style={{
-                            fontSize: 10,
-                            padding: "1px 6px",
-                            borderRadius: 4,
+                        {/* Top row */}
+                        <div className="flex items-start gap-3">
+                          {/* Source icon */}
+                          <div style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 6,
                             background: `${catColor}15`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                             color: catColor,
+                            flexShrink: 0,
                           }}>
-                            {CATEGORY_ICONS[r.research.category]} {CATEGORY_LABELS[r.research.category]}
-                          </span>
-                          {r.sourceType && (
-                            <span style={{
-                              fontSize: 10,
-                              padding: "1px 6px",
-                              borderRadius: 4,
-                              background: "rgba(255,255,255,0.06)",
-                              color: TEXT_TERTIARY,
-                            }}>
-                              {r.sourceType}
-                            </span>
-                          )}
-                          <span style={{
-                            fontSize: 10,
-                            padding: "1px 6px",
-                            borderRadius: 4,
-                            background: sentColor.bg,
-                            color: sentColor.text,
-                          }}>
-                            {r.sentiment}
-                          </span>
-                          <span style={{
-                            fontSize: 10,
-                            padding: "1px 6px",
-                            borderRadius: 4,
-                            background: relColor.bg,
-                            color: relColor.text,
-                            fontWeight: isCritical ? 700 : 400,
-                          }}>
-                            {r.relevance}
-                          </span>
-                          {r.actionable && (
-                            <span style={{
-                              fontSize: 10,
-                              padding: "1px 6px",
-                              borderRadius: 4,
-                              background: "rgba(245,158,11,0.12)",
-                              color: "#F59E0B",
-                            }}>
-                              ⚡ actionable
-                            </span>
-                          )}
-                          {isAccepted && (
-                            <span style={{
-                              fontSize: 10,
-                              padding: "1px 6px",
-                              borderRadius: 4,
-                              background: "rgba(34,197,94,0.15)",
-                              color: "#22C55E",
-                              fontWeight: 600,
-                            }}>
-                              ✅ Accepted{meta?.attendees ? ` — ${(meta.attendees as string[]).join(", ")}` : ""}
-                            </span>
-                          )}
-                          {isRejected && (
-                            <span style={{
-                              fontSize: 10,
-                              padding: "1px 6px",
-                              borderRadius: 4,
-                              background: "rgba(239,68,68,0.12)",
-                              color: "#EF4444",
-                            }}>
-                              ❌ Rejected
-                            </span>
-                          )}
-                          <span style={{ fontSize: 10, color: TEXT_TERTIARY, marginLeft: "auto" }}>
-                            {formatDate(r.createdAt)}
-                          </span>
-                        </div>
+                            {SOURCE_ICONS[r.sourceType || ""] || <Globe size={14} />}
+                          </div>
 
-                        {/* Summary */}
-                        <p style={{
-                          fontSize: 13,
-                          color: TEXT_SECONDARY,
-                          lineHeight: 1.5,
-                          marginTop: 8,
-                          display: expanded ? "block" : "-webkit-box",
-                          WebkitLineClamp: expanded ? undefined : 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: expanded ? "visible" : "hidden",
-                        }}>
-                          {r.summary}
-                        </p>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="flex items-center gap-2">
+                              <span style={{
+                                fontSize: 14,
+                                fontWeight: r.read ? 400 : 600,
+                                color: TEXT_PRIMARY,
+                                flex: 1,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: expanded ? "normal" : "nowrap",
+                              }}>
+                                {r.title}
+                              </span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleStar(r.id, r.starred) }}
+                                style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                              >
+                                <Star size={14} fill={r.starred ? "#F59E0B" : "none"} color={r.starred ? "#F59E0B" : TEXT_TERTIARY} />
+                              </button>
+                            </div>
 
-                        {/* Expanded details */}
-                        {expanded && (
-                          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${CARD_BORDER}` }}>
-                            {/* Metadata */}
-                            {meta && Object.keys(meta).filter(k => !["accepted","rejected","rejectionReason","attendees","eventId","wikiPageSlug"].includes(k)).length > 0 && (
-                              <div style={{ marginBottom: 12 }}>
-                                {Object.entries(meta)
-                                  .filter(([k]) => !["accepted","rejected","rejectionReason","attendees","eventId","wikiPageSlug"].includes(k))
-                                  .map(([k, v]) => (
-                                    <div key={k} className="flex items-center gap-2" style={{ marginBottom: 2 }}>
-                                      <span style={{ fontSize: 11, color: TEXT_TERTIARY, textTransform: "capitalize" }}>{k.replace(/_/g, " ")}:</span>
-                                      <span style={{ fontSize: 11, color: TEXT_SECONDARY }}>{String(v)}</span>
-                                    </div>
-                                  ))}
+                            {/* Badges row */}
+                            <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 6 }}>
+                              <span style={{
+                                fontSize: 10,
+                                padding: "1px 6px",
+                                borderRadius: 4,
+                                background: `${catColor}15`,
+                                color: catColor,
+                              }}>
+                                {CATEGORY_ICONS[r.research.category]} {CATEGORY_LABELS[r.research.category]}
+                              </span>
+                              {r.sourceType && (
+                                <span style={{
+                                  fontSize: 10,
+                                  padding: "1px 6px",
+                                  borderRadius: 4,
+                                  background: "rgba(255,255,255,0.06)",
+                                  color: TEXT_TERTIARY,
+                                }}>
+                                  {r.sourceType}
+                                </span>
+                              )}
+                              <span style={{
+                                fontSize: 10,
+                                padding: "1px 6px",
+                                borderRadius: 4,
+                                background: sentColor.bg,
+                                color: sentColor.text,
+                              }}>
+                                {r.sentiment}
+                              </span>
+                              <span style={{
+                                fontSize: 10,
+                                padding: "1px 6px",
+                                borderRadius: 4,
+                                background: relColor.bg,
+                                color: relColor.text,
+                                fontWeight: isCritical ? 700 : 400,
+                              }}>
+                                {r.relevance}
+                              </span>
+                              {r.actionable && (
+                                <span style={{
+                                  fontSize: 10,
+                                  padding: "1px 6px",
+                                  borderRadius: 4,
+                                  background: "rgba(245,158,11,0.12)",
+                                  color: "#F59E0B",
+                                }}>
+                                  ⚡ actionable
+                                </span>
+                              )}
+                              {isAccepted && (
+                                <span style={{
+                                  fontSize: 10,
+                                  padding: "1px 6px",
+                                  borderRadius: 4,
+                                  background: "rgba(34,197,94,0.15)",
+                                  color: "#22C55E",
+                                  fontWeight: 600,
+                                }}>
+                                  ✅ Accepted{meta?.attendees ? ` — ${(meta.attendees as string[]).join(", ")}` : ""}
+                                </span>
+                              )}
+                              {isRejected && (
+                                <span style={{
+                                  fontSize: 10,
+                                  padding: "1px 6px",
+                                  borderRadius: 4,
+                                  background: "rgba(239,68,68,0.12)",
+                                  color: "#EF4444",
+                                }}>
+                                  ❌ Rejected
+                                </span>
+                              )}
+                              <span style={{ fontSize: 10, color: TEXT_TERTIARY, marginLeft: "auto" }}>
+                                {formatDate(r.createdAt)}
+                              </span>
+                            </div>
+
+                            {/* Summary */}
+                            <p style={{
+                              fontSize: 13,
+                              color: TEXT_SECONDARY,
+                              lineHeight: 1.5,
+                              marginTop: 8,
+                              display: expanded ? "block" : "-webkit-box",
+                              WebkitLineClamp: expanded ? undefined : 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: expanded ? "visible" : "hidden",
+                            }}>
+                              {r.summary}
+                            </p>
+
+                            {/* Hover action buttons — visible on hover at bottom of collapsed card */}
+                            {isHovered && !expanded && (
+                              <div className="flex items-center gap-2" style={{ marginTop: 8, paddingTop: 6, borderTop: `1px solid ${CARD_BORDER}` }}>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); window.open(`/ai?contactName=${encodeURIComponent(r.title)}`, "_blank") }}
+                                  style={{ display: "flex", alignItems: "center", gap: 3, padding: "3px 8px", borderRadius: 5, border: `1px solid ${CARD_BORDER}`, background: "transparent", color: "#818CF8", fontSize: 10, cursor: "pointer" }}
+                                >
+                                  <Sparkles size={10} /> Deep Dive
+                                </button>
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation()
+                                    try {
+                                      await fetch("/api/tasks", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({
+                                          title: `[Intel] ${r.title}`,
+                                          description: r.summary,
+                                          tag: "compliance",
+                                          priority: r.relevance === "critical" ? "urgent" : r.relevance === "high" ? "high" : "medium",
+                                        }),
+                                      })
+                                      alert("Task created!")
+                                    } catch { /* empty */ }
+                                  }}
+                                  style={{ display: "flex", alignItems: "center", gap: 3, padding: "3px 8px", borderRadius: 5, border: `1px solid ${CARD_BORDER}`, background: "transparent", color: "#F59E0B", fontSize: 10, cursor: "pointer" }}
+                                >
+                                  <CheckCircle size={10} /> Task
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); dismissResult(r.id) }}
+                                  style={{ display: "flex", alignItems: "center", gap: 3, padding: "3px 8px", borderRadius: 5, border: `1px solid ${CARD_BORDER}`, background: "transparent", color: TEXT_TERTIARY, fontSize: 10, cursor: "pointer" }}
+                                >
+                                  <XCircle size={10} /> Dismiss
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    fetch(`/api/intel/results/${r.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ read: !r.read }),
+                                    })
+                                    setResults((prev) => prev.map((x) => (x.id === r.id ? { ...x, read: !r.read } : x)))
+                                  }}
+                                  style={{ display: "flex", alignItems: "center", gap: 3, padding: "3px 8px", borderRadius: 5, border: `1px solid ${CARD_BORDER}`, background: "transparent", color: TEXT_TERTIARY, fontSize: 10, cursor: "pointer" }}
+                                >
+                                  {r.read ? <EyeOff size={10} /> : <Eye size={10} />}
+                                  {r.read ? "Unread" : "Read"}
+                                </button>
                               </div>
                             )}
 
-                            {/* Source link */}
-                            {r.source && (
-                              <a
-                                href={r.source.startsWith("http") ? r.source : `https://${r.source}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 4,
-                                  fontSize: 11,
-                                  color: ROSE_GOLD,
-                                  textDecoration: "none",
-                                  marginBottom: 12,
-                                }}
-                              >
-                                <ExternalLink size={11} />
-                                {r.source.length > 60 ? r.source.slice(0, 60) + "..." : r.source}
-                              </a>
-                            )}
+                            {/* Expanded details */}
+                            {expanded && (
+                              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${CARD_BORDER}` }}>
+                                {/* Metadata */}
+                                {meta && Object.keys(meta).filter(k => !["accepted","rejected","rejectionReason","attendees","eventId","wikiPageSlug"].includes(k)).length > 0 && (
+                                  <div style={{ marginBottom: 12 }}>
+                                    {Object.entries(meta)
+                                      .filter(([k]) => !["accepted","rejected","rejectionReason","attendees","eventId","wikiPageSlug"].includes(k))
+                                      .map(([k, v]) => (
+                                        <div key={k} className="flex items-center gap-2" style={{ marginBottom: 2 }}>
+                                          <span style={{ fontSize: 11, color: TEXT_TERTIARY, textTransform: "capitalize" }}>{k.replace(/_/g, " ")}:</span>
+                                          <span style={{ fontSize: 11, color: TEXT_SECONDARY }}>{String(v)}</span>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
 
-                            {/* Action buttons */}
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {/* Conference actions */}
-                              {isConference && !isAccepted && !isRejected && (
-                                <>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setShowConferenceModal(r.id) }}
+                                {/* Source link */}
+                                {r.source && (
+                                  <a
+                                    href={r.source.startsWith("http") ? r.source : `https://${r.source}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
                                     style={{
-                                      display: "flex",
+                                      display: "inline-flex",
                                       alignItems: "center",
                                       gap: 4,
-                                      padding: "4px 10px",
-                                      borderRadius: 6,
-                                      border: "none",
-                                      background: "rgba(34,197,94,0.15)",
-                                      color: "#22C55E",
                                       fontSize: 11,
-                                      cursor: "pointer",
+                                      color: ROSE_GOLD,
+                                      textDecoration: "none",
+                                      marginBottom: 12,
+                                    }}
+                                  >
+                                    <ExternalLink size={11} />
+                                    {r.source.length > 60 ? r.source.slice(0, 60) + "..." : r.source}
+                                  </a>
+                                )}
+
+                                {/* Action buttons row */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {/* Conference actions */}
+                                  {isConference && !isAccepted && !isRejected && (
+                                    <>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setShowConferenceModal(r.id) }}
+                                        style={{
+                                          display: "flex", alignItems: "center", gap: 4,
+                                          padding: "4px 10px", borderRadius: 6,
+                                          border: "none", background: "rgba(34,197,94,0.15)",
+                                          color: "#22C55E", fontSize: 11, cursor: "pointer",
+                                        }}
+                                      >
+                                        <CheckCircle size={12} />
+                                        Accept — Add to Calendar
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); rejectConference(r.id) }}
+                                        style={{
+                                          display: "flex", alignItems: "center", gap: 4,
+                                          padding: "4px 10px", borderRadius: 6,
+                                          border: "none", background: "rgba(239,68,68,0.12)",
+                                          color: "#EF4444", fontSize: 11, cursor: "pointer",
+                                        }}
+                                      >
+                                        <XCircle size={12} />
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {/* Marketing actions */}
+                                  {isMarketing && r.research.subcategory === "competitive_intel" && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); window.open("https://www.linkedin.com/feed/", "_blank") }}
+                                      style={{
+                                        display: "flex", alignItems: "center", gap: 4,
+                                        padding: "4px 10px", borderRadius: 6,
+                                        border: "none", background: "rgba(192,139,136,0.15)",
+                                        color: ROSE_GOLD, fontSize: 11, cursor: "pointer",
+                                      }}
+                                    >
+                                      <Megaphone size={12} />
+                                      Inspire New Post
+                                    </button>
+                                  )}
+
+                                  {isMarketing && (r.research.subcategory === "content_ideas" || r.research.subcategory === "repost_suggestions") && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); window.open("https://www.linkedin.com/feed/", "_blank") }}
+                                      style={{
+                                        display: "flex", alignItems: "center", gap: 4,
+                                        padding: "4px 10px", borderRadius: 6,
+                                        border: "none", background: "rgba(192,139,136,0.15)",
+                                        color: ROSE_GOLD, fontSize: 11, cursor: "pointer",
+                                      }}
+                                    >
+                                      <TrendingUp size={12} />
+                                      Open on LinkedIn
+                                    </button>
+                                  )}
+
+                                  {/* Deep Dive */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      window.open(`/ai?contactName=${encodeURIComponent(r.title)}`, "_blank")
+                                    }}
+                                    style={{
+                                      display: "flex", alignItems: "center", gap: 4,
+                                      padding: "4px 10px", borderRadius: 6,
+                                      border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                                      color: "#818CF8", fontSize: 11, cursor: "pointer",
+                                    }}
+                                  >
+                                    <Sparkles size={12} />
+                                    Deep Dive
+                                  </button>
+
+                                  {/* Create Task */}
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation()
+                                      try {
+                                        await fetch("/api/tasks", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            title: `[Intel] ${r.title}`,
+                                            description: r.summary,
+                                            tag: "compliance",
+                                            priority: r.relevance === "critical" ? "urgent" : r.relevance === "high" ? "high" : "medium",
+                                          }),
+                                        })
+                                        alert("Task created!")
+                                      } catch { /* empty */ }
+                                    }}
+                                    style={{
+                                      display: "flex", alignItems: "center", gap: 4,
+                                      padding: "4px 10px", borderRadius: 6,
+                                      border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                                      color: "#F59E0B", fontSize: 11, cursor: "pointer",
                                     }}
                                   >
                                     <CheckCircle size={12} />
-                                    Accept — Add to Calendar
+                                    Create Task
                                   </button>
+
+                                  {/* Add to Wiki */}
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); rejectConference(r.id) }}
+                                    onClick={async (e) => {
+                                      e.stopPropagation()
+                                      const slug = r.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 80)
+                                      try {
+                                        await fetch("/api/wiki", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            title: r.title,
+                                            slug,
+                                            content: { type: "doc", content: [
+                                              { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: r.title }] },
+                                              { type: "paragraph", content: [{ type: "text", text: r.summary }] },
+                                              ...(r.source ? [{ type: "paragraph", content: [{ type: "text", text: `Source: ${r.source}` }] }] : []),
+                                            ]},
+                                            category: "Intel",
+                                            icon: CATEGORY_ICONS[r.research.category] || "🔍",
+                                          }),
+                                        })
+                                        alert("Wiki page created!")
+                                      } catch { /* empty */ }
+                                    }}
                                     style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 4,
-                                      padding: "4px 10px",
-                                      borderRadius: 6,
-                                      border: "none",
-                                      background: "rgba(239,68,68,0.12)",
-                                      color: "#EF4444",
-                                      fontSize: 11,
-                                      cursor: "pointer",
+                                      display: "flex", alignItems: "center", gap: 4,
+                                      padding: "4px 10px", borderRadius: 6,
+                                      border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                                      color: "#5BB8A8", fontSize: 11, cursor: "pointer",
+                                    }}
+                                  >
+                                    <FileText size={12} />
+                                    Add to Wiki
+                                  </button>
+
+                                  {/* Dismiss */}
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); dismissResult(r.id) }}
+                                    style={{
+                                      display: "flex", alignItems: "center", gap: 4,
+                                      padding: "4px 10px", borderRadius: 6,
+                                      border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                                      color: TEXT_TERTIARY, fontSize: 11, cursor: "pointer",
                                     }}
                                   >
                                     <XCircle size={12} />
-                                    Reject
+                                    Dismiss
                                   </button>
-                                </>
-                              )}
 
-                              {/* Marketing actions */}
-                              {isMarketing && r.research.subcategory === "competitive_intel" && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); window.open("https://www.linkedin.com/feed/", "_blank") }}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 4,
-                                    padding: "4px 10px",
-                                    borderRadius: 6,
-                                    border: "none",
-                                    background: "rgba(192,139,136,0.15)",
-                                    color: ROSE_GOLD,
-                                    fontSize: 11,
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  <Megaphone size={12} />
-                                  Inspire New Post
-                                </button>
-                              )}
+                                  {/* Share via Telegram */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      const text = encodeURIComponent(`📊 Intel: ${r.title}\n\n${r.summary.slice(0, 300)}${r.summary.length > 300 ? "..." : ""}${r.source ? `\n\n🔗 ${r.source}` : ""}`)
+                                      window.open(`https://t.me/share/url?url=${encodeURIComponent(r.source || "")}&text=${text}`, "_blank")
+                                    }}
+                                    style={{
+                                      display: "flex", alignItems: "center", gap: 4,
+                                      padding: "4px 10px", borderRadius: 6,
+                                      border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                                      color: "#29B6F6", fontSize: 11, cursor: "pointer",
+                                    }}
+                                  >
+                                    <Send size={12} />
+                                    Telegram
+                                  </button>
 
-                              {isMarketing && (r.research.subcategory === "content_ideas" || r.research.subcategory === "repost_suggestions") && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); window.open("https://www.linkedin.com/feed/", "_blank") }}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 4,
-                                    padding: "4px 10px",
-                                    borderRadius: 6,
-                                    border: "none",
-                                    background: "rgba(192,139,136,0.15)",
-                                    color: ROSE_GOLD,
-                                    fontSize: 11,
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  <TrendingUp size={12} />
-                                  Open on LinkedIn
-                                </button>
-                              )}
-
-                              {/* Deep Dive → Sentinel */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  window.open(`/ai?contactName=${encodeURIComponent(r.title)}`, "_blank")
-                                }}
-                                style={{
-                                  display: "flex", alignItems: "center", gap: 4,
-                                  padding: "4px 10px", borderRadius: 6,
-                                  border: `1px solid ${CARD_BORDER}`, background: "transparent",
-                                  color: "#818CF8", fontSize: 11, cursor: "pointer",
-                                }}
-                              >
-                                <Sparkles size={12} />
-                                Deep Dive
-                              </button>
-
-                              {/* Create Task */}
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation()
-                                  try {
-                                    await fetch("/api/tasks", {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({
-                                        title: `[Intel] ${r.title}`,
-                                        description: r.summary,
-                                        tag: "compliance",
-                                        priority: r.relevance === "critical" ? "urgent" : r.relevance === "high" ? "high" : "medium",
-                                      }),
-                                    })
-                                    alert("Task created!")
-                                  } catch { /* empty */ }
-                                }}
-                                style={{
-                                  display: "flex", alignItems: "center", gap: 4,
-                                  padding: "4px 10px", borderRadius: 6,
-                                  border: `1px solid ${CARD_BORDER}`, background: "transparent",
-                                  color: "#F59E0B", fontSize: 11, cursor: "pointer",
-                                }}
-                              >
-                                <CheckCircle size={12} />
-                                Create Task
-                              </button>
-
-                              {/* Add to Wiki */}
-                              <button
-                                onClick={async (e) => {
-                                  e.stopPropagation()
-                                  const slug = r.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 80)
-                                  try {
-                                    await fetch("/api/wiki", {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({
-                                        title: r.title,
-                                        slug,
-                                        content: { type: "doc", content: [
-                                          { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: r.title }] },
-                                          { type: "paragraph", content: [{ type: "text", text: r.summary }] },
-                                          ...(r.source ? [{ type: "paragraph", content: [{ type: "text", text: `Source: ${r.source}` }] }] : []),
-                                        ]},
-                                        category: "Intel",
-                                        icon: CATEGORY_ICONS[r.research.category] || "🔍",
-                                      }),
-                                    })
-                                    alert("Wiki page created!")
-                                  } catch { /* empty */ }
-                                }}
-                                style={{
-                                  display: "flex", alignItems: "center", gap: 4,
-                                  padding: "4px 10px", borderRadius: 6,
-                                  border: `1px solid ${CARD_BORDER}`, background: "transparent",
-                                  color: "#5BB8A8", fontSize: 11, cursor: "pointer",
-                                }}
-                              >
-                                <FileText size={12} />
-                                Add to Wiki
-                              </button>
-
-                              {/* Read/unread toggle */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  fetch(`/api/intel/results/${r.id}`, {
-                                    method: "PATCH",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ read: !r.read }),
-                                  })
-                                  setResults((prev) => prev.map((x) => (x.id === r.id ? { ...x, read: !r.read } : x)))
-                                }}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 4,
-                                  padding: "4px 10px",
-                                  borderRadius: 6,
-                                  border: `1px solid ${CARD_BORDER}`,
-                                  background: "transparent",
-                                  color: TEXT_TERTIARY,
-                                  fontSize: 11,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {r.read ? <EyeOff size={12} /> : <Eye size={12} />}
-                                {r.read ? "Mark unread" : "Mark read"}
-                              </button>
-                            </div>
+                                  {/* Read/unread toggle */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      fetch(`/api/intel/results/${r.id}`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ read: !r.read }),
+                                      })
+                                      setResults((prev) => prev.map((x) => (x.id === r.id ? { ...x, read: !r.read } : x)))
+                                    }}
+                                    style={{
+                                      display: "flex", alignItems: "center", gap: 4,
+                                      padding: "4px 10px", borderRadius: 6,
+                                      border: `1px solid ${CARD_BORDER}`, background: "transparent",
+                                      color: TEXT_TERTIARY, fontSize: 11, cursor: "pointer",
+                                    }}
+                                  >
+                                    {r.read ? <EyeOff size={12} /> : <Eye size={12} />}
+                                    {r.read ? "Mark unread" : "Mark read"}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                )
-              })}
+                    )
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <div style={{
+          position: "fixed",
+          top: contextMenu.y,
+          left: contextMenu.x,
+          zIndex: 200,
+          background: "#0F1118",
+          border: `1px solid ${CARD_BORDER}`,
+          borderRadius: 8,
+          padding: 4,
+          minWidth: 140,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+        }}>
+          <button
+            onClick={() => { runResearch(contextMenu.id); setContextMenu(null) }}
+            style={{ width: "100%", padding: "6px 12px", borderRadius: 6, border: "none", background: "transparent", color: TEXT_SECONDARY, fontSize: 12, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}
+          >
+            <RefreshCw size={12} /> Run
+          </button>
+          <button
+            onClick={() => { archiveResearch(contextMenu.id); setContextMenu(null) }}
+            style={{ width: "100%", padding: "6px 12px", borderRadius: 6, border: "none", background: "transparent", color: "#818CF8", fontSize: 12, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}
+          >
+            <Archive size={12} /> Archive
+          </button>
+          <button
+            onClick={() => { setShowDeleteConfirm(contextMenu.id); setContextMenu(null) }}
+            style={{ width: "100%", padding: "6px 12px", borderRadius: 6, border: "none", background: "transparent", color: "#EF4444", fontSize: 12, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 6 }}
+          >
+            <Trash2 size={12} /> Delete
+          </button>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(8px)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={() => setShowDeleteConfirm(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 400,
+              background: "#0F1118",
+              border: `1px solid ${CARD_BORDER}`,
+              borderRadius: 12,
+              padding: 28,
+            }}
+          >
+            <div className="flex items-center gap-3" style={{ marginBottom: 16 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(239,68,68,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <AlertTriangle size={18} color="#EF4444" />
+              </div>
+              <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: 0 }}>
+                Confirm Delete
+              </h3>
+            </div>
+            <p style={{ fontSize: 13, color: TEXT_SECONDARY, marginBottom: 20, lineHeight: 1.6 }}>
+              {showDeleteConfirm === "completed"
+                ? "This will permanently delete all completed researches and their results. This action cannot be undone."
+                : "This will permanently delete this research and all its results. This action cannot be undone."}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                style={{
+                  flex: 1,
+                  padding: "8px 0",
+                  borderRadius: 8,
+                  border: `1px solid ${CARD_BORDER}`,
+                  background: "transparent",
+                  color: TEXT_SECONDARY,
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (showDeleteConfirm === "completed") {
+                    deleteAllCompleted()
+                  } else {
+                    deleteResearch(showDeleteConfirm)
+                    setShowDeleteConfirm(null)
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: "8px 0",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "rgba(239,68,68,0.2)",
+                  color: "#EF4444",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Research Modal */}
       {showModal && (

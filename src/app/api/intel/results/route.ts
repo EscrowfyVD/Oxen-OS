@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const read = searchParams.get("read")
   const limit = parseInt(searchParams.get("limit") || "50")
 
-  const where: Record<string, unknown> = {}
+  const where: Record<string, unknown> = { dismissed: false }
   if (researchId) where.researchId = researchId
   if (category) where.research = { category }
   if (relevance) where.relevance = relevance
