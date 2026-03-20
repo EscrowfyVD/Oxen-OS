@@ -104,18 +104,24 @@ export async function GET() {
       orderBy: { renewalDate: "asc" },
     })
 
+    // Flatten upcoming deadlines into a single sorted array
+    const upcomingDeadlines = [
+      ...policiesForReview.map((p) => ({ type: "policy_review", title: `${p.code}: ${p.title}`, date: p.reviewDate!.toISOString(), id: p.id })),
+      ...trainingsDue.map((t) => ({ type: "training_due", title: `${t.code}: ${t.title}`, date: t.dueDate!.toISOString(), id: t.id })),
+      ...licenseRenewals.map((l) => ({ type: "license_renewal", title: `${l.name} (${l.regulator})`, date: (l.renewalDate || l.expiryDate)!.toISOString(), id: l.id })),
+    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
     return NextResponse.json({
       policies: policyCounts,
-      risks: { counts: riskCounts, averageRiskScore },
-      training: { completed: trainingCompleted, total: trainingTotal, completionRate: trainingCompletionRate },
+      risks: riskCounts,
+      avgRiskScore: averageRiskScore,
+      trainingCompletionRate,
+      trainingTotal,
+      trainingCompleted,
       incidents: incidentCounts,
       licenses: licenseCounts,
       screening: screeningCounts,
-      upcomingDeadlines: {
-        policiesForReview,
-        trainingsDue,
-        licenseRenewals,
-      },
+      upcomingDeadlines,
     })
   } catch (error) {
     console.error("[Compliance Overview] Error:", error)

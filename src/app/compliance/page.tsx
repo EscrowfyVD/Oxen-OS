@@ -232,8 +232,21 @@ export default function CompliancePage() {
   const fetchOverview = useCallback(async () => {
     try {
       const res = await fetch("/api/compliance/overview")
+      if (!res.ok) return
       const data = await res.json()
-      setOverview(data)
+      if (data.error) return
+      setOverview({
+        policies: data.policies || {},
+        risks: data.risks || {},
+        avgRiskScore: data.avgRiskScore || 0,
+        trainingCompletionRate: data.trainingCompletionRate || 0,
+        trainingTotal: data.trainingTotal || 0,
+        trainingCompleted: data.trainingCompleted || 0,
+        incidents: data.incidents || {},
+        licenses: data.licenses || {},
+        screening: data.screening || {},
+        upcomingDeadlines: data.upcomingDeadlines || [],
+      })
     } catch { /* ignore */ }
   }, [])
 
@@ -269,7 +282,14 @@ export default function CompliancePage() {
     try {
       const res = await fetch(`/api/compliance/training?${params}`)
       const data = await res.json()
-      setTrainings(data.trainings || [])
+      // Map completionStats from API to the fields the UI expects
+      const mapped = (data.trainings || []).map((t: TrainingItem & { completionStats?: { total: number; completed: number; rate: number } }) => ({
+        ...t,
+        completionRate: t.completionStats?.rate ?? t.completionRate ?? 0,
+        completedCount: t.completionStats?.completed ?? t.completedCount ?? 0,
+        totalAssigned: t.completionStats?.total ?? t.totalAssigned ?? 0,
+      }))
+      setTrainings(mapped)
     } catch { /* ignore */ }
   }, [filterCategory, filterEntity])
 
