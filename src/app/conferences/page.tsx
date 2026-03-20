@@ -1173,7 +1173,10 @@ function AddConferenceModal({
         if (extracted.country && !country) setCountry(extracted.country)
         if (extracted.startDate && !startDate) setStartDate(extracted.startDate)
         if (extracted.endDate && !endDate) setEndDate(extracted.endDate)
-        if (extracted.description && !description) setDescription(extracted.description)
+        if (extracted.description) {
+          if (!description) setDescription(extracted.description)
+          else if (!description.includes(extracted.description)) setDescription(description + "\n\n" + extracted.description)
+        }
         if (extracted.ticketPrice && !budget.ticketCost) {
           setBudget((b) => ({ ...b, ticketCost: String(extracted.ticketPrice) }))
           setShowBudget(true)

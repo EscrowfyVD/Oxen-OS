@@ -37,27 +37,52 @@ export async function POST(request: Request) {
       .trim()
       .slice(0, 30000)
 
+    // If trimmed content is too short, the site is probably JS-rendered
+    const contentTooShort = trimmedHtml.length < 200
+
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const msg = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 1500,
+      max_tokens: 2000,
       messages: [
         {
           role: "user",
-          content: `Extract conference information from this website content. Return ONLY valid JSON with these fields (omit any you cannot confidently extract):
+          content: contentTooShort
+            ? `I have a conference website URL: ${url}
+The website content could not be fully loaded (likely JavaScript-rendered).
+Based on the URL and any context you can infer, generate a helpful JSON response.
+If you recognize this conference, provide real details. Otherwise, provide reasonable guesses based on the URL/domain.
+
+Return ONLY valid JSON:
 {
   "name": "Conference Name",
   "location": "City, Venue",
   "country": "Country",
   "startDate": "YYYY-MM-DD",
   "endDate": "YYYY-MM-DD",
-  "description": "2-3 sentence summary of what the conference is about",
+  "description": "2-3 sentence summary describing what this conference is about, its focus area, and target audience",
+  "ticketPrice": 0,
+  "keyTopics": ["topic1", "topic2"],
+  "expectedAttendees": 0,
+  "speakers": ["Speaker Name 1"]
+}`
+            : `Extract conference information from this website content. Return ONLY valid JSON with these fields (include ALL fields, especially description — generate a helpful 2-3 sentence summary even if not explicitly stated on the page):
+{
+  "name": "Conference Name",
+  "location": "City, Venue",
+  "country": "Country",
+  "startDate": "YYYY-MM-DD",
+  "endDate": "YYYY-MM-DD",
+  "description": "2-3 sentence summary of what the conference is about, its focus area, and who should attend",
   "ticketPrice": 0,
   "keyTopics": ["topic1", "topic2"],
   "expectedAttendees": 0,
   "speakers": ["Speaker Name 1"]
 }
 
+IMPORTANT: Always include a "description" field with a useful summary. Synthesize one from the available content.
+
+Website URL: ${url}
 Website content:
 ${trimmedHtml}`,
         },
