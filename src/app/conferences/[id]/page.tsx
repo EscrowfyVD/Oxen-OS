@@ -237,7 +237,7 @@ export default function ConferenceDetailPage() {
 
   /* ── Fetch employees for attendee dropdown ── */
   useEffect(() => {
-    fetch("/api/employees").then(r => r.json()).then(setEmployees).catch(() => {})
+    fetch("/api/employees").then(r => r.json()).then(data => setEmployees(data.employees ?? [])).catch(() => {})
   }, [])
 
   /* ── Fetch ROI when tab switches ── */

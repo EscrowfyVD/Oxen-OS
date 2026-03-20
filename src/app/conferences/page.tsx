@@ -187,12 +187,19 @@ export default function ConferencesPage() {
   }, [])
 
   const fetchTeam = useCallback(() => {
-    fetch("/api/team")
+    fetch("/api/employees")
       .then((r) => r.json())
       .then((data) => {
-        const members: TeamMember[] = data.employees ?? data.members ?? data ?? []
+        const emps = data.employees ?? data.members ?? data ?? []
+        const members: TeamMember[] = emps.map((e: Record<string, string>) => ({
+          id: e.id,
+          name: e.name,
+          email: e.email,
+          role: e.role ?? e.jobTitle ?? "",
+          image: e.image ?? e.avatarUrl ?? null,
+        }))
         setTeamMembers(members)
-        setFilterMembers(new Set(members.map((m) => m.id)))
+        setFilterMembers(new Set(members.map((m: TeamMember) => m.id)))
       })
       .catch(() => {})
   }, [])
