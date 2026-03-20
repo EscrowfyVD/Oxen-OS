@@ -63,7 +63,9 @@ export async function POST(request: Request) {
       currency, budgetNotes, source, intelResultId,
     } = body
 
-    if (!name || !location || !startDate || !endDate) {
+    const budget = body.budget
+
+    if (!name || !startDate || !endDate) {
       return NextResponse.json(
         { error: "Missing required fields: name, location, startDate, endDate" },
         { status: 400 },
@@ -82,20 +84,20 @@ export async function POST(request: Request) {
         website: website ?? null,
         description: description ?? null,
         status: status ?? "planned",
-        ticketCost: ticketCost ? parseFloat(ticketCost) : 0,
-        hotelCost: hotelCost ? parseFloat(hotelCost) : 0,
-        flightCost: flightCost ? parseFloat(flightCost) : 0,
-        mealsCost: mealsCost ? parseFloat(mealsCost) : 0,
-        otherCost: otherCost ? parseFloat(otherCost) : 0,
-        currency: currency ?? "EUR",
-        budgetNotes: budgetNotes ?? null,
+        ticketCost: parseFloat(ticketCost || budget?.ticketCost) || 0,
+        hotelCost: parseFloat(hotelCost || budget?.hotelCost) || 0,
+        flightCost: parseFloat(flightCost || budget?.flightCost) || 0,
+        mealsCost: parseFloat(mealsCost || budget?.mealsCost) || 0,
+        otherCost: parseFloat(otherCost || budget?.otherCost) || 0,
+        currency: currency || budget?.currency || "EUR",
+        budgetNotes: budgetNotes || budget?.notes || null,
         source: source ?? "manual",
         intelResultId: intelResultId ?? null,
         createdBy: userId,
         attendees: attendees?.length
           ? {
-              create: attendees.map((a: { employeeId: string; role?: string }) => ({
-                employeeId: a.employeeId,
+              create: attendees.map((a: { id?: string; employeeId?: string; role?: string }) => ({
+                employeeId: a.employeeId || a.id || "",
                 role: a.role ?? null,
               })),
             }

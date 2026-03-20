@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import {
-  ArrowLeft, Edit2, ExternalLink, Plus, X, Loader2,
+  ArrowLeft, Edit2, ExternalLink, Plus, X, Loader2, Copy,
   Star, Users, FileText, BarChart3, DollarSign, ClipboardList,
 } from "lucide-react"
 
@@ -66,6 +66,11 @@ type Conference = {
   source: string | null
   status: string
   budget: { tickets?: number; hotel?: number; flights?: number; meals?: number; other?: number } | null
+  ticketCost?: number
+  hotelCost?: number
+  flightCost?: number
+  mealsCost?: number
+  otherCost?: number
   budgetNotes: string | null
   attendees: Attendee[]
   contacts: Contact[]
@@ -76,8 +81,9 @@ type Conference = {
 type Attendee = {
   id: string
   employeeId: string
-  employeeName: string
+  employeeName?: string
   role: string
+  employee?: { id: string; name: string }
 }
 
 type Contact = {
@@ -227,7 +233,7 @@ export default function ConferenceDetailPage() {
       const res = await fetch(`/api/conferences/${id}`)
       if (!res.ok) throw new Error("Failed to fetch")
       const data = await res.json()
-      setConf(data)
+      setConf(data.conference ?? data)
     } catch { /* ignore */ } finally {
       setLoading(false)
     }
@@ -310,12 +316,46 @@ export default function ConferenceDetailPage() {
               </p>
             </div>
           </div>
-          <button
-            style={{ ...btnGhost, display: "flex", alignItems: "center", gap: 6 }}
-            onClick={() => router.push(`/conferences/${id}/edit`)}
-          >
-            <Edit2 size={14} /> Edit
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              style={{ ...btnGhost, display: "flex", alignItems: "center", gap: 6 }}
+              onClick={async () => {
+                if (!confirm("Duplicate this conference? All details except dates will be copied.")) return
+                try {
+                  const res = await fetch("/api/conferences", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      name: `${conf.name} (Copy)`,
+                      location: conf.location,
+                      website: conf.website,
+                      description: conf.description,
+                      source: conf.source,
+                      status: "planned",
+                      budgetNotes: conf.budgetNotes,
+                      ticketCost: conf.ticketCost,
+                      hotelCost: conf.hotelCost,
+                      flightCost: conf.flightCost,
+                      mealsCost: conf.mealsCost,
+                      otherCost: conf.otherCost,
+                    }),
+                  })
+                  if (!res.ok) throw new Error("Failed to duplicate")
+                  const data = await res.json()
+                  const newId = data.conference?.id ?? data.id
+                  if (newId) router.push(`/conferences/${newId}`)
+                } catch { /* ignore */ }
+              }}
+            >
+              <Copy size={14} /> Duplicate
+            </button>
+            <button
+              style={{ ...btnGhost, display: "flex", alignItems: "center", gap: 6 }}
+              onClick={() => router.push(`/conferences/${id}/edit`)}
+            >
+              <Edit2 size={14} /> Edit
+            </button>
+          </div>
         </div>
 
         {/* ── Tabs ── */}
@@ -473,13 +513,13 @@ function OverviewTab({ conf, employees, onUpdate }: { conf: Conference; employee
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{
-                    width: 32, height: 32, borderRadius: "50%", background: avatarColor(att.employeeName),
+                    width: 32, height: 32, borderRadius: "50%", background: avatarColor(att.employee?.name || att.employeeName || ""),
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 12, fontWeight: 600, color: "#fff",
                   }}>
-                    {initials(att.employeeName)}
+                    {initials(att.employee?.name || att.employeeName || "")}
                   </div>
-                  <span style={{ fontSize: 14, color: TEXT_PRIMARY }}>{att.employeeName}</span>
+                  <span style={{ fontSize: 14, color: TEXT_PRIMARY }}>{att.employee?.name || att.employeeName}</span>
                   <span style={{
                     fontSize: 11, padding: "2px 8px", borderRadius: 12,
                     background: roleColor.bg, color: roleColor.text,
@@ -513,22 +553,21 @@ function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void 
   const [savingNotes, setSavingNotes] = useState(false)
 
   const fields = [
-    { key: "tickets", label: "Tickets", emoji: "🎫" },
-    { key: "hotel", label: "Hotel", emoji: "🏨" },
-    { key: "flights", label: "Flights", emoji: "✈️" },
-    { key: "meals", label: "Meals", emoji: "🍽" },
-    { key: "other", label: "Other", emoji: "📦" },
+    { key: "ticketCost", label: "Tickets", emoji: "🎫" },
+    { key: "hotelCost", label: "Hotel", emoji: "🏨" },
+    { key: "flightCost", label: "Flights", emoji: "✈️" },
+    { key: "mealsCost", label: "Meals", emoji: "🍽" },
+    { key: "otherCost", label: "Other", emoji: "📦" },
   ]
 
-  const total = fields.reduce((sum, f) => sum + ((budget as Record<string, number>)[f.key] || 0), 0)
+  const total = fields.reduce((sum, f) => sum + ((conf as unknown as Record<string, number>)[f.key] || 0), 0)
   const attendeeCount = conf.attendees?.length || 0
 
   const saveBudgetField = async (key: string, value: number) => {
-    const newBudget = { ...budget, [key]: value }
     await fetch(`/api/conferences/${conf.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ budget: newBudget }),
+      body: JSON.stringify({ [key]: value }),
     })
     onUpdate()
   }
@@ -548,7 +587,7 @@ function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void 
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
         {fields.map(f => {
-          const val = (budget as Record<string, number>)[f.key] || 0
+          const val = (conf as unknown as Record<string, number>)[f.key] || 0
           const isEditing = editing === f.key
           return (
             <div key={f.key} style={{ ...cardStyle, cursor: "pointer", transition: "border-color 0.15s" }}

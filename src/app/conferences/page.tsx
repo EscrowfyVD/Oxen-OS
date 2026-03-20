@@ -15,6 +15,7 @@ const ROSE_HOVER = "#D4A5A2"
 const ROSE_DIM = "rgba(192,139,136,0.15)"
 
 type TabKey = "calendar" | "intel" | "reports"
+type CalView = "day" | "week" | "month" | "year"
 
 interface TeamMember {
   id: string
@@ -36,16 +37,15 @@ interface Conference {
   status?: string
   source?: string
   reportStatus?: string
-  attendees?: { employeeId: string; name: string; role: string }[]
-  budget?: {
-    ticketCost?: number
-    hotelCost?: number
-    flightCost?: number
-    mealsCost?: number
-    otherCost?: number
-    currency?: string
-    notes?: string
-  }
+  ticketCost?: number
+  hotelCost?: number
+  flightCost?: number
+  mealsCost?: number
+  otherCost?: number
+  currency?: string
+  attendees?: { employeeId: string; employee?: { id: string; name: string }; name?: string; role: string }[]
+  report?: { id: string } | null
+  _count?: { collectedContacts: number }
 }
 
 interface IntelResult {
@@ -61,6 +61,8 @@ interface IntelResult {
 
 /* ── Helpers ── */
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const ATTENDEE_ROLES = ["Speaker", "Attendee", "Booth", "Networking"]
 
 function getDaysInMonth(year: number, month: number) {
@@ -69,11 +71,7 @@ function getDaysInMonth(year: number, month: number) {
 
 function getFirstDayOfWeek(year: number, month: number) {
   const d = new Date(year, month, 1).getDay()
-  return d === 0 ? 6 : d - 1 // Mon=0
-}
-
-function formatDateShort(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  return d === 0 ? 6 : d - 1
 }
 
 function formatDateRange(start: string, end: string) {
@@ -86,6 +84,23 @@ function formatDateRange(start: string, end: string) {
 
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
+function getWeekStart(date: Date) {
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + diff)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function confTotalBudget(c: Conference) {
+  return (c.ticketCost || 0) + (c.hotelCost || 0) + (c.flightCost || 0) + (c.mealsCost || 0) + (c.otherCost || 0)
+}
+
+function attName(att: Conference["attendees"] extends (infer T)[] | undefined ? T : never) {
+  return att?.employee?.name || att?.name || "Unknown"
 }
 
 /* ── Styles ── */
@@ -145,6 +160,19 @@ const btnSecondary: React.CSSProperties = {
   transition: "all 0.15s",
 }
 
+const viewBtn = (active: boolean): React.CSSProperties => ({
+  padding: "6px 14px",
+  borderRadius: 6,
+  border: `1px solid ${active ? ROSE : CARD_BORDER}`,
+  background: active ? ROSE_DIM : "transparent",
+  color: active ? ROSE_HOVER : TEXT_TERTIARY,
+  fontSize: 12,
+  fontWeight: 500,
+  fontFamily: "'DM Sans', sans-serif",
+  cursor: "pointer",
+  transition: "all 0.15s",
+})
+
 /* ══════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ══════════════════════════════════════════════════════════════════ */
@@ -152,6 +180,7 @@ export default function ConferencesPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabKey>("calendar")
   const [showAddModal, setShowAddModal] = useState(false)
+  const [calView, setCalView] = useState<CalView>("month")
 
   // Data
   const [conferences, setConferences] = useState<Conference[]>([])
@@ -162,6 +191,7 @@ export default function ConferencesPage() {
   // Calendar state
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
   const [calYear, setCalYear] = useState(new Date().getFullYear())
+  const [calDay, setCalDay] = useState(new Date().getDate())
   const [filterMembers, setFilterMembers] = useState<Set<string>>(new Set())
 
   // Intel state
@@ -223,7 +253,7 @@ export default function ConferencesPage() {
     if (activeTab === "intel") fetchIntel()
   }, [activeTab, fetchIntel])
 
-  /* ── Calendar helpers ── */
+  /* ── Calendar navigation ── */
   const prevMonth = () => {
     if (calMonth === 0) { setCalMonth(11); setCalYear((y) => y - 1) }
     else setCalMonth((m) => m - 1)
@@ -232,40 +262,91 @@ export default function ConferencesPage() {
     if (calMonth === 11) { setCalMonth(0); setCalYear((y) => y + 1) }
     else setCalMonth((m) => m + 1)
   }
+  const goToday = () => {
+    const now = new Date()
+    setCalYear(now.getFullYear())
+    setCalMonth(now.getMonth())
+    setCalDay(now.getDate())
+  }
 
-  const monthLabel = new Date(calYear, calMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  const navPrev = () => {
+    if (calView === "year") setCalYear((y) => y - 1)
+    else if (calView === "month") prevMonth()
+    else if (calView === "week") {
+      const d = new Date(calYear, calMonth, calDay - 7)
+      setCalYear(d.getFullYear())
+      setCalMonth(d.getMonth())
+      setCalDay(d.getDate())
+    } else {
+      const d = new Date(calYear, calMonth, calDay - 1)
+      setCalYear(d.getFullYear())
+      setCalMonth(d.getMonth())
+      setCalDay(d.getDate())
+    }
+  }
+  const navNext = () => {
+    if (calView === "year") setCalYear((y) => y + 1)
+    else if (calView === "month") nextMonth()
+    else if (calView === "week") {
+      const d = new Date(calYear, calMonth, calDay + 7)
+      setCalYear(d.getFullYear())
+      setCalMonth(d.getMonth())
+      setCalDay(d.getDate())
+    } else {
+      const d = new Date(calYear, calMonth, calDay + 1)
+      setCalYear(d.getFullYear())
+      setCalMonth(d.getMonth())
+      setCalDay(d.getDate())
+    }
+  }
+
+  const headerLabel = calView === "year"
+    ? String(calYear)
+    : calView === "month"
+      ? `${MONTH_NAMES[calMonth]} ${calYear}`
+      : calView === "week"
+        ? (() => {
+            const ws = getWeekStart(new Date(calYear, calMonth, calDay))
+            const we = new Date(ws); we.setDate(we.getDate() + 6)
+            return `${MONTH_SHORT[ws.getMonth()]} ${ws.getDate()} – ${MONTH_SHORT[we.getMonth()]} ${we.getDate()}, ${we.getFullYear()}`
+          })()
+        : new Date(calYear, calMonth, calDay).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+
   const daysInMonth = getDaysInMonth(calYear, calMonth)
   const firstDay = getFirstDayOfWeek(calYear, calMonth)
 
-  // Filter conferences for current month view
+  // Filter conferences for visibility
   const monthStart = new Date(calYear, calMonth, 1)
   const monthEnd = new Date(calYear, calMonth, daysInMonth, 23, 59, 59)
 
-  const visibleConferences = conferences.filter((c) => {
+  const filterConf = (c: Conference, start: Date, end: Date) => {
     const cs = new Date(c.startDate)
     const ce = new Date(c.endDate)
-    if (cs > monthEnd || ce < monthStart) return false
-    // Attendee filter
+    if (cs > end || ce < start) return false
     if (filterMembers.size < teamMembers.length && c.attendees) {
       const hasMatch = c.attendees.some((a) => filterMembers.has(a.employeeId))
       if (!hasMatch) return false
     }
     return true
-  })
+  }
 
-  // Get conferences for a specific day
-  const getConfsForDay = (day: number) => {
-    const date = new Date(calYear, calMonth, day)
-    return visibleConferences.filter((c) => {
-      const cs = new Date(c.startDate)
-      const ce = new Date(c.endDate)
-      cs.setHours(0, 0, 0, 0)
-      ce.setHours(23, 59, 59, 999)
-      return date >= cs && date <= ce
+  const visibleConferences = conferences.filter((c) => filterConf(c, monthStart, monthEnd))
+
+  const getConfsForDay = (day: number, month?: number, year?: number) => {
+    const m = month ?? calMonth
+    const y = year ?? calYear
+    const date = new Date(y, m, day)
+    return conferences.filter((c) => {
+      const cs = new Date(c.startDate); cs.setHours(0, 0, 0, 0)
+      const ce = new Date(c.endDate); ce.setHours(23, 59, 59, 999)
+      if (date < cs || date > ce) return false
+      if (filterMembers.size < teamMembers.length && c.attendees) {
+        return c.attendees.some((a) => filterMembers.has(a.employeeId))
+      }
+      return true
     })
   }
 
-  // Check if day is start of conference (for rendering bar start)
   const isConfStart = (conf: Conference, day: number) => {
     const cs = new Date(conf.startDate)
     const date = new Date(calYear, calMonth, day)
@@ -304,7 +385,7 @@ export default function ConferencesPage() {
           description: acceptModalItem.description || acceptModalItem.summary,
           website: acceptModalItem.url,
           source: "intel",
-          attendees: acceptAttendees,
+          attendees: acceptAttendees.map((a) => ({ id: a.id, role: a.role })),
         }),
       })
       setAcceptedIds((prev) => new Set(prev).add(acceptModalItem.id))
@@ -315,7 +396,7 @@ export default function ConferencesPage() {
 
   /* ── Reports helpers ── */
   const getReportStatus = (conf: Conference) => {
-    if (conf.reportStatus === "submitted") return { label: "Report submitted", color: "#22C55E", bg: "rgba(34,197,94,0.1)" }
+    if (conf.report) return { label: "Report submitted", color: "#22C55E", bg: "rgba(34,197,94,0.1)" }
     const endPlusSeven = new Date(conf.endDate)
     endPlusSeven.setDate(endPlusSeven.getDate() + 7)
     if (new Date() > endPlusSeven) return { label: "Overdue", color: "#EF4444", bg: "rgba(239,68,68,0.1)" }
@@ -323,6 +404,16 @@ export default function ConferencesPage() {
   }
 
   const pastConferences = conferences.filter((c) => new Date(c.endDate) < new Date())
+
+  // Sort conferences: upcoming first, past dimmed
+  const sortedConferences = [...conferences].sort((a, b) => {
+    const now = new Date()
+    const aFuture = new Date(a.startDate) >= now
+    const bFuture = new Date(b.startDate) >= now
+    if (aFuture && !bFuture) return -1
+    if (!aFuture && bFuture) return 1
+    return new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+  })
 
   /* ── Tab bar ── */
   const tabs: { key: TabKey; label: string }[] = [
@@ -385,184 +476,470 @@ export default function ConferencesPage() {
       <div style={{ padding: "24px 32px" }}>
         {/* ═══════ TAB 1: CALENDAR ═══════ */}
         {activeTab === "calendar" && (
-          <div>
-            {/* Team member filter pills */}
-            {teamMembers.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 20 }}>
-                <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginRight: 4 }}>
-                  Filter:
-                </span>
-                {teamMembers.map((m) => {
-                  const active = filterMembers.has(m.id)
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => toggleMember(m.id)}
-                      style={{
-                        padding: "5px 12px",
-                        borderRadius: 20,
-                        border: `1px solid ${active ? ROSE : CARD_BORDER}`,
-                        background: active ? ROSE_DIM : "transparent",
-                        color: active ? ROSE_HOVER : TEXT_TERTIARY,
-                        fontSize: 12,
-                        fontFamily: "'DM Sans', sans-serif",
-                        fontWeight: 500,
-                        cursor: "pointer",
-                        transition: "all 0.15s",
-                      }}
-                    >
-                      {m.name}
-                    </button>
-                  )
-                })}
+          <div style={{ display: "flex", gap: 24 }}>
+            {/* Left panel — conference list */}
+            <div style={{ width: 280, flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 12, fontFamily: "'DM Sans', sans-serif" }}>
+                All Conferences ({conferences.length})
               </div>
-            )}
-
-            {/* Month header */}
-            <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
-              <div className="flex items-center gap-3">
-                <button onClick={prevMonth} style={btnSecondary}>&#8592;</button>
-                <span style={{ fontSize: 16, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", minWidth: 180, textAlign: "center" }}>
-                  {monthLabel}
-                </span>
-                <button onClick={nextMonth} style={btnSecondary}>&#8594;</button>
-              </div>
-              <button
-                onClick={() => { setCalMonth(new Date().getMonth()); setCalYear(new Date().getFullYear()) }}
-                style={btnSecondary}
-              >
-                Today
-              </button>
-            </div>
-
-            {/* Calendar grid */}
-            <div style={cardStyle}>
-              {/* Day headers */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(7, 1fr)",
-                  borderBottom: `1px solid ${CARD_BORDER}`,
-                }}
-              >
-                {DAYS.map((d) => (
-                  <div
-                    key={d}
-                    style={{
-                      padding: "10px 8px",
-                      textAlign: "center",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: TEXT_TERTIARY,
-                      fontFamily: "'DM Sans', sans-serif",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    {d}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {sortedConferences.length === 0 && !loading && (
+                  <div style={{ padding: 20, textAlign: "center", color: TEXT_TERTIARY, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
+                    No conferences yet
                   </div>
-                ))}
-              </div>
-
-              {/* Day cells */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(7, 1fr)",
-                }}
-              >
-                {/* Empty cells for offset */}
-                {Array.from({ length: firstDay }).map((_, i) => (
-                  <div
-                    key={`empty-${i}`}
-                    style={{
-                      minHeight: 90,
-                      borderRight: `1px solid ${CARD_BORDER}`,
-                      borderBottom: `1px solid ${CARD_BORDER}`,
-                      background: "rgba(255,255,255,0.01)",
-                    }}
-                  />
-                ))}
-
-                {Array.from({ length: daysInMonth }).map((_, i) => {
-                  const day = i + 1
-                  const confs = getConfsForDay(day)
-                  const isToday = isSameDay(new Date(calYear, calMonth, day), new Date())
-
+                )}
+                {sortedConferences.map((c) => {
+                  const isPast = new Date(c.endDate) < new Date()
+                  const budget = confTotalBudget(c)
                   return (
                     <div
-                      key={day}
+                      key={c.id}
+                      onClick={() => router.push(`/conferences/${c.id}`)}
                       style={{
-                        minHeight: 90,
-                        padding: "6px 6px 4px",
-                        borderRight: `1px solid ${CARD_BORDER}`,
-                        borderBottom: `1px solid ${CARD_BORDER}`,
-                        background: isToday ? "rgba(192,139,136,0.04)" : "transparent",
-                        position: "relative",
+                        ...cardStyle,
+                        padding: "14px 16px",
+                        cursor: "pointer",
+                        opacity: isPast ? 0.5 : 1,
+                        transition: "all 0.15s",
+                        borderLeft: `3px solid ${isPast ? TEXT_TERTIARY : ROSE}`,
                       }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.opacity = "1" }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = CARD_BG; e.currentTarget.style.opacity = isPast ? "0.5" : "1" }}
                     >
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: isToday ? 700 : 400,
-                          color: isToday ? ROSE : TEXT_SECONDARY,
-                          fontFamily: "'DM Sans', sans-serif",
-                          marginBottom: 4,
-                        }}
-                      >
-                        {day}
+                      <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {c.name}
                       </div>
-
-                      {/* Conference bars */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        {confs.map((conf) => {
-                          const showLabel = isConfStart(conf, day)
-                          return (
-                            <div
-                              key={conf.id}
-                              onClick={() => router.push(`/conferences/${conf.id}`)}
-                              style={{
-                                background: ROSE_DIM,
-                                borderRadius: showLabel ? 4 : 0,
-                                borderTopLeftRadius: showLabel ? 4 : 0,
-                                borderBottomLeftRadius: showLabel ? 4 : 0,
-                                padding: "3px 6px",
-                                cursor: "pointer",
-                                transition: "background 0.15s",
-                                overflow: "hidden",
-                                whiteSpace: "nowrap",
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(192,139,136,0.25)")}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = ROSE_DIM)}
-                            >
-                              {showLabel && (
-                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                  <span style={{ fontSize: 10, fontWeight: 600, color: ROSE_HOVER, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {conf.name}
-                                  </span>
-                                  {conf.location && (
-                                    <span style={{ fontSize: 9, color: TEXT_TERTIARY, overflow: "hidden", textOverflow: "ellipsis" }}>
-                                      {conf.location}
-                                    </span>
-                                  )}
-                                  {conf.attendees && conf.attendees.length > 0 && (
-                                    <span style={{ fontSize: 9, color: TEXT_TERTIARY, flexShrink: 0 }}>
-                                      ({conf.attendees.length})
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                              {!showLabel && (
-                                <div style={{ height: 14 }} />
-                              )}
-                            </div>
-                          )
-                        })}
+                      <div style={{ fontSize: 11, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 2 }}>
+                        {c.location && `${c.location} · `}{formatDateRange(c.startDate, c.endDate)}
+                      </div>
+                      <div className="flex items-center justify-between" style={{ marginTop: 6 }}>
+                        <span style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+                          {c.attendees?.length || 0} attendee{(c.attendees?.length || 0) !== 1 ? "s" : ""}
+                        </span>
+                        {budget > 0 && (
+                          <span style={{ fontSize: 10, color: ROSE, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
+                            €{budget.toLocaleString()}
+                          </span>
+                        )}
                       </div>
                     </div>
                   )
                 })}
               </div>
+            </div>
+
+            {/* Right — calendar area */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* Filter pills */}
+              {teamMembers.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap" style={{ marginBottom: 16 }}>
+                  <span style={{ fontSize: 11, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginRight: 4 }}>
+                    Filter:
+                  </span>
+                  {teamMembers.map((m) => {
+                    const active = filterMembers.has(m.id)
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => toggleMember(m.id)}
+                        style={{
+                          padding: "5px 12px",
+                          borderRadius: 20,
+                          border: `1px solid ${active ? ROSE : CARD_BORDER}`,
+                          background: active ? ROSE_DIM : "transparent",
+                          color: active ? ROSE_HOVER : TEXT_TERTIARY,
+                          fontSize: 12,
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontWeight: 500,
+                          cursor: "pointer",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        {m.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* View toggle + navigation */}
+              <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
+                <div className="flex items-center gap-3">
+                  <button onClick={navPrev} style={btnSecondary}>&#8592;</button>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", minWidth: 220, textAlign: "center" }}>
+                    {headerLabel}
+                  </span>
+                  <button onClick={navNext} style={btnSecondary}>&#8594;</button>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(["day", "week", "month", "year"] as CalView[]).map((v) => (
+                    <button key={v} onClick={() => setCalView(v)} style={viewBtn(calView === v)}>
+                      {v.charAt(0).toUpperCase() + v.slice(1)}
+                    </button>
+                  ))}
+                  <button onClick={goToday} style={{ ...btnSecondary, marginLeft: 8 }}>Today</button>
+                </div>
+              </div>
+
+              {/* ─── MONTH VIEW ─── */}
+              {calView === "month" && (
+                <div style={cardStyle}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: `1px solid ${CARD_BORDER}` }}>
+                    {DAYS.map((d) => (
+                      <div key={d} style={{ padding: "10px 8px", textAlign: "center", fontSize: 11, fontWeight: 600, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+                    {Array.from({ length: firstDay }).map((_, i) => (
+                      <div key={`e-${i}`} style={{ minHeight: 100, borderRight: `1px solid ${CARD_BORDER}`, borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.01)" }} />
+                    ))}
+                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                      const day = i + 1
+                      const confs = getConfsForDay(day)
+                      const isToday = isSameDay(new Date(calYear, calMonth, day), new Date())
+                      return (
+                        <div
+                          key={day}
+                          style={{
+                            minHeight: 100,
+                            padding: "6px 6px 4px",
+                            borderRight: `1px solid ${CARD_BORDER}`,
+                            borderBottom: `1px solid ${CARD_BORDER}`,
+                            background: isToday ? "rgba(192,139,136,0.04)" : "transparent",
+                            position: "relative",
+                          }}
+                          onClick={() => { setCalDay(day); setCalView("day") }}
+                        >
+                          <div style={{ fontSize: 12, fontWeight: isToday ? 700 : 400, color: isToday ? ROSE : TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 4, cursor: "pointer" }}>
+                            {day}
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            {confs.map((conf) => {
+                              const show = isConfStart(conf, day)
+                              const cs = new Date(conf.startDate); cs.setHours(0, 0, 0, 0)
+                              const ce = new Date(conf.endDate); ce.setHours(23, 59, 59, 999)
+                              const thisDate = new Date(calYear, calMonth, day)
+                              const isStart = isSameDay(cs, thisDate) || (day === 1 && cs < monthStart)
+                              const isEnd = isSameDay(ce, thisDate) || (day === daysInMonth && ce > monthEnd)
+                              const dayOfWeek = (firstDay + day - 1) % 7
+                              const isWeekStart = dayOfWeek === 0
+
+                              return (
+                                <div
+                                  key={conf.id}
+                                  onClick={(e) => { e.stopPropagation(); router.push(`/conferences/${conf.id}`) }}
+                                  style={{
+                                    background: ROSE_DIM,
+                                    borderLeft: (isStart || isWeekStart) ? `3px solid ${ROSE}` : "none",
+                                    borderTopLeftRadius: (isStart || isWeekStart) ? 4 : 0,
+                                    borderBottomLeftRadius: (isStart || isWeekStart) ? 4 : 0,
+                                    borderTopRightRadius: isEnd ? 4 : 0,
+                                    borderBottomRightRadius: isEnd ? 4 : 0,
+                                    padding: "3px 6px",
+                                    cursor: "pointer",
+                                    transition: "background 0.15s",
+                                    overflow: "hidden",
+                                    whiteSpace: "nowrap",
+                                    marginLeft: (isStart || isWeekStart) ? 0 : -6,
+                                    marginRight: isEnd ? 0 : -6,
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(192,139,136,0.25)")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = ROSE_DIM)}
+                                >
+                                  {(show || isWeekStart) ? (
+                                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                      <span style={{ fontSize: 10, fontWeight: 600, color: ROSE_HOVER, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                        {conf.name}
+                                      </span>
+                                      {conf.location && (
+                                        <span style={{ fontSize: 9, color: TEXT_TERTIARY, overflow: "hidden", textOverflow: "ellipsis" }}>
+                                          {conf.location}
+                                        </span>
+                                      )}
+                                      {conf.attendees && conf.attendees.length > 0 && (
+                                        <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
+                                          {conf.attendees.slice(0, 3).map((a, idx) => (
+                                            <div key={idx} style={{
+                                              width: 14, height: 14, borderRadius: "50%", background: ROSE,
+                                              display: "flex", alignItems: "center", justifyContent: "center",
+                                              fontSize: 7, fontWeight: 700, color: "#fff",
+                                            }}>
+                                              {attName(a).charAt(0)}
+                                            </div>
+                                          ))}
+                                          {conf.attendees.length > 3 && (
+                                            <span style={{ fontSize: 8, color: TEXT_TERTIARY, marginLeft: 2 }}>+{conf.attendees.length - 3}</span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div style={{ height: 14 }} />
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ─── YEAR VIEW ─── */}
+              {calView === "year" && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+                  {Array.from({ length: 12 }).map((_, mi) => {
+                    const dim = getDaysInMonth(calYear, mi)
+                    const fd = getFirstDayOfWeek(calYear, mi)
+                    const mStart = new Date(calYear, mi, 1)
+                    const mEnd = new Date(calYear, mi, dim, 23, 59, 59)
+                    const mConfs = conferences.filter((c) => {
+                      const cs = new Date(c.startDate)
+                      const ce = new Date(c.endDate)
+                      return !(cs > mEnd || ce < mStart)
+                    })
+                    return (
+                      <div key={mi} style={{ ...cardStyle, padding: 12 }}>
+                        <div
+                          onClick={() => { setCalMonth(mi); setCalView("month") }}
+                          style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 8, cursor: "pointer" }}
+                        >
+                          {MONTH_NAMES[mi]}
+                        </div>
+                        {/* Mini month grid */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 1, marginBottom: 6 }}>
+                          {DAYS.map((d) => (
+                            <div key={d} style={{ fontSize: 8, color: TEXT_TERTIARY, textAlign: "center" }}>{d.charAt(0)}</div>
+                          ))}
+                          {Array.from({ length: fd }).map((_, i) => <div key={`ye-${i}`} />)}
+                          {Array.from({ length: dim }).map((_, di) => {
+                            const d = di + 1
+                            const hasConf = mConfs.some((c) => {
+                              const cs = new Date(c.startDate); cs.setHours(0, 0, 0, 0)
+                              const ce = new Date(c.endDate); ce.setHours(23, 59, 59, 999)
+                              const date = new Date(calYear, mi, d)
+                              return date >= cs && date <= ce
+                            })
+                            const today = isSameDay(new Date(calYear, mi, d), new Date())
+                            return (
+                              <div
+                                key={d}
+                                style={{
+                                  fontSize: 8,
+                                  textAlign: "center",
+                                  padding: "1px 0",
+                                  borderRadius: 2,
+                                  color: hasConf ? "#fff" : today ? ROSE : TEXT_TERTIARY,
+                                  background: hasConf ? ROSE : today ? "rgba(192,139,136,0.15)" : "transparent",
+                                  cursor: hasConf ? "pointer" : "default",
+                                  fontWeight: today || hasConf ? 700 : 400,
+                                }}
+                                onClick={() => {
+                                  if (hasConf) {
+                                    setCalMonth(mi)
+                                    setCalDay(d)
+                                    setCalView("day")
+                                  }
+                                }}
+                              >
+                                {d}
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {/* Conference bars for this month */}
+                        {mConfs.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
+                            {mConfs.slice(0, 3).map((c) => (
+                              <div
+                                key={c.id}
+                                onClick={() => router.push(`/conferences/${c.id}`)}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 4,
+                                  padding: "3px 6px", borderRadius: 4,
+                                  background: ROSE_DIM, borderLeft: `2px solid ${ROSE}`,
+                                  cursor: "pointer", overflow: "hidden",
+                                }}
+                                title={`${c.name} — ${c.location || ""} — ${formatDateRange(c.startDate, c.endDate)}`}
+                              >
+                                <span style={{ fontSize: 9, fontWeight: 600, color: ROSE_HOVER, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {c.name}
+                                </span>
+                                {c.attendees && c.attendees.length > 0 && (
+                                  <div style={{ display: "flex", gap: 1, flexShrink: 0 }}>
+                                    {c.attendees.slice(0, 2).map((a, idx) => (
+                                      <div key={idx} style={{ width: 10, height: 10, borderRadius: "50%", background: ROSE, fontSize: 6, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                        {attName(a).charAt(0)}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {mConfs.length > 3 && (
+                              <span style={{ fontSize: 9, color: TEXT_TERTIARY, paddingLeft: 6 }}>+{mConfs.length - 3} more</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* ─── WEEK VIEW ─── */}
+              {calView === "week" && (() => {
+                const ws = getWeekStart(new Date(calYear, calMonth, calDay))
+                const weekDays = Array.from({ length: 7 }).map((_, i) => {
+                  const d = new Date(ws)
+                  d.setDate(d.getDate() + i)
+                  return d
+                })
+                return (
+                  <div style={cardStyle}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: `1px solid ${CARD_BORDER}` }}>
+                      {weekDays.map((d, i) => {
+                        const today = isSameDay(d, new Date())
+                        return (
+                          <div key={i} style={{ padding: "10px 8px", textAlign: "center", borderRight: i < 6 ? `1px solid ${CARD_BORDER}` : "none" }}>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                              {DAYS[i]}
+                            </div>
+                            <div style={{ fontSize: 18, fontWeight: today ? 700 : 400, color: today ? ROSE : TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>
+                              {d.getDate()}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {/* All-day conference blocks */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", minHeight: 140, borderBottom: `1px solid ${CARD_BORDER}` }}>
+                      {weekDays.map((d, i) => {
+                        const dayConfs = getConfsForDay(d.getDate(), d.getMonth(), d.getFullYear())
+                        return (
+                          <div key={i} style={{ padding: 6, borderRight: i < 6 ? `1px solid ${CARD_BORDER}` : "none", display: "flex", flexDirection: "column", gap: 4 }}>
+                            {dayConfs.map((c) => {
+                              const cs = new Date(c.startDate); cs.setHours(0, 0, 0, 0)
+                              const isStart = isSameDay(cs, d) || i === 0
+                              return (
+                                <div
+                                  key={c.id}
+                                  onClick={() => router.push(`/conferences/${c.id}`)}
+                                  style={{
+                                    background: ROSE_DIM,
+                                    borderLeft: isStart ? `3px solid ${ROSE}` : "none",
+                                    borderRadius: isStart ? 4 : 0,
+                                    padding: "4px 6px",
+                                    cursor: "pointer",
+                                    overflow: "hidden",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(192,139,136,0.25)")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = ROSE_DIM)}
+                                >
+                                  {isStart ? (
+                                    <span style={{ fontSize: 10, fontWeight: 600, color: ROSE_HOVER, fontFamily: "'DM Sans', sans-serif" }}>
+                                      {c.name}
+                                    </span>
+                                  ) : (
+                                    <div style={{ height: 14 }} />
+                                  )}
+                                </div>
+                              )
+                            })}
+                            {dayConfs.length === 0 && (
+                              <div style={{ fontSize: 10, color: TEXT_TERTIARY, textAlign: "center", paddingTop: 20 }}>—</div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {/* Time slots placeholder */}
+                    <div style={{ padding: "20px 16px", textAlign: "center", color: TEXT_TERTIARY, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
+                      Team calendar events will appear here when Google Calendar sync is enabled
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* ─── DAY VIEW ─── */}
+              {calView === "day" && (() => {
+                const dayDate = new Date(calYear, calMonth, calDay)
+                const dayConfs = getConfsForDay(calDay)
+                return (
+                  <div style={cardStyle}>
+                    {/* All-day conference banners */}
+                    {dayConfs.length > 0 && (
+                      <div style={{ padding: 12, borderBottom: `1px solid ${CARD_BORDER}` }}>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                          Conferences
+                        </div>
+                        {dayConfs.map((c) => (
+                          <div
+                            key={c.id}
+                            onClick={() => router.push(`/conferences/${c.id}`)}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 12,
+                              padding: "10px 14px", borderRadius: 8,
+                              background: ROSE_DIM, borderLeft: `3px solid ${ROSE}`,
+                              cursor: "pointer", marginBottom: 6,
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(192,139,136,0.2)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = ROSE_DIM)}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: ROSE_HOVER, fontFamily: "'DM Sans', sans-serif" }}>
+                                {c.name}
+                              </div>
+                              <div style={{ fontSize: 11, color: TEXT_SECONDARY, marginTop: 2 }}>
+                                {c.location && `${c.location} · `}{formatDateRange(c.startDate, c.endDate)}
+                              </div>
+                            </div>
+                            {c.attendees && c.attendees.length > 0 && (
+                              <div style={{ display: "flex", gap: 2 }}>
+                                {c.attendees.slice(0, 4).map((a, idx) => (
+                                  <div key={idx} style={{
+                                    width: 24, height: 24, borderRadius: "50%", background: ROSE,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 10, fontWeight: 700, color: "#fff",
+                                  }}>
+                                    {attName(a).charAt(0)}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {dayConfs.length === 0 && (
+                      <div style={{ padding: "40px 20px", textAlign: "center" }}>
+                        <div style={{ fontSize: 14, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+                          No conferences on {dayDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                        </div>
+                      </div>
+                    )}
+                    {/* Time slots */}
+                    <div style={{ padding: "12px 16px" }}>
+                      {Array.from({ length: 12 }).map((_, i) => {
+                        const hour = i + 8
+                        return (
+                          <div key={hour} style={{ display: "flex", borderTop: `1px solid ${CARD_BORDER}`, minHeight: 48 }}>
+                            <div style={{ width: 60, padding: "8px 8px 8px 0", fontSize: 11, color: TEXT_TERTIARY, textAlign: "right", fontFamily: "'DM Sans', sans-serif" }}>
+                              {hour.toString().padStart(2, "0")}:00
+                            </div>
+                            <div style={{ flex: 1, padding: "8px 12px" }} />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </div>
         )}
@@ -574,10 +951,7 @@ export default function ConferencesPage() {
               <h2 style={{ fontSize: 18, fontWeight: 400, fontFamily: "'Bellfair', serif", color: TEXT_PRIMARY, margin: 0 }}>
                 Suggested Conferences
               </h2>
-              <button
-                onClick={() => setShowRejected((v) => !v)}
-                style={{ ...btnSecondary, fontSize: 11 }}
-              >
+              <button onClick={() => setShowRejected((v) => !v)} style={{ ...btnSecondary, fontSize: 11 }}>
                 {showRejected ? "Hide Rejected" : "Show Rejected"}
               </button>
             </div>
@@ -597,100 +971,30 @@ export default function ConferencesPage() {
                   const isAccepted = acceptedIds.has(item.id)
                   const isRejected = rejectedIds.has(item.id)
                   const isExpanded = expandedIntel.has(item.id)
-
                   return (
-                    <div
-                      key={item.id}
-                      style={{
-                        ...cardStyle,
-                        opacity: isRejected ? 0.45 : 1,
-                        transition: "opacity 0.2s",
-                      }}
-                    >
+                    <div key={item.id} style={{ ...cardStyle, opacity: isRejected ? 0.45 : 1, transition: "opacity 0.2s" }}>
                       <div style={{ padding: "16px 20px" }}>
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-3" style={{ marginBottom: 6 }}>
-                              <h3 style={{ fontSize: 14, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", margin: 0 }}>
-                                {item.title}
-                              </h3>
-                              {isAccepted && (
-                                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 10px", borderRadius: 4, background: "rgba(34,197,94,0.12)", color: "#22C55E", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                                  Accepted
-                                </span>
-                              )}
-                              {isRejected && (
-                                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 10px", borderRadius: 4, background: "rgba(239,68,68,0.12)", color: "#EF4444", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                                  Rejected
-                                </span>
-                              )}
+                              <h3 style={{ fontSize: 14, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", margin: 0 }}>{item.title}</h3>
+                              {isAccepted && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 10px", borderRadius: 4, background: "rgba(34,197,94,0.12)", color: "#22C55E", textTransform: "uppercase", letterSpacing: "0.04em" }}>Accepted</span>}
+                              {isRejected && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 10px", borderRadius: 4, background: "rgba(239,68,68,0.12)", color: "#EF4444", textTransform: "uppercase", letterSpacing: "0.04em" }}>Rejected</span>}
                             </div>
                             <p style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5, margin: 0 }}>
-                              {isExpanded
-                                ? (item.description || item.summary || "No description available.")
-                                : (item.description || item.summary || "No description available.").slice(0, 180) + ((item.description || item.summary || "").length > 180 ? "..." : "")
-                              }
+                              {isExpanded ? (item.description || item.summary || "No description.") : (item.description || item.summary || "No description.").slice(0, 180) + ((item.description || item.summary || "").length > 180 ? "..." : "")}
                             </p>
                             {item.url && isExpanded && (
-                              <a
-                                href={item.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ fontSize: 11, color: ROSE, fontFamily: "'DM Sans', sans-serif", marginTop: 8, display: "inline-block" }}
-                              >
+                              <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: ROSE, fontFamily: "'DM Sans', sans-serif", marginTop: 8, display: "inline-block" }}>
                                 {item.url}
                               </a>
                             )}
                           </div>
-
-                          {/* Action buttons */}
                           {!isAccepted && !isRejected && (
                             <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                onClick={() => openAcceptModal(item)}
-                                style={{
-                                  padding: "6px 14px",
-                                  borderRadius: 6,
-                                  border: "1px solid rgba(34,197,94,0.3)",
-                                  background: "rgba(34,197,94,0.08)",
-                                  color: "#22C55E",
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  fontFamily: "'DM Sans', sans-serif",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Accept
-                              </button>
-                              <button
-                                onClick={() => setRejectedIds((prev) => new Set(prev).add(item.id))}
-                                style={{
-                                  padding: "6px 14px",
-                                  borderRadius: 6,
-                                  border: "1px solid rgba(239,68,68,0.3)",
-                                  background: "rgba(239,68,68,0.08)",
-                                  color: "#EF4444",
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  fontFamily: "'DM Sans', sans-serif",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Reject
-                              </button>
-                              <button
-                                onClick={() => setExpandedIntel((prev) => {
-                                  const next = new Set(prev)
-                                  if (next.has(item.id)) next.delete(item.id)
-                                  else next.add(item.id)
-                                  return next
-                                })}
-                                style={{
-                                  ...btnSecondary,
-                                  padding: "6px 12px",
-                                  fontSize: 11,
-                                }}
-                              >
+                              <button onClick={() => openAcceptModal(item)} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid rgba(34,197,94,0.3)", background: "rgba(34,197,94,0.08)", color: "#22C55E", fontSize: 11, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>Accept</button>
+                              <button onClick={() => setRejectedIds((prev) => new Set(prev).add(item.id))} style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.08)", color: "#EF4444", fontSize: 11, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>Reject</button>
+                              <button onClick={() => setExpandedIntel((prev) => { const n = new Set(prev); if (n.has(item.id)) n.delete(item.id); else n.add(item.id); return n })} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 11 }}>
                                 {isExpanded ? "Less" : "More Info"}
                               </button>
                             </div>
@@ -707,85 +1011,34 @@ export default function ConferencesPage() {
         {/* ═══════ TAB 3: REPORTS ═══════ */}
         {activeTab === "reports" && (
           <div>
-            <h2 style={{ fontSize: 18, fontWeight: 400, fontFamily: "'Bellfair', serif", color: TEXT_PRIMARY, margin: 0, marginBottom: 20 }}>
-              Conference Reports
-            </h2>
-
+            <h2 style={{ fontSize: 18, fontWeight: 400, fontFamily: "'Bellfair', serif", color: TEXT_PRIMARY, margin: 0, marginBottom: 20 }}>Conference Reports</h2>
             {pastConferences.length === 0 && (
               <div style={{ ...cardStyle, padding: "40px 24px", textAlign: "center" }}>
-                <p style={{ color: TEXT_TERTIARY, fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>
-                  No past conferences found. Completed conferences will appear here for reporting.
-                </p>
+                <p style={{ color: TEXT_TERTIARY, fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>No past conferences found.</p>
               </div>
             )}
-
             {pastConferences.length > 0 && (
               <div style={cardStyle}>
-                {/* Table header */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "2fr 1fr 1fr 80px 160px",
-                    gap: 12,
-                    padding: "12px 20px",
-                    borderBottom: `1px solid ${CARD_BORDER}`,
-                    background: "rgba(255,255,255,0.02)",
-                  }}
-                >
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 80px 160px", gap: 12, padding: "12px 20px", borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.02)" }}>
                   {["Conference", "Dates", "Location", "Team", "Status"].map((h) => (
-                    <span key={h} style={{ fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                      {h}
-                    </span>
+                    <span key={h} style={{ fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</span>
                   ))}
                 </div>
-
-                {/* Table rows */}
                 {pastConferences.map((conf) => {
                   const status = getReportStatus(conf)
                   return (
                     <div
                       key={conf.id}
                       onClick={() => router.push(`/conferences/${conf.id}`)}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "2fr 1fr 1fr 80px 160px",
-                        gap: 12,
-                        padding: "14px 20px",
-                        borderBottom: `1px solid ${CARD_BORDER}`,
-                        cursor: "pointer",
-                        transition: "background 0.15s",
-                      }}
+                      style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 80px 160px", gap: 12, padding: "14px 20px", borderBottom: `1px solid ${CARD_BORDER}`, cursor: "pointer", transition: "background 0.15s" }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                     >
-                      <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {conf.name}
-                      </span>
-                      <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif" }}>
-                        {formatDateRange(conf.startDate, conf.endDate)}
-                      </span>
-                      <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {conf.location || "—"}
-                      </span>
-                      <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif" }}>
-                        {conf.attendees?.length ?? 0}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          padding: "4px 12px",
-                          borderRadius: 6,
-                          background: status.bg,
-                          color: status.color,
-                          fontFamily: "'DM Sans', sans-serif",
-                          display: "inline-block",
-                          textAlign: "center",
-                          width: "fit-content",
-                        }}
-                      >
-                        {status.label}
-                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{conf.name}</span>
+                      <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif" }}>{formatDateRange(conf.startDate, conf.endDate)}</span>
+                      <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{conf.location || "—"}</span>
+                      <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif" }}>{conf.attendees?.length ?? 0}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 12px", borderRadius: 6, background: status.bg, color: status.color, fontFamily: "'DM Sans', sans-serif", display: "inline-block", textAlign: "center", width: "fit-content" }}>{status.label}</span>
                     </div>
                   )
                 })}
@@ -797,74 +1050,27 @@ export default function ConferencesPage() {
 
       {/* ═══════ ACCEPT INTEL MODAL ═══════ */}
       {acceptModalItem && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-          }}
-          onClick={() => setAcceptModalItem(null)}
-        >
-          <div
-            style={{
-              ...cardStyle,
-              width: "100%",
-              maxWidth: 520,
-              maxHeight: "80vh",
-              overflowY: "auto",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={() => setAcceptModalItem(null)}>
+          <div style={{ ...cardStyle, width: "100%", maxWidth: 520, maxHeight: "80vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: "20px 24px", borderBottom: `1px solid ${CARD_BORDER}` }}>
-              <h3 style={{ fontSize: 16, fontWeight: 400, fontFamily: "'Bellfair', serif", color: TEXT_PRIMARY, margin: 0 }}>
-                Accept Conference
-              </h3>
-              <p style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>
-                {acceptModalItem.title}
-              </p>
+              <h3 style={{ fontSize: 16, fontWeight: 400, fontFamily: "'Bellfair', serif", color: TEXT_PRIMARY, margin: 0 }}>Accept Conference</h3>
+              <p style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>{acceptModalItem.title}</p>
             </div>
-
             <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 18 }}>
-              {/* Dates */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Start Date</label>
-                  <input
-                    type="date"
-                    value={acceptDates.start}
-                    onChange={(e) => setAcceptDates((d) => ({ ...d, start: e.target.value }))}
-                    style={{ ...inputStyle, colorScheme: "dark" }}
-                  />
+                  <input type="date" value={acceptDates.start} onChange={(e) => setAcceptDates((d) => ({ ...d, start: e.target.value }))} style={{ ...inputStyle, colorScheme: "dark" }} />
                 </div>
                 <div>
                   <label style={labelStyle}>End Date</label>
-                  <input
-                    type="date"
-                    value={acceptDates.end}
-                    onChange={(e) => setAcceptDates((d) => ({ ...d, end: e.target.value }))}
-                    style={{ ...inputStyle, colorScheme: "dark" }}
-                  />
+                  <input type="date" value={acceptDates.end} onChange={(e) => setAcceptDates((d) => ({ ...d, end: e.target.value }))} style={{ ...inputStyle, colorScheme: "dark" }} />
                 </div>
               </div>
-
-              {/* Location */}
               <div>
                 <label style={labelStyle}>Location</label>
-                <input
-                  type="text"
-                  value={acceptLocation}
-                  onChange={(e) => setAcceptLocation(e.target.value)}
-                  placeholder="City, Country"
-                  style={inputStyle}
-                />
+                <input type="text" value={acceptLocation} onChange={(e) => setAcceptLocation(e.target.value)} placeholder="City, Country" style={inputStyle} />
               </div>
-
-              {/* Attendees */}
               <div>
                 <label style={labelStyle}>Attendees</label>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -873,35 +1079,12 @@ export default function ConferencesPage() {
                     return (
                       <div key={m.id} className="flex items-center gap-3">
                         <label className="flex items-center gap-2" style={{ cursor: "pointer", flex: 1, minWidth: 0 }}>
-                          <input
-                            type="checkbox"
-                            checked={!!selected}
-                            onChange={() => {
-                              setAcceptAttendees((prev) =>
-                                selected
-                                  ? prev.filter((a) => a.id !== m.id)
-                                  : [...prev, { id: m.id, role: "Attendee" }]
-                              )
-                            }}
-                            style={{ accentColor: ROSE }}
-                          />
-                          <span style={{ fontSize: 13, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>
-                            {m.name}
-                          </span>
+                          <input type="checkbox" checked={!!selected} onChange={() => setAcceptAttendees((prev) => selected ? prev.filter((a) => a.id !== m.id) : [...prev, { id: m.id, role: "Attendee" }])} style={{ accentColor: ROSE }} />
+                          <span style={{ fontSize: 13, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>{m.name}</span>
                         </label>
                         {selected && (
-                          <select
-                            value={selected.role}
-                            onChange={(e) =>
-                              setAcceptAttendees((prev) =>
-                                prev.map((a) => (a.id === m.id ? { ...a, role: e.target.value } : a))
-                              )
-                            }
-                            style={{ ...inputStyle, width: 140, padding: "5px 8px", fontSize: 12 }}
-                          >
-                            {ATTENDEE_ROLES.map((r) => (
-                              <option key={r} value={r}>{r}</option>
-                            ))}
+                          <select value={selected.role} onChange={(e) => setAcceptAttendees((prev) => prev.map((a) => (a.id === m.id ? { ...a, role: e.target.value } : a)))} style={{ ...inputStyle, width: 140, padding: "5px 8px", fontSize: 12 }}>
+                            {ATTENDEE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                           </select>
                         )}
                       </div>
@@ -909,19 +1092,9 @@ export default function ConferencesPage() {
                   })}
                 </div>
               </div>
-
-              {/* Actions */}
               <div className="flex items-center justify-end gap-3" style={{ marginTop: 8 }}>
                 <button onClick={() => setAcceptModalItem(null)} style={btnSecondary}>Cancel</button>
-                <button
-                  onClick={submitAccept}
-                  disabled={!acceptDates.start || !acceptDates.end}
-                  style={{
-                    ...btnPrimary,
-                    opacity: (!acceptDates.start || !acceptDates.end) ? 0.5 : 1,
-                    cursor: (!acceptDates.start || !acceptDates.end) ? "not-allowed" : "pointer",
-                  }}
-                >
+                <button onClick={submitAccept} disabled={!acceptDates.start || !acceptDates.end} style={{ ...btnPrimary, opacity: (!acceptDates.start || !acceptDates.end) ? 0.5 : 1, cursor: (!acceptDates.start || !acceptDates.end) ? "not-allowed" : "pointer" }}>
                   Create Conference
                 </button>
               </div>
@@ -937,7 +1110,7 @@ export default function ConferencesPage() {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   ADD CONFERENCE MODAL (extracted to keep main component cleaner)
+   ADD CONFERENCE MODAL
    ══════════════════════════════════════════════════════════════════ */
 function AddConferenceModal({
   teamMembers,
@@ -967,6 +1140,8 @@ function AddConferenceModal({
     notes: "",
   })
   const [submitting, setSubmitting] = useState(false)
+  const [autoFilling, setAutoFilling] = useState(false)
+  const [autoFillMsg, setAutoFillMsg] = useState("")
 
   const toggleAttendee = (id: string) => {
     setAttendees((prev) => {
@@ -977,6 +1152,39 @@ function AddConferenceModal({
 
   const updateRole = (id: string, role: string) => {
     setAttendees((prev) => prev.map((a) => (a.id === id ? { ...a, role } : a)))
+  }
+
+  /* ── Auto-fill from website ── */
+  const handleAutoFill = async () => {
+    if (!website || autoFilling) return
+    setAutoFilling(true)
+    setAutoFillMsg("Sentinel is reading the conference website...")
+    try {
+      const res = await fetch("/api/conferences/auto-fill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: website }),
+      })
+      if (!res.ok) throw new Error("Failed")
+      const { extracted } = await res.json()
+      if (extracted) {
+        if (extracted.name && !name) setName(extracted.name)
+        if (extracted.location && !location) setLocation(extracted.location)
+        if (extracted.country && !country) setCountry(extracted.country)
+        if (extracted.startDate && !startDate) setStartDate(extracted.startDate)
+        if (extracted.endDate && !endDate) setEndDate(extracted.endDate)
+        if (extracted.description && !description) setDescription(extracted.description)
+        if (extracted.ticketPrice && !budget.ticketCost) {
+          setBudget((b) => ({ ...b, ticketCost: String(extracted.ticketPrice) }))
+          setShowBudget(true)
+        }
+        setAutoFillMsg("Auto-filled from website — review and adjust if needed")
+      }
+    } catch {
+      setAutoFillMsg("Could not extract data from this website")
+    }
+    setAutoFilling(false)
+    setTimeout(() => setAutoFillMsg(""), 5000)
   }
 
   const handleSubmit = async () => {
@@ -991,7 +1199,7 @@ function AddConferenceModal({
         endDate,
         website,
         description,
-        attendees,
+        attendees: attendees.map((a) => ({ id: a.id, role: a.role })),
       }
       if (showBudget) {
         body.budget = {
@@ -1016,61 +1224,19 @@ function AddConferenceModal({
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.7)",
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-      }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
       onClick={onClose}
     >
       <div
-        style={{
-          background: CARD_BG,
-          border: `1px solid ${CARD_BORDER}`,
-          borderRadius: 16,
-          width: "100%",
-          maxWidth: 620,
-          maxHeight: "85vh",
-          overflowY: "auto",
-        }}
+        style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 16, width: "100%", maxWidth: 620, maxHeight: "85vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          className="flex items-center justify-between"
-          style={{
-            padding: "20px 24px",
-            borderBottom: `1px solid ${CARD_BORDER}`,
-            background: "rgba(192,139,136,0.03)",
-            position: "sticky",
-            top: 0,
-            zIndex: 10,
-          }}
-        >
-          <h3 style={{ fontSize: 18, fontWeight: 400, fontFamily: "'Bellfair', serif", color: "#fff", margin: 0 }}>
-            Add Conference
-          </h3>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              color: TEXT_TERTIARY,
-              fontSize: 18,
-              cursor: "pointer",
-              padding: 4,
-            }}
-          >
-            &#x2715;
-          </button>
+        <div className="flex items-center justify-between" style={{ padding: "20px 24px", borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(192,139,136,0.03)", position: "sticky", top: 0, zIndex: 10 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 400, fontFamily: "'Bellfair', serif", color: "#fff", margin: 0 }}>Add Conference</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: TEXT_TERTIARY, fontSize: 18, cursor: "pointer", padding: 4 }}>&#x2715;</button>
         </div>
 
-        {/* Form body */}
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Name */}
           <div>
@@ -1102,68 +1268,64 @@ function AddConferenceModal({
             </div>
           </div>
 
-          {/* Website */}
+          {/* Website + Auto-fill */}
           <div>
             <label style={labelStyle}>Website</label>
-            <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." style={inputStyle} />
+            <div className="flex items-center gap-2">
+              <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." style={{ ...inputStyle, flex: 1 }} />
+              {website && (
+                <button
+                  onClick={handleAutoFill}
+                  disabled={autoFilling}
+                  style={{
+                    padding: "9px 14px",
+                    background: autoFilling ? "rgba(192,139,136,0.1)" : "rgba(192,139,136,0.08)",
+                    border: `1px solid ${ROSE}`,
+                    borderRadius: 8,
+                    color: ROSE_HOVER,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    fontFamily: "'DM Sans', sans-serif",
+                    cursor: autoFilling ? "wait" : "pointer",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {autoFilling ? "Reading..." : "🤖 Auto-fill"}
+                </button>
+              )}
+            </div>
+            {autoFillMsg && (
+              <div style={{ marginTop: 6, fontSize: 11, color: autoFillMsg.includes("Could not") ? "#EF4444" : "#22C55E", fontFamily: "'DM Sans', sans-serif" }}>
+                {autoFillMsg}
+              </div>
+            )}
           </div>
 
           {/* Description */}
           <div>
             <label style={labelStyle}>Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Conference details, goals, notes..."
-              rows={3}
-              style={{ ...inputStyle, resize: "vertical" }}
-            />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Conference details, goals, notes..." rows={3} style={{ ...inputStyle, resize: "vertical" }} />
           </div>
 
           {/* Attendees */}
           <div>
             <label style={labelStyle}>Attendees</label>
-            <div
-              style={{
-                border: `1px solid ${CARD_BORDER}`,
-                borderRadius: 8,
-                padding: 12,
-                maxHeight: 200,
-                overflowY: "auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
+            <div style={{ border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: 12, maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
               {teamMembers.length === 0 && (
-                <span style={{ fontSize: 12, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
-                  No team members loaded.
-                </span>
+                <span style={{ fontSize: 12, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>No team members loaded.</span>
               )}
               {teamMembers.map((m) => {
                 const selected = attendees.find((a) => a.id === m.id)
                 return (
                   <div key={m.id} className="flex items-center gap-3">
                     <label className="flex items-center gap-2" style={{ cursor: "pointer", flex: 1, minWidth: 0 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!selected}
-                        onChange={() => toggleAttendee(m.id)}
-                        style={{ accentColor: ROSE }}
-                      />
-                      <span style={{ fontSize: 13, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>
-                        {m.name}
-                      </span>
+                      <input type="checkbox" checked={!!selected} onChange={() => toggleAttendee(m.id)} style={{ accentColor: ROSE }} />
+                      <span style={{ fontSize: 13, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>{m.name}</span>
                     </label>
                     {selected && (
-                      <select
-                        value={selected.role}
-                        onChange={(e) => updateRole(m.id, e.target.value)}
-                        style={{ ...inputStyle, width: 140, padding: "5px 8px", fontSize: 12 }}
-                      >
-                        {ATTENDEE_ROLES.map((r) => (
-                          <option key={r} value={r}>{r}</option>
-                        ))}
+                      <select value={selected.role} onChange={(e) => updateRole(m.id, e.target.value)} style={{ ...inputStyle, width: 140, padding: "5px 8px", fontSize: 12 }}>
+                        {ATTENDEE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
                     )}
                   </div>
@@ -1176,23 +1338,9 @@ function AddConferenceModal({
           <div>
             <button
               onClick={() => setShowBudget((v) => !v)}
-              style={{
-                background: "none",
-                border: "none",
-                color: ROSE,
-                fontSize: 12,
-                fontWeight: 600,
-                fontFamily: "'DM Sans', sans-serif",
-                cursor: "pointer",
-                padding: 0,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
+              style={{ background: "none", border: "none", color: ROSE, fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}
             >
-              <span style={{ transform: showBudget ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>
-                &#9654;
-              </span>
+              <span style={{ transform: showBudget ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>&#9654;</span>
               Budget Details
             </button>
           </div>
@@ -1234,13 +1382,7 @@ function AddConferenceModal({
               </div>
               <div>
                 <label style={labelStyle}>Budget Notes</label>
-                <textarea
-                  value={budget.notes}
-                  onChange={(e) => setBudget((b) => ({ ...b, notes: e.target.value }))}
-                  placeholder="Additional budget notes..."
-                  rows={2}
-                  style={{ ...inputStyle, resize: "vertical" }}
-                />
+                <textarea value={budget.notes} onChange={(e) => setBudget((b) => ({ ...b, notes: e.target.value }))} placeholder="Additional budget notes..." rows={2} style={{ ...inputStyle, resize: "vertical" }} />
               </div>
             </div>
           )}
@@ -1251,11 +1393,7 @@ function AddConferenceModal({
             <button
               onClick={handleSubmit}
               disabled={!name || !startDate || !endDate || submitting}
-              style={{
-                ...btnPrimary,
-                opacity: (!name || !startDate || !endDate || submitting) ? 0.5 : 1,
-                cursor: (!name || !startDate || !endDate || submitting) ? "not-allowed" : "pointer",
-              }}
+              style={{ ...btnPrimary, opacity: (!name || !startDate || !endDate || submitting) ? 0.5 : 1, cursor: (!name || !startDate || !endDate || submitting) ? "not-allowed" : "pointer" }}
               onMouseEnter={(e) => { if (name && startDate && endDate && !submitting) e.currentTarget.style.background = ROSE_HOVER }}
               onMouseLeave={(e) => { e.currentTarget.style.background = ROSE }}
             >

@@ -88,9 +88,9 @@ export async function PATCH(
       await prisma.conferenceAttendee.deleteMany({ where: { conferenceId: id } })
       if (attendees.length > 0) {
         await prisma.conferenceAttendee.createMany({
-          data: attendees.map((a: { employeeId: string; role?: string }) => ({
+          data: attendees.map((a: { id?: string; employeeId?: string; role?: string }) => ({
             conferenceId: id,
-            employeeId: a.employeeId,
+            employeeId: a.employeeId || a.id || "",
             role: a.role ?? null,
           })),
         })
