@@ -7,6 +7,7 @@ import { useState, useEffect } from "react"
 import {
   LayoutDashboard,
   Shield,
+  ShieldCheck,
   CheckSquare,
   CalendarDays,
   BookOpen,
@@ -50,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null, pageKey: "crm" },
   { label: "Intel", href: "/intel", icon: Search, badge: null, count: null },
   { label: "Conferences", href: "/conferences", icon: Tent, badge: null, count: null },
+  { label: "Compliance", href: "/compliance", icon: ShieldCheck, badge: null, count: null, pageKey: "compliance" },
 ]
 
 export default function Sidebar() {

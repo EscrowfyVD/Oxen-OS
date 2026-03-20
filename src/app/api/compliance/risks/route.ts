@@ -1,0 +1,103 @@
+import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+import { logActivity } from "@/lib/activity"
+
+export async function GET(request: Request) {
+  try {
+    const session = await auth()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { searchParams } = new URL(request.url)
+    const category = searchParams.get("category")
+    const status = searchParams.get("status")
+    const minScore = searchParams.get("minScore")
+    const entityId = searchParams.get("entityId")
+
+    const where: Record<string, unknown> = {}
+    if (category && category !== "all") where.category = category
+    if (status && status !== "all") where.status = status
+    if (entityId && entityId !== "all") where.entityId = entityId
+    if (minScore) where.riskScore = { gte: parseInt(minScore) }
+
+    const risks = await prisma.risk.findMany({
+      where,
+      include: {
+        entity: { select: { id: true, name: true } },
+      },
+      orderBy: { riskScore: "desc" },
+    })
+
+    return NextResponse.json({ risks })
+  } catch (error) {
+    console.error("[Compliance Risks GET] Error:", error)
+    return NextResponse.json({ error: "Failed to fetch risks" }, { status: 500 })
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const session = await auth()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const body = await request.json()
+    const { title, category, description, likelihood, impact, status, mitigation, residualLikelihood, residualImpact, ownerId, entityId, reviewDate } = body
+
+    if (!title || !category) {
+      return NextResponse.json({ error: "title and category are required" }, { status: 400 })
+    }
+
+    const userId = session.user?.id ?? session.user?.email ?? "unknown"
+
+    // Auto-generate code RISK-001
+    const lastRisk = await prisma.risk.findFirst({
+      where: { code: { startsWith: "RISK-" } },
+      orderBy: { code: "desc" },
+    })
+    let nextNum = 1
+    if (lastRisk) {
+      const match = lastRisk.code.match(/RISK-(\d+)/)
+      if (match) nextNum = parseInt(match[1]) + 1
+    }
+    const code = `RISK-${String(nextNum).padStart(3, "0")}`
+
+    const lh = likelihood ?? 3
+    const imp = impact ?? 3
+    const riskScore = lh * imp
+
+    const resLh = residualLikelihood ?? null
+    const resImp = residualImpact ?? null
+    const residualScore = resLh && resImp ? resLh * resImp : null
+
+    const risk = await prisma.risk.create({
+      data: {
+        title,
+        code,
+        category,
+        description: description || null,
+        likelihood: lh,
+        impact: imp,
+        riskScore,
+        status: status || "open",
+        mitigation: mitigation || null,
+        residualLikelihood: resLh,
+        residualImpact: resImp,
+        residualScore,
+        ownerId: ownerId || null,
+        entityId: entityId || null,
+        reviewDate: reviewDate ? new Date(reviewDate) : null,
+        createdBy: userId,
+      },
+      include: {
+        entity: { select: { id: true, name: true } },
+      },
+    })
+
+    logActivity("risk_created", `Created risk ${code}: ${title} (score: ${riskScore})`, userId, entityId || undefined, `/compliance/risks`)
+
+    return NextResponse.json({ risk }, { status: 201 })
+  } catch (error) {
+    console.error("[Compliance Risks POST] Error:", error)
+    return NextResponse.json({ error: "Failed to create risk" }, { status: 500 })
+  }
+}

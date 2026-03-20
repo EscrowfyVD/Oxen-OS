@@ -90,6 +90,7 @@ model Employee {
   reviewedLeaves  LeaveRequest[]  @relation("ReviewerLeaveRequests")
   leaveBalances   LeaveBalance[]
   conferenceAttendances ConferenceAttendee[]
+  trainingCompletions   TrainingCompletion[]
 }
 
 // ─── Tasks (Kanban) ───
@@ -125,6 +126,11 @@ model OrgEntity {
   children     OrgEntity[] @relation("OrgStructure")
   employees    Employee[]
   driveLinks   DriveLink[]
+  policies     Policy[]
+  risks        Risk[]
+  trainings    Training[]
+  licenses     RegulatoryLicense[]
+  incidents    ComplianceIncident[]
   order        Int         @default(0)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -780,6 +786,172 @@ model ConferenceReport {
   submittedBy     String
   submittedAt     DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
+}
+
+// ─── Compliance Module ───
+
+model Policy {
+  id            String          @id @default(cuid())
+  title         String
+  code          String          @unique // e.g. "AML-001"
+  category      String          // "aml", "kyc", "data_protection", "operational", "conduct", "it_security", "hr"
+  status        String          @default("draft") // "draft", "pending_review", "approved", "active", "archived", "expired"
+  priority      String          @default("medium") // "critical", "high", "medium", "low"
+  description   String?         @db.Text
+  content       String?         @db.Text
+  entityId      String?
+  entity        OrgEntity?      @relation(fields: [entityId], references: [id])
+  ownerId       String?         // employee email who owns this policy
+  reviewerId    String?         // employee email who reviews/approves
+  approvedBy    String?
+  approvedAt    DateTime?
+  effectiveDate DateTime?
+  expiryDate    DateTime?
+  reviewDate    DateTime?       // next review due date
+  tags          String[]
+  createdBy     String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  versions      PolicyVersion[]
+}
+
+model PolicyVersion {
+  id        String   @id @default(cuid())
+  policyId  String
+  policy    Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  version   Int
+  content   String   @db.Text
+  changelog String?  @db.Text
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
+model Risk {
+  id              String    @id @default(cuid())
+  title           String
+  code            String    @unique // e.g. "RISK-001"
+  category        String    // "operational", "financial", "regulatory", "cyber", "reputational", "strategic", "compliance"
+  description     String?   @db.Text
+  likelihood      Int       @default(3) // 1-5
+  impact          Int       @default(3) // 1-5
+  riskScore       Int       @default(9) // likelihood * impact
+  status          String    @default("open") // "open", "mitigating", "accepted", "closed", "monitoring"
+  mitigation      String?   @db.Text
+  residualLikelihood Int?
+  residualImpact     Int?
+  residualScore      Int?
+  ownerId         String?   // employee email
+  entityId        String?
+  entity          OrgEntity? @relation(fields: [entityId], references: [id])
+  reviewDate      DateTime?
+  lastAssessedAt  DateTime?
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Training {
+  id            String               @id @default(cuid())
+  title         String
+  code          String               @unique // e.g. "TRN-001"
+  category      String               // "aml", "kyc", "data_protection", "conduct", "it_security", "orias", "general"
+  description   String?              @db.Text
+  provider      String?              // e.g. "Internal", "ACAMS", "ORIAS"
+  durationHours Float?
+  frequency     String?              // "annual", "biannual", "quarterly", "one_time"
+  mandatory     Boolean              @default(true)
+  entityId      String?
+  entity        OrgEntity?           @relation(fields: [entityId], references: [id])
+  dueDate       DateTime?
+  status        String               @default("active") // "active", "archived"
+  createdBy     String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  completions   TrainingCompletion[]
+}
+
+model TrainingCompletion {
+  id            String    @id @default(cuid())
+  trainingId    String
+  training      Training  @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  employeeId    String
+  employee      Employee  @relation(fields: [employeeId], references: [id])
+  completedAt   DateTime?
+  expiresAt     DateTime?
+  score         Float?    // percentage score if applicable
+  certificateUrl String?
+  status        String    @default("pending") // "pending", "completed", "expired", "failed"
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([trainingId, employeeId])
+}
+
+model RegulatoryLicense {
+  id              String    @id @default(cuid())
+  name            String
+  code            String?   // license number
+  regulator       String    // "ACPR", "FCA", "BaFin", etc.
+  entityId        String?
+  entity          OrgEntity? @relation(fields: [entityId], references: [id])
+  entityName      String?   // denormalized for display
+  type            String?   // "EMI", "PI", "agent", "distributor", "SEMI"
+  status          String    @default("active") // "active", "pending", "suspended", "expired", "revoked"
+  grantedDate     DateTime?
+  expiryDate      DateTime?
+  renewalDate     DateTime?
+  conditions      String?   @db.Text
+  notes           String?   @db.Text
+  documentUrl     String?
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ComplianceIncident {
+  id              String    @id @default(cuid())
+  title           String
+  code            String    @unique // e.g. "INC-001"
+  type            String    // "sar", "breach", "complaint", "near_miss", "audit_finding", "regulatory_inquiry"
+  severity        String    @default("medium") // "critical", "high", "medium", "low"
+  status          String    @default("open") // "open", "investigating", "reported", "resolved", "closed"
+  description     String?   @db.Text
+  rootCause       String?   @db.Text
+  remediation     String?   @db.Text
+  entityId        String?
+  entity          OrgEntity? @relation(fields: [entityId], references: [id])
+  reportedBy      String
+  assignedTo      String?
+  reportedToRegulator Boolean @default(false)
+  regulatorRef    String?   // regulator reference number
+  reportedAt      DateTime?
+  resolvedAt      DateTime?
+  financialImpact Float?
+  currency        String    @default("EUR")
+  tags            String[]
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ScreeningRecord {
+  id            String    @id @default(cuid())
+  subjectName   String
+  subjectType   String    // "individual", "company"
+  screeningType String    // "sanctions", "pep", "adverse_media", "kyc"
+  result        String    @default("clear") // "clear", "match", "potential_match", "pending"
+  provider      String?   // "ComplyAdvantage", "Refinitiv", "manual"
+  matchDetails  Json?     // details of any matches
+  contactId     String?
+  riskLevel     String?   // "high", "medium", "low"
+  notes         String?   @db.Text
+  screenedBy    String
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  nextScreeningDate DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 // ─── Drive Links (Google Drive integration) ───

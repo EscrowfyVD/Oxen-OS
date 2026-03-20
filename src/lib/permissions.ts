@@ -41,6 +41,7 @@ export const PAGE_ACCESS: Record<string, DeptAccessRule> = {
   marketing: { minRole: "admin", allowDepartments: ["Marketing"] },
   crm: { denyDepartments: ["Compliance"] },
   intel: { minRole: "manager" },
+  compliance: { minRole: "manager", allowDepartments: ["Compliance", "Legal"] },
 }
 
 /**
