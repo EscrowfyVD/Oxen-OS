@@ -89,6 +89,7 @@ model Employee {
   leaveRequests   LeaveRequest[]  @relation("EmployeeLeaveRequests")
   reviewedLeaves  LeaveRequest[]  @relation("ReviewerLeaveRequests")
   leaveBalances   LeaveBalance[]
+  conferenceAttendances ConferenceAttendee[]
 }
 
 // ─── Tasks (Kanban) ───
@@ -298,6 +299,7 @@ model Contact {
   outreachSequences OutreachSequence[]
   tasks           Task[]
   driveLinks      DriveLink[]       @relation("ContactDriveLinks")
+  conferenceContacts ConferenceContact[]
 }
 
 model Interaction {
@@ -695,6 +697,91 @@ model IntelResult {
   createdAt     DateTime      @default(now())
 }
 
+// ── Conferences ──
+
+model Conference {
+  id              String   @id @default(cuid())
+  name            String
+  location        String
+  country         String?
+  startDate       DateTime
+  endDate         DateTime
+  website         String?
+  description     String?  @db.Text
+  status          String   @default("planned") // "suggested", "planned", "ongoing", "completed", "cancelled", "rejected"
+  source          String?  // "manual", "intel"
+  intelResultId   String?
+
+  ticketCost      Float?   @default(0)
+  hotelCost       Float?   @default(0)
+  flightCost      Float?   @default(0)
+  mealsCost       Float?   @default(0)
+  otherCost       Float?   @default(0)
+  currency        String   @default("EUR")
+  budgetNotes     String?
+
+  attendees       ConferenceAttendee[]
+  collectedContacts ConferenceContact[]
+  driveLinks      DriveLink[]
+  report          ConferenceReport?
+
+  calendarEventId String?
+
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ConferenceAttendee {
+  id              String     @id @default(cuid())
+  conferenceId    String
+  conference      Conference @relation(fields: [conferenceId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee   @relation(fields: [employeeId], references: [id])
+  role            String?
+  confirmed       Boolean    @default(true)
+  reportSubmitted Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+}
+
+model ConferenceContact {
+  id              String     @id @default(cuid())
+  conferenceId    String
+  conference      Conference @relation(fields: [conferenceId], references: [id], onDelete: Cascade)
+  name            String
+  company         String?
+  role            String?
+  email           String?
+  phone           String?
+  linkedin        String?
+  telegram        String?
+  notes           String?    @db.Text
+  interest        String?
+  followUpAction  String?
+  addedToCrm      Boolean    @default(false)
+  contactId       String?
+  contact         Contact?   @relation(fields: [contactId], references: [id])
+  collectedBy     String
+  createdAt       DateTime   @default(now())
+}
+
+model ConferenceReport {
+  id              String     @id @default(cuid())
+  conferenceId    String     @unique
+  conference      Conference @relation(fields: [conferenceId], references: [id], onDelete: Cascade)
+  summary         String     @db.Text
+  keyTakeaways    Json?
+  marketInsights  String?    @db.Text
+  competitorSightings String? @db.Text
+  opportunities   String?    @db.Text
+  recommendations String?    @db.Text
+  rating          Int?
+  wikiPageId      String?
+  submittedBy     String
+  submittedAt     DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
 // ─── Drive Links (Google Drive integration) ───
 
 model DriveLink {
@@ -713,6 +800,8 @@ model DriveLink {
   wikiPage    WikiPage?  @relation(fields: [wikiPageId], references: [id])
   entityId    String?
   entity      OrgEntity? @relation(fields: [entityId], references: [id])
+  conferenceId String?
+  conference  Conference? @relation(fields: [conferenceId], references: [id])
   createdBy   String
   createdAt   DateTime   @default(now())
 }

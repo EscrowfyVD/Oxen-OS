@@ -18,6 +18,7 @@ import {
   Headphones,
   Handshake,
   Search,
+  Tent,
   Settings,
   LogOut,
   type LucideIcon,
@@ -48,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Support", href: "/support", icon: Headphones, badge: null, count: null },
   { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null, pageKey: "crm" },
   { label: "Intel", href: "/intel", icon: Search, badge: null, count: null },
+  { label: "Conferences", href: "/conferences", icon: Tent, badge: null, count: null },
 ]
 
 export default function Sidebar() {

@@ -1,0 +1,1069 @@
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
+import { useRouter, useParams } from "next/navigation"
+import {
+  ArrowLeft, Edit2, ExternalLink, Plus, X, Loader2,
+  Star, Users, FileText, BarChart3, DollarSign, ClipboardList,
+} from "lucide-react"
+
+/* ── Design tokens ── */
+const VOID = "#060709"
+const CARD_BG = "#0F1118"
+const CARD_BORDER = "rgba(255,255,255,0.06)"
+const TEXT_PRIMARY = "rgba(240,240,242,0.92)"
+const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
+const TEXT_TERTIARY = "rgba(240,240,242,0.35)"
+const ROSE_GOLD = "#C08B88"
+const ROSE_GOLD_HOVER = "#D4A5A2"
+
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  planned: { bg: "rgba(59,130,246,0.15)", text: "#3B82F6" },
+  ongoing: { bg: "rgba(34,197,94,0.15)", text: "#22C55E" },
+  completed: { bg: "rgba(156,163,175,0.15)", text: "#9CA3AF" },
+  cancelled: { bg: "rgba(239,68,68,0.15)", text: "#EF4444" },
+  suggested: { bg: "rgba(245,158,11,0.15)", text: "#F59E0B" },
+  rejected: { bg: "rgba(239,68,68,0.10)", text: "#F87171" },
+}
+
+const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
+  Speaker: { bg: "rgba(168,85,247,0.15)", text: "#A855F7" },
+  Attendee: { bg: "rgba(59,130,246,0.15)", text: "#3B82F6" },
+  Booth: { bg: "rgba(34,197,94,0.15)", text: "#22C55E" },
+  Networking: { bg: "rgba(245,158,11,0.15)", text: "#F59E0B" },
+}
+
+const INTEREST_OPTIONS = [
+  { value: "hot", label: "Hot", emoji: "🔥" },
+  { value: "warm", label: "Warm", emoji: "🟡" },
+  { value: "cold", label: "Cold", emoji: "🔵" },
+]
+
+const FOLLOWUP_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "send_proposal", label: "Send Proposal" },
+  { value: "schedule_call", label: "Schedule Call" },
+  { value: "add_to_sequence", label: "Add to Sequence" },
+]
+
+const TAB_LIST = [
+  { key: "overview", label: "Overview", icon: <ClipboardList size={15} /> },
+  { key: "budget", label: "Budget", icon: <DollarSign size={15} /> },
+  { key: "contacts", label: "Contacts", icon: <Users size={15} /> },
+  { key: "documents", label: "Documents", icon: <FileText size={15} /> },
+  { key: "report", label: "Report", icon: <Star size={15} /> },
+  { key: "roi", label: "ROI", icon: <BarChart3 size={15} /> },
+]
+
+type Conference = {
+  id: string
+  name: string
+  location: string | null
+  startDate: string | null
+  endDate: string | null
+  website: string | null
+  description: string | null
+  source: string | null
+  status: string
+  budget: { tickets?: number; hotel?: number; flights?: number; meals?: number; other?: number } | null
+  budgetNotes: string | null
+  attendees: Attendee[]
+  contacts: Contact[]
+  documents: Doc[]
+  report: Report | null
+}
+
+type Attendee = {
+  id: string
+  employeeId: string
+  employeeName: string
+  role: string
+}
+
+type Contact = {
+  id: string
+  name: string
+  company: string | null
+  roleTitle: string | null
+  email: string | null
+  phone: string | null
+  linkedin: string | null
+  telegram: string | null
+  notes: string | null
+  interestLevel: string | null
+  followUp: string | null
+  pushedToCrm: boolean
+}
+
+type Doc = {
+  id: string
+  name: string
+  link: string
+  type: string | null
+}
+
+type Report = {
+  id: string
+  summary: string
+  keyTakeaways: { title: string; detail: string }[]
+  marketInsights: string | null
+  competitorSightings: string | null
+  opportunities: string | null
+  recommendations: string | null
+  rating: number
+  wikiPageId: string | null
+}
+
+type ROIData = {
+  totalCost: number
+  contactsCollected: number
+  leadsInCrm: number
+  dealsCreated: number
+  pipelineValue: number
+  wonRevenue: number
+  roiPercent: number | null
+}
+
+type Employee = { id: string; name: string }
+
+/* ── Helpers ── */
+function formatDate(d: string | null) {
+  if (!d) return ""
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+}
+
+function formatDateRange(start: string | null, end: string | null) {
+  if (!start) return "Dates TBD"
+  const s = formatDate(start)
+  if (!end) return s
+  return `${s} - ${formatDate(end)}`
+}
+
+function initials(name: string) {
+  return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)
+}
+
+function avatarColor(name: string) {
+  const colors = ["#C08B88", "#818CF8", "#22C55E", "#F59E0B", "#A855F7", "#3B82F6", "#EF4444", "#5BB8A8"]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  return colors[Math.abs(hash) % colors.length]
+}
+
+/* ── Shared styles ── */
+const cardStyle: React.CSSProperties = {
+  background: CARD_BG,
+  border: `1px solid ${CARD_BORDER}`,
+  borderRadius: 10,
+  padding: 20,
+}
+
+const btnPrimary: React.CSSProperties = {
+  background: ROSE_GOLD,
+  color: "#fff",
+  border: "none",
+  borderRadius: 6,
+  padding: "8px 16px",
+  fontSize: 13,
+  fontFamily: "'DM Sans', sans-serif",
+  cursor: "pointer",
+  fontWeight: 500,
+}
+
+const btnGhost: React.CSSProperties = {
+  background: "rgba(255,255,255,0.04)",
+  color: TEXT_SECONDARY,
+  border: `1px solid ${CARD_BORDER}`,
+  borderRadius: 6,
+  padding: "8px 14px",
+  fontSize: 13,
+  fontFamily: "'DM Sans', sans-serif",
+  cursor: "pointer",
+}
+
+const inputStyle: React.CSSProperties = {
+  background: "rgba(255,255,255,0.04)",
+  border: `1px solid ${CARD_BORDER}`,
+  borderRadius: 6,
+  padding: "8px 12px",
+  color: TEXT_PRIMARY,
+  fontSize: 13,
+  fontFamily: "'DM Sans', sans-serif",
+  outline: "none",
+  width: "100%",
+}
+
+const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  appearance: "none" as const,
+  backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23666' stroke-width='1.5'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 10px center",
+  paddingRight: 28,
+}
+
+const textareaStyle: React.CSSProperties = {
+  ...inputStyle,
+  minHeight: 80,
+  resize: "vertical" as const,
+}
+
+/* ═══════════════════════════════════════════ */
+export default function ConferenceDetailPage() {
+  const router = useRouter()
+  const params = useParams()
+  const id = params.id as string
+
+  const [conf, setConf] = useState<Conference | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("overview")
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [roi, setRoi] = useState<ROIData | null>(null)
+  const [roiLoading, setRoiLoading] = useState(false)
+
+  /* ── Fetch conference ── */
+  const fetchConference = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/conferences/${id}`)
+      if (!res.ok) throw new Error("Failed to fetch")
+      const data = await res.json()
+      setConf(data)
+    } catch { /* ignore */ } finally {
+      setLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => { fetchConference() }, [fetchConference])
+
+  /* ── Fetch employees for attendee dropdown ── */
+  useEffect(() => {
+    fetch("/api/employees").then(r => r.json()).then(setEmployees).catch(() => {})
+  }, [])
+
+  /* ── Fetch ROI when tab switches ── */
+  useEffect(() => {
+    if (activeTab === "roi" && conf?.status === "completed" && !roi) {
+      setRoiLoading(true)
+      fetch(`/api/conferences/${id}/roi`)
+        .then(r => r.json())
+        .then(setRoi)
+        .catch(() => {})
+        .finally(() => setRoiLoading(false))
+    }
+  }, [activeTab, conf?.status, id, roi])
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: VOID }}>
+        <Loader2 size={28} color={ROSE_GOLD} style={{ animation: "spin 1s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
+  }
+
+  if (!conf) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: VOID, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif" }}>
+        <p style={{ fontSize: 16, marginBottom: 12 }}>Conference not found</p>
+        <button style={btnGhost} onClick={() => router.push("/conferences")}>Back to Conferences</button>
+      </div>
+    )
+  }
+
+  const statusColor = STATUS_COLORS[conf.status] || STATUS_COLORS.planned
+
+  return (
+    <div style={{ background: VOID, minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" }}>
+      {/* ── Header ── */}
+      <div style={{
+        padding: "16px 32px",
+        background: "rgba(6,7,9,0.88)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        borderBottom: `1px solid ${CARD_BORDER}`,
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <button
+              onClick={() => router.push("/conferences")}
+              style={{ background: "none", border: "none", color: TEXT_SECONDARY, cursor: "pointer", padding: 4, display: "flex" }}
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 28, fontWeight: 400, color: "#FFFFFF", margin: 0, lineHeight: 1.2 }}>
+                  {conf.name}
+                </h1>
+                <span style={{
+                  fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 20,
+                  background: statusColor.bg, color: statusColor.text, textTransform: "capitalize",
+                }}>
+                  {conf.status}
+                </span>
+              </div>
+              <p style={{ fontSize: 12, color: TEXT_TERTIARY, marginTop: 4, lineHeight: 1.4 }}>
+                {conf.location && `${conf.location}  ·  `}{formatDateRange(conf.startDate, conf.endDate)}
+              </p>
+            </div>
+          </div>
+          <button
+            style={{ ...btnGhost, display: "flex", alignItems: "center", gap: 6 }}
+            onClick={() => router.push(`/conferences/${id}/edit`)}
+          >
+            <Edit2 size={14} /> Edit
+          </button>
+        </div>
+
+        {/* ── Tabs ── */}
+        <div style={{ display: "flex", gap: 2, marginTop: 16 }}>
+          {TAB_LIST.filter(t => t.key !== "roi" || conf.status === "completed").map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                background: activeTab === tab.key ? "rgba(255,255,255,0.06)" : "transparent",
+                border: "none",
+                borderBottom: activeTab === tab.key ? `2px solid ${ROSE_GOLD}` : "2px solid transparent",
+                color: activeTab === tab.key ? TEXT_PRIMARY : TEXT_TERTIARY,
+                padding: "8px 16px",
+                fontSize: 13,
+                cursor: "pointer",
+                fontFamily: "'DM Sans', sans-serif",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                borderRadius: "6px 6px 0 0",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tab Content ── */}
+      <div style={{ padding: "24px 32px", maxWidth: 1100, margin: "0 auto" }}>
+        {activeTab === "overview" && <OverviewTab conf={conf} employees={employees} onUpdate={fetchConference} />}
+        {activeTab === "budget" && <BudgetTab conf={conf} onUpdate={fetchConference} />}
+        {activeTab === "contacts" && <ContactsTab conf={conf} onUpdate={fetchConference} />}
+        {activeTab === "documents" && <DocumentsTab conf={conf} />}
+        {activeTab === "report" && <ReportTab conf={conf} onUpdate={fetchConference} />}
+        {activeTab === "roi" && <ROITab roi={roi} loading={roiLoading} />}
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   OVERVIEW TAB
+   ═══════════════════════════════════════════ */
+function OverviewTab({ conf, employees, onUpdate }: { conf: Conference; employees: Employee[]; onUpdate: () => void }) {
+  const [showAddAttendee, setShowAddAttendee] = useState(false)
+  const [newEmployeeId, setNewEmployeeId] = useState("")
+  const [newRole, setNewRole] = useState("Attendee")
+  const [saving, setSaving] = useState(false)
+
+  const addAttendee = async () => {
+    if (!newEmployeeId) return
+    setSaving(true)
+    try {
+      await fetch(`/api/conferences/${conf.id}/attendees`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: newEmployeeId, role: newRole }),
+      })
+      setShowAddAttendee(false)
+      setNewEmployeeId("")
+      setNewRole("Attendee")
+      onUpdate()
+    } catch { /* ignore */ } finally { setSaving(false) }
+  }
+
+  const removeAttendee = async (attendeeId: string) => {
+    await fetch(`/api/conferences/${conf.id}/attendees/${attendeeId}`, { method: "DELETE" })
+    onUpdate()
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Conference Info */}
+      <div style={cardStyle}>
+        <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: "0 0 16px" }}>Conference Details</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 32px" }}>
+          <div>
+            <span style={{ fontSize: 11, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 0.5 }}>Name</span>
+            <p style={{ fontSize: 14, color: TEXT_PRIMARY, margin: "4px 0 0" }}>{conf.name}</p>
+          </div>
+          <div>
+            <span style={{ fontSize: 11, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 0.5 }}>Location</span>
+            <p style={{ fontSize: 14, color: TEXT_PRIMARY, margin: "4px 0 0" }}>{conf.location || "TBD"}</p>
+          </div>
+          <div>
+            <span style={{ fontSize: 11, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 0.5 }}>Dates</span>
+            <p style={{ fontSize: 14, color: TEXT_PRIMARY, margin: "4px 0 0" }}>{formatDateRange(conf.startDate, conf.endDate)}</p>
+          </div>
+          <div>
+            <span style={{ fontSize: 11, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 0.5 }}>Source</span>
+            <p style={{ fontSize: 14, color: TEXT_SECONDARY, margin: "4px 0 0" }}>{conf.source || "Manual"}</p>
+          </div>
+          {conf.website && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <span style={{ fontSize: 11, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 0.5 }}>Website</span>
+              <p style={{ margin: "4px 0 0" }}>
+                <a href={conf.website} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 14, color: ROSE_GOLD, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {conf.website} <ExternalLink size={12} />
+                </a>
+              </p>
+            </div>
+          )}
+          {conf.description && (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <span style={{ fontSize: 11, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 0.5 }}>Description</span>
+              <p style={{ fontSize: 14, color: TEXT_SECONDARY, margin: "4px 0 0", lineHeight: 1.6 }}>{conf.description}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Attendees */}
+      <div style={cardStyle}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: 0 }}>
+            Attendees ({conf.attendees?.length || 0})
+          </h3>
+          <button style={{ ...btnGhost, display: "flex", alignItems: "center", gap: 6, fontSize: 12 }} onClick={() => setShowAddAttendee(!showAddAttendee)}>
+            <Plus size={14} /> Add Attendee
+          </button>
+        </div>
+
+        {showAddAttendee && (
+          <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", padding: 12, background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
+            <select style={{ ...selectStyle, flex: 1 }} value={newEmployeeId} onChange={e => setNewEmployeeId(e.target.value)}>
+              <option value="">Select employee...</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+            <select style={{ ...selectStyle, width: 140 }} value={newRole} onChange={e => setNewRole(e.target.value)}>
+              {["Attendee", "Speaker", "Booth", "Networking"].map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <button style={{ ...btnPrimary, whiteSpace: "nowrap" }} onClick={addAttendee} disabled={saving}>
+              {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : "Add"}
+            </button>
+            <button style={{ background: "none", border: "none", color: TEXT_TERTIARY, cursor: "pointer" }} onClick={() => setShowAddAttendee(false)}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {(!conf.attendees || conf.attendees.length === 0) && (
+            <p style={{ fontSize: 13, color: TEXT_TERTIARY, textAlign: "center", padding: 20 }}>No attendees yet</p>
+          )}
+          {conf.attendees?.map(att => {
+            const roleColor = ROLE_COLORS[att.role] || ROLE_COLORS.Attendee
+            return (
+              <div key={att.id} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: "50%", background: avatarColor(att.employeeName),
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 12, fontWeight: 600, color: "#fff",
+                  }}>
+                    {initials(att.employeeName)}
+                  </div>
+                  <span style={{ fontSize: 14, color: TEXT_PRIMARY }}>{att.employeeName}</span>
+                  <span style={{
+                    fontSize: 11, padding: "2px 8px", borderRadius: 12,
+                    background: roleColor.bg, color: roleColor.text,
+                  }}>
+                    {att.role}
+                  </span>
+                </div>
+                <button
+                  onClick={() => removeAttendee(att.id)}
+                  style={{ background: "none", border: "none", color: TEXT_TERTIARY, cursor: "pointer", padding: 4 }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   BUDGET TAB
+   ═══════════════════════════════════════════ */
+function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void }) {
+  const budget = conf.budget || {}
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState("")
+  const [notes, setNotes] = useState(conf.budgetNotes || "")
+  const [savingNotes, setSavingNotes] = useState(false)
+
+  const fields = [
+    { key: "tickets", label: "Tickets", emoji: "🎫" },
+    { key: "hotel", label: "Hotel", emoji: "🏨" },
+    { key: "flights", label: "Flights", emoji: "✈️" },
+    { key: "meals", label: "Meals", emoji: "🍽" },
+    { key: "other", label: "Other", emoji: "📦" },
+  ]
+
+  const total = fields.reduce((sum, f) => sum + ((budget as Record<string, number>)[f.key] || 0), 0)
+  const attendeeCount = conf.attendees?.length || 0
+
+  const saveBudgetField = async (key: string, value: number) => {
+    const newBudget = { ...budget, [key]: value }
+    await fetch(`/api/conferences/${conf.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ budget: newBudget }),
+    })
+    onUpdate()
+  }
+
+  const saveNotes = async () => {
+    setSavingNotes(true)
+    await fetch(`/api/conferences/${conf.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ budgetNotes: notes }),
+    })
+    setSavingNotes(false)
+    onUpdate()
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+        {fields.map(f => {
+          const val = (budget as Record<string, number>)[f.key] || 0
+          const isEditing = editing === f.key
+          return (
+            <div key={f.key} style={{ ...cardStyle, cursor: "pointer", transition: "border-color 0.15s" }}
+              onClick={() => { if (!isEditing) { setEditing(f.key); setEditValue(String(val)) } }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>{f.emoji}</div>
+              <div style={{ fontSize: 12, color: TEXT_TERTIARY, marginBottom: 6 }}>{f.label}</div>
+              {isEditing ? (
+                <input
+                  autoFocus
+                  type="number"
+                  value={editValue}
+                  onChange={e => setEditValue(e.target.value)}
+                  onBlur={() => { saveBudgetField(f.key, Number(editValue) || 0); setEditing(null) }}
+                  onKeyDown={e => { if (e.key === "Enter") { saveBudgetField(f.key, Number(editValue) || 0); setEditing(null) } }}
+                  style={{ ...inputStyle, fontSize: 20, fontWeight: 600, width: "100%", padding: "4px 8px" }}
+                />
+              ) : (
+                <div style={{ fontSize: 20, fontWeight: 600, color: TEXT_PRIMARY }}>
+                  {"\u20AC"}{val.toLocaleString()}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Total card */}
+        <div style={{ ...cardStyle, borderColor: ROSE_GOLD, borderWidth: 1 }}>
+          <div style={{ fontSize: 12, color: TEXT_TERTIARY, marginBottom: 6 }}>TOTAL</div>
+          <div style={{ fontFamily: "'Bellfair', serif", fontSize: 28, color: ROSE_GOLD, fontWeight: 400 }}>
+            {"\u20AC"}{total.toLocaleString()}
+          </div>
+        </div>
+      </div>
+
+      {attendeeCount > 0 && (
+        <div style={{ fontSize: 14, color: TEXT_SECONDARY, textAlign: "center" }}>
+          {"\u20AC"}{attendeeCount ? Math.round(total / attendeeCount).toLocaleString() : 0} per person ({attendeeCount} attendee{attendeeCount !== 1 ? "s" : ""})
+        </div>
+      )}
+
+      {/* Budget notes */}
+      <div style={cardStyle}>
+        <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: "0 0 12px" }}>Budget Notes</h3>
+        <textarea
+          style={textareaStyle}
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Add budget notes..."
+        />
+        <button style={{ ...btnPrimary, marginTop: 10, opacity: savingNotes ? 0.6 : 1 }} onClick={saveNotes} disabled={savingNotes}>
+          {savingNotes ? "Saving..." : "Save Notes"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   CONTACTS TAB
+   ═══════════════════════════════════════════ */
+function ContactsTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void }) {
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [pushingAll, setPushingAll] = useState(false)
+  const [pushingId, setPushingId] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    name: "", company: "", roleTitle: "", email: "", phone: "",
+    linkedin: "", telegram: "", notes: "", interestLevel: "warm", followUp: "none",
+  })
+
+  const updateForm = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }))
+
+  const addContact = async () => {
+    if (!form.name.trim()) return
+    setSaving(true)
+    try {
+      await fetch(`/api/conferences/${conf.id}/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      setForm({ name: "", company: "", roleTitle: "", email: "", phone: "", linkedin: "", telegram: "", notes: "", interestLevel: "warm", followUp: "none" })
+      setShowForm(false)
+      onUpdate()
+    } catch { /* ignore */ } finally { setSaving(false) }
+  }
+
+  const pushToCrm = async (contactId: string) => {
+    setPushingId(contactId)
+    try {
+      await fetch(`/api/conferences/${conf.id}/contacts/${contactId}/push-crm`, { method: "POST" })
+      onUpdate()
+    } catch { /* ignore */ } finally { setPushingId(null) }
+  }
+
+  const pushAllToCrm = async () => {
+    setPushingAll(true)
+    try {
+      await fetch(`/api/conferences/${conf.id}/contacts/push-all`, { method: "POST" })
+      onUpdate()
+    } catch { /* ignore */ } finally { setPushingAll(false) }
+  }
+
+  const interestBadge = (level: string | null) => {
+    const opt = INTEREST_OPTIONS.find(o => o.value === level)
+    if (!opt) return null
+    const colors: Record<string, { bg: string; text: string }> = {
+      hot: { bg: "rgba(239,68,68,0.15)", text: "#EF4444" },
+      warm: { bg: "rgba(245,158,11,0.15)", text: "#F59E0B" },
+      cold: { bg: "rgba(59,130,246,0.15)", text: "#3B82F6" },
+    }
+    const c = colors[level || "warm"]
+    return (
+      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 12, background: c.bg, color: c.text }}>
+        {opt.emoji} {opt.label}
+      </span>
+    )
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Top bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: 0 }}>
+          Contacts ({conf.contacts?.length || 0})
+        </h3>
+        <div style={{ display: "flex", gap: 10 }}>
+          {conf.contacts?.some(c => !c.pushedToCrm) && (
+            <button style={{ ...btnGhost, fontSize: 12 }} onClick={pushAllToCrm} disabled={pushingAll}>
+              {pushingAll ? "Pushing..." : "Push All to CRM"}
+            </button>
+          )}
+          <button style={{ ...btnGhost, display: "flex", alignItems: "center", gap: 6, fontSize: 12 }} onClick={() => setShowForm(!showForm)}>
+            <Plus size={14} /> Add Contact
+          </button>
+        </div>
+      </div>
+
+      {/* Add contact form */}
+      {showForm && (
+        <div style={{ ...cardStyle, background: "rgba(255,255,255,0.02)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <input style={inputStyle} placeholder="Name *" value={form.name} onChange={e => updateForm("name", e.target.value)} />
+            <input style={inputStyle} placeholder="Company" value={form.company} onChange={e => updateForm("company", e.target.value)} />
+            <input style={inputStyle} placeholder="Role / Title" value={form.roleTitle} onChange={e => updateForm("roleTitle", e.target.value)} />
+            <input style={inputStyle} placeholder="Email" value={form.email} onChange={e => updateForm("email", e.target.value)} />
+            <input style={inputStyle} placeholder="Phone" value={form.phone} onChange={e => updateForm("phone", e.target.value)} />
+            <input style={inputStyle} placeholder="LinkedIn URL" value={form.linkedin} onChange={e => updateForm("linkedin", e.target.value)} />
+            <input style={inputStyle} placeholder="Telegram" value={form.telegram} onChange={e => updateForm("telegram", e.target.value)} />
+            <div /> {/* spacer */}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <textarea style={textareaStyle} placeholder="Notes" value={form.notes} onChange={e => updateForm("notes", e.target.value)} />
+            </div>
+          </div>
+
+          {/* Interest level */}
+          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, color: TEXT_TERTIARY }}>Interest:</span>
+            {INTEREST_OPTIONS.map(opt => (
+              <button key={opt.value} onClick={() => updateForm("interestLevel", opt.value)} style={{
+                background: form.interestLevel === opt.value ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
+                border: form.interestLevel === opt.value ? `1px solid ${ROSE_GOLD}` : `1px solid ${CARD_BORDER}`,
+                color: TEXT_PRIMARY, borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer",
+                fontFamily: "'DM Sans', sans-serif",
+              }}>
+                {opt.emoji} {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Follow-up */}
+          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, color: TEXT_TERTIARY }}>Follow-up:</span>
+            <select style={{ ...selectStyle, width: 200 }} value={form.followUp} onChange={e => updateForm("followUp", e.target.value)}>
+              {FOLLOWUP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+
+          <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+            <button style={btnPrimary} onClick={addContact} disabled={saving}>
+              {saving ? "Adding..." : "Add Contact"}
+            </button>
+            <button style={btnGhost} onClick={() => setShowForm(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Contact cards */}
+      {(!conf.contacts || conf.contacts.length === 0) && !showForm && (
+        <p style={{ fontSize: 13, color: TEXT_TERTIARY, textAlign: "center", padding: 40 }}>No contacts collected yet</p>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {conf.contacts?.map(contact => (
+          <div key={contact.id} style={{ ...cardStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                <span style={{ fontSize: 15, fontWeight: 500, color: TEXT_PRIMARY }}>{contact.name}</span>
+                {contact.company && <span style={{ fontSize: 12, color: TEXT_SECONDARY }}>{contact.company}</span>}
+                {interestBadge(contact.interestLevel)}
+              </div>
+              {contact.roleTitle && <div style={{ fontSize: 12, color: TEXT_TERTIARY, marginBottom: 4 }}>{contact.roleTitle}</div>}
+              {contact.followUp && contact.followUp !== "none" && (
+                <div style={{ fontSize: 12, color: ROSE_GOLD }}>
+                  Follow-up: {FOLLOWUP_OPTIONS.find(o => o.value === contact.followUp)?.label}
+                </div>
+              )}
+              {contact.notes && (
+                <div style={{ fontSize: 12, color: TEXT_TERTIARY, marginTop: 4, maxWidth: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {contact.notes}
+                </div>
+              )}
+            </div>
+            <div>
+              {contact.pushedToCrm ? (
+                <span style={{ fontSize: 12, color: "#22C55E" }}>In CRM</span>
+              ) : (
+                <button
+                  style={{ ...btnGhost, fontSize: 11, padding: "5px 10px" }}
+                  onClick={() => pushToCrm(contact.id)}
+                  disabled={pushingId === contact.id}
+                >
+                  {pushingId === contact.id ? "Pushing..." : "Push to CRM"}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   DOCUMENTS TAB
+   ═══════════════════════════════════════════ */
+function DocumentsTab({ conf }: { conf: Conference }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: 0 }}>Documents</h3>
+        <button
+          style={{ ...btnGhost, display: "flex", alignItems: "center", gap: 6, fontSize: 12, opacity: 0.5, cursor: "not-allowed" }}
+          title="Coming soon"
+        >
+          <Plus size={14} /> Link from Drive
+        </button>
+      </div>
+
+      {(!conf.documents || conf.documents.length === 0) ? (
+        <div style={{ ...cardStyle, textAlign: "center", padding: 40 }}>
+          <FileText size={32} color={TEXT_TERTIARY} style={{ marginBottom: 12 }} />
+          <p style={{ fontSize: 14, color: TEXT_TERTIARY }}>No documents linked yet</p>
+          <p style={{ fontSize: 12, color: TEXT_TERTIARY, marginTop: 4 }}>Drive integration coming soon</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {conf.documents.map(doc => (
+            <div key={doc.id} style={{ ...cardStyle, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <FileText size={16} color={TEXT_SECONDARY} />
+                <div>
+                  <span style={{ fontSize: 14, color: TEXT_PRIMARY }}>{doc.name}</span>
+                  {doc.type && <span style={{ fontSize: 11, color: TEXT_TERTIARY, marginLeft: 8 }}>{doc.type}</span>}
+                </div>
+              </div>
+              <a href={doc.link} target="_blank" rel="noopener noreferrer" style={{ color: ROSE_GOLD, display: "flex", alignItems: "center", gap: 4, fontSize: 12, textDecoration: "none" }}>
+                Open <ExternalLink size={12} />
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   REPORT TAB
+   ═══════════════════════════════════════════ */
+function ReportTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void }) {
+  const [submitting, setSubmitting] = useState(false)
+  const [form, setForm] = useState({
+    summary: "",
+    keyTakeaways: [{ title: "", detail: "" }],
+    marketInsights: "",
+    competitorSightings: "",
+    opportunities: "",
+    recommendations: "",
+    rating: 0,
+  })
+
+  const updateField = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }))
+
+  const addTakeaway = () => setForm(prev => ({ ...prev, keyTakeaways: [...prev.keyTakeaways, { title: "", detail: "" }] }))
+
+  const removeTakeaway = (idx: number) => setForm(prev => ({
+    ...prev, keyTakeaways: prev.keyTakeaways.filter((_, i) => i !== idx),
+  }))
+
+  const updateTakeaway = (idx: number, key: string, val: string) => {
+    setForm(prev => ({
+      ...prev,
+      keyTakeaways: prev.keyTakeaways.map((t, i) => i === idx ? { ...t, [key]: val } : t),
+    }))
+  }
+
+  const submitReport = async () => {
+    if (!form.summary.trim()) return
+    setSubmitting(true)
+    try {
+      await fetch(`/api/conferences/${conf.id}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      onUpdate()
+    } catch { /* ignore */ } finally { setSubmitting(false) }
+  }
+
+  // Show existing report
+  if (conf.report) {
+    const r = conf.report
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* Rating */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: TEXT_TERTIARY }}>Rating:</span>
+          {[1, 2, 3, 4, 5].map(s => (
+            <Star key={s} size={20} fill={s <= r.rating ? "#F59E0B" : "none"} color={s <= r.rating ? "#F59E0B" : TEXT_TERTIARY} />
+          ))}
+        </div>
+
+        {/* Summary */}
+        <div style={cardStyle}>
+          <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: "0 0 10px" }}>Summary</h3>
+          <p style={{ fontSize: 14, color: TEXT_SECONDARY, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{r.summary}</p>
+        </div>
+
+        {/* Key Takeaways */}
+        {r.keyTakeaways && r.keyTakeaways.length > 0 && (
+          <div>
+            <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: "0 0 12px" }}>Key Takeaways</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {r.keyTakeaways.map((t, i) => (
+                <div key={i} style={{ ...cardStyle, borderLeft: `3px solid ${ROSE_GOLD}` }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 600, color: TEXT_PRIMARY, margin: "0 0 6px" }}>{t.title}</h4>
+                  <p style={{ fontSize: 13, color: TEXT_SECONDARY, lineHeight: 1.6, margin: 0 }}>{t.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Text sections */}
+        {[
+          { key: "marketInsights", label: "Market Insights" },
+          { key: "competitorSightings", label: "Competitor Sightings" },
+          { key: "opportunities", label: "Opportunities" },
+          { key: "recommendations", label: "Recommendations" },
+        ].map(section => {
+          const val = r[section.key as keyof Report] as string | null
+          if (!val) return null
+          return (
+            <div key={section.key} style={cardStyle}>
+              <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: "0 0 10px" }}>{section.label}</h3>
+              <p style={{ fontSize: 14, color: TEXT_SECONDARY, lineHeight: 1.7, whiteSpace: "pre-wrap", margin: 0 }}>{val}</p>
+            </div>
+          )
+        })}
+
+        {r.wikiPageId && (
+          <a href={`/wiki/${r.wikiPageId}`} style={{ color: ROSE_GOLD, fontSize: 13, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            View in Wiki <ExternalLink size={12} />
+          </a>
+        )}
+      </div>
+    )
+  }
+
+  // Report submission form
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 800 }}>
+      <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 20, color: TEXT_PRIMARY, margin: 0 }}>Submit Conference Report</h3>
+
+      {/* Summary */}
+      <div>
+        <label style={{ fontSize: 12, color: TEXT_TERTIARY, display: "block", marginBottom: 6 }}>Summary *</label>
+        <textarea style={{ ...textareaStyle, minHeight: 100 }} value={form.summary} onChange={e => updateField("summary", e.target.value)} placeholder="Overall summary of the conference..." />
+      </div>
+
+      {/* Key Takeaways */}
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <label style={{ fontSize: 12, color: TEXT_TERTIARY }}>Key Takeaways</label>
+          <button style={{ ...btnGhost, fontSize: 11, padding: "4px 10px" }} onClick={addTakeaway}>
+            <Plus size={12} style={{ marginRight: 4 }} /> Add Takeaway
+          </button>
+        </div>
+        {form.keyTakeaways.map((t, i) => (
+          <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "start" }}>
+            <input style={{ ...inputStyle, flex: "0 0 200px" }} placeholder="Title" value={t.title} onChange={e => updateTakeaway(i, "title", e.target.value)} />
+            <input style={{ ...inputStyle, flex: 1 }} placeholder="Detail" value={t.detail} onChange={e => updateTakeaway(i, "detail", e.target.value)} />
+            {form.keyTakeaways.length > 1 && (
+              <button onClick={() => removeTakeaway(i)} style={{ background: "none", border: "none", color: TEXT_TERTIARY, cursor: "pointer", padding: 6 }}>
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Other text fields */}
+      {[
+        { key: "marketInsights", label: "Market Insights", placeholder: "Insights about market trends observed..." },
+        { key: "competitorSightings", label: "Competitor Sightings", placeholder: "Competitors seen, their booths, presentations..." },
+        { key: "opportunities", label: "Opportunities", placeholder: "Business opportunities identified..." },
+        { key: "recommendations", label: "Recommendations", placeholder: "Recommendations for future conferences..." },
+      ].map(field => (
+        <div key={field.key}>
+          <label style={{ fontSize: 12, color: TEXT_TERTIARY, display: "block", marginBottom: 6 }}>{field.label}</label>
+          <textarea
+            style={textareaStyle}
+            value={(form as Record<string, unknown>)[field.key] as string}
+            onChange={e => updateField(field.key, e.target.value)}
+            placeholder={field.placeholder}
+          />
+        </div>
+      ))}
+
+      {/* Rating */}
+      <div>
+        <label style={{ fontSize: 12, color: TEXT_TERTIARY, display: "block", marginBottom: 8 }}>Rating</label>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[1, 2, 3, 4, 5].map(s => (
+            <button key={s} onClick={() => setForm(prev => ({ ...prev, rating: s }))} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+              <Star size={24} fill={s <= form.rating ? "#F59E0B" : "none"} color={s <= form.rating ? "#F59E0B" : TEXT_TERTIARY} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button style={{ ...btnPrimary, alignSelf: "flex-start", padding: "10px 24px" }} onClick={submitReport} disabled={submitting}>
+        {submitting ? "Submitting..." : "Submit Report"}
+      </button>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   ROI TAB
+   ═══════════════════════════════════════════ */
+function ROITab({ roi, loading }: { roi: ROIData | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+        <Loader2 size={24} color={ROSE_GOLD} style={{ animation: "spin 1s linear infinite" }} />
+      </div>
+    )
+  }
+
+  if (!roi) {
+    return (
+      <div style={{ ...cardStyle, textAlign: "center", padding: 60 }}>
+        <BarChart3 size={36} color={TEXT_TERTIARY} style={{ marginBottom: 12 }} />
+        <p style={{ fontSize: 15, color: TEXT_SECONDARY }}>No deal data available yet</p>
+        <p style={{ fontSize: 12, color: TEXT_TERTIARY, marginTop: 6 }}>ROI metrics will appear once deals are linked to this conference</p>
+      </div>
+    )
+  }
+
+  const kpis = [
+    { label: "Total Cost", value: `\u20AC${roi.totalCost.toLocaleString()}`, border: "#EF4444" },
+    { label: "Contacts Collected", value: String(roi.contactsCollected), border: "#3B82F6" },
+    { label: "Leads in CRM", value: String(roi.leadsInCrm), border: "#F59E0B" },
+    { label: "Deals Created", value: String(roi.dealsCreated), border: "#A855F7" },
+    { label: "Pipeline Value", value: `\u20AC${roi.pipelineValue.toLocaleString()}`, border: ROSE_GOLD },
+    { label: "Won Revenue", value: `\u20AC${roi.wonRevenue.toLocaleString()}`, border: "#22C55E" },
+  ]
+
+  const roiPositive = (roi.roiPercent ?? 0) >= 0
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+        {kpis.map(kpi => (
+          <div key={kpi.label} style={{ ...cardStyle, borderLeft: `3px solid ${kpi.border}` }}>
+            <div style={{ fontSize: 12, color: TEXT_TERTIARY, marginBottom: 6 }}>{kpi.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: TEXT_PRIMARY }}>{kpi.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ROI % highlight */}
+      <div style={{
+        ...cardStyle,
+        textAlign: "center",
+        borderColor: roiPositive ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
+        padding: 32,
+      }}>
+        <div style={{ fontSize: 12, color: TEXT_TERTIARY, marginBottom: 8 }}>Return on Investment</div>
+        <div style={{
+          fontFamily: "'Bellfair', serif",
+          fontSize: 48,
+          color: roiPositive ? "#22C55E" : "#EF4444",
+          fontWeight: 400,
+        }}>
+          {roi.roiPercent !== null ? `${roi.roiPercent > 0 ? "+" : ""}${roi.roiPercent}%` : "N/A"}
+        </div>
+      </div>
+
+      <a href="/conferences" style={{ color: ROSE_GOLD, fontSize: 13, textDecoration: "none", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+        Compare with other conferences <ExternalLink size={12} />
+      </a>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  )
+}
