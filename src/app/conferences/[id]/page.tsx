@@ -226,6 +226,7 @@ export default function ConferenceDetailPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [roi, setRoi] = useState<ROIData | null>(null)
   const [roiLoading, setRoiLoading] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   /* ── Fetch conference ── */
   const fetchConference = useCallback(async () => {
@@ -351,7 +352,7 @@ export default function ConferenceDetailPage() {
             </button>
             <button
               style={{ ...btnGhost, display: "flex", alignItems: "center", gap: 6 }}
-              onClick={() => router.push(`/conferences/${id}/edit`)}
+              onClick={() => setShowEditModal(true)}
             >
               <Edit2 size={14} /> Edit
             </button>
@@ -394,6 +395,260 @@ export default function ConferenceDetailPage() {
         {activeTab === "documents" && <DocumentsTab conf={conf} />}
         {activeTab === "report" && <ReportTab conf={conf} onUpdate={fetchConference} />}
         {activeTab === "roi" && <ROITab roi={roi} loading={roiLoading} />}
+      </div>
+
+      {/* ── Edit Modal ── */}
+      {showEditModal && conf && (
+        <EditConferenceModal
+          conf={conf}
+          employees={employees}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => { setShowEditModal(false); fetchConference() }}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   EDIT CONFERENCE MODAL
+   ═══════════════════════════════════════════ */
+function EditConferenceModal({
+  conf,
+  employees,
+  onClose,
+  onSuccess,
+}: {
+  conf: Conference
+  employees: Employee[]
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [name, setName] = useState(conf.name)
+  const [location, setLocation] = useState(conf.location || "")
+  const [startDate, setStartDate] = useState(conf.startDate ? new Date(conf.startDate).toISOString().split("T")[0] : "")
+  const [endDate, setEndDate] = useState(conf.endDate ? new Date(conf.endDate).toISOString().split("T")[0] : "")
+  const [website, setWebsite] = useState(conf.website || "")
+  const [description, setDescription] = useState(conf.description || "")
+  const [status, setStatus] = useState(conf.status || "planned")
+  const [ticketCost, setTicketCost] = useState(String(conf.ticketCost || 0))
+  const [hotelCost, setHotelCost] = useState(String(conf.hotelCost || 0))
+  const [flightCost, setFlightCost] = useState(String(conf.flightCost || 0))
+  const [mealsCost, setMealsCost] = useState(String(conf.mealsCost || 0))
+  const [otherCost, setOtherCost] = useState(String(conf.otherCost || 0))
+  const [budgetNotes, setBudgetNotes] = useState(conf.budgetNotes || "")
+  const [showBudget, setShowBudget] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Attendee management
+  const currentAttendees = conf.attendees || []
+  const [attendeeIds, setAttendeeIds] = useState<Set<string>>(
+    new Set(currentAttendees.map((a) => a.employeeId))
+  )
+  const [attendeeRoles, setAttendeeRoles] = useState<Record<string, string>>(
+    Object.fromEntries(currentAttendees.map((a) => [a.employeeId, a.role || "Attendee"]))
+  )
+
+  const toggleAttendee = (empId: string) => {
+    setAttendeeIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(empId)) next.delete(empId)
+      else { next.add(empId); setAttendeeRoles((r) => ({ ...r, [empId]: r[empId] || "Attendee" })) }
+      return next
+    })
+  }
+
+  const handleSave = async () => {
+    if (!name || !startDate || !endDate) return
+    setSaving(true)
+    try {
+      const attendees = Array.from(attendeeIds).map((empId) => ({
+        employeeId: empId,
+        role: attendeeRoles[empId] || "Attendee",
+      }))
+
+      const body: Record<string, unknown> = {
+        name,
+        location,
+        startDate,
+        endDate,
+        website: website || null,
+        description: description || null,
+        status,
+        ticketCost: parseFloat(ticketCost) || 0,
+        hotelCost: parseFloat(hotelCost) || 0,
+        flightCost: parseFloat(flightCost) || 0,
+        mealsCost: parseFloat(mealsCost) || 0,
+        otherCost: parseFloat(otherCost) || 0,
+        budgetNotes: budgetNotes || null,
+        attendees,
+      }
+
+      const res = await fetch(`/api/conferences/${conf.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) onSuccess()
+    } catch { /* ignore */ }
+    setSaving(false)
+  }
+
+  const STATUSES = ["suggested", "planned", "ongoing", "completed", "cancelled", "rejected"]
+  const ROLES = ["Speaker", "Attendee", "Booth", "Networking"]
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "85vh", overflowY: "auto" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(192,139,136,0.03)", position: "sticky", top: 0, zIndex: 10 }}>
+          <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, fontWeight: 400, color: "#fff", margin: 0 }}>Edit Conference</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: TEXT_TERTIARY, fontSize: 18, cursor: "pointer", padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Name */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Name *</label>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+          </div>
+
+          {/* Location + Status */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Location</label>
+              <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ ...selectStyle }}>
+                {STATUSES.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Dates */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Start Date *</label>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ ...inputStyle, colorScheme: "dark" }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>End Date *</label>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ ...inputStyle, colorScheme: "dark" }} />
+            </div>
+          </div>
+
+          {/* Website */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Website</label>
+            <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." style={inputStyle} />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ ...textareaStyle }} />
+          </div>
+
+          {/* Attendees */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Attendees</label>
+            <div style={{ border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: 12, maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+              {employees.length === 0 && (
+                <span style={{ fontSize: 12, color: TEXT_TERTIARY }}>No team members loaded.</span>
+              )}
+              {employees.map((emp) => {
+                const checked = attendeeIds.has(emp.id)
+                return (
+                  <div key={emp.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flex: 1 }}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleAttendee(emp.id)} style={{ accentColor: ROSE_GOLD }} />
+                      <span style={{ fontSize: 13, color: TEXT_PRIMARY }}>{emp.name}</span>
+                    </label>
+                    {checked && (
+                      <select
+                        value={attendeeRoles[emp.id] || "Attendee"}
+                        onChange={(e) => setAttendeeRoles((r) => ({ ...r, [emp.id]: e.target.value }))}
+                        style={{ ...selectStyle, width: 130, padding: "4px 8px", fontSize: 12 }}
+                      >
+                        {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Budget toggle */}
+          <div>
+            <button
+              onClick={() => setShowBudget((v) => !v)}
+              style={{ background: "none", border: "none", color: ROSE_GOLD, fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <span style={{ transform: showBudget ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>&#9654;</span>
+              Budget Details
+            </button>
+          </div>
+
+          {showBudget && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingLeft: 12, borderLeft: `2px solid ${CARD_BORDER}` }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                {[
+                  { label: "Ticket", val: ticketCost, set: setTicketCost },
+                  { label: "Hotel", val: hotelCost, set: setHotelCost },
+                  { label: "Flight", val: flightCost, set: setFlightCost },
+                ].map((f) => (
+                  <div key={f.label}>
+                    <label style={{ fontSize: 10, color: TEXT_TERTIARY, display: "block", marginBottom: 4, textTransform: "uppercase" }}>{f.label}</label>
+                    <input type="number" value={f.val} onChange={(e) => f.set(e.target.value)} style={{ ...inputStyle, padding: "6px 10px" }} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                {[
+                  { label: "Meals", val: mealsCost, set: setMealsCost },
+                  { label: "Other", val: otherCost, set: setOtherCost },
+                ].map((f) => (
+                  <div key={f.label}>
+                    <label style={{ fontSize: 10, color: TEXT_TERTIARY, display: "block", marginBottom: 4, textTransform: "uppercase" }}>{f.label}</label>
+                    <input type="number" value={f.val} onChange={(e) => f.set(e.target.value)} style={{ ...inputStyle, padding: "6px 10px" }} />
+                  </div>
+                ))}
+                <div />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: TEXT_TERTIARY, display: "block", marginBottom: 4, textTransform: "uppercase" }}>Budget Notes</label>
+                <textarea value={budgetNotes} onChange={(e) => setBudgetNotes(e.target.value)} rows={2} style={{ ...textareaStyle, minHeight: 50 }} />
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8, paddingTop: 16, borderTop: `1px solid ${CARD_BORDER}` }}>
+            <button onClick={onClose} style={btnGhost}>Cancel</button>
+            <button
+              onClick={handleSave}
+              disabled={!name || !startDate || !endDate || saving}
+              style={{
+                ...btnPrimary,
+                opacity: (!name || !startDate || !endDate || saving) ? 0.5 : 1,
+                cursor: (!name || !startDate || !endDate || saving) ? "not-allowed" : "pointer",
+              }}
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
