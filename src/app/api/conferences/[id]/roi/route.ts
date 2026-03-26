@@ -15,6 +15,15 @@ export async function GET(
     const conference = await prisma.conference.findUnique({
       where: { id },
       include: {
+        attendees: {
+          select: {
+            ticketCost: true,
+            hotelCost: true,
+            flightCost: true,
+            mealsCost: true,
+            otherCost: true,
+          },
+        },
         collectedContacts: {
           select: {
             id: true,
@@ -29,13 +38,9 @@ export async function GET(
       return NextResponse.json({ error: "Conference not found" }, { status: 404 })
     }
 
-    // Calculate total cost
-    const totalCost =
-      (conference.ticketCost ?? 0) +
-      (conference.hotelCost ?? 0) +
-      (conference.flightCost ?? 0) +
-      (conference.mealsCost ?? 0) +
-      (conference.otherCost ?? 0)
+    // Calculate total cost from all attendee budgets
+    const totalCost = conference.attendees.reduce((sum, a) =>
+      sum + (a.ticketCost ?? 0) + (a.hotelCost ?? 0) + (a.flightCost ?? 0) + (a.mealsCost ?? 0) + (a.otherCost ?? 0), 0)
 
     const contactsCollected = conference.collectedContacts.length
     const crmLeads = conference.collectedContacts.filter((c) => c.addedToCrm).length

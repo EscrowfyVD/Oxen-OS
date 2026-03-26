@@ -61,8 +61,7 @@ export async function PATCH(
 
     const {
       name, location, country, startDate, endDate, website, description,
-      status, ticketCost, hotelCost, flightCost, mealsCost, otherCost,
-      currency, budgetNotes, attendees, color,
+      status, currency, attendees, color,
     } = body
 
     const data: Record<string, unknown> = {}
@@ -76,13 +75,7 @@ export async function PATCH(
     if (description !== undefined) data.description = description
     if (status !== undefined) data.status = status
     if (color !== undefined) data.color = color
-    if (ticketCost !== undefined) data.ticketCost = parseFloat(ticketCost)
-    if (hotelCost !== undefined) data.hotelCost = parseFloat(hotelCost)
-    if (flightCost !== undefined) data.flightCost = parseFloat(flightCost)
-    if (mealsCost !== undefined) data.mealsCost = parseFloat(mealsCost)
-    if (otherCost !== undefined) data.otherCost = parseFloat(otherCost)
     if (currency !== undefined) data.currency = currency
-    if (budgetNotes !== undefined) data.budgetNotes = budgetNotes
 
     // If attendees array provided, delete existing and recreate
     if (Array.isArray(attendees)) {

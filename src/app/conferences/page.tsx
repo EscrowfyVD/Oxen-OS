@@ -57,14 +57,9 @@ interface Conference {
   status?: string
   source?: string
   reportStatus?: string
-  ticketCost?: number
-  hotelCost?: number
-  flightCost?: number
-  mealsCost?: number
-  otherCost?: number
   currency?: string
   color?: string
-  attendees?: { employeeId: string; employee?: { id: string; name: string }; name?: string; role: string }[]
+  attendees?: { employeeId: string; employee?: { id: string; name: string }; name?: string; role: string; ticketCost?: number; hotelCost?: number; flightCost?: number; mealsCost?: number; otherCost?: number }[]
   report?: { id: string } | null
   _count?: { collectedContacts: number }
 }
@@ -117,7 +112,8 @@ function getWeekStart(date: Date) {
 }
 
 function confTotalBudget(c: Conference) {
-  return (c.ticketCost || 0) + (c.hotelCost || 0) + (c.flightCost || 0) + (c.mealsCost || 0) + (c.otherCost || 0)
+  return (c.attendees || []).reduce((sum, a) =>
+    sum + (a.ticketCost || 0) + (a.hotelCost || 0) + (a.flightCost || 0) + (a.mealsCost || 0) + (a.otherCost || 0), 0)
 }
 
 function attName(att: Conference["attendees"] extends (infer T)[] | undefined ? T : never) {
@@ -1188,16 +1184,6 @@ function AddConferenceModal({
   const [website, setWebsite] = useState("")
   const [description, setDescription] = useState("")
   const [attendees, setAttendees] = useState<{ id: string; role: string }[]>([])
-  const [showBudget, setShowBudget] = useState(false)
-  const [budget, setBudget] = useState({
-    ticketCost: "",
-    hotelCost: "",
-    flightCost: "",
-    mealsCost: "",
-    otherCost: "",
-    currency: "EUR",
-    notes: "",
-  })
   const [color, setColor] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [autoFilling, setAutoFilling] = useState(false)
@@ -1237,10 +1223,6 @@ function AddConferenceModal({
           if (!description) setDescription(extracted.description)
           else if (!description.includes(extracted.description)) setDescription(description + "\n\n" + extracted.description)
         }
-        if (extracted.ticketPrice && !budget.ticketCost) {
-          setBudget((b) => ({ ...b, ticketCost: String(extracted.ticketPrice) }))
-          setShowBudget(true)
-        }
         setAutoFillMsg("Auto-filled from website — review and adjust if needed")
       }
     } catch {
@@ -1264,17 +1246,6 @@ function AddConferenceModal({
         description,
         color: color || undefined,
         attendees: attendees.map((a) => ({ id: a.id, role: a.role })),
-      }
-      if (showBudget) {
-        body.budget = {
-          ticketCost: budget.ticketCost ? Number(budget.ticketCost) : undefined,
-          hotelCost: budget.hotelCost ? Number(budget.hotelCost) : undefined,
-          flightCost: budget.flightCost ? Number(budget.flightCost) : undefined,
-          mealsCost: budget.mealsCost ? Number(budget.mealsCost) : undefined,
-          otherCost: budget.otherCost ? Number(budget.otherCost) : undefined,
-          currency: budget.currency,
-          notes: budget.notes,
-        }
       }
       const res = await fetch("/api/conferences", {
         method: "POST",
@@ -1429,58 +1400,6 @@ function AddConferenceModal({
           </div>
 
           {/* Budget toggle */}
-          <div>
-            <button
-              onClick={() => setShowBudget((v) => !v)}
-              style={{ background: "none", border: "none", color: ROSE, fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}
-            >
-              <span style={{ transform: showBudget ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>&#9654;</span>
-              Budget Details
-            </button>
-          </div>
-
-          {showBudget && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "0 0 0 12px", borderLeft: `2px solid ${CARD_BORDER}` }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={labelStyle}>Ticket Cost</label>
-                  <input type="number" value={budget.ticketCost} onChange={(e) => setBudget((b) => ({ ...b, ticketCost: e.target.value }))} placeholder="0" style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Hotel Cost</label>
-                  <input type="number" value={budget.hotelCost} onChange={(e) => setBudget((b) => ({ ...b, hotelCost: e.target.value }))} placeholder="0" style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Flight Cost</label>
-                  <input type="number" value={budget.flightCost} onChange={(e) => setBudget((b) => ({ ...b, flightCost: e.target.value }))} placeholder="0" style={inputStyle} />
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={labelStyle}>Meals Cost</label>
-                  <input type="number" value={budget.mealsCost} onChange={(e) => setBudget((b) => ({ ...b, mealsCost: e.target.value }))} placeholder="0" style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Other Cost</label>
-                  <input type="number" value={budget.otherCost} onChange={(e) => setBudget((b) => ({ ...b, otherCost: e.target.value }))} placeholder="0" style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Currency</label>
-                  <select value={budget.currency} onChange={(e) => setBudget((b) => ({ ...b, currency: e.target.value }))} style={inputStyle}>
-                    <option value="EUR">EUR</option>
-                    <option value="USD">USD</option>
-                    <option value="GBP">GBP</option>
-                    <option value="AED">AED</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label style={labelStyle}>Budget Notes</label>
-                <textarea value={budget.notes} onChange={(e) => setBudget((b) => ({ ...b, notes: e.target.value }))} placeholder="Additional budget notes..." rows={2} style={{ ...inputStyle, resize: "vertical" }} />
-              </div>
-            </div>
-          )}
-
           {/* Submit */}
           <div className="flex items-center justify-end gap-3" style={{ marginTop: 8, paddingTop: 16, borderTop: `1px solid ${CARD_BORDER}` }}>
             <button onClick={onClose} style={btnSecondary}>Cancel</button>

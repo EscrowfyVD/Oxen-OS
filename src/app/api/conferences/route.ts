@@ -59,11 +59,8 @@ export async function POST(request: Request) {
     const body = await request.json()
     const {
       name, location, startDate, endDate, country, website, description,
-      status, attendees, ticketCost, hotelCost, flightCost, mealsCost, otherCost,
-      currency, budgetNotes, source, intelResultId, color,
+      status, attendees, currency, source, intelResultId, color,
     } = body
-
-    const budget = body.budget
 
     if (!name || !startDate || !endDate) {
       return NextResponse.json(
@@ -84,13 +81,7 @@ export async function POST(request: Request) {
         website: website ?? null,
         description: description ?? null,
         status: status ?? "planned",
-        ticketCost: parseFloat(ticketCost || budget?.ticketCost) || 0,
-        hotelCost: parseFloat(hotelCost || budget?.hotelCost) || 0,
-        flightCost: parseFloat(flightCost || budget?.flightCost) || 0,
-        mealsCost: parseFloat(mealsCost || budget?.mealsCost) || 0,
-        otherCost: parseFloat(otherCost || budget?.otherCost) || 0,
-        currency: currency || budget?.currency || "EUR",
-        budgetNotes: budgetNotes || budget?.notes || null,
+        currency: currency || "EUR",
         color: color ?? null,
         source: source ?? "manual",
         intelResultId: intelResultId ?? null,

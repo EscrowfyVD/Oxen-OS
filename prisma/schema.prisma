@@ -718,13 +718,7 @@ model Conference {
   source          String?  // "manual", "intel"
   intelResultId   String?
 
-  ticketCost      Float?   @default(0)
-  hotelCost       Float?   @default(0)
-  flightCost      Float?   @default(0)
-  mealsCost       Float?   @default(0)
-  otherCost       Float?   @default(0)
   currency        String   @default("EUR")
-  budgetNotes     String?
 
   attendees       ConferenceAttendee[]
   collectedContacts ConferenceContact[]
@@ -748,6 +742,12 @@ model ConferenceAttendee {
   role            String?
   confirmed       Boolean    @default(true)
   reportSubmitted Boolean    @default(false)
+  ticketCost      Float?     @default(0)
+  hotelCost       Float?     @default(0)
+  flightCost      Float?     @default(0)
+  mealsCost       Float?     @default(0)
+  otherCost       Float?     @default(0)
+  budgetNotes     String?
   createdAt       DateTime   @default(now())
 }
 

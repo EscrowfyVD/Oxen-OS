@@ -71,13 +71,7 @@ type Conference = {
   source: string | null
   status: string
   color: string | null
-  budget: { tickets?: number; hotel?: number; flights?: number; meals?: number; other?: number } | null
-  ticketCost?: number
-  hotelCost?: number
-  flightCost?: number
-  mealsCost?: number
-  otherCost?: number
-  budgetNotes: string | null
+  currency: string
   attendees: Attendee[]
   contacts: Contact[]
   documents: Doc[]
@@ -90,6 +84,12 @@ type Attendee = {
   employeeName?: string
   role: string
   employee?: { id: string; name: string }
+  ticketCost?: number
+  hotelCost?: number
+  flightCost?: number
+  mealsCost?: number
+  otherCost?: number
+  budgetNotes?: string | null
 }
 
 type Contact = {
@@ -351,12 +351,6 @@ export default function ConferenceDetailPage() {
                       description: conf.description,
                       source: conf.source,
                       status: "planned",
-                      budgetNotes: conf.budgetNotes,
-                      ticketCost: conf.ticketCost,
-                      hotelCost: conf.hotelCost,
-                      flightCost: conf.flightCost,
-                      mealsCost: conf.mealsCost,
-                      otherCost: conf.otherCost,
                     }),
                   })
                   if (!res.ok) throw new Error("Failed to duplicate")
@@ -502,14 +496,7 @@ function EditConferenceModal({
   const [website, setWebsite] = useState(conf.website || "")
   const [description, setDescription] = useState(conf.description || "")
   const [status, setStatus] = useState(conf.status || "planned")
-  const [ticketCost, setTicketCost] = useState(String(conf.ticketCost || 0))
-  const [hotelCost, setHotelCost] = useState(String(conf.hotelCost || 0))
-  const [flightCost, setFlightCost] = useState(String(conf.flightCost || 0))
-  const [mealsCost, setMealsCost] = useState(String(conf.mealsCost || 0))
-  const [otherCost, setOtherCost] = useState(String(conf.otherCost || 0))
-  const [budgetNotes, setBudgetNotes] = useState(conf.budgetNotes || "")
   const [selectedColor, setSelectedColor] = useState(conf.color || CONF_COLORS[0])
-  const [showBudget, setShowBudget] = useState(false)
   const [saving, setSaving] = useState(false)
 
   // Attendee management
@@ -548,12 +535,6 @@ function EditConferenceModal({
         description: description || null,
         status,
         color: selectedColor,
-        ticketCost: parseFloat(ticketCost) || 0,
-        hotelCost: parseFloat(hotelCost) || 0,
-        flightCost: parseFloat(flightCost) || 0,
-        mealsCost: parseFloat(mealsCost) || 0,
-        otherCost: parseFloat(otherCost) || 0,
-        budgetNotes: budgetNotes || null,
         attendees,
       }
 
@@ -686,50 +667,6 @@ function EditConferenceModal({
               })}
             </div>
           </div>
-
-          {/* Budget toggle */}
-          <div>
-            <button
-              onClick={() => setShowBudget((v) => !v)}
-              style={{ background: "none", border: "none", color: ROSE_GOLD, fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 6 }}
-            >
-              <span style={{ transform: showBudget ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>&#9654;</span>
-              Budget Details
-            </button>
-          </div>
-
-          {showBudget && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingLeft: 12, borderLeft: `2px solid ${CARD_BORDER}` }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                {[
-                  { label: "Ticket", val: ticketCost, set: setTicketCost },
-                  { label: "Hotel", val: hotelCost, set: setHotelCost },
-                  { label: "Flight", val: flightCost, set: setFlightCost },
-                ].map((f) => (
-                  <div key={f.label}>
-                    <label style={{ fontSize: 10, color: TEXT_TERTIARY, display: "block", marginBottom: 4, textTransform: "uppercase" }}>{f.label}</label>
-                    <input type="number" value={f.val} onChange={(e) => f.set(e.target.value)} style={{ ...inputStyle, padding: "6px 10px" }} />
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                {[
-                  { label: "Meals", val: mealsCost, set: setMealsCost },
-                  { label: "Other", val: otherCost, set: setOtherCost },
-                ].map((f) => (
-                  <div key={f.label}>
-                    <label style={{ fontSize: 10, color: TEXT_TERTIARY, display: "block", marginBottom: 4, textTransform: "uppercase" }}>{f.label}</label>
-                    <input type="number" value={f.val} onChange={(e) => f.set(e.target.value)} style={{ ...inputStyle, padding: "6px 10px" }} />
-                  </div>
-                ))}
-                <div />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: TEXT_TERTIARY, display: "block", marginBottom: 4, textTransform: "uppercase" }}>Budget Notes</label>
-                <textarea value={budgetNotes} onChange={(e) => setBudgetNotes(e.target.value)} rows={2} style={{ ...textareaStyle, minHeight: 50 }} />
-              </div>
-            </div>
-          )}
 
           {/* Actions */}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8, paddingTop: 16, borderTop: `1px solid ${CARD_BORDER}` }}>
@@ -899,13 +836,8 @@ function OverviewTab({ conf, employees, onUpdate }: { conf: Conference; employee
    BUDGET TAB
    ═══════════════════════════════════════════ */
 function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void }) {
-  const budget = conf.budget || {}
-  const [editing, setEditing] = useState<string | null>(null)
-  const [editValue, setEditValue] = useState("")
-  const [notes, setNotes] = useState(conf.budgetNotes || "")
-  const [savingNotes, setSavingNotes] = useState(false)
-
-  const fields = [
+  type CostField = "ticketCost" | "hotelCost" | "flightCost" | "mealsCost" | "otherCost"
+  const FIELDS: { key: CostField; label: string; emoji: string }[] = [
     { key: "ticketCost", label: "Tickets", emoji: "🎫" },
     { key: "hotelCost", label: "Hotel", emoji: "🏨" },
     { key: "flightCost", label: "Flights", emoji: "✈️" },
@@ -913,86 +845,257 @@ function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void 
     { key: "otherCost", label: "Other", emoji: "📦" },
   ]
 
-  const total = fields.reduce((sum, f) => sum + ((conf as unknown as Record<string, number>)[f.key] || 0), 0)
-  const attendeeCount = conf.attendees?.length || 0
+  const attendees = conf.attendees || []
+  const currency = conf.currency || "EUR"
+  const sym = currency === "EUR" ? "€" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency
 
-  const saveBudgetField = async (key: string, value: number) => {
-    await fetch(`/api/conferences/${conf.id}`, {
+  // Local editable state: map of attendeeId -> { field -> value }
+  const [budgets, setBudgets] = useState<Record<string, Record<CostField, number>>>(() => {
+    const m: Record<string, Record<CostField, number>> = {}
+    attendees.forEach(a => {
+      m[a.id] = {
+        ticketCost: a.ticketCost ?? 0,
+        hotelCost: a.hotelCost ?? 0,
+        flightCost: a.flightCost ?? 0,
+        mealsCost: a.mealsCost ?? 0,
+        otherCost: a.otherCost ?? 0,
+      }
+    })
+    return m
+  })
+
+  const [editingCell, setEditingCell] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [applyAllField, setApplyAllField] = useState<CostField | null>(null)
+  const [applyAllValue, setApplyAllValue] = useState("")
+  const [copyFrom, setCopyFrom] = useState("")
+
+  // Column totals
+  const colTotal = (key: CostField) => attendees.reduce((s, a) => s + (budgets[a.id]?.[key] ?? 0), 0)
+  const rowTotal = (id: string) => FIELDS.reduce((s, f) => s + (budgets[id]?.[f.key] ?? 0), 0)
+  const grandTotal = FIELDS.reduce((s, f) => s + colTotal(f.key), 0)
+  const avg = attendees.length > 0 ? Math.round(grandTotal / attendees.length) : 0
+
+  const saveCell = async (attendeeId: string, field: CostField, value: number) => {
+    setBudgets(prev => ({
+      ...prev,
+      [attendeeId]: { ...prev[attendeeId], [field]: value },
+    }))
+    await fetch(`/api/conferences/${conf.id}/attendees/${attendeeId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [key]: value }),
+      body: JSON.stringify({ [field]: value }),
     })
-    onUpdate()
   }
 
-  const saveNotes = async () => {
-    setSavingNotes(true)
-    await fetch(`/api/conferences/${conf.id}`, {
+  const applyToAll = async (field: CostField, value: number) => {
+    setSaving(true)
+    const updates = attendees.map(a => ({ attendeeId: a.id, [field]: value }))
+    await fetch(`/api/conferences/${conf.id}/attendees`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ budgetNotes: notes }),
+      body: JSON.stringify({ updates }),
     })
-    setSavingNotes(false)
-    onUpdate()
+    setBudgets(prev => {
+      const next = { ...prev }
+      attendees.forEach(a => { next[a.id] = { ...next[a.id], [field]: value } })
+      return next
+    })
+    setApplyAllField(null)
+    setApplyAllValue("")
+    setSaving(false)
+  }
+
+  const copyBudget = async (fromId: string, toId: string) => {
+    const src = budgets[fromId]
+    if (!src) return
+    setSaving(true)
+    await fetch(`/api/conferences/${conf.id}/attendees/${toId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(src),
+    })
+    setBudgets(prev => ({ ...prev, [toId]: { ...src } }))
+    setSaving(false)
+  }
+
+  const getName = (a: Attendee) => a.employee?.name || a.employeeName || "Unknown"
+
+  if (attendees.length === 0) {
+    return (
+      <div style={{ ...cardStyle, textAlign: "center", padding: 48 }}>
+        <p style={{ fontSize: 14, color: TEXT_SECONDARY, margin: 0 }}>
+          No attendees yet. Add attendees in the Overview tab to set per-person budgets.
+        </p>
+      </div>
+    )
+  }
+
+  const thStyle: React.CSSProperties = {
+    padding: "10px 12px", fontSize: 11, fontWeight: 600, color: TEXT_TERTIARY,
+    textTransform: "uppercase", letterSpacing: "0.04em", textAlign: "right",
+    borderBottom: `1px solid ${CARD_BORDER}`, whiteSpace: "nowrap",
+  }
+
+  const tdStyle: React.CSSProperties = {
+    padding: "8px 12px", fontSize: 13, color: TEXT_PRIMARY,
+    borderBottom: `1px solid ${CARD_BORDER}`, textAlign: "right",
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Summary Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-        {fields.map(f => {
-          const val = (conf as unknown as Record<string, number>)[f.key] || 0
-          const isEditing = editing === f.key
-          return (
-            <div key={f.key} style={{ ...cardStyle, cursor: "pointer", transition: "border-color 0.15s" }}
-              onClick={() => { if (!isEditing) { setEditing(f.key); setEditValue(String(val)) } }}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>{f.emoji}</div>
-              <div style={{ fontSize: 12, color: TEXT_TERTIARY, marginBottom: 6 }}>{f.label}</div>
-              {isEditing ? (
-                <input
-                  autoFocus
-                  type="number"
-                  value={editValue}
-                  onChange={e => setEditValue(e.target.value)}
-                  onBlur={() => { saveBudgetField(f.key, Number(editValue) || 0); setEditing(null) }}
-                  onKeyDown={e => { if (e.key === "Enter") { saveBudgetField(f.key, Number(editValue) || 0); setEditing(null) } }}
-                  style={{ ...inputStyle, fontSize: 20, fontWeight: 600, width: "100%", padding: "4px 8px" }}
-                />
-              ) : (
-                <div style={{ fontSize: 20, fontWeight: 600, color: TEXT_PRIMARY }}>
-                  {"\u20AC"}{val.toLocaleString()}
-                </div>
-              )}
-            </div>
-          )
-        })}
-
-        {/* Total card */}
-        <div style={{ ...cardStyle, borderColor: ROSE_GOLD, borderWidth: 1 }}>
-          <div style={{ fontSize: 12, color: TEXT_TERTIARY, marginBottom: 6 }}>TOTAL</div>
-          <div style={{ fontFamily: "'Bellfair', serif", fontSize: 28, color: ROSE_GOLD, fontWeight: 400 }}>
-            {"\u20AC"}{total.toLocaleString()}
+        {FIELDS.map(f => (
+          <div key={f.key} style={cardStyle}>
+            <div style={{ fontSize: 20, marginBottom: 6 }}>{f.emoji}</div>
+            <div style={{ fontSize: 11, color: TEXT_TERTIARY, marginBottom: 4, textTransform: "uppercase" }}>Total {f.label}</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: TEXT_PRIMARY }}>{sym}{colTotal(f.key).toLocaleString()}</div>
           </div>
+        ))}
+        <div style={{ ...cardStyle, borderColor: ROSE_GOLD, borderWidth: 1 }}>
+          <div style={{ fontSize: 20, marginBottom: 6 }}>💰</div>
+          <div style={{ fontSize: 11, color: TEXT_TERTIARY, marginBottom: 4, textTransform: "uppercase" }}>GRAND TOTAL</div>
+          <div style={{ fontFamily: "'Bellfair', serif", fontSize: 28, color: ROSE_GOLD, fontWeight: 400 }}>{sym}{grandTotal.toLocaleString()}</div>
+          <div style={{ fontSize: 11, color: TEXT_TERTIARY, marginTop: 4 }}>{sym}{avg.toLocaleString()} per person avg</div>
         </div>
       </div>
 
-      {attendeeCount > 0 && (
-        <div style={{ fontSize: 14, color: TEXT_SECONDARY, textAlign: "center" }}>
-          {"\u20AC"}{attendeeCount ? Math.round(total / attendeeCount).toLocaleString() : 0} per person ({attendeeCount} attendee{attendeeCount !== 1 ? "s" : ""})
-        </div>
-      )}
+      {/* Quick Actions */}
+      <div style={{ ...cardStyle, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontWeight: 600 }}>Quick actions:</span>
+        {applyAllField ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 12, color: TEXT_PRIMARY }}>{FIELDS.find(f => f.key === applyAllField)?.emoji} Apply {sym}</span>
+            <input
+              autoFocus
+              type="number"
+              value={applyAllValue}
+              onChange={e => setApplyAllValue(e.target.value)}
+              style={{ ...inputStyle, width: 100, padding: "4px 8px", fontSize: 13 }}
+              onKeyDown={e => { if (e.key === "Enter") applyToAll(applyAllField, Number(applyAllValue) || 0) }}
+            />
+            <span style={{ fontSize: 12, color: TEXT_SECONDARY }}>to all attendees</span>
+            <button
+              style={{ ...btnPrimary, padding: "4px 12px", fontSize: 12 }}
+              onClick={() => applyToAll(applyAllField, Number(applyAllValue) || 0)}
+              disabled={saving}
+            >Apply</button>
+            <button style={{ background: "none", border: "none", color: TEXT_TERTIARY, cursor: "pointer", fontSize: 12 }} onClick={() => setApplyAllField(null)}>Cancel</button>
+          </div>
+        ) : (
+          FIELDS.map(f => (
+            <button
+              key={f.key}
+              style={{ ...btnGhost, padding: "4px 10px", fontSize: 11 }}
+              onClick={() => setApplyAllField(f.key)}
+            >{f.emoji} Same {f.label} for all</button>
+          ))
+        )}
+      </div>
 
-      {/* Budget notes */}
-      <div style={cardStyle}>
-        <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, margin: "0 0 12px" }}>Budget Notes</h3>
-        <textarea
-          style={textareaStyle}
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder="Add budget notes..."
-        />
-        <button style={{ ...btnPrimary, marginTop: 10, opacity: savingNotes ? 0.6 : 1 }} onClick={saveNotes} disabled={savingNotes}>
-          {savingNotes ? "Saving..." : "Save Notes"}
-        </button>
+      {/* Per-Attendee Budget Table */}
+      <div style={{ ...cardStyle, padding: 0, overflow: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'DM Sans', sans-serif" }}>
+          <thead>
+            <tr>
+              <th style={{ ...thStyle, textAlign: "left", width: 180 }}>Attendee</th>
+              {FIELDS.map(f => (
+                <th key={f.key} style={thStyle}>{f.emoji} {f.label}</th>
+              ))}
+              <th style={{ ...thStyle, color: TEXT_PRIMARY }}>TOTAL</th>
+              <th style={{ ...thStyle, width: 120 }}>Copy from</th>
+            </tr>
+          </thead>
+          <tbody>
+            {attendees.map(a => {
+              const total = rowTotal(a.id)
+              return (
+                <tr key={a.id} style={{ transition: "background 0.1s" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                  <td style={{ ...tdStyle, textAlign: "left", fontWeight: 500 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: "50%",
+                        background: avatarColor(getName(a)),
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 11, fontWeight: 600, color: "#fff", flexShrink: 0,
+                      }}>{initials(getName(a))}</div>
+                      {getName(a)}
+                    </div>
+                  </td>
+                  {FIELDS.map(f => {
+                    const cellKey = `${a.id}-${f.key}`
+                    const val = budgets[a.id]?.[f.key] ?? 0
+                    const isEditing = editingCell === cellKey
+                    return (
+                      <td key={f.key} style={{ ...tdStyle, padding: 0 }}>
+                        {isEditing ? (
+                          <input
+                            autoFocus
+                            type="number"
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            onBlur={() => { saveCell(a.id, f.key, Number(editValue) || 0); setEditingCell(null) }}
+                            onKeyDown={e => { if (e.key === "Enter") { saveCell(a.id, f.key, Number(editValue) || 0); setEditingCell(null) } if (e.key === "Escape") setEditingCell(null) }}
+                            style={{
+                              background: "rgba(192,139,136,0.08)", border: `1px solid ${ROSE_GOLD}`,
+                              borderRadius: 4, padding: "6px 10px", color: TEXT_PRIMARY, fontSize: 13,
+                              fontFamily: "'DM Sans', sans-serif", outline: "none", width: "100%",
+                              textAlign: "right",
+                            }}
+                          />
+                        ) : (
+                          <div
+                            onClick={() => { setEditingCell(cellKey); setEditValue(String(val)) }}
+                            style={{
+                              padding: "8px 12px", cursor: "pointer", textAlign: "right",
+                              borderRadius: 4, transition: "background 0.1s",
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                          >
+                            {val > 0 ? `${sym}${val.toLocaleString()}` : <span style={{ color: TEXT_TERTIARY }}>—</span>}
+                          </div>
+                        )}
+                      </td>
+                    )
+                  })}
+                  <td style={{ ...tdStyle, fontWeight: 600, color: TEXT_PRIMARY }}>
+                    {sym}{total.toLocaleString()}
+                  </td>
+                  <td style={{ ...tdStyle, padding: "4px 8px" }}>
+                    <select
+                      value={copyFrom}
+                      onChange={e => { if (e.target.value) { copyBudget(e.target.value, a.id); e.target.value = "" } }}
+                      style={{ ...selectStyle, padding: "4px 24px 4px 8px", fontSize: 11, width: "100%" }}
+                    >
+                      <option value="">Copy...</option>
+                      {attendees.filter(o => o.id !== a.id).map(o => (
+                        <option key={o.id} value={o.id}>{getName(o)}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              )
+            })}
+            {/* Totals row */}
+            <tr style={{ background: "rgba(255,255,255,0.02)" }}>
+              <td style={{ ...tdStyle, textAlign: "left", fontWeight: 700, color: TEXT_PRIMARY, borderBottom: "none" }}>TOTAL</td>
+              {FIELDS.map(f => (
+                <td key={f.key} style={{ ...tdStyle, fontWeight: 700, color: TEXT_PRIMARY, borderBottom: "none" }}>
+                  {sym}{colTotal(f.key).toLocaleString()}
+                </td>
+              ))}
+              <td style={{ ...tdStyle, fontWeight: 700, borderBottom: "none" }}>
+                <span style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: ROSE_GOLD }}>{sym}{grandTotal.toLocaleString()}</span>
+              </td>
+              <td style={{ ...tdStyle, borderBottom: "none" }} />
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   )
