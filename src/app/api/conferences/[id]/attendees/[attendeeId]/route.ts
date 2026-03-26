@@ -24,6 +24,7 @@ export async function PATCH(
     if (body.ticketCost !== undefined) data.ticketCost = parseFloat(body.ticketCost) || 0
     if (body.hotelCost !== undefined) data.hotelCost = parseFloat(body.hotelCost) || 0
     if (body.flightCost !== undefined) data.flightCost = parseFloat(body.flightCost) || 0
+    if (body.taxiCost !== undefined) data.taxiCost = parseFloat(body.taxiCost) || 0
     if (body.mealsCost !== undefined) data.mealsCost = parseFloat(body.mealsCost) || 0
     if (body.otherCost !== undefined) data.otherCost = parseFloat(body.otherCost) || 0
     if (body.budgetNotes !== undefined) data.budgetNotes = body.budgetNotes

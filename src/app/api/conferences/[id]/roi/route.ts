@@ -20,6 +20,7 @@ export async function GET(
             ticketCost: true,
             hotelCost: true,
             flightCost: true,
+            taxiCost: true,
             mealsCost: true,
             otherCost: true,
           },
@@ -40,7 +41,7 @@ export async function GET(
 
     // Calculate total cost from all attendee budgets
     const totalCost = conference.attendees.reduce((sum, a) =>
-      sum + (a.ticketCost ?? 0) + (a.hotelCost ?? 0) + (a.flightCost ?? 0) + (a.mealsCost ?? 0) + (a.otherCost ?? 0), 0)
+      sum + (a.ticketCost ?? 0) + (a.hotelCost ?? 0) + (a.flightCost ?? 0) + (a.taxiCost ?? 0) + (a.mealsCost ?? 0) + (a.otherCost ?? 0), 0)
 
     const contactsCollected = conference.collectedContacts.length
     const crmLeads = conference.collectedContacts.filter((c) => c.addedToCrm).length

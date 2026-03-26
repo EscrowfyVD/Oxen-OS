@@ -13,7 +13,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { updates } = body as { updates: { attendeeId: string; ticketCost?: number; hotelCost?: number; flightCost?: number; mealsCost?: number; otherCost?: number; budgetNotes?: string }[] }
+    const { updates } = body as { updates: { attendeeId: string; ticketCost?: number; hotelCost?: number; flightCost?: number; taxiCost?: number; mealsCost?: number; otherCost?: number; budgetNotes?: string }[] }
 
     if (!Array.isArray(updates)) {
       return NextResponse.json({ error: "Missing updates array" }, { status: 400 })
@@ -25,6 +25,7 @@ export async function PATCH(
         if (u.ticketCost !== undefined) data.ticketCost = u.ticketCost
         if (u.hotelCost !== undefined) data.hotelCost = u.hotelCost
         if (u.flightCost !== undefined) data.flightCost = u.flightCost
+        if (u.taxiCost !== undefined) data.taxiCost = u.taxiCost
         if (u.mealsCost !== undefined) data.mealsCost = u.mealsCost
         if (u.otherCost !== undefined) data.otherCost = u.otherCost
         if (u.budgetNotes !== undefined) data.budgetNotes = u.budgetNotes

@@ -59,7 +59,7 @@ interface Conference {
   reportStatus?: string
   currency?: string
   color?: string
-  attendees?: { employeeId: string; employee?: { id: string; name: string }; name?: string; role: string; ticketCost?: number; hotelCost?: number; flightCost?: number; mealsCost?: number; otherCost?: number }[]
+  attendees?: { employeeId: string; employee?: { id: string; name: string }; name?: string; role: string; ticketCost?: number; hotelCost?: number; flightCost?: number; taxiCost?: number; mealsCost?: number; otherCost?: number }[]
   report?: { id: string } | null
   _count?: { collectedContacts: number }
 }
@@ -113,7 +113,7 @@ function getWeekStart(date: Date) {
 
 function confTotalBudget(c: Conference) {
   return (c.attendees || []).reduce((sum, a) =>
-    sum + (a.ticketCost || 0) + (a.hotelCost || 0) + (a.flightCost || 0) + (a.mealsCost || 0) + (a.otherCost || 0), 0)
+    sum + (a.ticketCost || 0) + (a.hotelCost || 0) + (a.flightCost || 0) + (a.taxiCost || 0) + (a.mealsCost || 0) + (a.otherCost || 0), 0)
 }
 
 function attName(att: Conference["attendees"] extends (infer T)[] | undefined ? T : never) {

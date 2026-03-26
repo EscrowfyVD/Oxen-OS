@@ -87,6 +87,7 @@ type Attendee = {
   ticketCost?: number
   hotelCost?: number
   flightCost?: number
+  taxiCost?: number
   mealsCost?: number
   otherCost?: number
   budgetNotes?: string | null
@@ -836,11 +837,12 @@ function OverviewTab({ conf, employees, onUpdate }: { conf: Conference; employee
    BUDGET TAB
    ═══════════════════════════════════════════ */
 function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void }) {
-  type CostField = "ticketCost" | "hotelCost" | "flightCost" | "mealsCost" | "otherCost"
+  type CostField = "ticketCost" | "hotelCost" | "flightCost" | "taxiCost" | "mealsCost" | "otherCost"
   const FIELDS: { key: CostField; label: string; emoji: string }[] = [
     { key: "ticketCost", label: "Tickets", emoji: "🎫" },
     { key: "hotelCost", label: "Hotel", emoji: "🏨" },
     { key: "flightCost", label: "Flights", emoji: "✈️" },
+    { key: "taxiCost", label: "Taxi", emoji: "🚕" },
     { key: "mealsCost", label: "Meals", emoji: "🍽" },
     { key: "otherCost", label: "Other", emoji: "📦" },
   ]
@@ -857,6 +859,7 @@ function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void 
         ticketCost: a.ticketCost ?? 0,
         hotelCost: a.hotelCost ?? 0,
         flightCost: a.flightCost ?? 0,
+        taxiCost: a.taxiCost ?? 0,
         mealsCost: a.mealsCost ?? 0,
         otherCost: a.otherCost ?? 0,
       }
