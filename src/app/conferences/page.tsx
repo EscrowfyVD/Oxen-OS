@@ -227,8 +227,14 @@ export default function ConferencesPage() {
   const fetchConferences = useCallback(() => {
     setLoading(true)
     fetch("/api/conferences")
-      .then((r) => r.json())
-      .then((data) => setConferences(data.conferences ?? data ?? []))
+      .then((r) => {
+        if (!r.ok) throw new Error(`API ${r.status}`)
+        return r.json()
+      })
+      .then((data) => {
+        const list = data.conferences ?? data ?? []
+        setConferences(Array.isArray(list) ? list : [])
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
