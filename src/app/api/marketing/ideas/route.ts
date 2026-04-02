@@ -24,6 +24,13 @@ export async function GET(request: Request) {
   const ideas = await prisma.contentIdea.findMany({
     where,
     orderBy: [{ updatedAt: "desc" }],
+    include: {
+      complianceChecks: {
+        select: { id: true, status: true, score: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
   })
 
   return NextResponse.json({ ideas })

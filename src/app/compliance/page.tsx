@@ -644,6 +644,9 @@ function OverviewTab({ overview }: { overview: OverviewData | null }) {
           <ComplianceBar label="Incidents Resolved" value={(overview.incidents["resolved"] || 0) + (overview.incidents["closed"] || 0)} total={totalIncidents} color="#8B5CF6" />
         </div>
       </div>
+
+      {/* Marketing Content Pending Review */}
+      <PendingContentReview />
     </div>
   )
 }
@@ -710,6 +713,61 @@ function RiskHeatmap() {
             {item.label}
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function PendingContentReview() {
+  const [pending, setPending] = useState<{ id: string; contentText: string; platform: string; status: string; score: number | null; overallRisk: string | null; createdBy: string; createdAt: string }[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/marketing/compliance-checks/pending")
+      .then((r) => r.json())
+      .then((data) => { setPending(data.checks ?? []); setLoaded(true) })
+      .catch(() => setLoaded(true))
+  }, [])
+
+  if (!loaded || pending.length === 0) return null
+
+  return (
+    <div style={{ background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 14, padding: 24, marginTop: 16 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 600, color: textPrimary, margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
+        <ShieldCheck size={16} color="#FBBF24" /> Marketing Content Pending Review
+        <span style={{ fontSize: 11, fontWeight: 400, color: "#FBBF24", background: "rgba(251,191,36,0.15)", padding: "2px 8px", borderRadius: 10 }}>
+          {pending.length}
+        </span>
+      </h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {pending.map((c) => {
+          const preview = c.contentText.length > 80 ? c.contentText.slice(0, 80) + "..." : c.contentText
+          const riskColor = c.overallRisk === "critical" ? "#EF4444" : c.overallRisk === "high" ? "#F59E0B" : c.overallRisk === "medium" ? "#FBBF24" : "#9CA3AF"
+          return (
+            <div key={c.id} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 8,
+              border: `1px solid ${cardBorder}`,
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: textPrimary, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview}</div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "rgba(255,255,255,0.06)", color: textSecondary, textTransform: "capitalize" }}>{c.platform}</span>
+                  <span style={{ fontSize: 10, color: riskColor, fontWeight: 600 }}>
+                    {c.status === "rejected" ? "❌ Rejected" : "⚠️ Needs Changes"} · {c.score !== null ? `${c.score}/100` : ""}
+                  </span>
+                  <span style={{ fontSize: 10, color: textTertiary }}>by {c.createdBy} · {new Date(c.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+              <a
+                href="/marketing"
+                style={{ fontSize: 11, color: roseGold, textDecoration: "none", padding: "4px 10px", borderRadius: 4, background: "rgba(192,139,136,0.1)", whiteSpace: "nowrap" }}
+              >
+                Review →
+              </a>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

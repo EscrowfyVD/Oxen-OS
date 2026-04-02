@@ -30,6 +30,7 @@ export interface ContentIdea {
   createdBy: string
   createdAt: string
   updatedAt: string
+  complianceChecks?: { id: string; status: string; score: number | null }[]
 }
 
 export interface MarketingIntel {

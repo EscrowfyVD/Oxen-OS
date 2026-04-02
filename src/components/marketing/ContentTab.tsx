@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { ShieldCheck } from "lucide-react"
 import {
   CARD_BG, CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   ROSE_GOLD, GREEN, AMBER, RED,
   IDEA_STATUSES, STATUS_COLORS, PLATFORM_COLORS, PRIORITIES,
 } from "./constants"
+import { CheckModal } from "./ComplianceCheckTab"
 import type { ContentIdea } from "./types"
 
 interface ContentTabProps {
@@ -13,11 +15,13 @@ interface ContentTabProps {
   onEdit: (idea: ContentIdea) => void
   onAdd: () => void
   onStatusChange: (id: string, status: string) => void
+  onRefresh?: () => void
 }
 
-export default function ContentTab({ ideas, onEdit, onAdd, onStatusChange }: ContentTabProps) {
+export default function ContentTab({ ideas, onEdit, onAdd, onStatusChange, onRefresh }: ContentTabProps) {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
   const [showRejected, setShowRejected] = useState(false)
+  const [checkingIdea, setCheckingIdea] = useState<ContentIdea | null>(null)
 
   const columns = IDEA_STATUSES.filter((s) => s.id !== "rejected")
   const rejectedIdeas = ideas.filter((i) => i.status === "rejected")
@@ -89,7 +93,7 @@ export default function ContentTab({ ideas, onEdit, onAdd, onStatusChange }: Con
               {/* Cards */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {colIdeas.map((idea) => (
-                  <IdeaCard key={idea.id} idea={idea} onEdit={onEdit} onDragStart={handleDragStart} />
+                  <IdeaCard key={idea.id} idea={idea} onEdit={onEdit} onDragStart={handleDragStart} onCheckCompliance={setCheckingIdea} />
                 ))}
               </div>
             </div>
@@ -114,11 +118,24 @@ export default function ContentTab({ ideas, onEdit, onAdd, onStatusChange }: Con
           {showRejected && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginTop: 8, opacity: 0.5 }}>
               {rejectedIdeas.map((idea) => (
-                <IdeaCard key={idea.id} idea={idea} onEdit={onEdit} onDragStart={handleDragStart} />
+                <IdeaCard key={idea.id} idea={idea} onEdit={onEdit} onDragStart={handleDragStart} onCheckCompliance={setCheckingIdea} />
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {/* Compliance Check Modal from Content Idea */}
+      {checkingIdea && (
+        <CheckModal
+          onClose={() => setCheckingIdea(null)}
+          onSuccess={() => { setCheckingIdea(null); onRefresh?.() }}
+          prefill={{
+            platform: checkingIdea.platform || undefined,
+            contentText: checkingIdea.description || "",
+            contentIdeaId: checkingIdea.id,
+          }}
+        />
       )}
     </div>
   )
@@ -128,11 +145,21 @@ interface IdeaCardProps {
   idea: ContentIdea
   onEdit: (idea: ContentIdea) => void
   onDragStart: (e: React.DragEvent, id: string) => void
+  onCheckCompliance: (idea: ContentIdea) => void
 }
 
-function IdeaCard({ idea, onEdit, onDragStart }: IdeaCardProps) {
+function IdeaCard({ idea, onEdit, onDragStart, onCheckCompliance }: IdeaCardProps) {
   const platformColor = idea.platform ? PLATFORM_COLORS[idea.platform] || TEXT_TERTIARY : null
   const priorityDef = PRIORITIES.find((p) => p.id === idea.priority)
+  const latestCheck = idea.complianceChecks?.[0]
+
+  const complianceBadge = latestCheck ? {
+    approved: { emoji: "✅", color: "#34D399", bg: "rgba(52,211,153,0.12)" },
+    needs_changes: { emoji: "⚠️", color: "#FBBF24", bg: "rgba(251,191,36,0.12)" },
+    rejected: { emoji: "❌", color: "#EF4444", bg: "rgba(239,68,68,0.12)" },
+    checking: { emoji: "🔄", color: "#60A5FA", bg: "rgba(96,165,250,0.12)" },
+    pending: { emoji: "⏳", color: "#9CA3AF", bg: "rgba(156,163,175,0.12)" },
+  }[latestCheck.status] : null
 
   return (
     <div
@@ -171,6 +198,16 @@ function IdeaCard({ idea, onEdit, onDragStart }: IdeaCardProps) {
             {idea.type}
           </span>
         )}
+        {/* Compliance badge */}
+        {complianceBadge && (
+          <span style={{
+            fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
+            background: complianceBadge.bg, color: complianceBadge.color,
+            fontFamily: "'DM Sans', sans-serif",
+          }}>
+            {complianceBadge.emoji} {latestCheck?.score !== null ? `${latestCheck?.score}` : ""}
+          </span>
+        )}
         {/* Priority dot */}
         <span style={{
           width: 6, height: 6, borderRadius: "50%",
@@ -196,8 +233,23 @@ function IdeaCard({ idea, onEdit, onDragStart }: IdeaCardProps) {
 
       {/* Footer */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 9, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
-        {idea.assignedTo && <span>{idea.assignedTo}</span>}
-        {idea.scheduledFor && <span>{new Date(idea.scheduledFor).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {idea.assignedTo && <span>{idea.assignedTo}</span>}
+          {idea.scheduledFor && <span>{new Date(idea.scheduledFor).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>}
+        </div>
+        {idea.status === "draft" && !latestCheck && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onCheckCompliance(idea) }}
+            style={{
+              background: "rgba(192,139,136,0.1)", border: "none", borderRadius: 4,
+              padding: "2px 6px", cursor: "pointer", display: "flex", alignItems: "center", gap: 3,
+              fontSize: 9, color: ROSE_GOLD, fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
+            }}
+            title="Run compliance check"
+          >
+            <ShieldCheck size={10} /> Check
+          </button>
+        )}
       </div>
     </div>
   )

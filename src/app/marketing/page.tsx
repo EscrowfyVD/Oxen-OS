@@ -7,6 +7,7 @@ import MetricsTab from "@/components/marketing/MetricsTab"
 import IntelTab from "@/components/marketing/IntelTab"
 import IdeaModal from "@/components/marketing/IdeaModal"
 import IntelModal from "@/components/marketing/IntelModal"
+import ComplianceCheckTab from "@/components/marketing/ComplianceCheckTab"
 import { fmtNum } from "@/components/marketing/constants"
 import type { SocialMetric, ContentIdea, MarketingIntel, MarketingSummary, Employee } from "@/components/marketing/types"
 
@@ -18,12 +19,13 @@ const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
 const CARD_BG = "#0F1118"
 const GREEN = "#34D399"
 
-type TabId = "overview" | "content" | "metrics" | "intel"
+type TabId = "overview" | "content" | "metrics" | "intel" | "compliance"
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "content", label: "Content Ideas" },
   { id: "metrics", label: "Social Metrics" },
   { id: "intel", label: "Veille / Intel" },
+  { id: "compliance", label: "✅ Compliance Check" },
 ]
 
 export default function MarketingPage() {
@@ -273,6 +275,7 @@ export default function MarketingPage() {
             onEdit={openEditIdea}
             onAdd={openNewIdea}
             onStatusChange={handleStatusChange}
+            onRefresh={fetchIdeas}
           />
         )}
         {activeTab === "metrics" && (
@@ -288,6 +291,9 @@ export default function MarketingPage() {
             onEdit={openEditIntel}
             onDelete={handleDeleteIntel}
           />
+        )}
+        {activeTab === "compliance" && (
+          <ComplianceCheckTab />
         )}
       </div>
 

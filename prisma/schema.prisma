@@ -398,21 +398,53 @@ model SocialMetrics {
 }
 
 model ContentIdea {
-  id           String    @id @default(cuid())
-  title        String
-  description  String?   @db.Text
-  platform     String?
-  type         String?
-  status       String    @default("idea")
-  priority     String    @default("medium")
-  scheduledFor DateTime?
-  publishedAt  DateTime?
-  assignedTo   String?
-  tags         String[]
-  notes        String?   @db.Text
-  createdBy    String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  title            String
+  description      String?   @db.Text
+  platform         String?
+  type             String?
+  status           String    @default("idea")
+  priority         String    @default("medium")
+  scheduledFor     DateTime?
+  publishedAt      DateTime?
+  assignedTo       String?
+  tags             String[]
+  notes            String?   @db.Text
+  createdBy        String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  complianceChecks ContentComplianceCheck[]
+}
+
+model ContentComplianceCheck {
+  id              String       @id @default(cuid())
+  contentIdeaId   String?
+  contentIdea     ContentIdea? @relation(fields: [contentIdeaId], references: [id])
+  platform        String
+  contentType     String
+  contentText     String       @db.Text
+  imageUrl        String?
+  targetAudience  String?
+  jurisdictions   String[]
+
+  status          String       @default("pending")
+  overallRisk     String?
+  score           Int?
+  findings        Json?
+  summary         String?      @db.Text
+
+  checkedAt       DateTime?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+
+  sourceType      String?
+  sourceFileName  String?
+  sourceDriveId   String?
+
+  createdBy       String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 }
 
 model MarketingIntel {
