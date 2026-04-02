@@ -572,6 +572,7 @@ model LeaveRequest {
   reviewedAt    DateTime?
   reviewNote    String?   @db.Text
   totalDays     Float     @default(0)
+  source        String    @default("request") // "request" | "manual" | "bulk_import"
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }

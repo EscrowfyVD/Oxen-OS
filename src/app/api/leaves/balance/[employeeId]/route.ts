@@ -61,8 +61,16 @@ export async function PATCH(
   }
 
   const body = await request.json()
-  const { vacationTotal, sickTotal, oooTotal, year: bodyYear } = body
+  const { vacationTotal, vacationUsed, sickTotal, sickUsed, oooTotal, oooUsed, year: bodyYear, auditNote } = body
   const year = bodyYear ?? new Date().getFullYear()
+
+  const data: Record<string, unknown> = {}
+  if (vacationTotal !== undefined) data.vacationTotal = vacationTotal
+  if (vacationUsed !== undefined) data.vacationUsed = vacationUsed
+  if (sickTotal !== undefined) data.sickTotal = sickTotal
+  if (sickUsed !== undefined) data.sickUsed = sickUsed
+  if (oooTotal !== undefined) data.oooTotal = oooTotal
+  if (oooUsed !== undefined) data.oooUsed = oooUsed
 
   // Upsert balance
   const balance = await prisma.leaveBalance.upsert({
@@ -70,16 +78,23 @@ export async function PATCH(
     create: {
       employeeId,
       year,
-      ...(vacationTotal !== undefined && { vacationTotal }),
-      ...(sickTotal !== undefined && { sickTotal }),
-      ...(oooTotal !== undefined && { oooTotal }),
+      ...data,
     },
-    update: {
-      ...(vacationTotal !== undefined && { vacationTotal }),
-      ...(sickTotal !== undefined && { sickTotal }),
-      ...(oooTotal !== undefined && { oooTotal }),
-    },
+    update: data,
   })
+
+  // Log the activity if there's an audit note
+  if (auditNote) {
+    try {
+      const { logActivity } = await import("@/lib/activity")
+      logActivity(
+        "leave_balance_adjusted",
+        `Balance adjusted: ${auditNote}`,
+        me.id,
+        employeeId,
+      )
+    } catch { /* activity log is optional */ }
+  }
 
   return NextResponse.json({ balance })
 }

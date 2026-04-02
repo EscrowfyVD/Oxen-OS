@@ -22,6 +22,7 @@ export interface LeaveRequest {
   reviewedAt: string | null
   reviewNote: string | null
   totalDays: number
+  source?: string
   createdAt: string
 }
 

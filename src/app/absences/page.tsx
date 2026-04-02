@@ -301,6 +301,7 @@ export default function AbsencesPage() {
             onApprove={handleApprove}
             onReject={handleReject}
             onEditQuota={setEditingQuota}
+            onRefresh={() => { fetchAllRequests(); fetchAllBalances(); fetchWhoIsOut(); fetchCalendarLeaves() }}
           />
         )}
       </div>
