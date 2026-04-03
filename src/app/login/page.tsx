@@ -38,20 +38,15 @@ function LoginContent() {
         <div style={{ padding: "36px 32px 32px" }}>
           {/* Brand Mark */}
           <div className="flex justify-center" style={{ marginBottom: 24 }}>
-            <div
-              className="flex items-center justify-center font-bold"
+            <img
+              src="/oxen-logo.svg"
+              alt="Oxen"
               style={{
                 width: 64,
                 height: 64,
-                borderRadius: 14,
-                background: "var(--logo-gradient, linear-gradient(135deg, #C08B88, #D4A5A2))",
-                color: "#060709",
-                fontSize: 28,
-                fontFamily: "'Bellfair', serif",
+                objectFit: "contain",
               }}
-            >
-              O
-            </div>
+            />
           </div>
 
           <h1

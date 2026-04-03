@@ -169,28 +169,16 @@ export default function Sidebar() {
           }}
         >
           <div className="flex items-center gap-3">
-            <div
-              className="flex items-center justify-center"
+            <img
+              src="/oxen-logo.svg"
+              alt="Oxen"
               style={{
                 width: 32,
                 height: 32,
-                borderRadius: 8,
-                background: "var(--logo-gradient)",
+                objectFit: "contain",
                 flexShrink: 0,
               }}
-            >
-              <span
-                style={{
-                  fontFamily: "'Bellfair', serif",
-                  fontSize: 18,
-                  color: "var(--void)",
-                  fontWeight: 400,
-                  lineHeight: 1,
-                }}
-              >
-                O
-              </span>
-            </div>
+            />
             <span
               style={{
                 fontFamily: "'Bellfair', serif",
