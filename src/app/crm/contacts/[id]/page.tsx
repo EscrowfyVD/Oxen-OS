@@ -8,6 +8,7 @@ import {
   VERTICALS, SUB_VERTICALS, GEO_ZONES, DEAL_OWNERS,
   ACQUISITION_SOURCES, CRM_COLORS, fmtCurrency,
 } from "@/lib/crm-config"
+import SupportTab from "@/components/crm/SupportTab"
 
 /* ── Design Tokens ── */
 const BG = "#060709"
@@ -146,7 +147,7 @@ export default function ContactDetailPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [contact, setContact] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<"activity" | "deals" | "emails" | "files" | "signals">("activity")
+  const [activeTab, setActiveTab] = useState<"activity" | "deals" | "emails" | "files" | "signals" | "support">("activity")
 
   // Activity state
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -380,7 +381,7 @@ export default function ContactDetailPage() {
 
           {/* Tab bar */}
           <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3 }}>
-            {(["activity", "deals", "emails", "files", "signals"] as const).map((tab) => (
+            {(["activity", "deals", "emails", "files", "signals", "support"] as const).map((tab) => (
               <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: "7px 16px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, border: "none", borderRadius: 6, cursor: "pointer", transition: "all 0.15s", background: activeTab === tab ? `${ROSE}22` : "transparent", color: activeTab === tab ? TEXT : TEXT2, textTransform: "capitalize" }}>
                 {tab === "activity" ? "Activity" : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
@@ -517,6 +518,9 @@ export default function ContactDetailPage() {
               )}
             </GlassCard>
           )}
+
+          {/* ── Tab: Support ── */}
+          {activeTab === "support" && <SupportTab contactId={id} />}
 
           {/* ── Tab: Signals ── */}
           {activeTab === "signals" && (

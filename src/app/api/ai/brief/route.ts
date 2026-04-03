@@ -89,6 +89,23 @@ export async function POST(request: Request) {
       }
     }
 
+    // Fetch open support tickets for context
+    if (contact) {
+      const openTickets = await prisma.supportTicket.findMany({
+        where: { contactId: contact.id, status: { in: ["open", "in_progress", "waiting_client"] } },
+        select: { subject: true, priority: true, status: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      })
+      if (openTickets.length > 0) {
+        const latest = openTickets[0]
+        contextParts.push(`\n## ⚠️ Active Support Issues: ${openTickets.length} open ticket${openTickets.length > 1 ? "s" : ""}. Latest: ${latest.subject} (${latest.priority})`)
+        for (const t of openTickets) {
+          contextParts.push(`- [${t.status.replace(/_/g, " ")}] ${t.subject} | Priority: ${t.priority} | Created: ${new Date(t.createdAt).toLocaleDateString()}`)
+        }
+      }
+    }
+
     const prompt = `Generate a comprehensive meeting brief for the following meeting. Return ONLY a valid JSON object.
 
 MEETING: ${title}

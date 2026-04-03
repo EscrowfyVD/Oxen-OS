@@ -264,6 +264,51 @@ export async function POST() {
       }
     }
 
+    // ─── Auto-create support tickets from support-related emails ───
+    const supportAddresses = ["support@oxen.finance", "help@oxen.finance"]
+    try {
+      const recentEmails = await prisma.email.findMany({
+        where: {
+          syncedBy: userEmail,
+          direction: "inbound",
+          date: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+        },
+        orderBy: { date: "desc" },
+        take: 200,
+      })
+
+      for (const email of recentEmails) {
+        const isToSupport = email.to?.some((addr: string) =>
+          supportAddresses.some((sa) => addr.toLowerCase().includes(sa))
+        )
+        if (!isToSupport) continue
+
+        const senderEmail = extractEmail(email.from)
+
+        // Check for existing open ticket with same sender
+        const existing = await prisma.supportTicket.findFirst({
+          where: {
+            clientEmail: { equals: senderEmail, mode: "insensitive" },
+            status: { in: ["open", "in_progress", "waiting_client"] },
+          },
+        })
+        if (!existing) {
+          const { createAutoTicket } = await import("@/lib/support-auto")
+          await createAutoTicket({
+            subject: email.subject || "Email Support Request",
+            clientName: senderEmail.split("@")[0],
+            clientEmail: senderEmail,
+            channel: "email",
+            message: email.bodyText?.substring(0, 2000) || null,
+            source: "email_auto",
+          })
+        }
+      }
+    } catch (autoTicketError) {
+      console.error("Auto-ticket creation error:", autoTicketError)
+      // Non-blocking — email sync still succeeded
+    }
+
     return NextResponse.json({ success: true, synced, matched })
   } catch (error) {
     console.error("Email sync error:", error)

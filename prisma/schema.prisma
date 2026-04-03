@@ -637,6 +637,10 @@ model SupportTicket {
   assignedTo      String?
   contactId       String?
   contact         CrmContact?      @relation(fields: [contactId], references: [id])
+  source          String    @default("manual")    // "manual", "email_auto", "website_form", "telegram"
+  slaResponseMinutes  Int?
+  slaResolutionMinutes Int?
+  slaBreached     Boolean   @default(false)
   messages        SupportMessage[]
   tasks           Task[]
   resolvedAt      DateTime?

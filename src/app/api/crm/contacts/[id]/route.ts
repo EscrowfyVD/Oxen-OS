@@ -22,6 +22,7 @@ export async function GET(
         tasks: { orderBy: { dueDate: "asc" }, where: { status: "pending" } },
         introducer: { select: { id: true, firstName: true, lastName: true, email: true } },
         referredContacts: { select: { id: true, firstName: true, lastName: true, email: true } },
+        supportTickets: { select: { id: true, subject: true, status: true, priority: true, createdAt: true }, orderBy: { createdAt: "desc" }, take: 5 },
       },
     })
 

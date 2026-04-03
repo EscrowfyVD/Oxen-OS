@@ -39,6 +39,40 @@ export async function POST(request: Request) {
       await handleBrief(chatId)
     } else if (text.startsWith("/digest")) {
       await handleDigest(chatId)
+    } else if (text.startsWith("/support")) {
+      const description = text.replace(/^\/support\s*/, "").trim()
+      if (!description) {
+        await sendTelegramMessage(
+          chatId,
+          "Usage: /support [describe your issue]\n\nExample: /support I need help with my account setup",
+        )
+        return NextResponse.json({ ok: true })
+      }
+
+      const employee = await prisma.employee.findFirst({
+        where: { telegramChatId: String(chatId) },
+        select: { name: true, email: true },
+      })
+
+      const { createAutoTicket } = await import("@/lib/support-auto")
+      const result = await createAutoTicket({
+        subject:
+          description.length > 100
+            ? description.substring(0, 100) + "..."
+            : description,
+        clientName: employee?.name || `Telegram User ${chatId}`,
+        clientEmail: employee?.email || null,
+        channel: "telegram",
+        message: description,
+        source: "telegram",
+      })
+
+      const ticketRef = result.ticket.id.slice(-8).toUpperCase()
+      await sendTelegramMessage(
+        chatId,
+        `✅ Support ticket created!\n\n📋 Reference: #${ticketRef}\n📌 Priority: ${result.ticket.priority}\n👤 Assigned to: ${result.ticket.assignedTo}\n⏱ Expected response: ${result.slaLabel}\n\nOur team will follow up shortly.`,
+      )
+      return NextResponse.json({ ok: true })
     } else if (pendingNotes.has(chatId)) {
       // User is replying with a contact name to link their note
       await handleNoteLinking(chatId, text)

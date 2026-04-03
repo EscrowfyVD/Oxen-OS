@@ -22,6 +22,8 @@ export async function GET(request: Request) {
   if (category && category !== "all") where.category = category
   if (channel && channel !== "all") where.channel = channel
   if (assignedTo && assignedTo !== "all") where.assignedTo = assignedTo
+  const contactId = searchParams.get("contactId")
+  if (contactId) where.contactId = contactId
   if (search) {
     where.OR = [
       { subject: { contains: search, mode: "insensitive" } },

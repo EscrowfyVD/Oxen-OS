@@ -6,6 +6,7 @@ import TableView from "@/components/crm/TableView"
 import CardView from "@/components/crm/CardView"
 import ContactModal from "@/components/crm/ContactModal"
 import DealModal from "@/components/crm/DealModal"
+import PersonalDashboard from "@/components/crm/PersonalDashboard"
 import type { Contact, Employee } from "@/components/crm/types"
 import type { PipelineDeal } from "@/components/crm/PipelineView"
 import {
@@ -31,7 +32,7 @@ const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 
 type ViewMode = "kanban" | "table" | "cards"
-type SubNav = "pipeline" | "contacts" | "companies" | "reports"
+type SubNav = "dashboard" | "pipeline" | "contacts" | "companies" | "reports"
 
 /* ── Filter state shape ── */
 interface Filters {
@@ -54,7 +55,8 @@ export default function CrmPage() {
 
   /* ── UI state ── */
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
-  const [subNav, setSubNav] = useState<SubNav>("pipeline")
+  const [subNav, setSubNav] = useState<SubNav>("dashboard")
+  const [currentEmployee, setCurrentEmployee] = useState<{ name: string; isAdmin: boolean } | null>(null)
   const [filters, setFilters] = useState<Filters>({
     owner: "All",
     verticals: [],
@@ -95,6 +97,12 @@ export default function CrmPage() {
         const dept = (data.employee?.department ?? "").toLowerCase()
         setHasAccess(dept !== "compliance")
         setAccessChecked(true)
+        if (data.employee) {
+          setCurrentEmployee({
+            name: data.employee.name,
+            isAdmin: data.employee.isAdmin || data.employee.roleLevel === "super_admin",
+          })
+        }
       })
       .catch(() => setAccessChecked(true))
   }, [])
@@ -108,7 +116,7 @@ export default function CrmPage() {
   }, [])
 
   const fetchContacts = useCallback(() => {
-    fetch("/api/contacts")
+    fetch("/api/crm/contacts")
       .then((r) => r.json())
       .then((data) => setContacts(data.contacts ?? []))
       .catch(() => {})
@@ -378,6 +386,7 @@ export default function CrmPage() {
             >
               {(
                 [
+                  { id: "dashboard", label: "Dashboard" },
                   { id: "pipeline", label: "Pipeline" },
                   { id: "contacts", label: "Contacts" },
                   { id: "companies", label: "Companies" },
@@ -678,6 +687,17 @@ export default function CrmPage() {
 
       {/* ══════════ CONTENT AREA ══════════ */}
       <div style={{ padding: "24px 32px" }}>
+        {subNav === "dashboard" && currentEmployee && (
+          <PersonalDashboard
+            ownerName={currentEmployee.isAdmin ? null : currentEmployee.name}
+            isAdmin={currentEmployee.isAdmin}
+            onStageClick={(stageId) => {
+              setFilters((f) => ({ ...f, owner: currentEmployee.name }))
+              setSubNav("pipeline")
+            }}
+          />
+        )}
+
         {subNav === "pipeline" && (
           <>
             {viewMode === "kanban" && (
