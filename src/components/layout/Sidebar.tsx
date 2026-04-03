@@ -156,8 +156,8 @@ export default function Sidebar() {
         }`}
         style={{
           width: 220,
-          background: "linear-gradient(180deg, var(--subtle-dark) 0%, var(--void) 100%)",
-          borderRight: "1px solid var(--card-border)",
+          background: "linear-gradient(180deg, #0D0F14 0%, #080A0E 50%, #060709 100%)",
+          borderRight: "1px solid rgba(255,255,255,0.04)",
           transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
           padding: "28px 0",
         }}

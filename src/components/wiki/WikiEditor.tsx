@@ -192,7 +192,7 @@ export default function WikiEditor({
   if (!editor) return null
 
   return (
-    <div style={{ background: "#0F1118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ background: "rgba(15,17,24,0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, overflow: "hidden" }}>
       {/* Toolbar */}
       <div
         style={{

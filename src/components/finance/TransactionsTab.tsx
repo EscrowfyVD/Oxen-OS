@@ -21,13 +21,15 @@ interface TransactionsTabProps {
 type SortKey = "date" | "type" | "category" | "amount" | "entity" | "status"
 
 const thStyle: React.CSSProperties = {
-  padding: "8px 10px", fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY,
-  textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `1px solid ${CARD_BORDER}`,
+  padding: "10px 12px", fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY,
+  textTransform: "uppercase", letterSpacing: 0.8, borderBottom: `1px solid ${CARD_BORDER}`,
   fontFamily: "'DM Sans', sans-serif", cursor: "pointer", userSelect: "none",
+  background: "rgba(255,255,255,0.02)",
 }
 const tdStyle: React.CSSProperties = {
-  padding: "10px 10px", fontSize: 12, color: TEXT_SECONDARY,
-  fontFamily: "'DM Sans', sans-serif", borderBottom: `1px solid rgba(255,255,255,0.03)`,
+  padding: "12px 12px", fontSize: 12, color: TEXT_SECONDARY,
+  fontFamily: "'DM Sans', sans-serif", fontVariantNumeric: "tabular-nums",
+  borderBottom: `1px solid rgba(255,255,255,0.03)`,
 }
 
 export default function TransactionsTab({ transactions, onEdit, onDelete, onAdd, onImport, onExport }: TransactionsTabProps) {
@@ -132,7 +134,7 @@ export default function TransactionsTab({ transactions, onEdit, onDelete, onAdd,
       </div>
 
       {/* Table */}
-      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: CARD_BG, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: `1px solid ${CARD_BORDER}`, borderRadius: 14, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
@@ -150,8 +152,13 @@ export default function TransactionsTab({ transactions, onEdit, onDelete, onAdd,
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ padding: 40, textAlign: "center", color: TEXT_TERTIARY, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
-                  No transactions found. Add your first transaction to get started.
+                <td colSpan={9} style={{ padding: "60px 20px", textAlign: "center" }}>
+                  <div style={{ width: 48, height: 48, margin: "0 auto 16px", borderRadius: 14, background: "linear-gradient(135deg, rgba(192,139,136,0.08), rgba(192,139,136,0.02))", border: "1px solid rgba(192,139,136,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, opacity: 0.6 }}>
+                    {"\u{1F4B3}"}
+                  </div>
+                  <div style={{ fontSize: 13, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6 }}>
+                    No transactions yet — click <strong style={{ color: ROSE_GOLD }}>+ Add Transaction</strong> to get started
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -161,8 +168,11 @@ export default function TransactionsTab({ transactions, onEdit, onDelete, onAdd,
                   <tr
                     key={tx.id}
                     onClick={() => onEdit(tx)}
-                    style={{ cursor: "pointer", transition: "background 0.1s" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+                    style={{
+                      cursor: "pointer", transition: "background 0.15s",
+                      borderLeft: tx.type === "revenue" ? "3px solid rgba(52,211,153,0.3)" : "3px solid rgba(248,113,113,0.2)",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(192,139,136,0.025)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
                     <td style={tdStyle}>
@@ -176,7 +186,16 @@ export default function TransactionsTab({ transactions, onEdit, onDelete, onAdd,
                         {tx.type}
                       </span>
                     </td>
-                    <td style={tdStyle}>{getCategoryLabel(tx.category)}</td>
+                    <td style={tdStyle}>
+                      <span style={{
+                        display: "inline-block", padding: "2px 10px", borderRadius: 6,
+                        background: tx.type === "revenue" ? "rgba(52,211,153,0.08)" : "rgba(192,139,136,0.08)",
+                        color: tx.type === "revenue" ? GREEN : ROSE_GOLD,
+                        fontSize: 10, fontWeight: 500, letterSpacing: 0.3,
+                      }}>
+                        {getCategoryLabel(tx.category)}
+                      </span>
+                    </td>
                     <td style={{ ...tdStyle, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {tx.description || "—"}
                       {tx.reference && <span style={{ color: TEXT_TERTIARY, marginLeft: 6, fontSize: 10 }}>#{tx.reference}</span>}

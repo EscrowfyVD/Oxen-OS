@@ -20,7 +20,7 @@ import { getCategoryColor } from "@/components/wiki/WikiPageCard"
 import DriveDocuments from "@/components/drive/DriveDocuments"
 
 const FROST = "#F0F0F2"
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
@@ -221,7 +221,7 @@ export default function WikiViewPage() {
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 36, lineHeight: 1 }}>{page.icon || "\uD83D\uDCDD"}</span>
           <div style={{ flex: 1 }}>
-            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 28, color: FROST, fontWeight: 400, margin: 0, lineHeight: 1.2 }}>
+            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, color: FROST, fontWeight: 400, margin: 0, lineHeight: 1.2 }}>
               {page.title}
             </h1>
           </div>

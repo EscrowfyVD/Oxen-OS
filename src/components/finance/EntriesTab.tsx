@@ -105,7 +105,7 @@ export default function EntriesTab({ entries, onEdit, onAdd, onImport }: Entries
       </div>
 
       {/* Table */}
-      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>

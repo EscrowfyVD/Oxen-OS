@@ -156,11 +156,12 @@ export default function DashboardPage() {
           <h1
             style={{
               fontFamily: "'Bellfair', serif",
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: 400,
               color: FROST,
               lineHeight: 1.2,
               margin: 0,
+              letterSpacing: "0.5px",
             }}
           >
             Dashboard

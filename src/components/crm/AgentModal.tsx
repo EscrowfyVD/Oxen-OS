@@ -77,7 +77,7 @@ export default function AgentModal({ show, onClose, agent, onSaved }: AgentModal
       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }} onClick={onClose} />
       <div style={{
         position: "relative", width: 560, maxHeight: "85vh", overflow: "auto",
-        background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12,
+        background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14,
         padding: 28, animation: "slideUp 0.2s ease",
       }}>
         <h2 style={{ fontFamily: "'Bellfair', serif", fontSize: 22, color: FROST, margin: "0 0 20px" }}>

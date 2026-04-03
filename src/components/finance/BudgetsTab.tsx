@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react"
 import {
-  CARD_BG, CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
+  CARD_BG, CARD_BORDER, GLASS_BLUR, GLASS_SHADOW,
+  TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   ROSE_GOLD, GREEN, RED, AMBER, CYAN, INDIGO,
   EXPENSE_CATEGORIES, getCategoryLabel, fmtFull, getMonthOptions, getPrevMonth,
 } from "./constants"
@@ -29,10 +30,12 @@ interface BudgetsTabProps {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 20,
+  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 24,
+  backdropFilter: GLASS_BLUR, WebkitBackdropFilter: GLASS_BLUR,
+  boxShadow: GLASS_SHADOW,
 }
 const sectionTitle: React.CSSProperties = {
-  fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, marginBottom: 14,
+  fontFamily: "'Bellfair', serif", fontSize: 20, color: TEXT_PRIMARY, marginBottom: 14,
 }
 
 export default function BudgetsTab({
@@ -147,8 +150,8 @@ export default function BudgetsTab({
                     <td style={tdBudget}>
                       {cat.label}
                       {budgetAmt > 0 && (
-                        <div style={{ height: 3, background: "rgba(255,255,255,0.04)", borderRadius: 2, marginTop: 4 }}>
-                          <div style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: over ? RED : GREEN, borderRadius: 2, transition: "width 0.3s" }} />
+                        <div style={{ height: 4, background: "rgba(255,255,255,0.04)", borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+                          <div className={`progress-bar-fill${over ? " over-budget" : ""}`} style={{ height: "100%", width: `${Math.min(pct, 100)}%`, background: over ? RED : `linear-gradient(90deg, ${GREEN}, ${GREEN}cc)`, borderRadius: 2, transition: "width 0.5s ease" }} />
                         </div>
                       )}
                     </td>
@@ -225,7 +228,7 @@ function GoalRow({ label, value, onChange, onSave, current, target, color, inver
       {target > 0 && (
         <>
           <div style={{ height: 6, background: "rgba(255,255,255,0.04)", borderRadius: 3, overflow: "hidden" }}>
-            <div style={{ height: "100%", width: `${Math.max(pct, 0)}%`, background: color, borderRadius: 3, transition: "width 0.5s ease" }} />
+            <div className="progress-bar-fill" style={{ height: "100%", width: `${Math.max(pct, 0)}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)`, borderRadius: 3, transition: "width 0.5s ease" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
             <span style={{ fontSize: 10, color: isGood ? GREEN : RED, fontFamily: "'DM Sans', sans-serif" }}>
@@ -242,10 +245,12 @@ function GoalRow({ label, value, onChange, onSave, current, target, color, inver
 }
 
 const thStyle: React.CSSProperties = {
-  textAlign: "left", padding: "8px 14px", fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY,
-  textTransform: "uppercase", letterSpacing: 0.5, borderBottom: `1px solid ${CARD_BORDER}`, fontFamily: "'DM Sans', sans-serif",
+  textAlign: "left", padding: "10px 14px", fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY,
+  textTransform: "uppercase", letterSpacing: 0.8, borderBottom: `1px solid ${CARD_BORDER}`, fontFamily: "'DM Sans', sans-serif",
+  background: "rgba(255,255,255,0.02)",
 }
 const tdBudget: React.CSSProperties = {
-  padding: "8px 14px", fontSize: 12, color: TEXT_PRIMARY,
-  fontFamily: "'DM Sans', sans-serif", borderBottom: `1px solid rgba(255,255,255,0.03)`,
+  padding: "10px 14px", fontSize: 12, color: TEXT_PRIMARY,
+  fontFamily: "'DM Sans', sans-serif", fontVariantNumeric: "tabular-nums",
+  borderBottom: `1px solid rgba(255,255,255,0.03)`,
 }

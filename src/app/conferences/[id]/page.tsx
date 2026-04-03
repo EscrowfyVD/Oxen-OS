@@ -9,7 +9,7 @@ import {
 
 /* ── Design tokens ── */
 const VOID = "#060709"
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "rgba(240,240,242,0.92)"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
@@ -321,7 +321,7 @@ export default function ConferenceDetailPage() {
             </button>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 28, fontWeight: 400, color: "#FFFFFF", margin: 0, lineHeight: 1.2 }}>
+                <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, color: "#FFFFFF", margin: 0, lineHeight: 1.2 }}>
                   {conf.name}
                 </h1>
                 <span style={{
@@ -960,7 +960,7 @@ function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void 
         <div style={{ ...cardStyle, borderColor: ROSE_GOLD, borderWidth: 1 }}>
           <div style={{ fontSize: 20, marginBottom: 6 }}>💰</div>
           <div style={{ fontSize: 11, color: TEXT_TERTIARY, marginBottom: 4, textTransform: "uppercase" }}>GRAND TOTAL</div>
-          <div style={{ fontFamily: "'Bellfair', serif", fontSize: 28, color: ROSE_GOLD, fontWeight: 400 }}>{sym}{grandTotal.toLocaleString()}</div>
+          <div style={{ fontFamily: "'Bellfair', serif", fontSize: 32, color: ROSE_GOLD, fontWeight: 400 }}>{sym}{grandTotal.toLocaleString()}</div>
           <div style={{ fontSize: 11, color: TEXT_TERTIARY, marginTop: 4 }}>{sym}{avg.toLocaleString()} per person avg</div>
         </div>
       </div>

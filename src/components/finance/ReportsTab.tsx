@@ -6,7 +6,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts"
 import {
-  CARD_BG, CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
+  CARD_BG, CARD_BORDER, GLASS_BLUR, GLASS_SHADOW, GLASS_HOVER_BORDER,
+  TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   GREEN, RED, ROSE_GOLD, INDIGO, AMBER, CYAN, TEAL,
   CHART_COLORS, ENTITIES, getCategoryLabel, fmtFull, fmt,
 } from "./constants"
@@ -14,10 +15,12 @@ import {
 type ReportType = "pnl" | "cashflow" | "entity_comparison"
 
 const cardStyle: React.CSSProperties = {
-  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 20,
+  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 24,
+  backdropFilter: GLASS_BLUR, WebkitBackdropFilter: GLASS_BLUR,
+  boxShadow: GLASS_SHADOW,
 }
 const sectionTitle: React.CSSProperties = {
-  fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, marginBottom: 14,
+  fontFamily: "'Bellfair', serif", fontSize: 20, color: TEXT_PRIMARY, marginBottom: 14,
 }
 const selectStyle: React.CSSProperties = {
   background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: "6px 10px",
@@ -27,7 +30,7 @@ const selectStyle: React.CSSProperties = {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: "10px 14px", fontSize: 11, fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ background: "rgba(10,11,15,0.95)", border: `1px solid ${CARD_BORDER}`, borderRadius: 10, padding: "10px 14px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", backdropFilter: "blur(12px)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
       <div style={{ color: TEXT_TERTIARY, marginBottom: 6 }}>{label}</div>
       {payload.map((p: any) => (
         <div key={p.dataKey} style={{ color: p.color, marginBottom: 2 }}>{p.name}: {fmtFull(p.value)}</div>
@@ -109,8 +112,9 @@ function PnLReport({ report }: { report: any }) {
     fontFamily: "'DM Sans', sans-serif", textAlign: "right",
   }
   const tdStyle: React.CSSProperties = {
-    padding: "6px 10px", fontSize: 11, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif",
+    padding: "8px 10px", fontSize: 11, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif",
     textAlign: "right", borderBottom: `1px solid rgba(255,255,255,0.03)`,
+    fontVariantNumeric: "tabular-nums",
   }
 
   return (
@@ -193,7 +197,7 @@ function PnLReport({ report }: { report: any }) {
                   {fmtFull(m.netProfit)}
                 </td>
               ))}
-              <td style={{ padding: "12px 10px", textAlign: "right", fontSize: 14, fontFamily: "'Bellfair', serif", color: totals.netProfit >= 0 ? GREEN : RED }}>
+              <td style={{ padding: "12px 10px", textAlign: "right", fontSize: 14, fontFamily: "'Bellfair', serif", color: totals.netProfit >= 0 ? GREEN : RED, textShadow: totals.netProfit >= 0 ? "0 0 30px rgba(52,211,153,0.2)" : "0 0 30px rgba(248,113,113,0.2)" }}>
                 {fmtFull(totals.netProfit)}
               </td>
             </tr>
@@ -284,10 +288,10 @@ function CashFlowReport({ report }: { report: any }) {
           <tbody>
             {months.map((m: any) => (
               <tr key={m.month}>
-                <td style={{ padding: "8px 12px", fontSize: 12, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{m.month}</td>
-                <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 12, color: GREEN, fontFamily: "'DM Sans', sans-serif", borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{fmtFull(m.inflow)}</td>
-                <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 12, color: ROSE_GOLD, fontFamily: "'DM Sans', sans-serif", borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{fmtFull(m.outflow)}</td>
-                <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 12, color: m.net >= 0 ? GREEN : RED, fontWeight: 500, fontFamily: "'DM Sans', sans-serif", borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{fmtFull(m.net)}</td>
+                <td style={{ padding: "10px 12px", fontSize: 12, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{m.month}</td>
+                <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 12, color: GREEN, fontFamily: "'DM Sans', sans-serif", fontVariantNumeric: "tabular-nums", borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{fmtFull(m.inflow)}</td>
+                <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 12, color: ROSE_GOLD, fontFamily: "'DM Sans', sans-serif", fontVariantNumeric: "tabular-nums", borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{fmtFull(m.outflow)}</td>
+                <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 12, color: m.net >= 0 ? GREEN : RED, fontWeight: 500, fontFamily: "'DM Sans', sans-serif", fontVariantNumeric: "tabular-nums", borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{fmtFull(m.net)}</td>
               </tr>
             ))}
           </tbody>

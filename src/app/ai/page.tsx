@@ -198,7 +198,7 @@ function AIPageInner() {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <h1 style={{
-                fontFamily: "'Bellfair', serif", fontSize: 28, fontWeight: 400, margin: 0, lineHeight: 1.2,
+                fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, margin: 0, lineHeight: 1.2,
                 background: "linear-gradient(90deg, #C08B88, #E8C4C0, #C08B88)",
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               }}>

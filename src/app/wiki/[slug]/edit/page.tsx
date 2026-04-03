@@ -9,7 +9,7 @@ import type { JSONContent } from "@tiptap/react"
 const CATEGORIES = ["Process", "Legal", "Product", "HR", "Finance", "Compliance", "General"]
 
 const FROST = "#F0F0F2"
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
@@ -240,7 +240,7 @@ export default function WikiEditPage() {
             style={{
               flex: 1,
               fontFamily: "'Bellfair', serif",
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: 400,
               color: FROST,
               background: "transparent",

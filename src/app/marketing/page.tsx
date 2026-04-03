@@ -16,7 +16,7 @@ const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const GREEN = "#34D399"
 
 type TabId = "overview" | "content" | "metrics" | "intel" | "compliance"
@@ -216,7 +216,7 @@ export default function MarketingPage() {
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
           <div>
-            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 28, fontWeight: 400, color: TEXT_PRIMARY, margin: 0, lineHeight: 1.2 }}>
+            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, color: TEXT_PRIMARY, margin: 0, lineHeight: 1.2 }}>
               Marketing
             </h1>
             <p style={{ fontSize: 12, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", marginTop: 6 }}>

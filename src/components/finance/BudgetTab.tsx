@@ -24,7 +24,7 @@ interface BudgetTabProps {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 20,
+  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 20,
 }
 
 const sectionTitle: React.CSSProperties = {

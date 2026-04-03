@@ -6,7 +6,7 @@ import { ROLE_COLORS, ROLE_LABELS, ROLE_LEVELS, type RoleLevel } from "@/lib/per
 import { canAccess } from "@/lib/permissions"
 import { getAvatarGradient } from "@/lib/avatar"
 
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
@@ -143,7 +143,7 @@ export default function SettingsPage() {
         <div
           style={{
             background: CARD_BG,
-            borderRadius: 12,
+            borderRadius: 14,
             border: `1px solid ${CARD_BORDER}`,
             overflow: "hidden",
           }}
@@ -294,7 +294,7 @@ export default function SettingsPage() {
         <div
           style={{
             background: CARD_BG,
-            borderRadius: 12,
+            borderRadius: 14,
             border: `1px solid ${CARD_BORDER}`,
             padding: 32,
           }}
@@ -328,7 +328,7 @@ export default function SettingsPage() {
             style={{
               background: CARD_BG,
               border: `1px solid ${CARD_BORDER}`,
-              borderRadius: 12,
+              borderRadius: 14,
               padding: 24,
               width: 400,
               maxWidth: "90vw",

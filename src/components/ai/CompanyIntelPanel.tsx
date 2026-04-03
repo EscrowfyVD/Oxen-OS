@@ -41,7 +41,7 @@ export default function CompanyIntelPanel({ contactId }: CompanyIntelPanelProps)
 
   return (
     <div style={{
-      background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12,
+      background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14,
       overflow: "hidden",
     }}>
       {/* Header */}

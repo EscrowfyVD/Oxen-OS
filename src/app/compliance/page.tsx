@@ -71,7 +71,7 @@ interface Employee {
 }
 
 /* ── style constants ── */
-const cardBg = "#0F1118"
+const cardBg = "rgba(15,17,24,0.6)"
 const cardBorder = "rgba(255,255,255,0.06)"
 const roseGold = "#C08B88"
 const void_ = "#060709"
@@ -433,7 +433,7 @@ export default function CompliancePage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 2, marginBottom: 28, background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 4, width: "fit-content" }}>
+      <div style={{ display: "flex", gap: 2, marginBottom: 28, background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: 4, width: "fit-content" }}>
         {TABS.map((t) => {
           const active = tab === t.key
           return (
@@ -782,7 +782,7 @@ function PoliciesTab({ policies, onDelete, onEdit }: { policies: Policy[]; onDel
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {policies.map((p) => (
         <div key={p.id} style={{
-          background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 12,
+          background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 14,
           padding: "16px 20px", display: "flex", alignItems: "center", gap: 16,
           borderLeft: `3px solid ${SEVERITY_COLORS[p.priority] || "#6B7280"}`,
         }}>
@@ -847,7 +847,7 @@ function RisksTab({ risks, onDelete, onEdit }: { risks: Risk[]; onDelete: (id: s
           const scoreColor = r.riskScore >= 16 ? "#EF4444" : r.riskScore >= 10 ? "#F59E0B" : r.riskScore >= 5 ? "#3B82F6" : "#22C55E"
           return (
             <div key={r.id} style={{
-              background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 12,
+              background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 14,
               padding: "16px 20px", display: "flex", alignItems: "center", gap: 16,
               borderLeft: `3px solid ${scoreColor}`,
             }}>
@@ -928,7 +928,7 @@ function TrainingTab({ trainings, employees, onRefresh }: { trainings: TrainingI
         const rate = t.completionRate ?? 0
         const rateColor = rate >= 80 ? "#22C55E" : rate >= 50 ? "#F59E0B" : "#EF4444"
         return (
-          <div key={t.id} style={{ background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+          <div key={t.id} style={{ background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{
               padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer",
             }} onClick={() => loadCompletions(t.id)}>
@@ -1061,7 +1061,7 @@ function IncidentsTab({ incidents, onDelete, onEdit }: { incidents: Incident[]; 
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {incidents.map((inc) => (
         <div key={inc.id} style={{
-          background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 12,
+          background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 14,
           padding: "16px 20px", display: "flex", alignItems: "center", gap: 16,
           borderLeft: `3px solid ${SEVERITY_COLORS[inc.severity] || "#6B7280"}`,
         }}>

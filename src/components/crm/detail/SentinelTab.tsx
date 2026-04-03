@@ -118,7 +118,7 @@ export default function SentinelTab({
         padding: 20,
         background: CARD_BG,
         border: `1px solid ${CARD_BORDER}`,
-        borderRadius: 12,
+        borderRadius: 14,
       }}>
         {/* Header */}
         <div style={{
@@ -275,7 +275,7 @@ export default function SentinelTab({
         padding: 20,
         background: CARD_BG,
         border: `1px solid ${CARD_BORDER}`,
-        borderRadius: 12,
+        borderRadius: 14,
       }}>
         {/* Header */}
         <div style={{
@@ -444,7 +444,7 @@ export default function SentinelTab({
         padding: 20,
         background: CARD_BG,
         border: `1px solid ${CARD_BORDER}`,
-        borderRadius: 12,
+        borderRadius: 14,
       }}>
         {/* Header */}
         <div style={{

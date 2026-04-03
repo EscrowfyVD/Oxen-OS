@@ -21,17 +21,19 @@ interface OverviewTabProps {
 }
 
 const kpiLabel: React.CSSProperties = {
-  fontSize: 10, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 1,
-  fontFamily: "'DM Sans', sans-serif", fontWeight: 500, marginBottom: 6,
+  fontSize: 10, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 1.2,
+  fontFamily: "'DM Sans', sans-serif", fontWeight: 500, marginBottom: 8,
 }
 const kpiValue: React.CSSProperties = {
-  fontFamily: "'Bellfair', serif", fontSize: 28, color: TEXT_PRIMARY, lineHeight: 1.1,
+  fontFamily: "'Bellfair', serif", fontSize: 32, color: TEXT_PRIMARY, lineHeight: 1.1,
 }
 const sectionTitle: React.CSSProperties = {
-  fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, marginBottom: 14,
+  fontFamily: "'Bellfair', serif", fontSize: 20, color: TEXT_PRIMARY, marginBottom: 16,
 }
 const cardStyle: React.CSSProperties = {
-  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 20,
+  background: CARD_BG, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+  border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 24,
+  position: "relative" as const, overflow: "hidden" as const,
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -298,13 +300,20 @@ export default function OverviewTab({ summary, goals, cashBalance: cashBalancePr
 
             {/* Net Profit */}
             <tr style={{ borderTop: `2px solid ${CARD_BORDER}` }}>
-              <td style={{ padding: "12px 12px", fontSize: 14, fontWeight: 400, fontFamily: "'Bellfair', serif", color: TEXT_PRIMARY }}>Net Profit</td>
+              <td style={{ padding: "14px 12px", fontSize: 16, fontWeight: 400, fontFamily: "'Bellfair', serif", color: TEXT_PRIMARY }}>Net Profit</td>
               <td style={pnlCell("right")}></td>
-              <td style={{ padding: "12px 12px", textAlign: "right", fontSize: 14, fontWeight: 400, fontFamily: "'Bellfair', serif", color: summary.netProfit >= 0 ? GREEN : RED }}>
+              <td style={{
+                padding: "14px 12px", textAlign: "right", fontSize: 18, fontWeight: 400, fontFamily: "'Bellfair', serif",
+                color: summary.netProfit >= 0 ? GREEN : RED,
+                textShadow: `0 0 30px ${summary.netProfit >= 0 ? "rgba(52,211,153,0.2)" : "rgba(248,113,113,0.2)"}`,
+              }}>
                 {fmtFull(summary.netProfit)}
               </td>
               <td style={pnlCell("right")}></td>
-              <td style={{ padding: "12px 12px", textAlign: "right", fontSize: 12, fontFamily: "'DM Sans', sans-serif", color: summary.revenue > 0 ? (summary.netProfit >= 0 ? GREEN : RED) : TEXT_TERTIARY }}>
+              <td style={{
+                padding: "14px 12px", textAlign: "right", fontSize: 12, fontFamily: "'DM Sans', sans-serif",
+                color: summary.revenue > 0 ? (summary.netProfit >= 0 ? GREEN : RED) : TEXT_TERTIARY,
+              }}>
                 {summary.revenue > 0 ? `${((summary.netProfit / summary.revenue) * 100).toFixed(1)}%` : "—"}
               </td>
             </tr>
@@ -335,11 +344,12 @@ export default function OverviewTab({ summary, goals, cashBalance: cashBalancePr
 
 function pnlCell(align: "left" | "right"): React.CSSProperties {
   return {
-    padding: "6px 12px",
+    padding: "8px 12px",
     textAlign: align,
     fontSize: 12,
     color: TEXT_SECONDARY,
     fontFamily: "'DM Sans', sans-serif",
+    fontVariantNumeric: "tabular-nums",
     borderBottom: `1px solid rgba(255,255,255,0.03)`,
   }
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const FROST = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
@@ -139,7 +139,7 @@ export default function DriveBrowserModal({ onSelect, onClose }: Props) {
         style={{
           width: 680, maxHeight: "85vh",
           background: CARD_BG, border: `1px solid ${CARD_BORDER}`,
-          borderRadius: 12, display: "flex", flexDirection: "column",
+          borderRadius: 14, display: "flex", flexDirection: "column",
           overflow: "hidden",
         }}
       >

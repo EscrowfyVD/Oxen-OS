@@ -131,7 +131,7 @@ export default function TimelineTab({ contactId, contact, onRefresh }: TimelineT
         padding: 16,
         background: CARD_BG,
         border: `1px solid ${CARD_BORDER}`,
-        borderRadius: 12,
+        borderRadius: 14,
       }}>
         <div style={{ ...labelStyle, marginBottom: 10 }}>Log Interaction</div>
 
@@ -198,7 +198,7 @@ export default function TimelineTab({ contactId, contact, onRefresh }: TimelineT
       <div style={{
         background: CARD_BG,
         border: `1px solid ${CARD_BORDER}`,
-        borderRadius: 12,
+        borderRadius: 14,
         padding: 20,
       }}>
         <div style={{

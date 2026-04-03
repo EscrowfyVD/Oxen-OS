@@ -84,7 +84,7 @@ export default function EmailsTab({ contactId, contactEmail }: EmailsTabProps) {
         padding: "16px 20px",
         background: CARD_BG,
         border: `1px solid ${CARD_BORDER}`,
-        borderRadius: 12,
+        borderRadius: 14,
       }}>
         <div>
           <span style={{
@@ -145,7 +145,7 @@ export default function EmailsTab({ contactId, contactEmail }: EmailsTabProps) {
       <div style={{
         background: CARD_BG,
         border: `1px solid ${CARD_BORDER}`,
-        borderRadius: 12,
+        borderRadius: 14,
         overflow: "hidden",
       }}>
         {loading && (

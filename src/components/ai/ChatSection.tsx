@@ -293,7 +293,7 @@ export default function ChatSection({ onRefresh, initialPrompt }: ChatSectionPro
               <div style={{
                 maxWidth: isUser ? "65%" : "85%",
                 padding: isUser ? "8px 14px" : "12px 16px",
-                borderRadius: 12,
+                borderRadius: 14,
                 ...(isUser
                   ? { background: "rgba(255,255,255,0.05)", borderTopRightRadius: 4 }
                   : { background: "rgba(192,139,136,0.04)", border: `1px solid rgba(192,139,136,0.08)`, borderTopLeftRadius: 4 }),
@@ -338,7 +338,7 @@ export default function ChatSection({ onRefresh, initialPrompt }: ChatSectionPro
         {sending && (
           <div style={{ display: "flex", justifyContent: "flex-start" }}>
             <div className="ai-shimmer" style={{
-              padding: "16px 20px", borderRadius: 12, borderTopLeftRadius: 4,
+              padding: "16px 20px", borderRadius: 14, borderTopLeftRadius: 4,
               width: 200, height: 48,
             }} />
           </div>
@@ -372,7 +372,7 @@ export default function ChatSection({ onRefresh, initialPrompt }: ChatSectionPro
 
         <div style={{
           display: "flex", gap: 8, alignItems: "flex-end",
-          padding: 3, borderRadius: 12,
+          padding: 3, borderRadius: 14,
           background: inputFocused
             ? "linear-gradient(135deg, rgba(192,139,136,0.12), rgba(232,196,192,0.06))"
             : "transparent",

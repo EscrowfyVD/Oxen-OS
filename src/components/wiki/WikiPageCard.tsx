@@ -52,9 +52,9 @@ export default function WikiPageCard({ page }: WikiPageCardProps) {
       style={{
         display: "block",
         textDecoration: "none",
-        background: "#0F1118",
+        background: "rgba(15,17,24,0.6)",
         border: "1px solid rgba(255,255,255,0.06)",
-        borderRadius: 12,
+        borderRadius: 14,
         overflow: "hidden",
         transition: "all 0.25s ease",
         position: "relative",

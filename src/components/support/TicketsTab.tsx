@@ -131,7 +131,7 @@ export default function TicketsTab({ tickets, agents, onSelect, onAdd }: Tickets
 
       {/* Table */}
       <div style={{
-        background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12,
+        background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14,
         overflow: "auto",
       }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>

@@ -16,7 +16,7 @@ const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const GREEN = "#34D399"
 const RED = "#F87171"
 const ROSE_GOLD = "#C08B88"
@@ -216,7 +216,7 @@ export default function FinancePage() {
       <div className="fade-in" style={{ padding: "24px 28px 0", marginBottom: 4 }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
           <div>
-            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 28, fontWeight: 400, color: TEXT_PRIMARY, margin: 0, lineHeight: 1.2 }}>
+            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, color: TEXT_PRIMARY, margin: 0, lineHeight: 1.2, letterSpacing: "0.5px" }}>
               Finance
             </h1>
             <p style={{ fontSize: 12, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", marginTop: 6 }}>
@@ -266,12 +266,16 @@ export default function FinancePage() {
           </div>
         </div>
 
+        {/* Gradient separator */}
+        <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${ROSE_GOLD}40, transparent)`, marginBottom: 0 }} />
+
         {/* Tabs */}
         <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${CARD_BORDER}` }}>
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              className="tab-btn"
               style={{
                 padding: "10px 20px", fontSize: 12, fontWeight: 500,
                 fontFamily: "'DM Sans', sans-serif",
@@ -279,6 +283,7 @@ export default function FinancePage() {
                 background: "transparent", border: "none",
                 borderBottom: activeTab === tab.id ? `2px solid ${ROSE_GOLD}` : "2px solid transparent",
                 cursor: "pointer", transition: "all 0.15s", marginBottom: -1,
+                textShadow: activeTab === tab.id ? `0 0 20px rgba(192,139,136,0.3)` : "none",
               }}
             >
               {tab.label}

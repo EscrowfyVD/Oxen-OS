@@ -1,7 +1,11 @@
 /* ── Finance Module Design Tokens & Constants ── */
 
-export const CARD_BG = "#0F1118"
+export const CARD_BG = "rgba(15,17,24,0.6)"
+export const CARD_BG_SOLID = "#0F1118"
 export const CARD_BORDER = "rgba(255,255,255,0.06)"
+export const GLASS_BLUR = "blur(20px)"
+export const GLASS_HOVER_BORDER = "rgba(192,139,136,0.18)"
+export const GLASS_SHADOW = "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)"
 export const TEXT_PRIMARY = "#F0F0F2"
 export const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 export const TEXT_TERTIARY = "rgba(240,240,242,0.3)"

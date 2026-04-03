@@ -219,7 +219,7 @@ export default function ContactModal({ show, onClose, contact, employees, onSave
           overflowY: "auto",
           background: CARD_BG,
           border: `1px solid ${CARD_BORDER}`,
-          borderRadius: 12,
+          borderRadius: 14,
         }}
       >
         {/* Header */}

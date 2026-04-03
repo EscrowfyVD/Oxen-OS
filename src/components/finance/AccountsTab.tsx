@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import {
-  CARD_BG, CARD_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
+  CARD_BG, CARD_BORDER, GLASS_BLUR, GLASS_HOVER_BORDER, GLASS_SHADOW,
+  TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TERTIARY,
   ROSE_GOLD, GREEN, ENTITIES, ACCOUNT_TYPES, fmtFull, labelStyle,
 } from "./constants"
 import type { BankAccount } from "./types"
@@ -15,7 +16,9 @@ interface AccountsTabProps {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 20,
+  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 24,
+  backdropFilter: GLASS_BLUR, WebkitBackdropFilter: GLASS_BLUR,
+  boxShadow: GLASS_SHADOW,
 }
 const inputStyle: React.CSSProperties = {
   width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${CARD_BORDER}`,
@@ -100,9 +103,10 @@ export default function AccountsTab({ accounts, onSave, onDelete, onRefresh }: A
                 <div
                   key={account.id}
                   onClick={() => openEdit(account)}
-                  style={{ ...cardStyle, cursor: "pointer", transition: "border-color 0.15s" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = ROSE_GOLD)}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = CARD_BORDER)}
+                  className="account-card"
+                  style={{ ...cardStyle, cursor: "pointer", transition: "all 0.2s ease", borderLeft: `3px solid rgba(192,139,136,0.2)` }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = GLASS_HOVER_BORDER; e.currentTarget.style.transform = "translateY(-2px)" }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = CARD_BORDER; e.currentTarget.style.borderLeftColor = "rgba(192,139,136,0.2)"; e.currentTarget.style.transform = "translateY(0)" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -142,17 +146,22 @@ export default function AccountsTab({ accounts, onSave, onDelete, onRefresh }: A
       })}
 
       {activeAccounts.length === 0 && (
-        <div style={{ textAlign: "center", padding: "60px 0", color: TEXT_TERTIARY, fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>
-          No bank accounts yet. Add your first account to track balances.
+        <div className="empty-state" style={{ textAlign: "center", padding: "60px 0" }}>
+          <div style={{ width: 48, height: 48, margin: "0 auto 16px", borderRadius: 14, background: "linear-gradient(135deg, rgba(192,139,136,0.08), rgba(192,139,136,0.02))", border: "1px solid rgba(192,139,136,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, opacity: 0.6 }}>
+            🏦
+          </div>
+          <div style={{ fontSize: 13, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6 }}>
+            No bank accounts yet — click <strong style={{ color: ROSE_GOLD }}>+ Add Account</strong> to get started
+          </div>
         </div>
       )}
 
       {/* Add/Edit Modal */}
       {showForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+        <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={() => { setShowForm(false); setEditing(null) }}>
-          <div onClick={(e) => e.stopPropagation()} className="animate-slideUp"
-            style={{ background: "#0A0B0F", border: `1px solid ${CARD_BORDER}`, borderRadius: 16, padding: 28, width: 460, maxHeight: "80vh", overflowY: "auto" }}>
+          <div onClick={(e) => e.stopPropagation()} className="modal-content animate-slideUp"
+            style={{ background: "linear-gradient(180deg, #0D0F14 0%, #0A0B0F 100%)", border: `1px solid ${CARD_BORDER}`, borderRadius: 16, padding: 28, width: 460, maxHeight: "80vh", overflowY: "auto", borderTop: "1px solid rgba(192,139,136,0.15)", boxShadow: "0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03)" }}>
             <div style={{ fontFamily: "'Bellfair', serif", fontSize: 20, color: TEXT_PRIMARY, marginBottom: 20 }}>
               {editing ? "Edit Account" : "Add Bank Account"}
             </div>

@@ -75,31 +75,31 @@ export default function OverviewTab({ stats, daily }: OverviewTabProps) {
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14 }}>
         {/* Open Tickets */}
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={kpiLabel}>Open Tickets</div>
           <div style={kpiValue}><Counter target={stats.openCount} /></div>
         </div>
         {/* Avg Response Time */}
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={kpiLabel}>Avg Response Time</div>
           <div style={{ ...kpiValue, color: stats.avgResponseMs > 3600000 ? AMBER : GREEN }}>
             {fmtDuration(stats.avgResponseMs)}
           </div>
         </div>
         {/* Avg Resolution Time */}
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={kpiLabel}>Avg Resolution Time</div>
           <div style={{ ...kpiValue, color: stats.avgResolutionMs > 86400000 ? AMBER : GREEN }}>
             {fmtDuration(stats.avgResolutionMs)}
           </div>
         </div>
         {/* Resolved Today */}
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={kpiLabel}>Resolved Today</div>
           <div style={{ ...kpiValue, color: GREEN }}><Counter target={stats.resolvedToday} /></div>
         </div>
         {/* Satisfaction */}
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18, opacity: 0.5 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18, opacity: 0.5 }}>
           <div style={kpiLabel}>Client Satisfaction</div>
           <div style={{ ...kpiValue, fontSize: 14, color: TEXT_TERTIARY, marginTop: 8 }}>Coming soon</div>
         </div>
@@ -108,7 +108,7 @@ export default function OverviewTab({ stats, daily }: OverviewTabProps) {
       {/* Charts row: Volume + Channel donut */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 14 }}>
         {/* Ticket Volume */}
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
             Ticket Volume (Last 30 Days)
           </div>
@@ -126,7 +126,7 @@ export default function OverviewTab({ stats, daily }: OverviewTabProps) {
         </div>
 
         {/* Channel donut */}
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
             By Channel
           </div>
@@ -156,7 +156,7 @@ export default function OverviewTab({ stats, daily }: OverviewTabProps) {
       </div>
 
       {/* Category bar chart */}
-      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
         <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
           Tickets by Category
         </div>
@@ -174,7 +174,7 @@ export default function OverviewTab({ stats, daily }: OverviewTabProps) {
       {/* Team Performance + Activity */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         {/* Team Performance */}
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
             Team Performance (This Week)
           </div>
@@ -229,7 +229,7 @@ export default function OverviewTab({ stats, daily }: OverviewTabProps) {
         </div>
 
         {/* Recent Activity */}
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
             Recent Activity
           </div>

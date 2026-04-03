@@ -218,23 +218,23 @@ export default function ReportsTab({ tickets }: ReportsTabProps) {
 
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14 }}>
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={kpiLabel}>Total Tickets</div>
           <div style={kpiValue}><Counter target={totalInRange} /></div>
         </div>
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={kpiLabel}>Avg First Response</div>
           <div style={{ ...kpiValue, fontSize: 22 }}>{fmtDuration(avgFirstResponse)}</div>
         </div>
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={kpiLabel}>Avg Resolution</div>
           <div style={{ ...kpiValue, fontSize: 22 }}>{fmtDuration(avgResolution)}</div>
         </div>
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={kpiLabel}>Resolution Rate</div>
           <div style={{ ...kpiValue, color: resolutionRate >= 70 ? GREEN : AMBER }}>{resolutionRate.toFixed(0)}%</div>
         </div>
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={kpiLabel}>Tickets / Day</div>
           <div style={kpiValue}>{ticketsPerDay.toFixed(1)}</div>
         </div>
@@ -242,7 +242,7 @@ export default function ReportsTab({ tickets }: ReportsTabProps) {
 
       {/* Charts row 1: Volume + Response Time */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
             Ticket Volume Over Time
           </div>
@@ -259,7 +259,7 @@ export default function ReportsTab({ tickets }: ReportsTabProps) {
           </ResponsiveContainer>
         </div>
 
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
             Response Time Trend
           </div>
@@ -277,7 +277,7 @@ export default function ReportsTab({ tickets }: ReportsTabProps) {
 
       {/* Charts row 2: Status + Categories */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
             Tickets by Status
           </div>
@@ -294,7 +294,7 @@ export default function ReportsTab({ tickets }: ReportsTabProps) {
           </ResponsiveContainer>
         </div>
 
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
             Top Categories
           </div>
@@ -312,7 +312,7 @@ export default function ReportsTab({ tickets }: ReportsTabProps) {
 
       {/* Agent Comparison */}
       {agentData.length > 0 && (
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 18 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 18 }}>
           <div style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif", marginBottom: 16 }}>
             Agent Comparison
           </div>
@@ -331,7 +331,7 @@ export default function ReportsTab({ tickets }: ReportsTabProps) {
       )}
 
       {/* Detailed Table */}
-      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, overflow: "auto" }}>
+      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, overflow: "auto" }}>
         <div style={{ padding: "14px 18px", borderBottom: `1px solid ${CARD_BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span style={{ fontSize: 12, fontWeight: 500, color: TEXT_PRIMARY, fontFamily: "'DM Sans', sans-serif" }}>
             Detailed Log ({rangeTickets.length} tickets)

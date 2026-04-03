@@ -7,7 +7,7 @@ import {
   AlertTriangle, CheckCircle2, FileText, DollarSign, Edit3, X,
 } from "lucide-react"
 
-const cardBg = "#0F1118"
+const cardBg = "rgba(15,17,24,0.6)"
 const cardBorder = "rgba(255,255,255,0.06)"
 const roseGold = "#C08B88"
 const void_ = "#060709"

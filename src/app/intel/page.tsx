@@ -577,7 +577,7 @@ export default function IntelPage() {
       {/* Header */}
       <div className="flex items-center justify-between" style={{ marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 28, color: TEXT_PRIMARY, margin: 0 }}>Intel</h1>
+          <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, color: TEXT_PRIMARY, margin: 0 }}>Intel</h1>
           <p style={{ fontSize: 13, color: TEXT_TERTIARY, margin: "4px 0 0" }}>Strategic Intelligence Hub</p>
         </div>
         <div className="flex items-center gap-3">
@@ -943,7 +943,7 @@ export default function IntelPage() {
                 onClick={() => setResultFilter(f.value)}
                 style={{
                   padding: "3px 10px",
-                  borderRadius: 12,
+                  borderRadius: 14,
                   border: resultFilter === f.value ? `1px solid ${ROSE_GOLD}` : `1px solid transparent`,
                   background: resultFilter === f.value ? `${ROSE_GOLD}15` : "transparent",
                   color: resultFilter === f.value ? ROSE_GOLD : TEXT_TERTIARY,
@@ -1539,7 +1539,7 @@ export default function IntelPage() {
           top: contextMenu.y,
           left: contextMenu.x,
           zIndex: 200,
-          background: "#0F1118",
+          background: "rgba(15,17,24,0.6)",
           border: `1px solid ${CARD_BORDER}`,
           borderRadius: 8,
           padding: 4,
@@ -1586,9 +1586,9 @@ export default function IntelPage() {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 400,
-              background: "#0F1118",
+              background: "rgba(15,17,24,0.6)",
               border: `1px solid ${CARD_BORDER}`,
-              borderRadius: 12,
+              borderRadius: 14,
               padding: 28,
             }}
           >
@@ -1670,9 +1670,9 @@ export default function IntelPage() {
               width: 520,
               maxHeight: "85vh",
               overflowY: "auto",
-              background: "#0F1118",
+              background: "rgba(15,17,24,0.6)",
               border: `1px solid ${CARD_BORDER}`,
-              borderRadius: 12,
+              borderRadius: 14,
               padding: 28,
             }}
           >
@@ -2049,9 +2049,9 @@ export default function IntelPage() {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 420,
-              background: "#0F1118",
+              background: "rgba(15,17,24,0.6)",
               border: `1px solid ${CARD_BORDER}`,
-              borderRadius: 12,
+              borderRadius: 14,
               padding: 28,
             }}
           >

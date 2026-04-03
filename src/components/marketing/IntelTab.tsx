@@ -67,7 +67,7 @@ export default function IntelTab({ intel, onAdd, onEdit, onDelete }: IntelTabPro
             <div
               key={item.id}
               style={{
-                background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12,
+                background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14,
                 padding: "16px 20px", transition: "all 0.15s",
                 position: "relative",
               }}

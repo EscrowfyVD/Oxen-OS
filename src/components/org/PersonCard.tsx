@@ -32,7 +32,7 @@ export default function PersonCard({ employee, color, textColor, onClick }: Pers
         padding: "12px 14px",
         background: "var(--bg-card)",
         border: "1px solid var(--border)",
-        borderRadius: 12,
+        borderRadius: 14,
         transition: "all 0.2s ease",
         fontFamily: "'DM Sans', sans-serif",
       }}

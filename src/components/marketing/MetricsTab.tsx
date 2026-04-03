@@ -70,7 +70,7 @@ export default function MetricsTab({ metrics, onSave }: MetricsTabProps) {
   return (
     <div>
       {/* Input Section */}
-      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 20, marginBottom: 20 }}>
         <div style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, marginBottom: 14 }}>
           Add Metrics
         </div>
@@ -116,7 +116,7 @@ export default function MetricsTab({ metrics, onSave }: MetricsTabProps) {
 
       {/* Charts */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14, marginBottom: 20 }}>
-        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 20 }}>
+        <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
             <div style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY }}>
               Platform Trends
@@ -155,7 +155,7 @@ export default function MetricsTab({ metrics, onSave }: MetricsTabProps) {
       </div>
 
       {/* Historical Table */}
-      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, overflow: "hidden" }}>
         <div style={{ padding: "12px 16px", borderBottom: `1px solid ${CARD_BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontFamily: "'Bellfair', serif", fontSize: 16, color: TEXT_PRIMARY }}>Historical Data</div>
           <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)} style={{ ...inputSt, width: 140 }}>

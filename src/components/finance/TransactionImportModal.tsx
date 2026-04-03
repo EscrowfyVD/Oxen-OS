@@ -84,10 +84,10 @@ export default function TransactionImportModal({ onClose, onImported }: ImportMo
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="animate-slideUp"
-        style={{ background: "#0A0B0F", border: `1px solid ${CARD_BORDER}`, borderRadius: 16, padding: 28, width: 640, maxHeight: "85vh", overflowY: "auto" }}>
+        style={{ background: "linear-gradient(180deg, #0D0F14 0%, #0A0B0F 100%)", border: `1px solid ${CARD_BORDER}`, borderRadius: 16, padding: 28, width: 640, maxHeight: "85vh", overflowY: "auto" }}>
         <div style={{ fontFamily: "'Bellfair', serif", fontSize: 20, color: TEXT_PRIMARY, marginBottom: 6 }}>
           Import Transactions
         </div>

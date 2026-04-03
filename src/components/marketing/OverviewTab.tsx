@@ -26,7 +26,7 @@ const kpiValue: React.CSSProperties = {
   fontFamily: "'Bellfair', serif", fontSize: 28, color: TEXT_PRIMARY, lineHeight: 1.1,
 }
 const cardStyle: React.CSSProperties = {
-  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 12, padding: 20,
+  background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 14, padding: 20,
 }
 const sectionTitle: React.CSSProperties = {
   fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT_PRIMARY, marginBottom: 14,

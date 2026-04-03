@@ -8,7 +8,7 @@ import WikiPageCard, { WikiPage, getCategoryColor } from "@/components/wiki/Wiki
 const CATEGORIES = ["All", "Process", "Legal", "Product", "HR", "Finance", "Compliance", "General"]
 
 const FROST = "#F0F0F2"
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
 const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
@@ -675,7 +675,7 @@ export default function WikiListPage() {
         {/* Header */}
         <div className="fade-in" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div>
-            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 28, color: FROST, fontWeight: 400, margin: 0, lineHeight: 1.2 }}>
+            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, color: FROST, fontWeight: 400, margin: 0, lineHeight: 1.2 }}>
               Wiki
             </h1>
             <p style={{ fontSize: 12, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", margin: "4px 0 0" }}>

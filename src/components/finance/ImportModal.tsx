@@ -103,7 +103,7 @@ export default function ImportModal({ onClose, onDone }: ImportModalProps) {
           {rows.length === 0 && (
             <div>
               <div style={{
-                border: `2px dashed ${CARD_BORDER}`, borderRadius: 12, padding: "40px 20px",
+                border: `2px dashed ${CARD_BORDER}`, borderRadius: 14, padding: "40px 20px",
                 textAlign: "center", cursor: "pointer",
               }} onClick={() => fileRef.current?.click()}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>{"\uD83D\uDCC4"}</div>

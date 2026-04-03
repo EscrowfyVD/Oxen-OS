@@ -126,7 +126,7 @@ export default function AgentDetailPage() {
           {kpis.map((kpi) => (
             <div key={kpi.label} style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 10, padding: 20 }}>
               <div style={{ fontSize: 10, color: TEXT_TERTIARY, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>{kpi.label}</div>
-              <div style={{ fontSize: 28, fontFamily: "'Bellfair', serif", color: FROST, marginTop: 8 }}>
+              <div style={{ fontSize: 32, fontFamily: "'Bellfair', serif", color: FROST, marginTop: 8 }}>
                 {kpi.prefix}<Counter target={kpi.value} duration={600} />{kpi.suffix ?? ""}
               </div>
             </div>

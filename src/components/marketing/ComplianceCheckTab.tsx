@@ -5,7 +5,7 @@ import { ShieldCheck, Plus, X, Loader2, ChevronDown, ChevronRight, Upload, FileT
 
 /* ── Design tokens ── */
 const VOID = "#060709"
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "rgba(240,240,242,0.92)"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
@@ -460,7 +460,7 @@ function CheckModal({
             {/* Overall Status Banner */}
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: 20, borderRadius: 12,
+              padding: 20, borderRadius: 14,
               background: result.status === "approved" ? "rgba(52,211,153,0.08)" : result.status === "needs_changes" ? "rgba(251,191,36,0.08)" : "rgba(239,68,68,0.08)",
               border: `1px solid ${result.status === "approved" ? "rgba(52,211,153,0.25)" : result.status === "needs_changes" ? "rgba(251,191,36,0.25)" : "rgba(239,68,68,0.25)"}`,
             }}>
@@ -581,7 +581,7 @@ export default function ComplianceCheckTab() {
       {/* ── Left Panel — Previous Checks ── */}
       <div style={{
         width: 320, minWidth: 320, background: CARD_BG, border: `1px solid ${CARD_BORDER}`,
-        borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column",
+        borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column",
       }}>
         <div style={{
           padding: "16px 18px", borderBottom: `1px solid ${CARD_BORDER}`,
@@ -665,7 +665,7 @@ export default function ComplianceCheckTab() {
       {/* ── Right Panel — Selected Check Results ── */}
       <div style={{
         flex: 1, background: CARD_BG, border: `1px solid ${CARD_BORDER}`,
-        borderRadius: 12, overflow: "hidden",
+        borderRadius: 14, overflow: "hidden",
       }}>
         {!selected ? (
           <div style={{

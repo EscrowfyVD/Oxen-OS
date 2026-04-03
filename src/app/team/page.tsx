@@ -7,7 +7,7 @@ import { AVATAR_THEMES, AVATAR_THEME_NAMES, getAvatarGradient, getLeastUsedTheme
 
 /* ── Design tokens ── */
 const FROST = "#FFFFFF"
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
@@ -478,7 +478,7 @@ export default function TeamPage() {
                   gap: 16,
                   background: CARD_BG,
                   border: `1px solid ${CARD_BORDER}`,
-                  borderRadius: 12,
+                  borderRadius: 14,
                   transition: "all 0.25s ease",
                   position: "relative",
                   overflow: "hidden",
@@ -803,7 +803,7 @@ export default function TeamPage() {
               overflowY: "auto",
               background: CARD_BG,
               border: `1px solid ${CARD_BORDER}`,
-              borderRadius: 12,
+              borderRadius: 14,
             }}
           >
             {/* Header */}

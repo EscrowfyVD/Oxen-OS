@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 
 /* ── Design tokens ── */
-const CARD_BG = "#0F1118"
+const CARD_BG = "rgba(15,17,24,0.6)"
 const CARD_BORDER = "rgba(255,255,255,0.06)"
 const TEXT_PRIMARY = "#F0F0F2"
 const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
@@ -760,7 +760,7 @@ export default function TasksPage() {
             <h1
               style={{
                 fontFamily: "'Bellfair', serif",
-                fontSize: 28,
+                fontSize: 32,
                 fontWeight: 400,
                 color: FROST,
                 lineHeight: 1.2,
@@ -1049,7 +1049,7 @@ export default function TasksPage() {
                   <span
                     style={{
                       fontFamily: "'Bellfair', serif",
-                      fontSize: 28,
+                      fontSize: 32,
                       fontWeight: 400,
                       color: FROST,
                       lineHeight: 1,
@@ -1106,7 +1106,7 @@ export default function TasksPage() {
               overflowY: "auto",
               background: CARD_BG,
               border: `1px solid ${CARD_BORDER}`,
-              borderRadius: 12,
+              borderRadius: 14,
             }}
           >
             {/* Modal header */}
