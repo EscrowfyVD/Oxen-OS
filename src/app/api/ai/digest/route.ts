@@ -36,24 +36,24 @@ export async function POST() {
     // Active deals
     const deals = await prisma.deal.findMany({
       where: { stage: { notIn: ["closed_won", "closed_lost"] } },
-      include: { contact: { select: { name: true, company: true } } },
-      orderBy: { expectedRevenue: "desc" },
+      include: { contact: { select: { firstName: true, lastName: true, company: { select: { name: true } } } } },
+      orderBy: { dealValue: "desc" },
       take: 15,
     })
 
     // Recent insights
     const insights = await prisma.aIInsight.findMany({
       where: { dismissed: false },
-      include: { contact: { select: { name: true, company: true } } },
+      include: { contact: { select: { firstName: true, lastName: true, company: { select: { name: true } } } } },
       orderBy: { createdAt: "desc" },
       take: 5,
     })
 
     // Recently updated contacts
-    const recentContacts = await prisma.contact.findMany({
+    const recentContacts = await prisma.crmContact.findMany({
       orderBy: { updatedAt: "desc" },
       take: 5,
-      select: { name: true, company: true, status: true, healthStatus: true, updatedAt: true },
+      select: { firstName: true, lastName: true, lifecycleStage: true, relationshipStrength: true, updatedAt: true, company: { select: { name: true } } },
     })
 
     const contextParts: string[] = []
@@ -77,8 +77,9 @@ export async function POST() {
       contextParts.push("\n## Active Pipeline")
       let totalValue = 0
       for (const d of deals) {
-        totalValue += d.expectedRevenue || 0
-        contextParts.push(`- ${d.name} (${d.contact?.company || d.contact?.name || "?"}) — ${d.stage} — €${d.expectedRevenue?.toLocaleString() || "?"}`)
+        totalValue += d.dealValue || 0
+        const contactLabel = d.contact?.company?.name || `${d.contact?.firstName} ${d.contact?.lastName}` || "?"
+        contextParts.push(`- ${d.dealName} (${contactLabel}) — ${d.stage} — €${d.dealValue?.toLocaleString() || "?"}`)
       }
       contextParts.push(`Total pipeline: €${totalValue.toLocaleString()}`)
     }

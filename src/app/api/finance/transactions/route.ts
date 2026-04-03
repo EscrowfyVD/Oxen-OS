@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       skip: (page - 1) * limit,
       take: limit,
       include: {
-        contact: { select: { id: true, name: true, company: true } },
+        contact: { select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } } },
       },
     }),
     prisma.financeTransaction.count({ where }),
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
       createdBy: userId,
     },
     include: {
-      contact: { select: { id: true, name: true, company: true } },
+      contact: { select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } } },
     },
   })
 

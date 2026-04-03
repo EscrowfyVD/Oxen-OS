@@ -24,13 +24,13 @@ export async function POST(request: Request) {
     // Contact data
     let contact = null
     if (contactId) {
-      contact = await prisma.contact.findUnique({
+      contact = await prisma.crmContact.findUnique({
         where: { id: contactId },
         include: {
-          interactions: { orderBy: { createdAt: "desc" }, take: 10 },
+          activities: { orderBy: { createdAt: "desc" }, take: 10 },
           deals: { orderBy: { updatedAt: "desc" }, take: 5 },
-          metrics: { orderBy: { month: "desc" }, take: 6 },
           companyIntel: { orderBy: { updatedAt: "desc" }, take: 1 },
+          company: { select: { name: true } },
         },
       })
     }
@@ -38,18 +38,19 @@ export async function POST(request: Request) {
     // If no contact but attendees, try to find by name/email
     if (!contact && attendees?.length > 0) {
       for (const att of attendees) {
-        const found = await prisma.contact.findFirst({
+        const found = await prisma.crmContact.findFirst({
           where: {
             OR: [
               { email: { equals: att, mode: "insensitive" } },
-              { name: { contains: att.split("@")[0], mode: "insensitive" } },
+              { firstName: { contains: att.split("@")[0], mode: "insensitive" } },
+              { lastName: { contains: att.split("@")[0], mode: "insensitive" } },
             ],
           },
           include: {
-            interactions: { orderBy: { createdAt: "desc" }, take: 10 },
+            activities: { orderBy: { createdAt: "desc" }, take: 10 },
             deals: { orderBy: { updatedAt: "desc" }, take: 5 },
-            metrics: { orderBy: { month: "desc" }, take: 6 },
             companyIntel: { orderBy: { updatedAt: "desc" }, take: 1 },
+            company: { select: { name: true } },
           },
         })
         if (found) { contact = found; break }
@@ -57,30 +58,22 @@ export async function POST(request: Request) {
     }
 
     if (contact) {
-      contextParts.push(`## Contact: ${contact.name}`)
-      contextParts.push(`Company: ${contact.company || "?"} | Email: ${contact.email || "?"} | Status: ${contact.status} | Health: ${contact.healthStatus}`)
-      contextParts.push(`Sector: ${contact.sector || "?"} | Segment: ${contact.segment || "?"} | Country: ${contact.country || "?"}`)
-      if (contact.monthlyGtv) contextParts.push(`Monthly GTV: €${contact.monthlyGtv.toLocaleString()} | Revenue: €${contact.monthlyRevenue?.toLocaleString() || "?"}`)
-      if (contact.notes) contextParts.push(`Notes: ${contact.notes}`)
+      contextParts.push(`## Contact: ${contact.firstName} ${contact.lastName}`)
+      contextParts.push(`Company: ${contact.company?.name || "?"} | Email: ${contact.email || "?"} | Stage: ${contact.lifecycleStage} | Relationship: ${contact.relationshipStrength || "?"}`)
+      contextParts.push(`Vertical: ${contact.vertical.join(", ") || "?"} | ICP Fit: ${contact.icpFit || "?"} | Country: ${contact.country || "?"}`)
+      if (contact.pinnedNote) contextParts.push(`Notes: ${contact.pinnedNote}`)
 
-      if (contact.interactions.length > 0) {
+      if (contact.activities.length > 0) {
         contextParts.push("\n## Relationship History")
-        for (const i of contact.interactions) {
-          contextParts.push(`- [${i.type}] ${new Date(i.createdAt).toLocaleDateString()}: ${i.content}`)
+        for (const a of contact.activities) {
+          contextParts.push(`- [${a.type}] ${new Date(a.createdAt).toLocaleDateString()}: ${a.description || ""}`)
         }
       }
 
       if (contact.deals.length > 0) {
         contextParts.push("\n## Deals")
         for (const d of contact.deals) {
-          contextParts.push(`- ${d.name} | Stage: ${d.stage} | Revenue: €${d.expectedRevenue?.toLocaleString() || "?"} | Probability: ${d.probability || "?"}% | Owner: ${d.assignedTo || "?"}`)
-        }
-      }
-
-      if (contact.metrics.length > 0) {
-        contextParts.push("\n## Financial Metrics")
-        for (const m of contact.metrics) {
-          contextParts.push(`- ${m.month}: GTV €${m.gtv.toLocaleString()} | Revenue €${m.revenue.toLocaleString()} | Take Rate ${m.takeRate}%`)
+          contextParts.push(`- ${d.dealName} | Stage: ${d.stage} | Value: €${d.dealValue?.toLocaleString() || "?"} | Probability: ${d.winProbability || "?"}% | Owner: ${d.dealOwner || "?"}`)
         }
       }
 
@@ -147,7 +140,7 @@ Be specific, actionable, and reference real data. If no data available for a sec
         briefContent,
         createdBy: "ai",
       },
-      include: { contact: { select: { id: true, name: true, company: true } } },
+      include: { contact: { select: { id: true, firstName: true, lastName: true, company: { select: { name: true } } } } },
     })
 
     // Auto-send via Telegram to relevant team members

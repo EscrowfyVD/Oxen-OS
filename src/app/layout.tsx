@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import SessionProvider from "@/components/layout/SessionProvider"
 import SidebarLayout from "@/components/layout/SidebarLayout"
+import CommandPaletteProvider from "@/components/crm/CommandPaletteProvider"
 
 export const metadata: Metadata = {
   title: "Oxen OS",
@@ -17,7 +18,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <SessionProvider>
-          <SidebarLayout>{children}</SidebarLayout>
+          <CommandPaletteProvider>
+            <SidebarLayout>{children}</SidebarLayout>
+          </CommandPaletteProvider>
         </SessionProvider>
       </body>
     </html>

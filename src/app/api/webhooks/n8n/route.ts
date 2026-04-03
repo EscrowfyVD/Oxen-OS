@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
     if (!action || !contactEmail) return NextResponse.json({ ok: true })
 
-    const contact = await prisma.contact.findFirst({
+    const contact = await prisma.crmContact.findFirst({
       where: { email: { equals: contactEmail, mode: "insensitive" } },
     })
 
@@ -39,30 +39,30 @@ export async function POST(request: Request) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: any = {}
         const allowed = [
-          "name", "company", "sector", "status", "source", "country",
-          "outreachStatus", "leadSource", "clientType", "vertical",
+          "firstName", "lastName", "company", "vertical", "lifecycleStage", "source", "country",
+          "outreachStatus", "leadSource", "clientType", "dealOwner", "introducerId",
         ]
         for (const key of allowed) {
           if (data?.[key] !== undefined) updateData[key] = data[key]
         }
         if (Object.keys(updateData).length > 0) {
-          await prisma.contact.update({ where: { id: contact.id }, data: updateData })
+          await prisma.crmContact.update({ where: { id: contact.id }, data: updateData })
         }
         break
       }
 
       case "create_interaction":
-        await prisma.interaction.create({
+        await prisma.activity.create({
           data: {
             contactId: contact.id,
             type: data?.type || "note",
-            content: data?.content || "n8n interaction",
-            createdBy: "webhook:n8n",
+            description: data?.content || "n8n interaction",
+            performedBy: "system",
           },
         })
-        await prisma.contact.update({
+        await prisma.crmContact.update({
           where: { id: contact.id },
-          data: { lastContactedAt: new Date() },
+          data: { lastInteraction: new Date() },
         })
         break
     }

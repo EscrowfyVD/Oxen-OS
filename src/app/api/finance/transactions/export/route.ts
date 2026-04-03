@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const transactions = await prisma.financeTransaction.findMany({
     where,
     orderBy: { date: "desc" },
-    include: { contact: { select: { name: true, company: true } } },
+    include: { contact: { select: { firstName: true, lastName: true, company: { select: { id: true, name: true } } } } },
   })
 
   const headers = [
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     t.paymentSource || "",
     t.reference || "",
     t.status,
-    t.contact?.name || "",
+    t.contact ? `${t.contact.firstName} ${t.contact.lastName}` : "",
     (t.notes || "").replace(/,/g, ";").replace(/\n/g, " "),
   ])
 

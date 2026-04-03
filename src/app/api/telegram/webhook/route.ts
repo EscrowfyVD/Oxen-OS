@@ -172,16 +172,16 @@ async function handleDigest(chatId: number) {
     // Active deals
     const deals = await prisma.deal.findMany({
       where: { stage: { notIn: ["closed_won", "closed_lost"] } },
-      include: { contact: { select: { name: true, company: true } } },
-      orderBy: { expectedRevenue: "desc" },
+      include: { contact: { select: { firstName: true, lastName: true, company: { select: { id: true, name: true } } } } },
+      orderBy: { dealValue: "desc" },
       take: 10,
     })
     if (deals.length > 0) {
       contextParts.push("\n## Active Pipeline")
       let totalValue = 0
       for (const d of deals) {
-        totalValue += d.expectedRevenue || 0
-        contextParts.push(`- ${d.name} (${d.contact?.company || d.contact?.name || "?"}) — ${d.stage} — €${d.expectedRevenue?.toLocaleString() || "?"}`)
+        totalValue += d.dealValue || 0
+        contextParts.push(`- ${d.dealName} (${d.contact?.company?.name || (d.contact ? `${d.contact.firstName} ${d.contact.lastName}` : "?")}) — ${d.stage} — €${d.dealValue?.toLocaleString() || "?"}`)
       }
       contextParts.push(`Total pipeline: €${totalValue.toLocaleString()}`)
     }
@@ -337,13 +337,15 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
 
   try {
     // Search contacts
-    const contacts = await prisma.contact.findMany({
+    const contacts = await prisma.crmContact.findMany({
       where: {
         OR: [
-          { name: { contains: contactQuery, mode: "insensitive" } },
-          { company: { contains: contactQuery, mode: "insensitive" } },
+          { firstName: { contains: contactQuery, mode: "insensitive" } },
+          { lastName: { contains: contactQuery, mode: "insensitive" } },
+          { company: { name: { contains: contactQuery, mode: "insensitive" } } },
         ],
       },
+      include: { company: { select: { id: true, name: true } } },
       take: 5,
     })
 
@@ -357,12 +359,12 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
     const contact = contacts[0]
 
     // Create interaction
-    await prisma.interaction.create({
+    await prisma.activity.create({
       data: {
         contactId: contact.id,
         type: "call",
-        content: `[Telegram Note] ${noteData.summary}\n\nAction Items:\n${noteData.actionItems.join("\n")}\n\nOriginal: ${noteData.rawNote}`,
-        createdBy: employee.name,
+        description: `[Telegram Note] ${noteData.summary}\n\nAction Items:\n${noteData.actionItems.join("\n")}\n\nOriginal: ${noteData.rawNote}`,
+        performedBy: employee.name,
       },
     })
 
@@ -381,7 +383,7 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
           tag: "follow-up",
           assignee: assignee || employee.name,
           createdBy: employee.name,
-          description: `From meeting note by ${employee.name} re: ${contact.company || contact.name}`,
+          description: `From meeting note by ${employee.name} re: ${contact.company?.name || `${contact.firstName} ${contact.lastName}`}`,
         },
       })
       tasksCreated++
@@ -391,7 +393,7 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
 
     await sendTelegramMessage(
       chatId,
-      `✅ Linked to *${contact.name}* (${contact.company || "?"}).\n\n📝 Interaction saved\n📋 ${tasksCreated} task${tasksCreated !== 1 ? "s" : ""} created`,
+      `✅ Linked to *${contact.firstName} ${contact.lastName}* (${contact.company?.name || "?"}).\n\n📝 Interaction saved\n📋 ${tasksCreated} task${tasksCreated !== 1 ? "s" : ""} created`,
     )
   } catch (error) {
     console.error("Note linking error:", error)

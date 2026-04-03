@@ -62,15 +62,15 @@ export async function GET(
         select: {
           id: true,
           stage: true,
-          expectedRevenue: true,
+          dealValue: true,
         },
       })
 
       dealsCount = deals.length
-      pipelineValue = deals.reduce((sum, d) => sum + (d.expectedRevenue ?? 0), 0)
+      pipelineValue = deals.reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
       wonRevenue = deals
         .filter((d) => d.stage === "won" || d.stage === "closed_won")
-        .reduce((sum, d) => sum + (d.expectedRevenue ?? 0), 0)
+        .reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
     }
 
     const roi = totalCost > 0 ? ((wonRevenue - totalCost) / totalCost) * 100 : 0

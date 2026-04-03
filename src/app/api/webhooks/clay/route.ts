@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
     if (!email) return NextResponse.json({ ok: true })
 
-    const contact = await prisma.contact.findFirst({
+    const contact = await prisma.crmContact.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
     })
 
@@ -42,11 +42,10 @@ export async function POST(request: Request) {
       .filter((s) => !s.expiresAt || s.expiresAt > now)
       .reduce((sum, s) => sum + s.score, 0)
 
-    await prisma.contact.update({
+    await prisma.crmContact.update({
       where: { id: contact.id },
       data: {
-        intentScore: Math.min(totalScore, 100),
-        outreachStatus: contact.outreachStatus === "new" ? "enriched" : contact.outreachStatus,
+        relationshipScore: Math.min(totalScore, 100),
       },
     })
   } catch (error) {

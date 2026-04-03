@@ -14,19 +14,22 @@ export async function POST(
 
   const { contactId } = await params
 
-  const contact = await prisma.contact.findUnique({ where: { id: contactId } })
+  const contact = await prisma.crmContact.findUnique({
+    where: { id: contactId },
+    include: { company: { select: { name: true } } },
+  })
   if (!contact) return NextResponse.json({ error: "Contact not found" }, { status: 404 })
 
   try {
-    const companyName = contact.company || contact.name
+    const companyName = contact.company?.name || `${contact.firstName} ${contact.lastName}`
     const website = contact.website || ""
 
     const prompt = `Research the following company for a premium banking/payment infrastructure sales team. Return ONLY a valid JSON object.
 
 COMPANY: ${companyName}
 WEBSITE: ${website || "Not provided"}
-SECTOR: ${contact.sector || "Not specified"}
-CONTACT NAME: ${contact.name}
+VERTICAL: ${contact.vertical.join(", ") || "Not specified"}
+CONTACT NAME: ${contact.firstName} ${contact.lastName}
 COUNTRY: ${contact.country || "Not specified"}
 
 Context: We are Oxen Finance, providing multi-currency accounts, SEPA/SWIFT payments, crypto-to-fiat exchange, card issuing, and compliance-first onboarding. Our target sectors are iGaming, crypto, family offices, and luxury asset brokers.

@@ -108,7 +108,7 @@ model Task {
   supportTicketId  String?
   supportTicket    SupportTicket? @relation(fields: [supportTicketId], references: [id])
   contactId        String?
-  contact          Contact?       @relation(fields: [contactId], references: [id])
+  contact          CrmContact?    @relation(fields: [contactId], references: [id])
   createdBy        String
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
@@ -251,105 +251,204 @@ model ActivityLog {
   createdAt DateTime @default(now())
 }
 
-// ─── CRM / CRO Revenue Intelligence ───
+// ─── CRM v2 — Companies, Contacts, Deals, Activities ───
 
-model Contact {
-  id              String            @id @default(cuid())
+model Company {
+  id              String   @id @default(cuid())
   name            String
-  email           String?
+  website         String?
+  domain          String?  @unique
+  industry        String?
+  description     String?  @db.Text
+  hqCountry       String?
+  hqCity          String?
+  vertical        String[] // multi-select: primary verticals
+  subVertical     String[] // multi-select: sub-verticals
+  geoZone         String?  // "Malta", "Cyprus", "Luxembourg", "UK", "UAE", "Europe", "Asia", "South America", "Other"
+  // Clay enrichment
+  employeeCount   Int?
+  revenueRange    String?  // "<100K", "100K-500K", "500K-1M", "1M-5M", "5M-20M", "20M+", "Unknown"
+  fundingTotal    String?
+  techStack       String[]
+  linkedinUrl     String?
+  socialProfiles  Json?
+  // Computed
+  contactsCount   Int      @default(0)
+  activeDealsCount Int     @default(0)
+  totalRevenue    Float    @default(0)
+  // Relations
+  contacts        CrmContact[]
+  deals           Deal[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CrmContact {
+  id              String   @id @default(cuid())
+  firstName       String
+  lastName        String
+  email           String   @unique
   phone           String?
-  company         String?
-  sector          String?
-  status          String            @default("lead")
-  source          String?
-  value           Float?
-  currency        String            @default("EUR")
-  notes           String?           @db.Text
-  assignedTo      String?
+  linkedinUrl     String?
+  jobTitle        String?
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id])
+  // Classification
+  vertical        String[] // multi-select: 7 primary verticals
+  subVertical     String[] // multi-select: 28 sub-verticals
+  geoZone         String?  // determines deal owner auto-assignment
+  dealOwner       String?  // "Andy", "Paul Louis", "Vernon"
+  acquisitionSource       String? // "Clay / Outbound Sequence", "Conference", etc.
+  acquisitionSourceDetail String? // event name if conference, introducer name if referral
+  lifecycleStage  String   @default("new_lead") // 9 stages
+  icpFit          String?  // AI-generated: "tier_1", "tier_2", "tier_3"
+  contactType     String   @default("prospect") // "prospect", "client", "introducer", "partner"
+  // Clay enrichment
+  companySize     String?
+  fundingStage    String?
+  techStack       String[]
+  annualRevenueRange String?
+  country         String?
+  city            String?
+  // Smart fields (auto-computed)
+  lastInteraction DateTime?
+  daysSinceLastContact Int?
+  nextScheduledMeeting DateTime?
+  totalInteractions Int    @default(0)
+  avgResponseTimeHours Float?
+  relationshipStrength String? // "strong", "warm", "cold", "no_relationship"
+  relationshipScore Int    @default(0) // 0-100
+  aiSummary       String?  @db.Text // AI one-liner
+  // Meta
+  doNotContact    Boolean  @default(false)
+  pinnedNote      String?  @db.Text
+  createdBy       String?
+  // Introducer self-relation
+  introducerId    String?
+  introducer      CrmContact? @relation("IntroducerReferrals", fields: [introducerId], references: [id])
+  referredContacts CrmContact[] @relation("IntroducerReferrals")
+  // Introducer-specific fields
+  introducerVertical String[]
+  introducerGeo   String?
+  totalReferrals  Int      @default(0)
+  successfulReferrals Int  @default(0)
+  referralSuccessRate Float? @default(0)
+  // Legacy compat fields (migrated from old Contact)
   telegram        String?
   whatsapp        String?
   website         String?
-  country         String?
-  // CRO fields
-  healthStatus    String            @default("healthy")
-  monthlyGtv      Float?
-  monthlyRevenue  Float?
-  takeRate        Float?
-  segment         String?
-  projectedVolume Float?
-  // GTM fields
-  clientType        String?
-  vertical          String?
-  icpScore          Int?              @default(0)
-  intentScore       Int?              @default(0)
-  priorityScore     Int?              @default(0)
-  leadSource        String?
-  outreachStatus    String?           @default("new")
-  lemlistCampaignId String?
-  lastContactedAt   DateTime?
-  lastRepliedAt     DateTime?
-  agentId           String?
-  agent             Agent?            @relation(fields: [agentId], references: [id])
-  createdBy       String
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  interactions    Interaction[]
-  metrics         CustomerMetrics[]
+  // Relations
   deals           Deal[]
+  activities      Activity[]
+  tasks           CrmTask[]
+  conferenceContacts ConferenceContact[]
+  intentSignals   IntentSignal[]
+  emails          Email[]          @relation("ContactEmails")
+  driveLinks      DriveLink[]      @relation("ContactDriveLinks")
+  financeTransactions FinanceTransaction[] @relation("ContactFinance")
   supportTickets  SupportTicket[]
-  companyIntel    CompanyIntel[]    @relation("ContactIntel")
+  companyIntel    CompanyIntel[]   @relation("ContactIntel")
   meetingBriefs   MeetingBrief[]   @relation("ContactBriefs")
   aiInsights      AIInsight[]      @relation("ContactInsights")
-  emails          Email[]          @relation("ContactEmails")
-  signals         IntentSignal[]
-  outreachSequences OutreachSequence[]
-  tasks           Task[]
-  driveLinks      DriveLink[]       @relation("ContactDriveLinks")
-  conferenceContacts ConferenceContact[]
-  financeTransactions FinanceTransaction[] @relation("ContactFinance")
-}
-
-model Interaction {
-  id        String   @id @default(cuid())
-  contactId String
-  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  type      String
-  content   String   @db.Text
-  createdBy String
-  createdAt DateTime @default(now())
-}
-
-model CustomerMetrics {
-  id        String   @id @default(cuid())
-  contactId String
-  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  month     String   // "YYYY-MM"
-  gtv       Float    @default(0)
-  revenue   Float    @default(0)
-  takeRate  Float    @default(0)
-  txCount   Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([contactId, month])
+  kanbanTasks     Task[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Deal {
   id              String   @id @default(cuid())
-  name            String
+  dealName        String   // default: "{firstName} {lastName} — {company.name}"
   contactId       String
-  contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  stage           String   @default("discovery")
-  expectedVolume  Float?
-  takeRate        Float?
-  expectedRevenue Float?
-  probability     Float    @default(50)
-  closeDate       DateTime?
-  assignedTo      String?
+  contact         CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id])
+  stage           String   @default("new_lead") // 9 stages
+  dealValue       Float?   // estimated monthly revenue
+  dealOwner       String   // "Andy", "Paul Louis", "Vernon"
+  acquisitionSource       String?
+  acquisitionSourceDetail String?
+  vertical        String[]
+  expectedCloseDate DateTime?
+  winProbability  Float?   // auto-set from stage, manually adjustable
+  weightedValue   Float?   // dealValue × winProbability
+  // Lost tracking
+  lostReason      String?  // REQUIRED when closed_lost
+  lostNotes       String?  @db.Text
+  // KYC
+  kycStatus       String   @default("not_started") // "not_started", "in_progress", "documents_pending", "under_review", "approved", "rejected"
+  // Aging
+  daysInCurrentStage Int   @default(0)
+  daysSinceLastActivity Int @default(0)
+  aiDealHealth    String?  // "on_track", "needs_attention", "at_risk"
+  // Introducer
+  introducerId    String?  // contact who introduced this deal
+  conferenceName  String?  // if source is conference
+  // Timestamps
+  stageChangedAt  DateTime @default(now())
+  closedAt        DateTime?
   notes           String?  @db.Text
   createdBy       String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  activities      Activity[]
+  tasks           CrmTask[]
+}
+
+model Activity {
+  id              String   @id @default(cuid())
+  type            String   // "email_sent", "email_received", "meeting_calendly", "meeting_manual", "call_outbound", "call_inbound", "linkedin_message", "whatsapp_message", "clay_sequence_event", "note_added", "file_attached", "conference_encounter", "stage_change", "task_completed", "proposal_sent"
+  description     String?  @db.Text
+  contactId       String?
+  contact         CrmContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId          String?
+  deal            Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  metadata        Json?    // flexible: email subject, meeting link, call duration, etc.
+  performedBy     String?
+  isPrivate       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+}
+
+model CrmTask {
+  id              String   @id @default(cuid())
+  title           String
+  type            String   // "follow_up_email", "follow_up_call", "schedule_meeting", "send_proposal", "pre_meeting_prep", "post_meeting_summary", "conference_followup", "send_documents", "internal_discussion", "crm_data_update", "other"
+  priority        String   @default("medium") // "urgent", "high", "medium", "low"
+  dueDate         DateTime
+  assignee        String   // "Andy", "Paul Louis", "Vernon"
+  contactId       String?
+  contact         CrmContact? @relation(fields: [contactId], references: [id])
+  dealId          String?
+  deal            Deal?    @relation(fields: [dealId], references: [id])
+  status          String   @default("pending") // "pending", "completed", "cancelled"
+  outcomeNote     String?
+  isAutoGenerated Boolean  @default(false)
+  completedAt     DateTime?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String   // "contact", "deal", "company", "task", "activity"
+  entityId    String
+  action      String   // "created", "updated", "deleted", "stage_changed"
+  field       String?  // which field changed
+  oldValue    String?
+  newValue    String?
+  performedBy String
+  createdAt   DateTime @default(now())
+}
+
+model SmartView {
+  id          String   @id @default(cuid())
+  name        String
+  filters     Json     // array of filter conditions
+  filterLogic String   @default("and") // "and" | "or"
+  isShared    Boolean  @default(false)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ─── Finance ───
@@ -393,7 +492,7 @@ model FinanceTransaction {
   reimbursedDate  DateTime?
   // Relations
   contactId       String?
-  contact         Contact?  @relation("ContactFinance", fields: [contactId], references: [id])
+  contact         CrmContact? @relation("ContactFinance", fields: [contactId], references: [id])
   // Attachment
   attachmentUrl   String?
   attachmentName  String?
@@ -537,7 +636,7 @@ model SupportTicket {
   category        String?          // "account_issue", "transaction", "onboarding", "compliance", "technical", "general"
   assignedTo      String?
   contactId       String?
-  contact         Contact?         @relation(fields: [contactId], references: [id])
+  contact         CrmContact?      @relation(fields: [contactId], references: [id])
   messages        SupportMessage[]
   tasks           Task[]
   resolvedAt      DateTime?
@@ -562,7 +661,7 @@ model SupportMessage {
 model CompanyIntel {
   id             String    @id @default(cuid())
   contactId      String
-  contact        Contact   @relation("ContactIntel", fields: [contactId], references: [id], onDelete: Cascade)
+  contact        CrmContact @relation("ContactIntel", fields: [contactId], references: [id], onDelete: Cascade)
   companyName    String
   website        String?
   description    String?   @db.Text
@@ -584,7 +683,7 @@ model MeetingBrief {
   id           String    @id @default(cuid())
   eventId      String?   @unique
   contactId    String?
-  contact      Contact?  @relation("ContactBriefs", fields: [contactId], references: [id])
+  contact      CrmContact? @relation("ContactBriefs", fields: [contactId], references: [id])
   title        String
   meetingDate  DateTime
   attendees    String[]
@@ -601,7 +700,7 @@ model AIInsight {
   title        String
   summary      String   @db.Text
   contactId    String?
-  contact      Contact? @relation("ContactInsights", fields: [contactId], references: [id])
+  contact      CrmContact? @relation("ContactInsights", fields: [contactId], references: [id])
   severity     String   @default("medium")
   actionable   Boolean  @default(true)
   dismissed    Boolean  @default(false)
@@ -684,7 +783,7 @@ model LeaveRules {
 model Email {
   id            String   @id @default(cuid())
   contactId     String?
-  contact       Contact? @relation("ContactEmails", fields: [contactId], references: [id])
+  contact       CrmContact? @relation("ContactEmails", fields: [contactId], references: [id])
   gmailId       String   @unique
   threadId      String?
   from          String
@@ -701,37 +800,14 @@ model Email {
   createdAt     DateTime @default(now())
 }
 
-// ─── Agent / Referral Partner ───
-
-model Agent {
-  id                  String    @id @default(cuid())
-  name                String
-  company             String?
-  type                String    @default("broker")
-  email               String?
-  phone               String?
-  telegram            String?
-  whatsapp            String?
-  country             String?
-  website             String?
-  commissionDirect    Float     @default(15)
-  commissionIndirect  Float     @default(5)
-  status              String    @default("prospect")
-  onboardedAt         DateTime?
-  notes               String?   @db.Text
-  createdBy           String
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  referredClients     Contact[]
-  driveLinks          DriveLink[]
-}
+// ─── Agent model removed — introducers are now CrmContact with contactType="introducer" ───
 
 // ─── Intent Signals ───
 
 model IntentSignal {
   id          String    @id @default(cuid())
   contactId   String
-  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact     CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
   source      String
   signalType  String
   title       String
@@ -742,21 +818,7 @@ model IntentSignal {
   createdAt   DateTime  @default(now())
 }
 
-// ─── Outreach Sequences ───
-
-model OutreachSequence {
-  id              String   @id @default(cuid())
-  contactId       String
-  contact         Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  platform        String
-  campaignName    String?
-  status          String   @default("active")
-  stepsCompleted  Int      @default(0)
-  totalSteps      Int      @default(0)
-  lastStepAt      DateTime?
-  enqueuedAt      DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
+// ─── OutreachSequence removed — tracked via Activity + Clay integration ───
 
 // ─── Intelligence Hub ───
 
@@ -866,7 +928,7 @@ model ConferenceContact {
   followUpAction  String?
   addedToCrm      Boolean    @default(false)
   contactId       String?
-  contact         Contact?   @relation(fields: [contactId], references: [id])
+  contact         CrmContact? @relation(fields: [contactId], references: [id])
   collectedBy     String
   createdAt       DateTime   @default(now())
 }
@@ -1065,9 +1127,7 @@ model DriveLink {
   iconUrl     String?
   category    String?    // "contract", "kyc", "invoice", "proposal", "legal", "compliance", "process", "other"
   contactId   String?
-  contact     Contact?   @relation("ContactDriveLinks", fields: [contactId], references: [id])
-  agentId     String?
-  agent       Agent?     @relation(fields: [agentId], references: [id])
+  contact     CrmContact? @relation("ContactDriveLinks", fields: [contactId], references: [id])
   wikiPageId  String?
   wikiPage    WikiPage?  @relation(fields: [wikiPageId], references: [id])
   entityId    String?

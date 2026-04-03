@@ -20,7 +20,7 @@ export async function PATCH(
       ...(actionTaken !== undefined && { actionTaken }),
       ...(linkedTaskId !== undefined && { linkedTaskId }),
     },
-    include: { contact: { select: { id: true, name: true, company: true } } },
+    include: { contact: { select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } } } },
   })
 
   return NextResponse.json({ insight })

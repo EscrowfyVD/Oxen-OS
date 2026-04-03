@@ -219,7 +219,7 @@ export async function POST() {
 
         let contactId: string | null = null
         for (const email of allEmails) {
-          const contact = await prisma.contact.findFirst({
+          const contact = await prisma.crmContact.findFirst({
             where: { email: { equals: email, mode: "insensitive" } },
             select: { id: true },
           })

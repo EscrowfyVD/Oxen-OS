@@ -110,17 +110,17 @@ async function generateBrief(event: {
   // Try to find a matching contact from attendees
   let contact = null
   for (const att of event.attendees) {
-    const found = await prisma.contact.findFirst({
+    const found = await prisma.crmContact.findFirst({
       where: {
         OR: [
           { email: { equals: att, mode: "insensitive" } },
-          { name: { contains: att.split("@")[0], mode: "insensitive" } },
+          { firstName: { contains: att.split("@")[0], mode: "insensitive" } },
         ],
       },
       include: {
-        interactions: { orderBy: { createdAt: "desc" }, take: 5 },
+        company: { select: { name: true } },
+        activities: { orderBy: { createdAt: "desc" }, take: 5 },
         deals: { orderBy: { updatedAt: "desc" }, take: 3 },
-        metrics: { orderBy: { month: "desc" }, take: 3 },
       },
     })
     if (found) { contact = found; break }
@@ -129,18 +129,18 @@ async function generateBrief(event: {
   // Build context
   const contextParts: string[] = []
   if (contact) {
-    contextParts.push(`## Contact: ${contact.name}`)
-    contextParts.push(`Company: ${contact.company || "?"} | Status: ${contact.status} | Health: ${contact.healthStatus}`)
-    if (contact.interactions.length > 0) {
-      contextParts.push("\n## Recent Interactions")
-      for (const i of contact.interactions) {
-        contextParts.push(`- [${i.type}] ${new Date(i.createdAt).toLocaleDateString()}: ${i.content.substring(0, 150)}`)
+    contextParts.push(`## Contact: ${contact.firstName} ${contact.lastName ?? ""}`.trim())
+    contextParts.push(`Company: ${contact.company?.name || "?"} | Stage: ${contact.lifecycleStage}`)
+    if (contact.activities.length > 0) {
+      contextParts.push("\n## Recent Activities")
+      for (const i of contact.activities) {
+        contextParts.push(`- [${i.type}] ${new Date(i.createdAt).toLocaleDateString()}: ${(i.description ?? "").substring(0, 150)}`)
       }
     }
     if (contact.deals.length > 0) {
       contextParts.push("\n## Deals")
       for (const d of contact.deals) {
-        contextParts.push(`- ${d.name} | Stage: ${d.stage} | Revenue: €${d.expectedRevenue?.toLocaleString() || "?"}`)
+        contextParts.push(`- ${d.dealName} | Stage: ${d.stage} | Revenue: €${d.dealValue?.toLocaleString() || "?"}`)
       }
     }
   }

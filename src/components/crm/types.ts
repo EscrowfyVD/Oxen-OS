@@ -1,96 +1,128 @@
-/* ── CRO Revenue Intelligence Shared Types ── */
-
-import type { AIInsight, MeetingBrief } from "@/components/ai/types"
+/* ── CRM v2 — Shared Types ── */
 
 export interface Contact {
   id: string
-  name: string
-  email: string | null
+  firstName: string
+  lastName: string
+  email: string
   phone: string | null
-  company: string | null
-  sector: string | null
-  status: string
-  source: string | null
-  value: number | null
-  currency: string
-  notes: string | null
-  assignedTo: string | null
+  linkedinUrl: string | null
+  jobTitle: string | null
+  companyId: string | null
+  company: { id: string; name: string; domain: string | null } | null
+  // Classification
+  vertical: string[]
+  subVertical: string[]
+  geoZone: string | null
+  dealOwner: string | null
+  acquisitionSource: string | null
+  acquisitionSourceDetail: string | null
+  lifecycleStage: string
+  icpFit: string | null
+  contactType: string
+  // Clay enrichment
+  companySize: string | null
+  fundingStage: string | null
+  techStack: string[]
+  annualRevenueRange: string | null
+  country: string | null
+  city: string | null
+  // Smart fields
+  lastInteraction: string | null
+  daysSinceLastContact: number | null
+  nextScheduledMeeting: string | null
+  totalInteractions: number
+  avgResponseTimeHours: number | null
+  relationshipStrength: string | null
+  relationshipScore: number
+  aiSummary: string | null
+  // Meta
+  doNotContact: boolean
+  pinnedNote: string | null
+  createdBy: string | null
+  // Introducer
+  introducerId: string | null
+  introducer: { id: string; firstName: string; lastName: string } | null
+  introducerVertical: string[]
+  introducerGeo: string | null
+  totalReferrals: number
+  successfulReferrals: number
+  referralSuccessRate: number | null
+  // Legacy compat
   telegram: string | null
   whatsapp: string | null
   website: string | null
-  country: string | null
-  // CRO fields
-  healthStatus: string
-  monthlyGtv: number | null
-  monthlyRevenue: number | null
-  takeRate: number | null
-  segment: string | null
-  projectedVolume: number | null
-  // GTM fields
-  clientType: string | null
-  vertical: string | null
-  icpScore: number | null
-  intentScore: number | null
-  priorityScore: number | null
-  leadSource: string | null
-  outreachStatus: string | null
-  lemlistCampaignId: string | null
-  lastContactedAt: string | null
-  lastRepliedAt: string | null
-  agentId: string | null
-  agent?: Agent | null
-  signals?: IntentSignal[]
-  createdBy: string
+  // Relations (optional, populated with includes)
+  deals: Deal[]
+  activities: Activity[]
+  intentSignals?: IntentSignal[]
+  emails?: Array<{ id: string; subject: string; snippet: string | null; from: string; to: string[]; date: string; direction: string; bodyText: string | null }>
+  // Timestamps
   createdAt: string
   updatedAt: string
-  interactions: Interaction[]
-  metrics?: CustomerMetrics[]
-  deals?: Deal[]
-  // AI relations (populated when extended includes are used)
-  aiInsights?: AIInsight[]
-  meetingBriefs?: MeetingBrief[]
-  companyIntel?: Array<Record<string, unknown>>
-  emails?: Array<{ id: string; subject: string; snippet: string | null; from: string; to: string[]; date: string; direction: string; bodyText: string | null }>
-}
-
-export interface Interaction {
-  id: string
-  contactId: string
-  type: string
-  content: string
-  createdBy: string
-  createdAt: string
-}
-
-export interface CustomerMetrics {
-  id: string
-  contactId: string
-  month: string
-  gtv: number
-  revenue: number
-  takeRate: number
-  txCount: number
 }
 
 export interface Deal {
   id: string
-  name: string
+  dealName: string
   contactId: string
   contact?: {
     id: string
-    name: string
-    company: string | null
-    sector: string | null
-    segment: string | null
+    firstName: string
+    lastName: string
+    company: { id: string; name: string } | null
   }
+  companyId: string | null
+  company?: { id: string; name: string } | null
   stage: string
-  expectedVolume: number | null
-  takeRate: number | null
-  expectedRevenue: number | null
-  probability: number
-  closeDate: string | null
-  assignedTo: string | null
+  dealValue: number | null
+  dealOwner: string
+  acquisitionSource: string | null
+  acquisitionSourceDetail: string | null
+  vertical: string[]
+  expectedCloseDate: string | null
+  winProbability: number | null
+  weightedValue: number | null
+  lostReason: string | null
+  lostNotes: string | null
+  kycStatus: string
+  daysInCurrentStage: number
+  daysSinceLastActivity: number
+  aiDealHealth: string | null
+  introducerId: string | null
+  conferenceName: string | null
+  stageChangedAt: string
+  closedAt: string | null
   notes: string | null
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  activities?: Activity[]
+  tasks?: CrmTask[]
+}
+
+export interface Activity {
+  id: string
+  type: string
+  description: string | null
+  contactId: string | null
+  dealId: string | null
+  metadata: Record<string, unknown> | null
+  performedBy: string
+  createdAt: string
+}
+
+export interface CrmTask {
+  id: string
+  title: string
+  description: string | null
+  type: string
+  dueDate: string | null
+  completed: boolean
+  completedAt: string | null
+  assignedTo: string
+  contactId: string | null
+  dealId: string | null
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -102,92 +134,6 @@ export interface Employee {
   initials: string
   role: string
 }
-
-export interface ContactFormData {
-  name: string
-  email: string
-  phone: string
-  company: string
-  sector: string
-  status: string
-  source: string
-  value: string
-  currency: string
-  assignedTo: string
-  country: string
-  telegram: string
-  whatsapp: string
-  website: string
-  notes: string
-  healthStatus: string
-  monthlyGtv: string
-  monthlyRevenue: string
-  takeRate: string
-  segment: string
-  projectedVolume: string
-  // GTM fields
-  clientType: string
-  vertical: string
-  leadSource: string
-  outreachStatus: string
-  agentId: string
-}
-
-export interface DealFormData {
-  name: string
-  contactId: string
-  stage: string
-  expectedVolume: string
-  takeRate: string
-  expectedRevenue: string
-  probability: string
-  closeDate: string
-  assignedTo: string
-  notes: string
-}
-
-/* ── Agent / Referral Partner ── */
-
-export interface Agent {
-  id: string
-  name: string
-  company: string | null
-  type: string
-  email: string | null
-  phone: string | null
-  telegram: string | null
-  whatsapp: string | null
-  country: string | null
-  website: string | null
-  commissionDirect: number
-  commissionIndirect: number
-  status: string
-  onboardedAt: string | null
-  notes: string | null
-  createdBy: string
-  createdAt: string
-  updatedAt: string
-  referredClients?: Contact[]
-  _count?: { referredClients: number }
-}
-
-export interface AgentFormData {
-  name: string
-  company: string
-  type: string
-  email: string
-  phone: string
-  telegram: string
-  whatsapp: string
-  country: string
-  website: string
-  commissionDirect: string
-  commissionIndirect: string
-  status: string
-  notes: string
-}
-
-/* ── Intent Signals ── */
 
 export interface IntentSignal {
   id: string
@@ -201,69 +147,18 @@ export interface IntentSignal {
   createdAt: string
 }
 
-/* ── Outreach Sequences ── */
-
-export interface OutreachSequence {
-  id: string
-  contactId: string
-  platform: string
-  campaignName: string | null
-  status: string
-  stepsCompleted: number
-  totalSteps: number
-  lastStepAt: string | null
-  enqueuedAt: string
-}
-
-/* ── CRO Dashboard Types ── */
-
-export interface OverviewData {
-  monthlyGtv: number
-  monthlyRevenue: number
-  avgTakeRate: number
-  revenueRunRate: number
-  activeCustomers: number
-  totalContacts: number
-  pipelineValue: number
-  revenueTrend: Array<{ month: string; gtv: number; revenue: number }>
-  concentration: {
-    top1Pct: number
-    top2to5Pct: number
-    top6to10Pct: number
-    restPct: number
-  }
-  topCustomers: Array<{
-    id: string
-    name: string
-    company: string | null
-    monthlyGtv: number | null
-    monthlyRevenue: number | null
-    takeRate: number | null
-    healthStatus: string
-    segment: string | null
-  }>
-  alerts: Array<{
-    id: string
-    name: string
-    company: string | null
-    healthStatus: string
-    monthlyGtv: number | null
-    monthlyRevenue: number | null
-    segment: string | null
-  }>
-  healthDistribution: Array<{ status: string; count: number }>
-}
+/* ── Dashboard / Report Types ── */
 
 export interface PipelineData {
   totalDeals: number
-  totalExpectedRevenue: number
-  totalWeightedRevenue: number
+  totalDealValue: number
+  totalWeightedValue: number
   avgProbability: number
   byStage: Array<{
     stage: string
     count: number
-    expectedRevenue: number
-    weightedRevenue: number
+    dealValue: number
+    weightedValue: number
   }>
   deals: Deal[]
   wonThisQuarter: number
@@ -287,45 +182,7 @@ export interface ForecastData {
 
 export interface ForecastBucket {
   count: number
-  totalRevenue: number
-  weightedRevenue: number
-  totalVolume: number
+  totalDealValue: number
+  weightedValue: number
   deals: Deal[]
-}
-
-export interface MetricsData {
-  monthly: Array<{
-    month: string
-    gtv: number
-    revenue: number
-    takeRate: number
-    txCount: number
-    customerCount: number
-    gtvGrowth: number
-    revenueGrowth: number
-  }>
-}
-
-export interface CrmStats {
-  totalContacts: number
-  pipelineValue: number
-  wonDeals: number
-  wonValue: number
-  conversionRate: number
-  byStatus: Array<{ status: string; count: number; value: number }>
-  bySector: Array<{ sector: string; count: number }>
-  monthlyNew: Array<{ month: string; count: number }>
-  topDeals: Contact[]
-  sentinelStats?: {
-    totalInsights: number
-    activeInsights: number
-    briefCoverage: number
-    revenueAtRisk: number
-  }
-  agentStats?: {
-    revenueByAgent: Array<{ agentId: string; agentName: string; revenue: number }>
-    referralsByType: Array<{ type: string; count: number }>
-    monthlyReferrals: Array<{ month: string; count: number }>
-    conversionByType: Array<{ type: string; rate: number }>
-  }
 }

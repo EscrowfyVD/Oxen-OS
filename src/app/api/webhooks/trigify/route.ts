@@ -14,19 +14,21 @@ export async function POST(request: Request) {
     if (!email) return NextResponse.json({ ok: true })
 
     // Find or create contact
-    let contact = await prisma.contact.findFirst({
+    let contact = await prisma.crmContact.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
     })
 
     if (!contact) {
-      contact = await prisma.contact.create({
+      const fallbackName = name || email.split("@")[0]
+      const [first, ...rest] = fallbackName.split(" ")
+      contact = await prisma.crmContact.create({
         data: {
-          name: name || email.split("@")[0],
+          firstName: first,
+          lastName: rest.length > 0 ? rest.join(" ") : "",
           email,
-          company: company || null,
-          source: "Trigify",
-          leadSource: "Trigify",
-          outreachStatus: "enriched",
+          acquisitionSource: "Other",
+          acquisitionSourceDetail: "Trigify",
+          lifecycleStage: "new_lead",
           createdBy: "webhook:trigify",
         },
       })
@@ -56,9 +58,9 @@ export async function POST(request: Request) {
       .filter((s) => !s.expiresAt || s.expiresAt > now)
       .reduce((sum, s) => sum + s.score, 0)
 
-    await prisma.contact.update({
+    await prisma.crmContact.update({
       where: { id: contact.id },
-      data: { intentScore: Math.min(totalScore, 100) },
+      data: { relationshipScore: Math.min(totalScore, 100) },
     })
   } catch (error) {
     console.error("Trigify webhook error:", error)

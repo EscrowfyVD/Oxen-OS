@@ -17,7 +17,7 @@ export async function GET(
     where: { id },
     include: {
       contact: {
-        select: { id: true, name: true, company: true, sector: true },
+        select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } }, vertical: true },
       },
     },
   })
@@ -41,8 +41,8 @@ export async function PATCH(
   const { id } = await params
   const body = await request.json()
   const {
-    name, stage, expectedVolume, takeRate, expectedRevenue,
-    probability, closeDate, assignedTo, notes,
+    dealName, stage, dealValue,
+    winProbability, closeDate, dealOwner, notes,
   } = body
 
   const existing = await prisma.deal.findUnique({ where: { id } })
@@ -53,27 +53,21 @@ export async function PATCH(
   const deal = await prisma.deal.update({
     where: { id },
     data: {
-      ...(name !== undefined && { name }),
+      ...(dealName !== undefined && { dealName }),
       ...(stage !== undefined && { stage }),
-      ...(expectedVolume !== undefined && {
-        expectedVolume: expectedVolume !== null ? parseFloat(expectedVolume) : null,
+      ...(dealValue !== undefined && {
+        dealValue: dealValue !== null ? parseFloat(dealValue) : null,
       }),
-      ...(takeRate !== undefined && {
-        takeRate: takeRate !== null ? parseFloat(takeRate) : null,
-      }),
-      ...(expectedRevenue !== undefined && {
-        expectedRevenue: expectedRevenue !== null ? parseFloat(expectedRevenue) : null,
-      }),
-      ...(probability !== undefined && { probability: parseFloat(probability) }),
+      ...(winProbability !== undefined && { winProbability: parseFloat(winProbability) }),
       ...(closeDate !== undefined && {
         closeDate: closeDate ? new Date(closeDate) : null,
       }),
-      ...(assignedTo !== undefined && { assignedTo: assignedTo || null }),
+      ...(dealOwner !== undefined && { dealOwner: dealOwner || null }),
       ...(notes !== undefined && { notes: notes || null }),
     },
     include: {
       contact: {
-        select: { id: true, name: true, company: true },
+        select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } },
       },
     },
   })
@@ -83,23 +77,23 @@ export async function PATCH(
     try {
       const stageLabel = stage.replace(/_/g, " ")
       const prevLabel = existing.stage.replace(/_/g, " ")
-      const companyName = deal.contact?.company || deal.contact?.name || "unknown"
+      const companyName = deal.contact?.company?.name || (deal.contact ? `${deal.contact.firstName} ${deal.contact.lastName}` : "unknown")
 
       let insightType = "buying_signal"
       let severity = "low"
-      let title = `Deal "${deal.name}" moved to ${stageLabel}`
-      let summary = `Deal "${deal.name}" for ${companyName} moved from ${prevLabel} to ${stageLabel}. Expected revenue: EUR${deal.expectedRevenue?.toLocaleString() || "?"}. Probability: ${deal.probability || "?"}%.`
+      let title = `Deal "${deal.dealName}" moved to ${stageLabel}`
+      let summary = `Deal "${deal.dealName}" for ${companyName} moved from ${prevLabel} to ${stageLabel}. Expected revenue: EUR${deal.dealValue?.toLocaleString() || "?"}. Probability: ${deal.winProbability || "?"}%.`
 
       if (stage === "closed_won" || stage === "commit" || stage === "volume_ramp") {
         insightType = "opportunity"
         severity = "medium"
-        title = `Deal won: "${deal.name}"`
-        summary = `Deal "${deal.name}" for ${companyName} has reached ${stageLabel}. Expected revenue: EUR${deal.expectedRevenue?.toLocaleString() || "?"}. Time to celebrate and plan onboarding.`
+        title = `Deal won: "${deal.dealName}"`
+        summary = `Deal "${deal.dealName}" for ${companyName} has reached ${stageLabel}. Expected revenue: EUR${deal.dealValue?.toLocaleString() || "?"}. Time to celebrate and plan onboarding.`
       } else if (stage === "closed_lost") {
         insightType = "risk"
         severity = "high"
-        title = `Deal lost: "${deal.name}"`
-        summary = `Deal "${deal.name}" for ${companyName} was marked as lost. Expected revenue was EUR${deal.expectedRevenue?.toLocaleString() || "?"}. Review what happened and document lessons learned.`
+        title = `Deal lost: "${deal.dealName}"`
+        summary = `Deal "${deal.dealName}" for ${companyName} was marked as lost. Expected revenue was EUR${deal.dealValue?.toLocaleString() || "?"}. Review what happened and document lessons learned.`
       }
 
       await prisma.aIInsight.create({

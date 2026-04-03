@@ -12,7 +12,7 @@ export async function GET(
   const { id } = await params
   const transaction = await prisma.financeTransaction.findUnique({
     where: { id },
-    include: { contact: { select: { id: true, name: true, company: true } } },
+    include: { contact: { select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } } } },
   })
 
   if (!transaction) {
@@ -56,7 +56,7 @@ export async function PATCH(
   const transaction = await prisma.financeTransaction.update({
     where: { id },
     data,
-    include: { contact: { select: { id: true, name: true, company: true } } },
+    include: { contact: { select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } } } },
   })
 
   return NextResponse.json({ transaction })

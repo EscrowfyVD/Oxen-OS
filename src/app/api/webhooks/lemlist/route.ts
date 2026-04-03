@@ -4,64 +4,48 @@ import { prisma } from "@/lib/prisma"
 export async function POST(request: Request) {
   const secret = request.headers.get("x-webhook-secret")
   if (process.env.LEMLIST_WEBHOOK_SECRET && secret !== process.env.LEMLIST_WEBHOOK_SECRET) {
-    return NextResponse.json({ ok: true }) // Silent reject, always 200
+    return NextResponse.json({ ok: true })
   }
 
   try {
     const body = await request.json()
-    const { email, event, campaignName, stepsCompleted, totalSteps } = body
+    const { email, event, campaignName } = body
 
     if (!email) return NextResponse.json({ ok: true })
 
-    const contact = await prisma.contact.findFirst({
+    const contact = await prisma.crmContact.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
     })
 
     if (!contact) return NextResponse.json({ ok: true })
 
-    // Map Lemlist events to outreach statuses
-    const statusMap: Record<string, string> = {
-      emailsSent: "sequenced",
-      emailsOpened: "sequenced",
-      emailsClicked: "sequenced",
+    // Map Lemlist events to lifecycle stages
+    const stageMap: Record<string, string> = {
+      emailsSent: "sequence_active",
+      emailsOpened: "sequence_active",
+      emailsClicked: "sequence_active",
       emailsReplied: "replied",
-      emailsBounced: "disqualified",
-      emailsUnsubscribed: "disqualified",
     }
 
-    const outreachStatus = statusMap[event] || contact.outreachStatus
+    const newStage = stageMap[event]
 
-    // Upsert outreach sequence
-    await prisma.outreachSequence.upsert({
-      where: {
-        id: `${contact.id}-lemlist`, // deterministic ID
-      },
-      update: {
-        status: event === "emailsReplied" ? "replied" : event === "emailsBounced" ? "bounced" : "active",
-        stepsCompleted: stepsCompleted ?? 0,
-        totalSteps: totalSteps ?? 0,
-        lastStepAt: new Date(),
-      },
-      create: {
-        id: `${contact.id}-lemlist`,
-        contactId: contact.id,
-        platform: "lemlist",
-        campaignName: campaignName || null,
-        status: "active",
-        stepsCompleted: stepsCompleted ?? 0,
-        totalSteps: totalSteps ?? 0,
-        lastStepAt: new Date(),
-      },
-    })
+    if (newStage) {
+      await prisma.crmContact.update({
+        where: { id: contact.id },
+        data: {
+          lifecycleStage: newStage,
+          lastInteraction: new Date(),
+        },
+      })
+    }
 
-    // Update contact outreach status
-    await prisma.contact.update({
-      where: { id: contact.id },
+    // Log as activity
+    await prisma.activity.create({
       data: {
-        outreachStatus,
-        lemlistCampaignId: campaignName || contact.lemlistCampaignId,
-        lastContactedAt: new Date(),
-        ...(event === "emailsReplied" ? { lastRepliedAt: new Date() } : {}),
+        type: "clay_sequence_event",
+        description: `Lemlist: ${event}${campaignName ? ` (${campaignName})` : ""}`,
+        contactId: contact.id,
+        performedBy: "system",
       },
     })
   } catch (error) {

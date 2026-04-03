@@ -13,7 +13,7 @@ export async function GET(
 
   const brief = await prisma.meetingBrief.findUnique({
     where: { id },
-    include: { contact: { select: { id: true, name: true, company: true } } },
+    include: { contact: { select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } } } },
   })
 
   if (!brief) return NextResponse.json({ error: "Brief not found" }, { status: 404 })

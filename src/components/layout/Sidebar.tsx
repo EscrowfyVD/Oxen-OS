@@ -22,6 +22,8 @@ import {
   Tent,
   Settings,
   LogOut,
+  ChevronDown,
+  ChevronRight,
   type LucideIcon,
 } from "lucide-react"
 import { ROLE_COLORS, ROLE_LABELS, canAccess, canAccessPage, type RoleLevel } from "@/lib/permissions"
@@ -34,7 +36,16 @@ type NavItem = {
   badge: string | null
   count: number | null
   pageKey?: string
+  hasSubNav?: boolean
 }
+
+const CRM_SUB_ITEMS = [
+  { label: "Pipeline", href: "/crm" },
+  { label: "Contacts", href: "/crm/contacts" },
+  { label: "Companies", href: "/crm/companies" },
+  { label: "Inbox", href: "/crm/inbox" },
+  { label: "Reports", href: "/crm/reports" },
+]
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard, badge: null, count: null },
@@ -48,7 +59,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Finance", href: "/finance", icon: Wallet, badge: null, count: null, pageKey: "finance" },
   { label: "Marketing", href: "/marketing", icon: Megaphone, badge: null, count: null, pageKey: "marketing" },
   { label: "Support", href: "/support", icon: Headphones, badge: null, count: null },
-  { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null, pageKey: "crm" },
+  { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null, pageKey: "crm", hasSubNav: true },
   { label: "Intel", href: "/intel", icon: Search, badge: null, count: null },
   { label: "Conferences", href: "/conferences", icon: Tent, badge: null, count: null },
   { label: "Compliance", href: "/compliance", icon: ShieldCheck, badge: null, count: null, pageKey: "compliance" },
@@ -207,37 +218,81 @@ export default function Sidebar() {
         <nav className="flex-1 overflow-y-auto" style={{ padding: 0 }}>
           {navItems.map((item) => {
             const active = isActive(item.href)
+            const crmExpanded = item.hasSubNav && pathname.startsWith("/crm")
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`nav-item${active ? " active" : ""}${item.label === "Sentinel" ? " ai-agent-nav" : ""}`}
-                style={{
-                  textDecoration: "none",
-                }}
-              >
-                <span className={`nav-icon${item.label === "Sentinel" ? " ai-pulse" : ""}`}>
-                  <item.icon size={16} strokeWidth={1.8} />
-                </span>
-                <span className="flex-1" style={item.label === "Sentinel" ? { background: "linear-gradient(90deg, #C08B88, #E8C4C0)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" } : undefined}>{item.label}</span>
-                {item.count !== null && (
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      fontSize: 10,
-                      color: "var(--text-tertiary)",
-                    }}
-                  >
-                    {item.count}
+              <div key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`nav-item${active ? " active" : ""}${item.label === "Sentinel" ? " ai-agent-nav" : ""}`}
+                  style={{
+                    textDecoration: "none",
+                  }}
+                >
+                  <span className={`nav-icon${item.label === "Sentinel" ? " ai-pulse" : ""}`}>
+                    <item.icon size={16} strokeWidth={1.8} />
                   </span>
+                  <span className="flex-1" style={item.label === "Sentinel" ? { background: "linear-gradient(90deg, #C08B88, #E8C4C0)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" } : undefined}>{item.label}</span>
+                  {item.count !== null && (
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        fontSize: 10,
+                        color: "var(--text-tertiary)",
+                      }}
+                    >
+                      {item.count}
+                    </span>
+                  )}
+                  {item.badge && (
+                    <span className="nav-badge">
+                      {item.badge}
+                    </span>
+                  )}
+                  {item.hasSubNav && (
+                    <span style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
+                      {crmExpanded ? (
+                        <ChevronDown size={13} strokeWidth={1.8} style={{ color: "var(--text-tertiary)" }} />
+                      ) : (
+                        <ChevronRight size={13} strokeWidth={1.8} style={{ color: "var(--text-tertiary)" }} />
+                      )}
+                    </span>
+                  )}
+                </Link>
+
+                {/* CRM sub-navigation */}
+                {crmExpanded && (
+                  <div style={{ padding: "2px 0 4px" }}>
+                    {CRM_SUB_ITEMS.map((sub) => {
+                      const subActive =
+                        sub.href === "/crm"
+                          ? pathname === "/crm"
+                          : pathname.startsWith(sub.href)
+                      return (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          onClick={() => setMobileOpen(false)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            padding: "6px 16px 6px 48px",
+                            fontSize: 11,
+                            fontFamily: "'DM Sans', sans-serif",
+                            color: subActive ? "#F0F0F2" : "rgba(240,240,242,0.45)",
+                            textDecoration: "none",
+                            borderLeft: subActive ? "2px solid #C08B88" : "2px solid transparent",
+                            transition: "color 0.15s, border-color 0.15s",
+                            fontWeight: subActive ? 500 : 400,
+                          }}
+                        >
+                          {sub.label}
+                        </Link>
+                      )
+                    })}
+                  </div>
                 )}
-                {item.badge && (
-                  <span className="nav-badge">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
+              </div>
             )
           })}
         </nav>

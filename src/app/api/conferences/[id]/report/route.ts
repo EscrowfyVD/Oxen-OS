@@ -206,12 +206,12 @@ export async function POST(
     // Create Interaction for all CRM-linked collected contacts
     for (const cc of conference.collectedContacts) {
       if (cc.contactId) {
-        await prisma.interaction.create({
+        await prisma.activity.create({
           data: {
             contactId: cc.contactId,
             type: "conference",
-            content: `Conference report submitted for ${conference.name}`,
-            createdBy: userId,
+            description: `Conference report submitted for ${conference.name}`,
+            performedBy: userId,
           },
         })
       }

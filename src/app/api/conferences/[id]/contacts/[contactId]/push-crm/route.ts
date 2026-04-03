@@ -32,17 +32,38 @@ export async function POST(
     const notesText = `Met at ${conference?.name ?? "conference"}.${confContact.notes ? ` ${confContact.notes}` : ""}`
 
     // Create CRM Contact
-    const crmContact = await prisma.contact.create({
+    const nameParts = (confContact.name || "").trim().split(/\s+/)
+    const firstName = nameParts[0] || ""
+    const lastName = nameParts.slice(1).join(" ") || ""
+
+    // Look up or create a Company record from the conference contact's company name
+    let companyId: string | undefined
+    if (confContact.company) {
+      const company = await prisma.company.upsert({
+        where: { domain: confContact.company.toLowerCase().replace(/\s+/g, "-") },
+        update: {},
+        create: {
+          name: confContact.company,
+          domain: confContact.company.toLowerCase().replace(/\s+/g, "-"),
+        },
+        select: { id: true },
+      })
+      companyId = company.id
+    }
+
+    const crmContact = await prisma.crmContact.create({
       data: {
-        name: confContact.name,
-        email: confContact.email,
+        firstName,
+        lastName,
+        email: confContact.email || `${firstName.toLowerCase()}.${lastName.toLowerCase()}@unknown.com`,
         phone: confContact.phone,
-        company: confContact.company,
+        companyId: companyId ?? null,
         telegram: confContact.telegram,
         website: confContact.linkedin,
-        status: "lead",
-        source: "Conference",
-        notes: notesText,
+        lifecycleStage: "new_lead",
+        acquisitionSource: "Conference",
+        acquisitionSourceDetail: conference?.name ?? "conference",
+        pinnedNote: notesText,
         createdBy: userId,
       },
     })
@@ -57,12 +78,12 @@ export async function POST(
     })
 
     // Create Interaction
-    await prisma.interaction.create({
+    await prisma.activity.create({
       data: {
         contactId: crmContact.id,
         type: "conference",
-        content: `Met at ${conference?.name ?? "conference"}`,
-        createdBy: userId,
+        description: `Met at ${conference?.name ?? "conference"}`,
+        performedBy: userId,
       },
     })
 

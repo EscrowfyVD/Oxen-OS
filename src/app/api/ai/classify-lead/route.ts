@@ -12,13 +12,13 @@ export async function POST(request: Request) {
   const { contactId } = await request.json()
   if (!contactId) return NextResponse.json({ error: "contactId is required" }, { status: 400 })
 
-  const contact = await prisma.contact.findUnique({
+  const contact = await prisma.crmContact.findUnique({
     where: { id: contactId },
     include: {
-      interactions: { orderBy: { createdAt: "desc" }, take: 5 },
+      activities: { orderBy: { createdAt: "desc" }, take: 5 },
       deals: { orderBy: { updatedAt: "desc" }, take: 5 },
-      metrics: { orderBy: { month: "desc" }, take: 6 },
-      signals: { orderBy: { createdAt: "desc" }, take: 10 },
+      intentSignals: { orderBy: { createdAt: "desc" }, take: 10 },
+      company: { select: { name: true } },
     },
   })
 
@@ -26,29 +26,25 @@ export async function POST(request: Request) {
 
   const prompt = `Analyze this contact and classify them for our GTM pipeline.
 
-Contact: ${contact.name}
-Company: ${contact.company || "Unknown"}
-Sector: ${contact.sector || "Unknown"}
-Status: ${contact.status}
+Contact: ${contact.firstName} ${contact.lastName}
+Company: ${contact.company?.name || "Unknown"}
+Vertical: ${contact.vertical.join(", ") || "Unknown"}
+Lifecycle Stage: ${contact.lifecycleStage}
 Country: ${contact.country || "Unknown"}
-Source: ${contact.source || "Unknown"}
-Monthly GTV: €${contact.monthlyGtv?.toLocaleString() ?? "0"}
-Monthly Revenue: €${contact.monthlyRevenue?.toLocaleString() ?? "0"}
-Take Rate: ${contact.takeRate ?? 0}%
-Health: ${contact.healthStatus}
-Segment: ${contact.segment || "Unknown"}
+Source: ${contact.acquisitionSource || "Unknown"}
+Relationship: ${contact.relationshipStrength || "Unknown"}
+ICP Fit: ${contact.icpFit || "Unknown"}
 
-Recent Interactions: ${contact.interactions.map((i) => `${i.type}: ${i.content.slice(0, 100)}`).join("; ") || "None"}
-Active Deals: ${contact.deals.map((d) => `${d.name} (${d.stage}, €${d.expectedRevenue?.toLocaleString() ?? "0"})`).join("; ") || "None"}
-Intent Signals: ${contact.signals.map((s) => `${s.signalType}: ${s.title} (score: ${s.score})`).join("; ") || "None"}
-Revenue Trend: ${contact.metrics.map((m) => `${m.month}: €${m.revenue.toLocaleString()}`).join(", ") || "No data"}
+Recent Activities: ${contact.activities.map((a) => `${a.type}: ${(a.description || "").slice(0, 100)}`).join("; ") || "None"}
+Active Deals: ${contact.deals.map((d) => `${d.dealName} (${d.stage}, €${d.dealValue?.toLocaleString() ?? "0"})`).join("; ") || "None"}
+Intent Signals: ${contact.intentSignals.map((s) => `${s.signalType}: ${s.title} (score: ${s.score})`).join("; ") || "None"}
 
 Return a JSON object with:
 - icpScore (0-100): How well they match our Ideal Customer Profile (payment services, crypto, iGaming, family offices, high-net-worth)
 - intentScore (0-100): Their buying intent based on signals, interactions, engagement
 - priorityScore (0-100): Overall priority for sales outreach (weighted combination of ICP + intent + revenue potential)
-- segment: One of "Enterprise", "Mid-Market", "SMB"
-- clientType: One of "direct", "agent_referred", "partner"
+- icpFit: One of "tier_1", "tier_2", "tier_3"
+- contactType: One of "prospect", "client", "introducer", "partner"
 - vertical: Industry vertical (e.g., "iGaming", "Crypto", "Family Office", "Luxury", "Fintech", "Real Estate")
 
 RESPOND ONLY WITH VALID JSON, no markdown.`
@@ -63,15 +59,13 @@ RESPOND ONLY WITH VALID JSON, no markdown.`
     const text = response.content[0].type === "text" ? response.content[0].text : ""
     const scores = JSON.parse(text)
 
-    await prisma.contact.update({
+    await prisma.crmContact.update({
       where: { id: contactId },
       data: {
-        icpScore: scores.icpScore ?? 0,
-        intentScore: scores.intentScore ?? 0,
-        priorityScore: scores.priorityScore ?? 0,
-        segment: scores.segment || contact.segment,
-        clientType: scores.clientType || contact.clientType,
-        vertical: scores.vertical || contact.vertical,
+        icpFit: scores.icpFit || contact.icpFit,
+        contactType: scores.contactType || contact.contactType,
+        vertical: scores.vertical ? [scores.vertical] : contact.vertical,
+        relationshipScore: scores.priorityScore ?? contact.relationshipScore,
       },
     })
 

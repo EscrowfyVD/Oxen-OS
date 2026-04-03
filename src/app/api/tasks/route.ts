@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     where,
     include: {
       supportTicket: { select: { id: true, subject: true, clientName: true, status: true } },
-      contact: { select: { id: true, name: true, company: true } },
+      contact: { select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } } },
     },
     orderBy: [{ column: "asc" }, { order: "asc" }],
   })

@@ -56,9 +56,9 @@ export async function GET() {
         contactId: { in: riskContactIds },
         stage: { notIn: ["closed_won", "closed_lost"] },
       },
-      _sum: { expectedRevenue: true },
+      _sum: { dealValue: true },
     })
-    revenueAtRisk = atRiskDeals._sum.expectedRevenue ?? 0
+    revenueAtRisk = atRiskDeals._sum.dealValue ?? 0
   }
 
   return NextResponse.json({

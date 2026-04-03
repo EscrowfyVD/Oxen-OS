@@ -28,10 +28,10 @@ export async function GET() {
 
   // ── 1. KPI Stats ──
   const [activeClients, pipelineAgg, totalDeals, userTasks] = await Promise.all([
-    prisma.contact.count({ where: { status: "won" } }),
+    prisma.crmContact.count({ where: { lifecycleStage: "closed_won" } }),
     prisma.deal.aggregate({
       where: { stage: { notIn: ["closed_won", "closed_lost"] } },
-      _sum: { expectedRevenue: true },
+      _sum: { dealValue: true },
     }),
     prisma.deal.count({
       where: { stage: { notIn: ["closed_won", "closed_lost"] } },
@@ -46,7 +46,7 @@ export async function GET() {
 
   const stats = {
     activeClients,
-    pipelineValue: pipelineAgg._sum.expectedRevenue ?? 0,
+    pipelineValue: pipelineAgg._sum.dealValue ?? 0,
     totalDeals,
     userOpenTasks: userTasks,
   }

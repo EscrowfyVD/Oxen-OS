@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
   const insights = await prisma.aIInsight.findMany({
     where,
-    include: { contact: { select: { id: true, name: true, company: true } } },
+    include: { contact: { select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } } } },
     orderBy: { createdAt: "desc" },
     take: 50,
   })

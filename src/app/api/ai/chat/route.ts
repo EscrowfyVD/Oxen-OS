@@ -141,13 +141,13 @@ async function gatherContext(message: string, userEmail: string): Promise<string
   const msgLower = message.toLowerCase()
 
   // If mentions a specific company/contact, fetch it
-  const contacts = await prisma.contact.findMany({
+  const contacts = await prisma.crmContact.findMany({
     take: 10,
     orderBy: { updatedAt: "desc" },
     include: {
-      interactions: { take: 5, orderBy: { createdAt: "desc" } },
+      activities: { take: 5, orderBy: { createdAt: "desc" } },
       deals: { take: 5, orderBy: { updatedAt: "desc" } },
-      metrics: { take: 3, orderBy: { month: "desc" } },
+      company: { select: { name: true } },
     },
   })
 
@@ -155,14 +155,14 @@ async function gatherContext(message: string, userEmail: string): Promise<string
   if (msgLower.includes("pipeline") || msgLower.includes("deal") || msgLower.includes("risk") || msgLower.includes("revenue") || msgLower.includes("client") || msgLower.includes("digest") || msgLower.includes("overview")) {
     const deals = await prisma.deal.findMany({
       where: { stage: { not: "closed_lost" } },
-      include: { contact: { select: { name: true, company: true, healthStatus: true, segment: true } } },
+      include: { contact: { select: { firstName: true, lastName: true, relationshipStrength: true, icpFit: true, company: { select: { name: true } } } } },
       orderBy: { updatedAt: "desc" },
       take: 20,
     })
     if (deals.length > 0) {
       parts.push("## Active Deals")
       for (const d of deals) {
-        parts.push(`- ${d.name} | ${d.contact?.company || d.contact?.name || "?"} | Stage: ${d.stage} | Revenue: €${d.expectedRevenue?.toLocaleString() || "?"} | Probability: ${d.probability || "?"}% | Owner: ${d.assignedTo || "?"}`)
+        parts.push(`- ${d.dealName} | ${d.contact?.company?.name || `${d.contact?.firstName} ${d.contact?.lastName}` || "?"} | Stage: ${d.stage} | Value: €${d.dealValue?.toLocaleString() || "?"} | Probability: ${d.winProbability || "?"}% | Owner: ${d.dealOwner || "?"}`)
       }
     }
   }
@@ -171,14 +171,15 @@ async function gatherContext(message: string, userEmail: string): Promise<string
   if (contacts.length > 0) {
     parts.push("## Recent Contacts")
     for (const c of contacts) {
-      let line = `- ${c.name} (${c.company || "no company"}) | Status: ${c.status} | Health: ${c.healthStatus} | Sector: ${c.sector || "?"}`
-      if (c.monthlyGtv) line += ` | GTV: €${c.monthlyGtv.toLocaleString()}/mo`
-      if (c.assignedTo) line += ` | Owner: ${c.assignedTo}`
+      const fullName = `${c.firstName} ${c.lastName}`
+      let line = `- ${fullName} (${c.company?.name || "no company"}) | Stage: ${c.lifecycleStage} | Relationship: ${c.relationshipStrength || "?"} | Vertical: ${c.vertical.join(", ") || "?"}`
+      if (c.dealOwner) line += ` | Owner: ${c.dealOwner}`
       parts.push(line)
 
-      if (c.interactions.length > 0) {
-        for (const i of c.interactions.slice(0, 2)) {
-          parts.push(`  · [${i.type}] ${i.content.substring(0, 100)}${i.content.length > 100 ? "..." : ""} (${new Date(i.createdAt).toLocaleDateString()})`)
+      if (c.activities.length > 0) {
+        for (const a of c.activities.slice(0, 2)) {
+          const desc = a.description || ""
+          parts.push(`  · [${a.type}] ${desc.substring(0, 100)}${desc.length > 100 ? "..." : ""} (${new Date(a.createdAt).toLocaleDateString()})`)
         }
       }
     }
@@ -253,34 +254,36 @@ async function gatherContext(message: string, userEmail: string): Promise<string
   // Search for specific contact/company mentioned
   const words = message.split(/\s+/).filter((w) => w.length > 3)
   for (const word of words.slice(0, 5)) {
-    const found = await prisma.contact.findMany({
+    const found = await prisma.crmContact.findMany({
       where: {
         OR: [
-          { name: { contains: word, mode: "insensitive" } },
-          { company: { contains: word, mode: "insensitive" } },
+          { firstName: { contains: word, mode: "insensitive" } },
+          { lastName: { contains: word, mode: "insensitive" } },
+          { company: { name: { contains: word, mode: "insensitive" } } },
         ],
       },
       include: {
-        interactions: { take: 5, orderBy: { createdAt: "desc" } },
+        activities: { take: 5, orderBy: { createdAt: "desc" } },
         deals: { take: 5 },
         companyIntel: { take: 1, orderBy: { updatedAt: "desc" } },
+        company: { select: { name: true } },
       },
       take: 3,
     })
     for (const c of found) {
-      if (parts.some((p) => p.includes(c.name))) continue
-      parts.push(`\n## Contact Detail: ${c.name} (${c.company || "no company"})`)
-      parts.push(`ID: ${c.id} | Email: ${c.email || "?"} | Phone: ${c.phone || "?"} | Status: ${c.status} | Health: ${c.healthStatus}`)
+      const fullName = `${c.firstName} ${c.lastName}`
+      if (parts.some((p) => p.includes(fullName))) continue
+      parts.push(`\n## Contact Detail: ${fullName} (${c.company?.name || "no company"})`)
+      parts.push(`ID: ${c.id} | Email: ${c.email || "?"} | Phone: ${c.phone || "?"} | Stage: ${c.lifecycleStage} | Relationship: ${c.relationshipStrength || "?"}`)
       if (c.website) parts.push(`Website: ${c.website}`)
-      if (c.monthlyGtv) parts.push(`Monthly GTV: €${c.monthlyGtv.toLocaleString()} | Revenue: €${c.monthlyRevenue?.toLocaleString() || "?"}`)
-      if (c.notes) parts.push(`Notes: ${c.notes.substring(0, 200)}`)
+      if (c.pinnedNote) parts.push(`Notes: ${c.pinnedNote.substring(0, 200)}`)
       if (c.deals.length > 0) {
         parts.push(`Deals:`)
-        for (const d of c.deals) parts.push(`  - ${d.name} | Stage: ${d.stage} | Revenue: €${d.expectedRevenue?.toLocaleString() || "?"}`)
+        for (const d of c.deals) parts.push(`  - ${d.dealName} | Stage: ${d.stage} | Value: €${d.dealValue?.toLocaleString() || "?"}`)
       }
-      if (c.interactions.length > 0) {
-        parts.push(`Recent interactions:`)
-        for (const i of c.interactions) parts.push(`  - [${i.type}] ${i.content.substring(0, 150)} (${new Date(i.createdAt).toLocaleDateString()})`)
+      if (c.activities.length > 0) {
+        parts.push(`Recent activities:`)
+        for (const a of c.activities) parts.push(`  - [${a.type}] ${(a.description || "").substring(0, 150)} (${new Date(a.createdAt).toLocaleDateString()})`)
       }
       if (c.companyIntel.length > 0) {
         const intel = c.companyIntel[0]

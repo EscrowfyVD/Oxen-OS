@@ -18,12 +18,12 @@ export async function POST() {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
     // Fetch all active contacts with relevant data
-    const contacts = await prisma.contact.findMany({
-      where: { status: { notIn: ["lost", "churned"] } },
+    const contacts = await prisma.crmContact.findMany({
+      where: { lifecycleStage: { notIn: ["lost", "churned"] } },
       include: {
-        interactions: { orderBy: { createdAt: "desc" }, take: 3 },
+        activities: { orderBy: { createdAt: "desc" }, take: 3 },
         deals: { where: { stage: { notIn: ["closed_won", "closed_lost"] } }, orderBy: { updatedAt: "desc" } },
-        metrics: { orderBy: { month: "desc" }, take: 3 },
+        company: { select: { name: true } },
       },
     })
 
@@ -31,42 +31,35 @@ export async function POST() {
     const analysisPoints: string[] = []
 
     for (const c of contacts) {
-      const lastInteraction = c.interactions[0]
-      const daysSinceContact = lastInteraction
-        ? Math.floor((Date.now() - new Date(lastInteraction.createdAt).getTime()) / 86400000)
+      const fullName = `${c.firstName} ${c.lastName}`
+      const companyName = c.company?.name || "?"
+      const lastActivity = c.activities[0]
+      const daysSinceContact = lastActivity
+        ? Math.floor((Date.now() - new Date(lastActivity.createdAt).getTime()) / 86400000)
         : 999
 
       // Follow-up needed
       if (daysSinceContact > 14) {
-        analysisPoints.push(`FOLLOW_UP: ${c.name} (${c.company || "?"}) - No contact for ${daysSinceContact} days. Status: ${c.status}, Health: ${c.healthStatus}. GTV: €${c.monthlyGtv?.toLocaleString() || "?"}`)
+        analysisPoints.push(`FOLLOW_UP: ${fullName} (${companyName}) - No contact for ${daysSinceContact} days. Stage: ${c.lifecycleStage}, Relationship: ${c.relationshipStrength || "?"}`)
       }
 
       // Deal stuck
       for (const d of c.deals) {
         const daysInStage = Math.floor((Date.now() - new Date(d.updatedAt).getTime()) / 86400000)
         if (daysInStage > 7) {
-          analysisPoints.push(`DEAL_STUCK: Deal "${d.name}" for ${c.company || c.name} stuck in "${d.stage}" for ${daysInStage} days. Value: €${d.expectedRevenue?.toLocaleString() || "?"}`)
+          analysisPoints.push(`DEAL_STUCK: Deal "${d.dealName}" for ${companyName || fullName} stuck in "${d.stage}" for ${daysInStage} days. Value: €${d.dealValue?.toLocaleString() || "?"}`)
         }
       }
 
-      // Churn warning (declining GTV)
-      if (c.metrics.length >= 2) {
-        const latest = c.metrics[0]
-        const previous = c.metrics[1]
-        if (latest.gtv < previous.gtv * 0.8) {
-          analysisPoints.push(`CHURN_WARNING: ${c.company || c.name} GTV dropped from €${previous.gtv.toLocaleString()} to €${latest.gtv.toLocaleString()} (${c.metrics[0].month})`)
-        }
-      }
-
-      // New contact with no interaction
-      if (c.interactions.length === 0 && c.status === "lead") {
-        analysisPoints.push(`OPPORTUNITY: New lead ${c.name} (${c.company || "?"}) with no interactions yet. Sector: ${c.sector || "?"}`)
+      // New contact with no activity
+      if (c.activities.length === 0 && c.lifecycleStage === "new_lead") {
+        analysisPoints.push(`OPPORTUNITY: New lead ${fullName} (${companyName}) with no activities yet. Vertical: ${c.vertical.join(", ") || "?"}`)
       }
 
       // High-value deals in negotiation
       for (const d of c.deals) {
-        if (d.stage === "negotiation" && d.expectedRevenue && d.expectedRevenue > 10000) {
-          analysisPoints.push(`BUYING_SIGNAL: High-value deal "${d.name}" (€${d.expectedRevenue.toLocaleString()}) in negotiation with ${c.company || c.name}. Probability: ${d.probability || "?"}%`)
+        if (d.stage === "negotiation" && d.dealValue && d.dealValue > 10000) {
+          analysisPoints.push(`BUYING_SIGNAL: High-value deal "${d.dealName}" (€${d.dealValue.toLocaleString()}) in negotiation with ${companyName || fullName}. Probability: ${d.winProbability || "?"}%`)
         }
       }
     }
@@ -121,11 +114,12 @@ Return the top 10 most important insights, ordered by severity. Be specific and 
       // Try to find matching contact
       let contactId: string | null = null
       if (insight.contactName) {
-        const contact = await prisma.contact.findFirst({
+        const contact = await prisma.crmContact.findFirst({
           where: {
             OR: [
-              { name: { contains: insight.contactName, mode: "insensitive" } },
-              { company: { contains: insight.contactName, mode: "insensitive" } },
+              { firstName: { contains: insight.contactName, mode: "insensitive" } },
+              { lastName: { contains: insight.contactName, mode: "insensitive" } },
+              { company: { name: { contains: insight.contactName, mode: "insensitive" } } },
             ],
           },
         })
@@ -140,7 +134,7 @@ Return the top 10 most important insights, ordered by severity. Be specific and 
           contactId,
           severity: insight.severity,
         },
-        include: { contact: { select: { id: true, name: true, company: true } } },
+        include: { contact: { select: { id: true, firstName: true, lastName: true, company: { select: { name: true } } } } },
       })
       savedInsights.push(saved)
     }
@@ -161,11 +155,11 @@ Return the top 10 most important insights, ordered by severity. Be specific and 
           if (insight.contactId) {
             const relatedDeal = await prisma.deal.findFirst({
               where: { contactId: insight.contactId, stage: { notIn: ["closed_won", "closed_lost"] } },
-              select: { assignedTo: true },
+              select: { dealOwner: true },
             })
-            if (relatedDeal?.assignedTo) {
+            if (relatedDeal?.dealOwner) {
               assigneeEmployee = await prisma.employee.findFirst({
-                where: { name: { contains: relatedDeal.assignedTo, mode: "insensitive" }, telegramChatId: { not: null } },
+                where: { name: { contains: relatedDeal.dealOwner, mode: "insensitive" }, telegramChatId: { not: null } },
                 select: { id: true, name: true },
               })
             }
@@ -184,7 +178,7 @@ Return the top 10 most important insights, ordered by severity. Be specific and 
               })
 
           const emoji = insight.severity === "critical" ? "🚨" : "⚠️"
-          const msg = `${emoji} *${insight.severity.toUpperCase()} Insight — Oxen OS*\n\n*${insight.title}*\n${insight.summary}\n\n${insight.contact ? `Contact: ${insight.contact.name} (${insight.contact.company || "?"})` : ""}`
+          const msg = `${emoji} *${insight.severity.toUpperCase()} Insight — Oxen OS*\n\n*${insight.title}*\n${insight.summary}\n\n${insight.contact ? `Contact: ${insight.contact.firstName} ${insight.contact.lastName} (${insight.contact.company?.name || "?"})` : ""}`
 
           for (const r of recipients) {
             await sendTelegramNotification(r.id, msg)

@@ -11,13 +11,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const wikiPageId = searchParams.get("wikiPageId")
   const contactId = searchParams.get("contactId")
-  const agentId = searchParams.get("agentId")
   const entityId = searchParams.get("entityId")
 
   const where: Record<string, unknown> = {}
   if (wikiPageId) where.wikiPageId = wikiPageId
   if (contactId) where.contactId = contactId
-  if (agentId) where.agentId = agentId
   if (entityId) where.entityId = entityId
 
   const links = await prisma.driveLink.findMany({
@@ -35,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { driveFileId, fileName, fileUrl, mimeType, iconUrl, category, contactId, agentId, wikiPageId, entityId } = body
+  const { driveFileId, fileName, fileUrl, mimeType, iconUrl, category, contactId, wikiPageId, entityId } = body
 
   if (!driveFileId || !fileName || !fileUrl || !mimeType) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -52,7 +50,6 @@ export async function POST(request: Request) {
       iconUrl: iconUrl ?? null,
       category: category ?? null,
       contactId: contactId ?? null,
-      agentId: agentId ?? null,
       wikiPageId: wikiPageId ?? null,
       entityId: entityId ?? null,
       createdBy: userId,
