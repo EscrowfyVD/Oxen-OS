@@ -47,7 +47,32 @@ export const EXPENSE_CATEGORIES = [
   { id: "travel", label: "Travel" },
   { id: "licenses", label: "Licenses" },
   { id: "contractors", label: "Contractors" },
+  { id: "banking_fees", label: "Banking Fees" },
+  { id: "insurance", label: "Insurance" },
   { id: "other_expense", label: "Other Expense" },
+]
+
+/* ── Payment sources ── */
+export const PAYMENT_SOURCES = [
+  { id: "bank_transfer", label: "Bank Transfer" },
+  { id: "card", label: "Card" },
+  { id: "crypto", label: "Crypto" },
+  { id: "cash", label: "Cash" },
+]
+
+/* ── Account types ── */
+export const ACCOUNT_TYPES = [
+  { id: "operating", label: "Operating" },
+  { id: "savings", label: "Savings" },
+  { id: "escrow", label: "Escrow" },
+  { id: "card", label: "Card" },
+]
+
+/* ── Transaction statuses ── */
+export const TX_STATUSES = [
+  { id: "confirmed", label: "Confirmed" },
+  { id: "pending", label: "Pending" },
+  { id: "reconciled", label: "Reconciled" },
 ]
 
 /* ── All categories lookup ── */

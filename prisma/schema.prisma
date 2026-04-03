@@ -306,6 +306,7 @@ model Contact {
   tasks           Task[]
   driveLinks      DriveLink[]       @relation("ContactDriveLinks")
   conferenceContacts ConferenceContact[]
+  financeTransactions FinanceTransaction[] @relation("ContactFinance")
 }
 
 model Interaction {
@@ -367,6 +368,70 @@ model FinanceEntry {
   createdBy   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model FinanceTransaction {
+  id              String    @id @default(cuid())
+  type            String    // "revenue", "expense"
+  category        String
+  description     String?
+  amount          Float
+  currency        String    @default("EUR")
+  exchangeRate    Float?    @default(1)
+  amountEur       Float?    // Normalized EUR amount
+  date            DateTime
+  entity          String    @default("oxen")
+  recurring       Boolean   @default(false)
+  recurringPeriod String?   // "monthly", "quarterly", "yearly"
+  paymentSource   String?   // "bank_transfer", "card", "crypto", "cash"
+  bankAccountName String?   // Which bank account
+  reference       String?   // Invoice/PO number
+  status          String    @default("confirmed") // "confirmed", "pending", "reconciled"
+  // Reimbursement
+  reimbursable    Boolean   @default(false)
+  reimbursedTo    String?
+  reimbursedDate  DateTime?
+  // Relations
+  contactId       String?
+  contact         Contact?  @relation("ContactFinance", fields: [contactId], references: [id])
+  // Attachment
+  attachmentUrl   String?
+  attachmentName  String?
+  notes           String?   @db.Text
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model FinanceBudget {
+  id        String   @id @default(cuid())
+  category  String
+  amount    Float
+  month     String   // "YYYY-MM"
+  entityId  String   @default("oxen")
+  notes     String?
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, month, entityId])
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  name          String
+  bankName      String
+  currency      String   @default("EUR")
+  iban          String?
+  accountType   String   @default("operating") // "operating", "savings", "escrow", "card"
+  entity        String   @default("oxen")
+  currentBalance Float   @default(0)
+  lastUpdated   DateTime @default(now())
+  isActive      Boolean  @default(true)
+  notes         String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model FinanceGoal {

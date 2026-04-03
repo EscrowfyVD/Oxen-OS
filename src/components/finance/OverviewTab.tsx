@@ -17,7 +17,7 @@ import type { FinanceSummary, FinanceGoal } from "./types"
 interface OverviewTabProps {
   summary: FinanceSummary | null
   goals: FinanceGoal[]
-  cashBalance: number
+  cashBalance?: number
 }
 
 const kpiLabel: React.CSSProperties = {
@@ -48,7 +48,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function OverviewTab({ summary, goals, cashBalance }: OverviewTabProps) {
+export default function OverviewTab({ summary, goals, cashBalance: cashBalanceProp }: OverviewTabProps) {
   if (!summary) {
     return (
       <div style={{ textAlign: "center", padding: "60px 0", color: TEXT_TERTIARY, fontSize: 13 }}>
@@ -56,6 +56,8 @@ export default function OverviewTab({ summary, goals, cashBalance }: OverviewTab
       </div>
     )
   }
+
+  const cashBalance = cashBalanceProp ?? summary.totalBalance ?? 0
 
   const revenueSparkData = summary.monthlyTrend.length >= 2
     ? summary.monthlyTrend.map((r) => r.revenue)
