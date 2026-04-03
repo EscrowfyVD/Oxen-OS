@@ -176,7 +176,79 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
     fetch(`/api/crm/dashboard${params}`)
       .then((r) => r.json())
       .then((d) => {
-        setData(d)
+        // Transform API shape to component's DashboardData shape
+        const kpis = d.kpis || {}
+        const tasksToday = d.tasksToday || {}
+        const perf = d.performance || {}
+
+        // Build closedWon/closedLost from funnel data
+        const funnelArr: FunnelStage[] = d.funnel || []
+        const wonStage = funnelArr.find((s: FunnelStage) => s.stageId === "closed_won")
+        const lostStage = funnelArr.find((s: FunnelStage) => s.stageId === "closed_lost")
+
+        // Transform tasks to expected shape
+        const mapTask = (t: Record<string, unknown>) => ({
+          id: t.id as string,
+          title: t.title as string,
+          type: (t.type as string) || "other",
+          dueDate: t.dueDate as string,
+          contactName: t.contact
+            ? `${(t.contact as Record<string, string>).firstName || ""} ${(t.contact as Record<string, string>).lastName || ""}`.trim() || null
+            : null,
+        })
+
+        // Transform activities
+        const mapActivity = (a: Record<string, unknown>) => ({
+          id: a.id as string,
+          type: (a.type as string) || "note",
+          description: (a.description as string) || "",
+          date: a.createdAt as string,
+          contactName: a.contact
+            ? `${(a.contact as Record<string, string>).firstName || ""} ${(a.contact as Record<string, string>).lastName || ""}`.trim() || null
+            : null,
+        })
+
+        // Transform stale deals
+        const mapStale = (s: Record<string, unknown>) => ({
+          id: s.id as string,
+          dealName: (s.dealName as string) || "",
+          contactName: s.contact
+            ? `${(s.contact as Record<string, string>).firstName || ""} ${(s.contact as Record<string, string>).lastName || ""}`.trim() || null
+            : null,
+          daysSinceLastActivity: (s.daysSinceLastActivity as number) || 0,
+        })
+
+        // Build performance metrics array from thisMonth/lastMonth
+        const performanceMetrics: PerformanceMetric[] = perf.thisMonth
+          ? [
+              { label: "Deals Created", thisMonth: perf.thisMonth.dealsCreated || 0, lastMonth: perf.lastMonth?.dealsCreated || 0 },
+              { label: "Meetings Booked", thisMonth: perf.thisMonth.meetingsBooked || 0, lastMonth: perf.lastMonth?.meetingsBooked || 0 },
+              { label: "Proposals Sent", thisMonth: perf.thisMonth.proposalsSent || 0, lastMonth: perf.lastMonth?.proposalsSent || 0 },
+              { label: "Deals Won", thisMonth: perf.thisMonth.dealsWon || 0, lastMonth: perf.lastMonth?.dealsWon || 0 },
+              { label: "Deals Lost", thisMonth: perf.thisMonth.dealsLost || 0, lastMonth: perf.lastMonth?.dealsLost || 0 },
+              { label: "Revenue", thisMonth: perf.thisMonth.revenue || 0, lastMonth: perf.lastMonth?.revenue || 0 },
+            ]
+          : []
+
+        const transformed: DashboardData = {
+          activeDeals: kpis.activeDeals ?? 0,
+          pipelineValue: kpis.pipelineValue ?? 0,
+          meetingsThisWeek: kpis.meetingsThisWeek ?? 0,
+          overdueTasks: kpis.overdueTasks ?? 0,
+          funnel: funnelArr,
+          closedWon: { count: wonStage?.count ?? 0, value: wonStage?.value ?? 0 },
+          closedLost: { count: lostStage?.count ?? 0, value: lostStage?.value ?? 0 },
+          tasksOverdue: (tasksToday.overdue || []).map(mapTask),
+          tasksDueToday: (tasksToday.dueToday || []).map(mapTask),
+          tasksThisWeek: (tasksToday.upcoming || []).map(mapTask),
+          recentActivity: (d.recentActivity || []).map(mapActivity),
+          staleDeals: (d.staleDeals || []).map(mapStale),
+          followUpCount: d.followUpCount ?? 0,
+          atRiskDeals: d.atRiskDeals || [],
+          performance: performanceMetrics,
+        }
+
+        setData(transformed)
         setLoading(false)
       })
       .catch(() => setLoading(false))
