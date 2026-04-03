@@ -45,6 +45,7 @@ const CRM_SUB_ITEMS = [
   { label: "Companies", href: "/crm/companies" },
   { label: "Inbox", href: "/crm/inbox" },
   { label: "Reports", href: "/crm/reports" },
+  { label: "Forecast", href: "/crm/forecast" },
 ]
 
 const NAV_ITEMS: NavItem[] = [

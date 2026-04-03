@@ -95,6 +95,16 @@ interface PerformanceMetric {
   lastMonth: number
 }
 
+interface AtRiskDeal {
+  id: string
+  dealName: string
+  dealValue: number | null
+  aiDealHealth: string
+  aiDealHealthReason: string | null
+  contactName: string | null
+  daysSinceLastActivity: number | null
+}
+
 interface DashboardData {
   activeDeals: number
   pipelineValue: number
@@ -108,6 +118,8 @@ interface DashboardData {
   tasksThisWeek: DashboardTask[]
   recentActivity: DashboardActivity[]
   staleDeals: StaleDeal[]
+  followUpCount: number
+  atRiskDeals: AtRiskDeal[]
   performance: PerformanceMetric[]
 }
 
@@ -153,6 +165,8 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<"personal" | "team">(ownerName ? "personal" : "team")
+  const [automationRunning, setAutomationRunning] = useState(false)
+  const [automationToast, setAutomationToast] = useState<string | null>(null)
 
   const effectiveOwner = viewMode === "team" ? null : ownerName
 
@@ -233,36 +247,123 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
         </div>
 
         {isAdmin && (
-          <div style={{
-            display: "flex",
-            gap: 2,
-            background: "rgba(255,255,255,0.04)",
-            borderRadius: 8,
-            padding: 3,
-          }}>
-            {(["personal", "team"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                style={{
-                  padding: "6px 16px",
-                  fontSize: 11,
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 600,
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  background: viewMode === mode ? ROSE : "transparent",
-                  color: viewMode === mode ? "#060709" : TEXT_SEC,
-                }}
-              >
-                {mode === "personal" ? "Personal" : "Team"}
-              </button>
-            ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              onClick={async () => {
+                setAutomationRunning(true)
+                setAutomationToast(null)
+                try {
+                  const res = await fetch("/api/crm/automation/run-daily", { method: "POST" })
+                  if (res.ok) {
+                    const result = await res.json()
+                    setAutomationToast(
+                      `Automation complete: ${result.dealAging} deals, ${result.relationships} relationships, ${result.staleTasks} tasks, ${result.contactUpdates} contacts`
+                    )
+                    fetchData()
+                  } else {
+                    setAutomationToast("Automation failed")
+                  }
+                } catch {
+                  setAutomationToast("Automation failed")
+                }
+                setAutomationRunning(false)
+                setTimeout(() => setAutomationToast(null), 5000)
+              }}
+              disabled={automationRunning}
+              style={{
+                padding: "6px 14px",
+                fontSize: 11,
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 600,
+                border: `1px solid ${CARD_BORDER}`,
+                borderRadius: 6,
+                cursor: automationRunning ? "not-allowed" : "pointer",
+                transition: "all 0.15s ease",
+                background: "rgba(255,255,255,0.06)",
+                color: automationRunning ? TEXT_TER : TEXT_SEC,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {automationRunning ? (
+                <span style={{
+                  display: "inline-block",
+                  width: 12,
+                  height: 12,
+                  border: `2px solid ${TEXT_TER}`,
+                  borderTopColor: ROSE,
+                  borderRadius: "50%",
+                  animation: "oxen-skeleton-pulse 0.8s linear infinite",
+                }} />
+              ) : (
+                <span style={{ fontSize: 13 }}>{"🔄"}</span>
+              )}
+              {automationRunning ? "Running..." : "Run Automations"}
+            </button>
+
+            <div style={{
+              display: "flex",
+              gap: 2,
+              background: "rgba(255,255,255,0.04)",
+              borderRadius: 8,
+              padding: 3,
+            }}>
+              {(["personal", "team"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  style={{
+                    padding: "6px 16px",
+                    fontSize: 11,
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 600,
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    background: viewMode === mode ? ROSE : "transparent",
+                    color: viewMode === mode ? "#060709" : TEXT_SEC,
+                  }}
+                >
+                  {mode === "personal" ? "Personal" : "Team"}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
+
+      {/* ── Automation Toast ── */}
+      {automationToast && (
+        <div style={{
+          ...GLASS,
+          padding: "10px 18px",
+          marginBottom: 16,
+          borderLeft: `3px solid ${GREEN}`,
+          fontSize: 12,
+          fontFamily: "'DM Sans', sans-serif",
+          color: TEXT,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}>
+          <span>{automationToast}</span>
+          <button
+            onClick={() => setAutomationToast(null)}
+            style={{
+              background: "none",
+              border: "none",
+              color: TEXT_TER,
+              cursor: "pointer",
+              fontSize: 14,
+              padding: "0 4px",
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* ═══════ 2. KPI CARDS ═══════ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
@@ -664,6 +765,157 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════ 5b. AI FOLLOW-UP SUGGESTIONS ═══════ */}
+      {data.followUpCount > 0 && (
+        <div style={{
+          ...GLASS,
+          padding: 22,
+          marginBottom: 24,
+          borderLeft: `3px solid ${ROSE}`,
+        }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 10,
+          }}>
+            <h3 style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 14,
+              fontWeight: 600,
+              color: TEXT,
+              margin: 0,
+            }}>
+              {"🤖"} AI Follow-up Suggestions ({data.followUpCount})
+            </h3>
+            <button
+              style={{
+                padding: "6px 14px",
+                fontSize: 11,
+                fontFamily: "'DM Sans', sans-serif",
+                fontWeight: 600,
+                border: "none",
+                borderRadius: 6,
+                cursor: "pointer",
+                background: `${ROSE}22`,
+                color: ROSE,
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = `${ROSE}33` }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = `${ROSE}22` }}
+            >
+              View Suggestions
+            </button>
+          </div>
+          <p style={{
+            fontSize: 12,
+            color: TEXT_SEC,
+            fontFamily: "'DM Sans', sans-serif",
+            margin: 0,
+          }}>
+            AI has identified {data.followUpCount} pending follow-up{data.followUpCount !== 1 ? "s" : ""} that may need your attention.
+          </p>
+        </div>
+      )}
+
+      {/* ═══════ 5c. AT-RISK DEALS ═══════ */}
+      {data.atRiskDeals && data.atRiskDeals.length > 0 && (
+        <div style={{
+          ...GLASS,
+          padding: 22,
+          marginBottom: 24,
+          borderLeft: `3px solid ${RED}`,
+        }}>
+          <h3 style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: 14,
+            fontWeight: 600,
+            color: TEXT,
+            margin: "0 0 14px",
+          }}>
+            {"🔴"} Deals At Risk
+          </h3>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {data.atRiskDeals.map((deal) => (
+              <div
+                key={deal.id}
+                onClick={() => { window.location.href = `/crm/${deal.id}` }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 8px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  transition: "background 0.1s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)" }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{
+                      fontSize: 12,
+                      color: TEXT,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontWeight: 500,
+                      display: "block",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {deal.dealName}
+                    </span>
+                    {deal.contactName && (
+                      <span style={{ fontSize: 10, color: TEXT_TER, fontFamily: "'DM Sans', sans-serif" }}>
+                        {deal.contactName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+                  {deal.dealValue != null && (
+                    <span style={{
+                      fontSize: 11,
+                      color: ROSE,
+                      fontFamily: "'Bellfair', serif",
+                    }}>
+                      {fmtCurrency(deal.dealValue)}
+                    </span>
+                  )}
+                  {deal.daysSinceLastActivity != null && (
+                    <span style={{
+                      fontSize: 10,
+                      color: RED,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontWeight: 600,
+                    }}>
+                      {deal.daysSinceLastActivity}d inactive
+                    </span>
+                  )}
+                  {deal.aiDealHealthReason && (
+                    <span style={{
+                      fontSize: 10,
+                      color: TEXT_SEC,
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontStyle: "italic",
+                      maxWidth: 200,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {deal.aiDealHealthReason}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

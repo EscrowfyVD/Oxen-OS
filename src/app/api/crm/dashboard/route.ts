@@ -212,32 +212,67 @@ export async function GET(request: Request) {
     take: 15,
   })
 
-  // ── Stale Deals ──
+  // ── Stale Deals + Follow-up Count + At-Risk Deals ──
 
-  const staleDeals = await prisma.deal.findMany({
-    where: {
-      ...dealOwnerFilter,
-      stage: { notIn: closedStages },
-      daysSinceLastActivity: { gte: 7 },
-    },
-    select: {
-      id: true,
-      dealName: true,
-      dealValue: true,
-      stage: true,
-      daysSinceLastActivity: true,
-      dealOwner: true,
-      contact: {
-        select: {
-          firstName: true,
-          lastName: true,
-          company: { select: { name: true } },
+  const [staleDeals, followUpCount, atRiskDeals] = await Promise.all([
+    prisma.deal.findMany({
+      where: {
+        ...dealOwnerFilter,
+        stage: { notIn: closedStages },
+        daysSinceLastActivity: { gte: 7 },
+      },
+      select: {
+        id: true,
+        dealName: true,
+        dealValue: true,
+        stage: true,
+        daysSinceLastActivity: true,
+        dealOwner: true,
+        contact: {
+          select: {
+            firstName: true,
+            lastName: true,
+            company: { select: { name: true } },
+          },
         },
       },
-    },
-    orderBy: { daysSinceLastActivity: "desc" },
-    take: 10,
-  })
+      orderBy: { daysSinceLastActivity: "desc" },
+      take: 10,
+    }),
+
+    // Pending AI follow-ups
+    prisma.aIFollowUp.count({
+      where: {
+        status: "pending",
+        ...(owner ? { assignee: owner } : {}),
+      },
+    }),
+
+    // At-risk deals
+    prisma.deal.findMany({
+      where: {
+        ...dealOwnerFilter,
+        stage: { notIn: closedStages },
+        aiDealHealth: "at_risk",
+      },
+      select: {
+        id: true,
+        dealName: true,
+        dealValue: true,
+        aiDealHealth: true,
+        aiDealHealthReason: true,
+        daysSinceLastActivity: true,
+        contact: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: { daysSinceLastActivity: "desc" },
+      take: 10,
+    }),
+  ])
 
   // ── Performance (this month vs last month) ──
 
@@ -317,6 +352,18 @@ export async function GET(request: Request) {
     tasksToday,
     recentActivity,
     staleDeals,
+    followUpCount,
+    atRiskDeals: atRiskDeals.map((d) => ({
+      id: d.id,
+      dealName: d.dealName,
+      dealValue: d.dealValue,
+      aiDealHealth: d.aiDealHealth,
+      aiDealHealthReason: d.aiDealHealthReason,
+      contactName: d.contact
+        ? `${d.contact.firstName} ${d.contact.lastName}`.trim()
+        : null,
+      daysSinceLastActivity: d.daysSinceLastActivity,
+    })),
     performance,
   })
 }

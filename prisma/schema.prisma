@@ -302,6 +302,9 @@ model CrmContact {
   acquisitionSourceDetail String? // event name if conference, introducer name if referral
   lifecycleStage  String   @default("new_lead") // 9 stages
   icpFit          String?  // AI-generated: "tier_1", "tier_2", "tier_3"
+  icpScore        Int?     @default(0) // 0-100
+  icpScoredAt     DateTime?
+  icpScoreBreakdown Json?  // {vertical_match, geo_match, company_size, engagement, revenue_potential}
   contactType     String   @default("prospect") // "prospect", "client", "introducer", "partner"
   // Clay enrichment
   companySize     String?
@@ -350,6 +353,7 @@ model CrmContact {
   companyIntel    CompanyIntel[]   @relation("ContactIntel")
   meetingBriefs   MeetingBrief[]   @relation("ContactBriefs")
   aiInsights      AIInsight[]      @relation("ContactInsights")
+  aiFollowUps     AIFollowUp[]
   kanbanTasks     Task[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -380,6 +384,8 @@ model Deal {
   daysInCurrentStage Int   @default(0)
   daysSinceLastActivity Int @default(0)
   aiDealHealth    String?  // "on_track", "needs_attention", "at_risk"
+  aiDealHealthReason String?
+  aiDealHealthScoredAt DateTime?
   // Introducer
   introducerId    String?  // contact who introduced this deal
   conferenceName  String?  // if source is conference
@@ -392,6 +398,38 @@ model Deal {
   updatedAt       DateTime @updatedAt
   activities      Activity[]
   tasks           CrmTask[]
+  playbookSteps   PlaybookStep[]
+  aiFollowUps     AIFollowUp[]
+}
+
+model PlaybookStep {
+  id          String    @id @default(cuid())
+  dealId      String
+  deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  stage       String    // which pipeline stage this step belongs to
+  title       String
+  description String?
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  completedBy String?
+  isBlocking  Boolean   @default(false)
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+}
+
+model AIFollowUp {
+  id              String     @id @default(cuid())
+  contactId       String
+  contact         CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId          String?
+  deal            Deal?      @relation(fields: [dealId], references: [id])
+  reason          String     // "conversation_stalled", "no_response_5_days", "meeting_no_followup", "proposal_no_response"
+  suggestedAction String     // "send_follow_up", "schedule_call", "send_reminder"
+  draftMessage    String?    @db.Text
+  status          String     @default("pending") // "pending", "accepted", "dismissed", "sent"
+  assignee        String     // deal owner
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 }
 
 model Activity {

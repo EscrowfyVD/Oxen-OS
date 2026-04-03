@@ -1,21 +1,65 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import {
+  PIPELINE_STAGES,
+  STAGE_LABELS,
+  STAGE_COLORS,
+  STAGE_PROBABILITY,
+} from "@/lib/crm-config"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { error } = await requirePageAccess("crm")
   if (error) return error
 
-  // All active deals (not closed)
+  const url = new URL(req.url)
+  const owner = url.searchParams.get("owner") || null
+  const months = Math.min(Math.max(parseInt(url.searchParams.get("months") ?? "4", 10) || 4, 1), 12)
+
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() // 0-indexed
+
+  // Build month ranges
+  const monthRanges: Array<{
+    label: string
+    startDate: Date
+    endDate: Date
+  }> = []
+
+  for (let i = 0; i < months; i++) {
+    const m = currentMonth + i
+    const year = currentYear + Math.floor(m / 12)
+    const month = m % 12
+    const startDate = new Date(year, month, 1)
+    const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999) // last day of month
+    const label = startDate.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+    monthRanges.push({ label, startDate, endDate })
+  }
+
+  // Query all deals across the full date range
+  const globalStart = monthRanges[0].startDate
+  const globalEnd = monthRanges[monthRanges.length - 1].endDate
+
+  const whereClause: Record<string, unknown> = {
+    expectedCloseDate: {
+      gte: globalStart,
+      lte: globalEnd,
+    },
+    stage: { notIn: ["closed_lost"] },
+  }
+  if (owner) {
+    whereClause.dealOwner = owner
+  }
+
   const deals = await prisma.deal.findMany({
-    where: { stage: { notIn: ["closed_won", "closed_lost"] } },
+    where: whereClause,
     include: {
       contact: {
         select: {
           id: true,
           firstName: true,
           lastName: true,
-          vertical: true,
         },
       },
       company: {
@@ -25,96 +69,83 @@ export async function GET() {
         },
       },
     },
-    orderBy: { winProbability: "desc" },
+    orderBy: { dealValue: "desc" },
   })
 
-  // 3 forecast buckets
-  // Committed: winProbability >= 80%
-  const committed = deals.filter((d) => (d.winProbability ?? 0) >= 80)
-  // Probable / Best Case: 50% <= winProbability < 80%
-  const probable = deals.filter(
-    (d) => (d.winProbability ?? 0) >= 50 && (d.winProbability ?? 0) < 80
-  )
-  // Stretch / Upside: winProbability < 50%
-  const stretch = deals.filter((d) => (d.winProbability ?? 0) < 50)
+  // Build month buckets
+  const monthsResult = monthRanges.map((range) => {
+    const monthDeals = deals.filter((d) => {
+      if (!d.expectedCloseDate) return false
+      const close = new Date(d.expectedCloseDate)
+      return close >= range.startDate && close <= range.endDate
+    })
 
-  const sumDealValue = (arr: typeof deals) =>
-    arr.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-  const sumWeightedValue = (arr: typeof deals) =>
-    arr.reduce((s, d) => s + (d.weightedValue ?? 0), 0)
+    // Group by stage
+    const byStage = PIPELINE_STAGES
+      .filter((s) => s.id !== "closed_lost")
+      .map((stage) => {
+        const stageDeals = monthDeals.filter((d) => d.stage === stage.id)
+        const totalValue = stageDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
+        const weightedValue = stageDeals.reduce((s, d) => s + (d.weightedValue ?? 0), 0)
 
-  // Current monthly revenue (from won deals)
-  const currentAgg = await prisma.deal.aggregate({
-    where: { stage: "closed_won", dealValue: { not: null } },
-    _sum: { dealValue: true },
-  })
-  const currentMonthlyRevenue = currentAgg._sum.dealValue ?? 0
+        return {
+          stageId: stage.id,
+          label: stage.label,
+          color: stage.color,
+          deals: stageDeals.map((d) => ({
+            id: d.id,
+            contactId: d.contact?.id ?? null,
+            dealName: d.dealName,
+            contactName: d.contact
+              ? `${d.contact.firstName} ${d.contact.lastName}`
+              : "Unknown",
+            companyName: d.company?.name ?? null,
+            dealValue: d.dealValue,
+            weightedValue: d.weightedValue,
+            winProbability: d.winProbability,
+            stage: d.stage,
+            aiDealHealth: d.aiDealHealth ?? null,
+          })),
+          totalValue,
+          weightedValue,
+        }
+      })
+      .filter((s) => s.deals.length > 0)
 
-  // Projections for next 6 months
-  const months: string[] = []
-  const now = new Date()
-  for (let i = 1; i <= 6; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
-    months.push(
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-    )
-  }
+    const totalValue = monthDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
+    const totalWeightedValue = monthDeals.reduce((s, d) => s + (d.weightedValue ?? 0), 0)
+    const dealCount = monthDeals.length
 
-  const projections = months.map((month) => {
-    // Deals closing before this month contribute weighted value
-    const monthDate = new Date(month + "-01")
-    const closingDeals = deals.filter(
-      (d) => d.expectedCloseDate && new Date(d.expectedCloseDate) <= monthDate
-    )
-    const newRevenue = closingDeals.reduce(
-      (s, d) => s + (d.weightedValue ?? 0),
-      0
-    )
     return {
-      month,
-      base: currentMonthlyRevenue,
-      committed: committed
-        .filter((d) => d.expectedCloseDate && new Date(d.expectedCloseDate) <= monthDate)
-        .reduce((s, d) => s + (d.weightedValue ?? 0), 0),
-      probable: probable
-        .filter((d) => d.expectedCloseDate && new Date(d.expectedCloseDate) <= monthDate)
-        .reduce((s, d) => s + (d.weightedValue ?? 0), 0),
-      stretch: stretch
-        .filter((d) => d.expectedCloseDate && new Date(d.expectedCloseDate) <= monthDate)
-        .reduce((s, d) => s + (d.weightedValue ?? 0), 0),
-      total: currentMonthlyRevenue + newRevenue,
+      label: range.label,
+      startDate: range.startDate.toISOString(),
+      endDate: range.endDate.toISOString(),
+      byStage,
+      totalValue,
+      totalWeightedValue,
+      dealCount,
     }
   })
 
-  const formatDeals = (arr: typeof deals) =>
-    arr.map((d) => ({
-      ...d,
-      contactName: `${d.contact.firstName} ${d.contact.lastName}`,
-      companyName: d.company?.name ?? null,
-    }))
+  // Scenarios across all months
+  const allMonthDeals = deals.filter((d) => {
+    if (!d.expectedCloseDate) return false
+    const close = new Date(d.expectedCloseDate)
+    return close >= globalStart && close <= globalEnd
+  })
+
+  const bestCase = allMonthDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
+  const expected = allMonthDeals.reduce((s, d) => s + (d.weightedValue ?? 0), 0)
+  const worstCase = allMonthDeals
+    .filter((d) => d.stage === "closed_won" || d.stage === "negotiation")
+    .reduce((s, d) => s + (d.dealValue ?? 0), 0)
 
   return NextResponse.json({
-    forecast: {
-      currentMonthlyRevenue,
-      committed: {
-        count: committed.length,
-        totalDealValue: sumDealValue(committed),
-        weightedValue: sumWeightedValue(committed),
-        deals: formatDeals(committed),
-      },
-      probable: {
-        count: probable.length,
-        totalDealValue: sumDealValue(probable),
-        weightedValue: sumWeightedValue(probable),
-        deals: formatDeals(probable),
-      },
-      stretch: {
-        count: stretch.length,
-        totalDealValue: sumDealValue(stretch),
-        weightedValue: sumWeightedValue(stretch),
-        deals: formatDeals(stretch),
-      },
-      projections,
+    months: monthsResult,
+    scenarios: {
+      bestCase,
+      expected,
+      worstCase,
     },
   })
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { STAGE_PROBABILITY, STAGE_LABELS, getOwnerForGeo } from "@/lib/crm-config"
+import { PLAYBOOK_TEMPLATES } from "@/lib/playbook-templates"
 
 export async function PATCH(
   request: Request,
@@ -189,6 +190,30 @@ export async function PATCH(
         where: { id: deal.companyId },
         data: { activeDealsCount: activeCount },
       })
+    }
+  }
+
+  // --- Auto-initialize playbook steps for the new stage ---
+  const playbookTemplate = PLAYBOOK_TEMPLATES[newStage]
+  if (playbookTemplate && playbookTemplate.length > 0) {
+    const existingPlaybook = await prisma.playbookStep.findFirst({
+      where: { dealId: id, stage: newStage },
+    })
+    if (!existingPlaybook) {
+      await prisma.$transaction(
+        playbookTemplate.map((t, idx) =>
+          prisma.playbookStep.create({
+            data: {
+              dealId: id,
+              stage: newStage,
+              title: t.title,
+              description: t.description ?? null,
+              isBlocking: t.isBlocking ?? false,
+              order: idx,
+            },
+          })
+        )
+      )
     }
   }
 
