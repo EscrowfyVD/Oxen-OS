@@ -8,6 +8,7 @@ import IntelTab from "@/components/marketing/IntelTab"
 import IdeaModal from "@/components/marketing/IdeaModal"
 import IntelModal from "@/components/marketing/IntelModal"
 import ComplianceCheckTab from "@/components/marketing/ComplianceCheckTab"
+import SeoModule from "@/components/seo/SeoModule"
 import { fmtNum } from "@/components/marketing/constants"
 import type { SocialMetric, ContentIdea, MarketingIntel, MarketingSummary, Employee } from "@/components/marketing/types"
 
@@ -19,13 +20,13 @@ const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
 const CARD_BG = "rgba(15,17,24,0.6)"
 const GREEN = "#34D399"
 
-type TabId = "overview" | "content" | "metrics" | "intel" | "compliance"
+type TabId = "social" | "content" | "seo" | "intel" | "compliance"
 const TABS: { id: TabId; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "content", label: "Content Ideas" },
-  { id: "metrics", label: "Social Metrics" },
-  { id: "intel", label: "Veille / Intel" },
-  { id: "compliance", label: "✅ Compliance Check" },
+  { id: "social", label: "\ud83d\udcf1 Social Media" },
+  { id: "content", label: "\ud83d\udcdd Content" },
+  { id: "seo", label: "\ud83d\udcc8 SEO / GEO" },
+  { id: "intel", label: "\ud83d\udd0d Veille" },
+  { id: "compliance", label: "\u2705 Compliance Check" },
 ]
 
 export default function MarketingPage() {
@@ -34,7 +35,7 @@ export default function MarketingPage() {
   const [metrics, setMetrics] = useState<SocialMetric[]>([])
   const [intel, setIntel] = useState<MarketingIntel[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [activeTab, setActiveTab] = useState<TabId>("overview")
+  const [activeTab, setActiveTab] = useState<TabId>("social")
 
   /* Idea modal state */
   const [showIdeaModal, setShowIdeaModal] = useState(false)
@@ -266,8 +267,14 @@ export default function MarketingPage() {
 
       {/* Tab content */}
       <div style={{ padding: "20px 28px 40px" }}>
-        {activeTab === "overview" && (
-          <OverviewTab summary={summary} />
+        {activeTab === "social" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+            <OverviewTab summary={summary} />
+            <MetricsTab
+              metrics={metrics}
+              onSave={handleMetricsSave}
+            />
+          </div>
         )}
         {activeTab === "content" && (
           <ContentTab
@@ -278,11 +285,8 @@ export default function MarketingPage() {
             onRefresh={fetchIdeas}
           />
         )}
-        {activeTab === "metrics" && (
-          <MetricsTab
-            metrics={metrics}
-            onSave={handleMetricsSave}
-          />
+        {activeTab === "seo" && (
+          <SeoModule />
         )}
         {activeTab === "intel" && (
           <IntelTab

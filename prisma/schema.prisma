@@ -1179,3 +1179,116 @@ model DriveLink {
   createdBy   String
   createdAt   DateTime   @default(now())
 }
+
+// ─── SEO / GEO Module ───
+
+model Keyword {
+  id               String    @id @default(cuid())
+  keyword          String    @unique
+  vertical         String
+  searchVolume     Int?
+  difficulty       Int?
+  currentPosition  Int?
+  previousPosition Int?
+  targetPosition   Int?      @default(10)
+  rankingUrl       String?
+  trend            String?
+  isTracked        Boolean   @default(true)
+  lastChecked      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model NewsSource {
+  id          String     @id @default(cuid())
+  name        String
+  url         String
+  rssUrl      String?
+  category    String
+  isActive    Boolean    @default(true)
+  lastScanned DateTime?
+  createdAt   DateTime   @default(now())
+  newsItems   NewsItem[]
+}
+
+model NewsItem {
+  id             String      @id @default(cuid())
+  title          String
+  url            String      @unique
+  sourceId       String
+  source         NewsSource  @relation(fields: [sourceId], references: [id])
+  snippet        String?     @db.Text
+  publishedAt    DateTime?
+  relevanceScore Int?
+  vertical       String[]
+  status         String      @default("new")
+  clusterId      String?
+  createdAt      DateTime    @default(now())
+}
+
+model Article {
+  id                 String    @id @default(cuid())
+  title              String
+  slug               String    @unique
+  metaDescription    String?
+  content            String    @db.Text
+  vertical           String[]
+  primaryKeyword     String?
+  secondaryKeywords  String[]
+  wordCount          Int?
+  status             String    @default("queued")
+  publishedAt        DateTime?
+  scheduledFor       DateTime?
+  sourceArticles     String[]
+  organicSessions7d  Int?      @default(0)
+  organicSessions30d Int?      @default(0)
+  keywordsRanking    Int?      @default(0)
+  bestPosition       Int?
+  backlinksEarned    Int?      @default(0)
+  aiCitations        Int?      @default(0)
+  schemaJson         Json?
+  socialPost         String?   @db.Text
+  socialPosted       Boolean   @default(false)
+  generatedBy        String    @default("ai")
+  reviewedBy         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model GeoTestPrompt {
+  id         String          @id @default(cuid())
+  prompt     String          @db.Text
+  vertical   String
+  results    GeoTestResult[]
+  lastTested DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+model GeoTestResult {
+  id               String        @id @default(cuid())
+  promptId         String
+  prompt           GeoTestPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  platform         String
+  oxenCited        Boolean       @default(false)
+  citationContext  String?       @db.Text
+  competitorsCited String[]
+  fullResponse     String?       @db.Text
+  testedAt         DateTime      @default(now())
+}
+
+model SeoAlert {
+  id           String    @id @default(cuid())
+  type         String
+  severity     String
+  title        String
+  detail       String    @db.Text
+  keywordId    String?
+  promptId     String?
+  articleId    String?
+  resolved     Boolean   @default(false)
+  resolvedBy   String?
+  resolvedAt   DateTime?
+  resolvedNote String?
+  createdAt    DateTime  @default(now())
+}
