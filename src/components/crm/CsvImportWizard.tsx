@@ -1,0 +1,1185 @@
+"use client"
+
+import { useState, useRef, useCallback } from "react"
+import Papa from "papaparse"
+
+/* ── Design Tokens ── */
+const CARD_BG = "rgba(15,17,24,0.6)"
+const CARD_BORDER = "rgba(255,255,255,0.06)"
+const TEXT = "#F0F0F2"
+const TEXT2 = "rgba(240,240,242,0.55)"
+const TEXT3 = "rgba(240,240,242,0.3)"
+const ROSE = "#C08B88"
+const GREEN = "#34D399"
+const AMBER = "#FBBF24"
+const RED = "#F87171"
+const GLASS: React.CSSProperties = {
+  background: CARD_BG,
+  border: `1px solid ${CARD_BORDER}`,
+  borderRadius: 14,
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
+}
+
+/* ── CRM Field Options ── */
+const CRM_FIELDS = [
+  { value: "", label: "-- Skip --" },
+  { value: "firstName", label: "First Name" },
+  { value: "lastName", label: "Last Name" },
+  { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
+  { value: "jobTitle", label: "Job Title" },
+  { value: "companyName", label: "Company" },
+  { value: "linkedinUrl", label: "LinkedIn URL" },
+  { value: "notes", label: "Notes" },
+  { value: "vertical", label: "Vertical" },
+  { value: "subVertical", label: "Sub-Vertical" },
+  { value: "geoZone", label: "Geo Zone" },
+  { value: "dealOwner", label: "Deal Owner" },
+  { value: "lifecycleStage", label: "Lifecycle Stage" },
+  { value: "acquisitionSource", label: "Acquisition Source" },
+  { value: "acquisitionSourceDetail", label: "Acquisition Detail" },
+  { value: "outreachGroup", label: "Outreach Group" },
+  { value: "dealValue", label: "Deal Value" },
+  { value: "contactType", label: "Contact Type" },
+]
+
+/* ── Auto-Mapping ── */
+const AUTO_MAP: Record<string, string> = {
+  "firstname": "firstName",
+  "first_name": "firstName",
+  "first name": "firstName",
+  "lastname": "lastName",
+  "last_name": "lastName",
+  "last name": "lastName",
+  "favoriteemail": "email",
+  "favorite email": "email",
+  "email": "email",
+  "e-mail": "email",
+  "jobtitle": "jobTitle",
+  "job title": "jobTitle",
+  "job_title": "jobTitle",
+  "title": "jobTitle",
+  "companies": "companyName",
+  "company": "companyName",
+  "company name": "companyName",
+  "company_name": "companyName",
+  "favoritephone": "phone",
+  "phone": "phone",
+  "phone number": "phone",
+  "favoriteurl": "linkedinUrl",
+  "linkedin": "linkedinUrl",
+  "linkedin url": "linkedinUrl",
+  "linkedin_url": "linkedinUrl",
+  "website": "linkedinUrl",
+  "url": "linkedinUrl",
+  "description": "notes",
+  "notes": "notes",
+  "note": "notes",
+  "vertical": "vertical",
+  "status": "lifecycleStage",
+  "stage": "lifecycleStage",
+  "lifecycle stage": "lifecycleStage",
+  "lifecycle_stage": "lifecycleStage",
+  "prospect owner": "dealOwner",
+  "owner": "dealOwner",
+  "deal_owner": "dealOwner",
+  "deal owner": "dealOwner",
+  "assigned to": "dealOwner",
+  "deal value": "dealValue",
+  "deal_value": "dealValue",
+  "value": "dealValue",
+  "amount": "dealValue",
+  "channel": "acquisitionSource",
+  "source": "acquisitionSource",
+  "acquisition source": "acquisitionSource",
+  "place of meeting": "acquisitionSourceDetail",
+  "groups": "outreachGroup",
+  "group": "outreachGroup",
+  "type": "contactType",
+  "contact type": "contactType",
+  "geo": "geoZone",
+  "geo zone": "geoZone",
+  "geo_zone": "geoZone",
+  "region": "geoZone",
+}
+
+/* ── Value Mappers ── */
+function mapVertical(raw: string): string[] {
+  const lower = raw.toLowerCase()
+  if (lower.includes("csp") || lower.includes("fiduciar")) return ["CSP / Fiduciaries"]
+  if (lower.includes("crypto") || lower.includes("fintech") || lower.includes("blockchain")) return ["FinTech / Crypto"]
+  if (lower.includes("family office") || lower.includes("mfo")) return ["Family Office"]
+  if (lower.includes("gaming") || lower.includes("igaming")) return ["iGaming"]
+  if (lower.includes("yacht")) return ["Yacht Brokers"]
+  if (lower.includes("luxury")) return ["Luxury Assets"]
+  if (lower.includes("import") || lower.includes("export") || lower.includes("trade")) return ["Import / Export"]
+  if (lower.includes("legal") || lower.includes("lawyer")) return ["CSP / Fiduciaries"]
+  return [raw]
+}
+
+function mapLifecycleStage(raw: string): string {
+  const lower = raw.toLowerCase()
+  if (lower.includes("lead") || lower === "new") return "new_lead"
+  if (lower.includes("qualif")) return "replied"
+  if (lower.includes("meeting")) return "meeting_booked"
+  if (lower.includes("proposal")) return "proposal_sent"
+  if (lower.includes("negot")) return "negotiation"
+  if (lower.includes("won") || lower.includes("client")) return "closed_won"
+  if (lower.includes("lost")) return "closed_lost"
+  return "new_lead"
+}
+
+function mapDealOwner(raw: string): string {
+  const lower = raw.toLowerCase()
+  if (lower.includes("andy")) return "Andy"
+  if (lower.includes("paul")) return "Paul Louis"
+  if (lower.includes("vernon")) return "Vernon"
+  return raw
+}
+
+function mapAcquisitionSource(raw: string): string {
+  const lower = raw.toLowerCase()
+  if (lower.includes("outbound") || lower.includes("clay")) return "Clay / Outbound Sequence"
+  if (lower.includes("conference") || lower.includes("event")) return "Conference"
+  if (lower.includes("inbound") || lower.includes("website")) return "Inbound / Website"
+  if (lower.includes("linkedin")) return "LinkedIn / DM"
+  if (lower.includes("referral")) return "Referral / Introducer"
+  return raw
+}
+
+/* ── Stage Labels for Preview ── */
+const STAGE_LABELS: Record<string, string> = {
+  new_lead: "New Lead",
+  sequence_active: "Sequence Active",
+  replied: "Replied",
+  meeting_booked: "Meeting Booked",
+  meeting_completed: "Meeting Completed",
+  proposal_sent: "Proposal Sent",
+  negotiation: "Negotiation",
+  closed_won: "Closed Won",
+  closed_lost: "Closed Lost",
+}
+
+/* ── Types ── */
+interface CsvImportWizardProps {
+  onClose: () => void
+  onComplete: () => void
+}
+
+interface MappedContact {
+  firstName: string
+  lastName: string
+  email: string
+  phone?: string
+  jobTitle?: string
+  companyName?: string
+  linkedinUrl?: string
+  notes?: string
+  vertical?: string[]
+  subVertical?: string[]
+  geoZone?: string
+  dealOwner?: string
+  lifecycleStage?: string
+  acquisitionSource?: string
+  acquisitionSourceDetail?: string
+  outreachGroup?: string
+  dealValue?: number
+  contactType?: string
+}
+
+interface ImportResult {
+  imported: number
+  updated: number
+  skipped: number
+  errors: Array<{ email: string; reason: string }>
+}
+
+const STEPS = ["Upload", "Map Columns", "Preview", "Import"]
+
+/* ══════════════════════════════════════════════════════════════
+   CSV IMPORT WIZARD
+   ══════════════════════════════════════════════════════════════ */
+export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizardProps) {
+  const [step, setStep] = useState(0)
+  const [fileName, setFileName] = useState("")
+  const [headers, setHeaders] = useState<string[]>([])
+  const [rows, setRows] = useState<string[][]>([])
+  const [mapping, setMapping] = useState<Record<string, string>>({})
+  const [duplicateAction, setDuplicateAction] = useState<"skip" | "update">("skip")
+  const [importing, setImporting] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  /* ── Parse CSV ── */
+  const handleFile = useCallback((file: File) => {
+    if (!file.name.endsWith(".csv")) return
+    setFileName(file.name)
+    Papa.parse(file, {
+      skipEmptyLines: true,
+      complete: (results) => {
+        const data = results.data as string[][]
+        if (data.length < 2) return
+        const hdrs = data[0]
+        const rws = data.slice(1)
+        setHeaders(hdrs)
+        setRows(rws)
+
+        // Auto-map
+        const autoMapping: Record<string, string> = {}
+        hdrs.forEach((h) => {
+          const key = h.trim().toLowerCase()
+          if (AUTO_MAP[key]) {
+            autoMapping[h] = AUTO_MAP[key]
+          }
+        })
+        setMapping(autoMapping)
+        setStep(1)
+      },
+    })
+  }, [])
+
+  /* ── Build mapped contacts from raw data ── */
+  const buildMappedContacts = useCallback((): MappedContact[] => {
+    return rows.map((row) => {
+      const contact: Record<string, unknown> = {}
+      headers.forEach((header, idx) => {
+        const field = mapping[header]
+        if (!field) return
+        const val = (row[idx] || "").trim()
+        if (!val) return
+
+        switch (field) {
+          case "vertical":
+            contact.vertical = mapVertical(val)
+            break
+          case "lifecycleStage":
+            contact.lifecycleStage = mapLifecycleStage(val)
+            break
+          case "dealOwner":
+            contact.dealOwner = mapDealOwner(val)
+            break
+          case "acquisitionSource":
+            contact.acquisitionSource = mapAcquisitionSource(val)
+            break
+          case "dealValue": {
+            const num = parseFloat(val.replace(/[^0-9.-]/g, ""))
+            if (!isNaN(num)) contact.dealValue = num
+            break
+          }
+          default:
+            contact[field] = val
+        }
+      })
+      return contact as unknown as MappedContact
+    })
+  }, [rows, headers, mapping])
+
+  /* ── Import ── */
+  const handleImport = useCallback(async () => {
+    setImporting(true)
+    setProgress(10)
+
+    const allContacts = buildMappedContacts()
+    // Filter out contacts without email
+    const contactsToImport = allContacts.filter((c) => c.email)
+
+    setProgress(30)
+
+    try {
+      const res = await fetch("/api/crm/contacts/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contacts: contactsToImport,
+          duplicateAction,
+        }),
+      })
+
+      setProgress(90)
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: "Import failed" }))
+        setResult({
+          imported: 0,
+          updated: 0,
+          skipped: 0,
+          errors: [{ email: "N/A", reason: errData.error || "Import failed" }],
+        })
+      } else {
+        const data = await res.json()
+        setResult(data)
+      }
+    } catch {
+      setResult({
+        imported: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [{ email: "N/A", reason: "Network error during import" }],
+      })
+    }
+
+    setProgress(100)
+    setImporting(false)
+    setStep(3)
+  }, [buildMappedContacts, duplicateAction])
+
+  /* ── Preview Data ── */
+  const previewContacts = step === 2 ? buildMappedContacts() : []
+  const validContacts = previewContacts.filter((c) => c.email)
+  const skippedNoEmail = previewContacts.filter((c) => !c.email)
+  const emailsSeen = new Set<string>()
+  const duplicateEmails = new Set<string>()
+  validContacts.forEach((c) => {
+    const e = c.email.toLowerCase()
+    if (emailsSeen.has(e)) duplicateEmails.add(e)
+    emailsSeen.add(e)
+  })
+
+  /* ── Styles ── */
+  const overlayStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    zIndex: 9999,
+    background: "rgba(0,0,0,0.75)",
+    backdropFilter: "blur(8px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  }
+
+  const modalStyle: React.CSSProperties = {
+    ...GLASS,
+    width: "min(96vw, 1100px)",
+    maxHeight: "92vh",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+  }
+
+  const headerStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "20px 28px 16px",
+    borderBottom: `1px solid ${CARD_BORDER}`,
+  }
+
+  const bodyStyle: React.CSSProperties = {
+    flex: 1,
+    overflowY: "auto",
+    padding: "24px 28px",
+  }
+
+  const footerStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "16px 28px",
+    borderTop: `1px solid ${CARD_BORDER}`,
+  }
+
+  const btnBase: React.CSSProperties = {
+    padding: "8px 20px",
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: "'DM Sans', sans-serif",
+    cursor: "pointer",
+    border: "none",
+    transition: "opacity 0.15s",
+  }
+
+  const btnPrimary: React.CSSProperties = {
+    ...btnBase,
+    background: `linear-gradient(135deg, ${ROSE}, #A07070)`,
+    color: "#fff",
+  }
+
+  const btnSecondary: React.CSSProperties = {
+    ...btnBase,
+    background: "rgba(255,255,255,0.06)",
+    color: TEXT2,
+    border: `1px solid ${CARD_BORDER}`,
+  }
+
+  const selectStyle: React.CSSProperties = {
+    background: "rgba(255,255,255,0.06)",
+    border: `1px solid ${CARD_BORDER}`,
+    borderRadius: 8,
+    color: TEXT,
+    padding: "7px 10px",
+    fontSize: 12,
+    fontFamily: "'DM Sans', sans-serif",
+    width: "100%",
+  }
+
+  /* ── Step Indicator ── */
+  const renderStepIndicator = () => (
+    <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+      {STEPS.map((label, i) => (
+        <div key={label} style={{ display: "flex", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: "'DM Sans', sans-serif",
+                background: i <= step ? ROSE : "rgba(255,255,255,0.08)",
+                color: i <= step ? "#fff" : TEXT3,
+                transition: "all 0.2s",
+              }}
+            >
+              {i < step ? "\u2713" : i + 1}
+            </div>
+            <span
+              style={{
+                fontSize: 12,
+                fontFamily: "'DM Sans', sans-serif",
+                color: i === step ? TEXT : TEXT3,
+                fontWeight: i === step ? 600 : 400,
+              }}
+            >
+              {label}
+            </span>
+          </div>
+          {i < STEPS.length - 1 && (
+            <div
+              style={{
+                width: 40,
+                height: 1,
+                background: i < step ? ROSE : CARD_BORDER,
+                margin: "0 12px",
+              }}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+
+  /* ═════════════════════════════════════════════════════
+     STEP 1 — Upload
+     ═════════════════════════════════════════════════════ */
+  const renderUpload = () => (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: 340,
+        gap: 20,
+      }}
+    >
+      <div
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragOver(false)
+          const file = e.dataTransfer.files[0]
+          if (file) handleFile(file)
+        }}
+        style={{
+          width: "100%",
+          maxWidth: 480,
+          border: `2px dashed ${dragOver ? ROSE : CARD_BORDER}`,
+          borderRadius: 16,
+          padding: "60px 40px",
+          textAlign: "center",
+          background: dragOver ? "rgba(192,139,136,0.06)" : "transparent",
+          transition: "all 0.2s",
+          cursor: "pointer",
+        }}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }}>
+          {"\u2B06\uFE0F"}
+        </div>
+        <p
+          style={{
+            fontFamily: "'Bellfair', serif",
+            fontSize: 20,
+            color: TEXT,
+            margin: "0 0 8px",
+          }}
+        >
+          Drop your CSV file here
+        </p>
+        <p
+          style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: 13,
+            color: TEXT3,
+            margin: 0,
+          }}
+        >
+          or click to browse
+        </p>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) handleFile(file)
+        }}
+      />
+
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        style={btnPrimary}
+      >
+        Choose CSV File
+      </button>
+    </div>
+  )
+
+  /* ═════════════════════════════════════════════════════
+     STEP 2 — Column Mapping
+     ═════════════════════════════════════════════════════ */
+  const renderMapping = () => {
+    const sampleRows = rows.slice(0, 3)
+
+    return (
+      <div>
+        <p
+          style={{
+            fontFamily: "'Bellfair', serif",
+            fontSize: 18,
+            color: TEXT,
+            margin: "0 0 4px",
+          }}
+        >
+          Map CSV Columns to CRM Fields
+        </p>
+        <p
+          style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: 12,
+            color: TEXT3,
+            margin: "0 0 20px",
+          }}
+        >
+          {fileName} -- {rows.length} row{rows.length !== 1 ? "s" : ""} detected
+        </p>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 2fr",
+            gap: "1px",
+            background: CARD_BORDER,
+            borderRadius: 10,
+            overflow: "hidden",
+          }}
+        >
+          {/* Header Row */}
+          <div
+            style={{
+              padding: "10px 14px",
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: 0.8,
+              color: TEXT3,
+              fontFamily: "'DM Sans', sans-serif",
+              background: "rgba(15,17,24,0.8)",
+            }}
+          >
+            CSV Column
+          </div>
+          <div
+            style={{
+              padding: "10px 14px",
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: 0.8,
+              color: TEXT3,
+              fontFamily: "'DM Sans', sans-serif",
+              background: "rgba(15,17,24,0.8)",
+            }}
+          >
+            CRM Field
+          </div>
+          <div
+            style={{
+              padding: "10px 14px",
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: 0.8,
+              color: TEXT3,
+              fontFamily: "'DM Sans', sans-serif",
+              background: "rgba(15,17,24,0.8)",
+            }}
+          >
+            Sample Data
+          </div>
+
+          {/* Mapping Rows */}
+          {headers.map((header, hIdx) => (
+            <div key={header} style={{ display: "contents" }}>
+              <div
+                style={{
+                  padding: "12px 14px",
+                  fontSize: 13,
+                  color: mapping[header] ? TEXT : TEXT2,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: mapping[header] ? 500 : 400,
+                  background: CARD_BG,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {header}
+              </div>
+              <div
+                style={{
+                  padding: "8px 10px",
+                  background: CARD_BG,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <select
+                  value={mapping[header] || ""}
+                  onChange={(e) =>
+                    setMapping((m) => ({ ...m, [header]: e.target.value }))
+                  }
+                  style={selectStyle}
+                >
+                  {CRM_FIELDS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div
+                style={{
+                  padding: "8px 14px",
+                  background: CARD_BG,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                {sampleRows.map((row, rIdx) => (
+                  <span
+                    key={rIdx}
+                    style={{
+                      display: "inline-block",
+                      padding: "2px 8px",
+                      fontSize: 11,
+                      color: TEXT2,
+                      fontFamily: "'DM Sans', sans-serif",
+                      background: "rgba(255,255,255,0.04)",
+                      borderRadius: 4,
+                      maxWidth: 180,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {row[hIdx] || "--"}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  /* ═════════════════════════════════════════════════════
+     STEP 3 — Preview
+     ═════════════════════════════════════════════════════ */
+  const renderPreview = () => {
+    const previewThStyle: React.CSSProperties = {
+      padding: "10px 12px",
+      textAlign: "left",
+      fontSize: 10,
+      color: TEXT3,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      fontWeight: 600,
+      fontFamily: "'DM Sans', sans-serif",
+      whiteSpace: "nowrap",
+      borderBottom: `1px solid ${CARD_BORDER}`,
+      position: "sticky" as const,
+      top: 0,
+      background: "rgba(15,17,24,0.95)",
+      zIndex: 1,
+    }
+
+    const previewTdStyle: React.CSSProperties = {
+      padding: "8px 12px",
+      fontSize: 12,
+      fontFamily: "'DM Sans', sans-serif",
+      borderBottom: `1px solid ${CARD_BORDER}`,
+      color: TEXT,
+      whiteSpace: "nowrap",
+      maxWidth: 180,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+    }
+
+    return (
+      <div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <div>
+            <p
+              style={{
+                fontFamily: "'Bellfair', serif",
+                fontSize: 18,
+                color: TEXT,
+                margin: "0 0 4px",
+              }}
+            >
+              Preview Import
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: 16,
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: GREEN }}>
+                {validContacts.length - duplicateEmails.size} to import
+              </span>
+              {duplicateEmails.size > 0 && (
+                <span style={{ color: AMBER }}>
+                  {duplicateEmails.size} duplicate{duplicateEmails.size !== 1 ? "s" : ""}
+                </span>
+              )}
+              {skippedNoEmail.length > 0 && (
+                <span style={{ color: RED }}>
+                  {skippedNoEmail.length} skipped (no email)
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 12,
+              color: TEXT2,
+            }}
+          >
+            <span>When duplicate found:</span>
+            <select
+              value={duplicateAction}
+              onChange={(e) =>
+                setDuplicateAction(e.target.value as "skip" | "update")
+              }
+              style={{
+                ...selectStyle,
+                width: "auto",
+                minWidth: 120,
+              }}
+            >
+              <option value="skip">Skip</option>
+              <option value="update">Update existing</option>
+            </select>
+          </div>
+        </div>
+
+        <div
+          style={{
+            ...GLASS,
+            overflow: "hidden",
+            maxHeight: 400,
+          }}
+        >
+          <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: 400 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  <th style={previewThStyle}>Status</th>
+                  <th style={previewThStyle}>Name</th>
+                  <th style={previewThStyle}>Email</th>
+                  <th style={previewThStyle}>Company</th>
+                  <th style={previewThStyle}>Vertical</th>
+                  <th style={previewThStyle}>Stage</th>
+                  <th style={previewThStyle}>Owner</th>
+                  <th style={previewThStyle}>Deal Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewContacts.map((c, i) => {
+                  const hasEmail = !!c.email
+                  const isDup = hasEmail && duplicateEmails.has(c.email.toLowerCase())
+                  const rowBg = !hasEmail
+                    ? "rgba(248,113,113,0.04)"
+                    : isDup
+                    ? "rgba(251,191,36,0.04)"
+                    : "transparent"
+
+                  return (
+                    <tr key={i} style={{ background: rowBg }}>
+                      <td style={previewTdStyle}>
+                        {!hasEmail ? (
+                          <span
+                            title="No email - will be skipped"
+                            style={{
+                              color: RED,
+                              fontSize: 14,
+                              cursor: "help",
+                            }}
+                          >
+                            {"\u2717"}
+                          </span>
+                        ) : isDup ? (
+                          <span
+                            title="Duplicate email detected"
+                            style={{
+                              color: AMBER,
+                              fontSize: 14,
+                              cursor: "help",
+                            }}
+                          >
+                            {"\u26A0"}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              color: GREEN,
+                              fontSize: 14,
+                            }}
+                          >
+                            {"\u2713"}
+                          </span>
+                        )}
+                      </td>
+                      <td style={previewTdStyle}>
+                        {c.firstName || ""} {c.lastName || ""}
+                      </td>
+                      <td style={{ ...previewTdStyle, color: hasEmail ? TEXT2 : RED }}>
+                        {c.email || "Missing"}
+                      </td>
+                      <td style={{ ...previewTdStyle, color: TEXT2 }}>
+                        {c.companyName || "--"}
+                      </td>
+                      <td style={{ ...previewTdStyle, color: TEXT2 }}>
+                        {c.vertical?.join(", ") || "--"}
+                      </td>
+                      <td style={previewTdStyle}>
+                        {c.lifecycleStage ? (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "2px 8px",
+                              fontSize: 10,
+                              fontWeight: 500,
+                              borderRadius: 16,
+                              background: "rgba(192,139,136,0.12)",
+                              color: ROSE,
+                            }}
+                          >
+                            {STAGE_LABELS[c.lifecycleStage] || c.lifecycleStage}
+                          </span>
+                        ) : (
+                          <span style={{ color: TEXT3 }}>--</span>
+                        )}
+                      </td>
+                      <td style={{ ...previewTdStyle, color: TEXT2 }}>
+                        {c.dealOwner || "--"}
+                      </td>
+                      <td style={{ ...previewTdStyle, color: TEXT2 }}>
+                        {c.dealValue
+                          ? `\u20AC${c.dealValue.toLocaleString()}`
+                          : "--"}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  /* ═════════════════════════════════════════════════════
+     STEP 4 — Import Progress & Results
+     ═════════════════════════════════════════════════════ */
+  const renderResults = () => (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: 340,
+        gap: 24,
+      }}
+    >
+      {/* Progress Bar */}
+      <div style={{ width: "100%", maxWidth: 480 }}>
+        <div
+          style={{
+            width: "100%",
+            height: 8,
+            background: "rgba(255,255,255,0.06)",
+            borderRadius: 4,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: `${progress}%`,
+              height: "100%",
+              background: `linear-gradient(90deg, ${ROSE}, ${GREEN})`,
+              borderRadius: 4,
+              transition: "width 0.5s ease",
+            }}
+          />
+        </div>
+        <p
+          style={{
+            textAlign: "center",
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: 12,
+            color: TEXT3,
+            marginTop: 8,
+          }}
+        >
+          {importing ? "Importing contacts..." : `${progress}% complete`}
+        </p>
+      </div>
+
+      {/* Results */}
+      {result && !importing && (
+        <div
+          style={{
+            ...GLASS,
+            padding: "28px 36px",
+            width: "100%",
+            maxWidth: 480,
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'Bellfair', serif",
+              fontSize: 20,
+              color: TEXT,
+              margin: "0 0 20px",
+              textAlign: "center",
+            }}
+          >
+            Import Complete
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 14,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ color: GREEN, fontSize: 16 }}>{"\u2705"}</span>
+              <span style={{ color: TEXT }}>
+                Imported: <strong>{result.imported}</strong> contacts
+              </span>
+            </div>
+
+            {result.updated > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ color: AMBER, fontSize: 16 }}>{"\uD83D\uDD04"}</span>
+                <span style={{ color: TEXT }}>
+                  Updated: <strong>{result.updated}</strong> existing
+                </span>
+              </div>
+            )}
+
+            {result.skipped > 0 && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ color: TEXT3, fontSize: 16 }}>{"\u23ED\uFE0F"}</span>
+                <span style={{ color: TEXT }}>
+                  Skipped: <strong>{result.skipped}</strong> contacts
+                </span>
+              </div>
+            )}
+
+            {result.errors.length > 0 && (
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 8,
+                  }}
+                >
+                  <span style={{ color: RED, fontSize: 16 }}>{"\u274C"}</span>
+                  <span style={{ color: RED }}>
+                    Errors: <strong>{result.errors.length}</strong>
+                  </span>
+                </div>
+                <div
+                  style={{
+                    maxHeight: 120,
+                    overflowY: "auto",
+                    background: "rgba(248,113,113,0.06)",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                  }}
+                >
+                  {result.errors.map((err, i) => (
+                    <p
+                      key={i}
+                      style={{
+                        fontSize: 11,
+                        color: TEXT2,
+                        margin: "4px 0",
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}
+                    >
+                      <span style={{ color: RED }}>{err.email}</span>:{" "}
+                      {err.reason}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => {
+              onComplete()
+              onClose()
+            }}
+            style={{
+              ...btnPrimary,
+              width: "100%",
+              marginTop: 24,
+              padding: "10px 20px",
+            }}
+          >
+            Done
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
+  /* ═════════════════════════════════════════════════════
+     RENDER
+     ═════════════════════════════════════════════════════ */
+  return (
+    <div style={overlayStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={modalStyle}>
+        {/* Header */}
+        <div style={headerStyle}>
+          {renderStepIndicator()}
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              color: TEXT3,
+              fontSize: 20,
+              cursor: "pointer",
+              padding: "4px 8px",
+              lineHeight: 1,
+              borderRadius: 6,
+              transition: "color 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = TEXT)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = TEXT3)}
+            title="Cancel"
+          >
+            {"\u2715"}
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={bodyStyle}>
+          {step === 0 && renderUpload()}
+          {step === 1 && renderMapping()}
+          {step === 2 && renderPreview()}
+          {step === 3 && renderResults()}
+        </div>
+
+        {/* Footer */}
+        {step > 0 && step < 3 && (
+          <div style={footerStyle}>
+            <button
+              onClick={() => setStep((s) => s - 1)}
+              style={btnSecondary}
+            >
+              Back
+            </button>
+
+            {step === 1 && (
+              <button
+                onClick={() => setStep(2)}
+                style={btnPrimary}
+              >
+                Next
+              </button>
+            )}
+
+            {step === 2 && (
+              <button
+                onClick={handleImport}
+                disabled={importing || validContacts.length === 0}
+                style={{
+                  ...btnPrimary,
+                  opacity: importing || validContacts.length === 0 ? 0.5 : 1,
+                  cursor:
+                    importing || validContacts.length === 0
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+              >
+                {importing
+                  ? "Importing..."
+                  : `Import ${validContacts.length} Contact${validContacts.length !== 1 ? "s" : ""}`}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

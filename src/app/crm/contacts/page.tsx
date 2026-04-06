@@ -8,6 +8,7 @@ import {
   OWNER_COLORS, CRM_COLORS,
   OUTREACH_GROUPS, OUTREACH_GROUP_COLORS,
 } from "@/lib/crm-config"
+import CsvImportWizard from "@/components/crm/CsvImportWizard"
 
 /* ── Design Tokens ── */
 const BG = "#060709"
@@ -78,6 +79,7 @@ export default function ContactListPage() {
   const [contacts, setContacts] = useState<CrmContact[]>([])
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 1 })
   const [loading, setLoading] = useState(true)
+  const [showImportWizard, setShowImportWizard] = useState(false)
 
   // Filters
   const [search, setSearch] = useState("")
@@ -177,9 +179,42 @@ export default function ContactListPage() {
               {pagination.total} contact{pagination.total !== 1 ? "s" : ""} in database
             </p>
           </div>
-          <button onClick={() => router.push("/crm?tab=clients")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${ROSE}, #A07070)`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-            + New Contact
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              onClick={async () => {
+                const params = new URLSearchParams()
+                if (search) params.set("q", search)
+                if (outreachGroup !== "all") params.set("outreachGroup", outreachGroup)
+                if (lifecycleStage !== "all") params.set("lifecycleStage", lifecycleStage)
+                if (dealOwner !== "all") params.set("dealOwner", dealOwner)
+                if (vertical !== "all") params.set("vertical", vertical)
+                if (geoZone !== "all") params.set("geoZone", geoZone)
+                if (contactType !== "all") params.set("contactType", contactType)
+                const res = await fetch(`/api/crm/contacts/export?${params}`)
+                const blob = await res.blob()
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement("a")
+                a.href = url
+                a.download = `crm-contacts-${new Date().toISOString().slice(0, 10)}.csv`
+                a.click()
+                URL.revokeObjectURL(url)
+              }}
+              style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.06)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+            <button
+              onClick={() => setShowImportWizard(true)}
+              style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.06)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Import CSV
+            </button>
+            <button onClick={() => router.push("/crm?tab=clients")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${ROSE}, #A07070)`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              + New Contact
+            </button>
+          </div>
         </div>
 
         {/* Search + Filters */}
@@ -323,6 +358,14 @@ export default function ContactListPage() {
           )}
         </div>
       </div>
+
+      {/* CSV Import Wizard Modal */}
+      {showImportWizard && (
+        <CsvImportWizard
+          onClose={() => setShowImportWizard(false)}
+          onComplete={() => fetchContacts(1)}
+        />
+      )}
     </div>
   )
 }
