@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import Papa from "papaparse"
 
 /* ── Design Tokens ── */
@@ -33,7 +33,7 @@ const CRM_FIELDS = [
   { value: "companyName", label: "Company" },
   { value: "linkedinUrl", label: "LinkedIn URL" },
   { value: "notes", label: "Notes" },
-  { value: "vertical", label: "Vertical" },
+  { value: "vertical", label: "Vertical (auto-detects sub-vertical)" },
   { value: "subVertical", label: "Sub-Vertical" },
   { value: "geoZone", label: "Geo Zone" },
   { value: "dealOwner", label: "Deal Owner" },
@@ -103,6 +103,11 @@ const AUTO_MAP: Record<string, string> = {
   "geo zone": "geoZone",
   "geo_zone": "geoZone",
   "region": "geoZone",
+  "company vertical": "vertical",
+  "sub-vertical": "subVertical",
+  "sub vertical": "subVertical",
+  "subvertical": "subVertical",
+  "sub_vertical": "subVertical",
 }
 
 /* ── Value Mappers ── */
@@ -113,10 +118,50 @@ function mapVertical(raw: string): string[] {
   if (lower.includes("family office") || lower.includes("mfo")) return ["Family Office"]
   if (lower.includes("gaming") || lower.includes("igaming")) return ["iGaming"]
   if (lower.includes("yacht")) return ["Yacht Brokers"]
-  if (lower.includes("luxury")) return ["Luxury Assets"]
-  if (lower.includes("import") || lower.includes("export") || lower.includes("trade")) return ["Import / Export"]
-  if (lower.includes("legal") || lower.includes("lawyer")) return ["CSP / Fiduciaries"]
+  if (lower.includes("luxury") || lower.includes("art broker") || lower.includes("private jet") || lower.includes("concierge") || lower.includes("real estate")) return ["Luxury Assets"]
+  if (lower.includes("import") || lower.includes("export") || lower.includes("trade") || lower.includes("freight") || lower.includes("commodity")) return ["Import / Export"]
+  // Sub-vertical keywords → parent vertical
+  if (lower.includes("legal") || lower.includes("lawyer") || lower.includes("law firm") || lower.includes("tax")) return ["CSP / Fiduciaries"]
+  if (lower.includes("wealth") || lower.includes("trust") || lower.includes("asset manag") || lower.includes("fund manag")) return ["Family Office"]
+  if (lower.includes("rbi") || lower.includes("cbi") || lower.includes("residence by invest") || lower.includes("citizen")) return ["CSP / Fiduciaries"]
+  if (lower.includes("relocation")) return ["CSP / Fiduciaries"]
   return [raw]
+}
+
+function mapSubVertical(raw: string): string[] {
+  const lower = raw.toLowerCase()
+  if (lower.includes("tax lawyer") || lower.includes("tax advisor")) return ["Tax Lawyers"]
+  if (lower.includes("corporate lawyer") || lower.includes("corporate law")) return ["Corporate Lawyers"]
+  if (lower.includes("m&a") || lower.includes("mergers")) return ["M&A Lawyers"]
+  if (lower.includes("immigration lawyer") || lower.includes("immigration law")) return ["Immigration Lawyers"]
+  if (lower.includes("international contract")) return ["International Contracts Lawyers"]
+  if (lower.includes("rbi") || lower.includes("residence by invest")) return ["RBI Specialists"]
+  if (lower.includes("cbi") || lower.includes("citizen")) return ["CBI Specialists"]
+  if (lower.includes("wealth manag")) return ["Wealth Managers"]
+  if (lower.includes("trust")) return ["Trustees / Trust Companies"]
+  if (lower.includes("corporate service") && !lower.includes("lawyer")) return ["Corporate Service Providers (CSPs)"]
+  if (lower.includes("management comp")) return ["Management Companies"]
+  if (lower.includes("asset manag")) return ["Asset Managers"]
+  if (lower.includes("fund manag")) return ["Fund Managers"]
+  if (lower.includes("crypto fund")) return ["Crypto Funds"]
+  if (lower.includes("crypto account")) return ["Crypto Accountants"]
+  if (lower.includes("crypto tax")) return ["Crypto Tax Advisors"]
+  if (lower.includes("crypto") && lower.includes("csp")) return ["Crypto Company Services Providers"]
+  if (lower.includes("family office") || lower.includes("mfo")) return ["Multi-Family Offices (MFO)"]
+  if (lower.includes("real estate")) return ["Real Estate Brokers"]
+  if (lower.includes("yacht broker")) return ["Yacht Brokers"]
+  if (lower.includes("art broker")) return ["Art Brokers"]
+  if (lower.includes("private jet")) return ["Private Jets Brokers"]
+  if (lower.includes("concierge")) return ["Luxury Concierges"]
+  if (lower.includes("relocation")) return ["Relocation Agencies"]
+  if (lower.includes("igaming oper")) return ["iGaming Operators"]
+  if (lower.includes("igaming plat")) return ["iGaming Platform Providers"]
+  if (lower.includes("freight") || lower.includes("logistics")) return ["Freight / Logistics Brokers"]
+  if (lower.includes("commodity")) return ["Commodity Traders"]
+  // Generic "legal" / "lawyer" → default sub-vertical
+  if (lower.includes("legal") || lower.includes("lawyer") || lower.includes("law firm")) return ["Corporate Lawyers"]
+  if (lower.includes("tax")) return ["Tax Lawyers"]
+  return []
 }
 
 function mapLifecycleStage(raw: string): string {
@@ -212,7 +257,31 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
   const [progress, setProgress] = useState(0)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [existingDbEmails, setExistingDbEmails] = useState<Set<string>>(new Set())
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  /* ── Check existing DB duplicates when entering preview ── */
+  useEffect(() => {
+    if (step !== 2) return
+    const mapped = buildMappedContacts()
+    const emails = mapped.filter((c) => c.email).map((c) => c.email.toLowerCase())
+    if (emails.length === 0) return
+
+    setCheckingDuplicates(true)
+    fetch("/api/crm/contacts/check-duplicates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emails }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.existing) setExistingDbEmails(new Set(data.existing as string[]))
+      })
+      .catch(() => {})
+      .finally(() => setCheckingDuplicates(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
 
   /* ── Parse CSV ── */
   const handleFile = useCallback((file: File) => {
@@ -253,8 +322,20 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
         if (!val) return
 
         switch (field) {
-          case "vertical":
+          case "vertical": {
             contact.vertical = mapVertical(val)
+            const subs = mapSubVertical(val)
+            if (subs.length > 0) contact.subVertical = subs
+            break
+          }
+          case "subVertical":
+            contact.subVertical = mapSubVertical(val)
+            break
+          case "linkedinUrl":
+            // Only set as LinkedIn URL if value actually contains "linkedin"
+            if (val.toLowerCase().includes("linkedin")) {
+              contact.linkedinUrl = val
+            }
             break
           case "lifecycleStage":
             contact.lifecycleStage = mapLifecycleStage(val)
@@ -780,12 +861,22 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
               </span>
               {duplicateEmails.size > 0 && (
                 <span style={{ color: AMBER }}>
-                  {duplicateEmails.size} duplicate{duplicateEmails.size !== 1 ? "s" : ""}
+                  {duplicateEmails.size} CSV duplicate{duplicateEmails.size !== 1 ? "s" : ""}
+                </span>
+              )}
+              {existingDbEmails.size > 0 && (
+                <span style={{ color: AMBER }}>
+                  {existingDbEmails.size} already in CRM
                 </span>
               )}
               {skippedNoEmail.length > 0 && (
                 <span style={{ color: RED }}>
                   {skippedNoEmail.length} skipped (no email)
+                </span>
+              )}
+              {checkingDuplicates && (
+                <span style={{ color: TEXT3 }}>
+                  Checking duplicates...
                 </span>
               )}
             </div>
@@ -835,6 +926,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
                   <th style={previewThStyle}>Email</th>
                   <th style={previewThStyle}>Company</th>
                   <th style={previewThStyle}>Vertical</th>
+                  <th style={previewThStyle}>Sub-Vertical</th>
                   <th style={previewThStyle}>Stage</th>
                   <th style={previewThStyle}>Owner</th>
                   <th style={previewThStyle}>Deal Value</th>
@@ -844,9 +936,10 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
                 {previewContacts.map((c, i) => {
                   const hasEmail = !!c.email
                   const isDup = hasEmail && duplicateEmails.has(c.email.toLowerCase())
+                  const isDbDup = hasEmail && existingDbEmails.has(c.email.toLowerCase())
                   const rowBg = !hasEmail
                     ? "rgba(248,113,113,0.04)"
-                    : isDup
+                    : isDup || isDbDup
                     ? "rgba(251,191,36,0.04)"
                     : "transparent"
 
@@ -864,9 +957,20 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
                           >
                             {"\u2717"}
                           </span>
+                        ) : isDbDup ? (
+                          <span
+                            title={`Already exists in CRM — will ${duplicateAction}`}
+                            style={{
+                              color: AMBER,
+                              fontSize: 14,
+                              cursor: "help",
+                            }}
+                          >
+                            {"\uD83D\uDD04"}
+                          </span>
                         ) : isDup ? (
                           <span
-                            title="Duplicate email detected"
+                            title="Duplicate email in CSV"
                             style={{
                               color: AMBER,
                               fontSize: 14,
@@ -897,6 +1001,9 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
                       </td>
                       <td style={{ ...previewTdStyle, color: TEXT2 }}>
                         {c.vertical?.join(", ") || "--"}
+                      </td>
+                      <td style={{ ...previewTdStyle, color: TEXT2, fontSize: 11 }}>
+                        {c.subVertical?.join(", ") || "--"}
                       </td>
                       <td style={previewTdStyle}>
                         {c.lifecycleStage ? (

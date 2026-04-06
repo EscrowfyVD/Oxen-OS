@@ -148,7 +148,7 @@ export async function POST(request: Request) {
               await tx.activity.create({
                 data: {
                   type: "note_added",
-                  description: "Imported from CSV",
+                  description: "Imported from Folk CRM",
                   contactId: existing.id,
                   performedBy: userId,
                 },

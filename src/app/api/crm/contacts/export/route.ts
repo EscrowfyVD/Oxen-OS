@@ -11,13 +11,17 @@ const CSV_COLUMNS = [
   "phone",
   "company",
   "jobTitle",
+  "linkedinUrl",
   "vertical",
   "subVertical",
   "outreachGroup",
   "geoZone",
   "dealOwner",
+  "contactType",
   "lifecycleStage",
   "acquisitionSource",
+  "acquisitionSourceDetail",
+  "dealValue",
   "lastInteraction",
   "notes",
 ] as const
@@ -72,10 +76,15 @@ export async function GET(request: Request) {
       ]
     }
 
+    if (searchParams.get("contactType") && searchParams.get("contactType") !== "all") {
+      where.contactType = searchParams.get("contactType")
+    }
+
     const contacts = await prisma.crmContact.findMany({
       where,
       include: {
         company: { select: { name: true } },
+        deals: { select: { dealValue: true }, orderBy: { createdAt: "desc" }, take: 1 },
         activities: { orderBy: { createdAt: "desc" }, take: 1 },
       },
       orderBy: { createdAt: "desc" },
@@ -89,6 +98,7 @@ export async function GET(request: Request) {
       const latestActivityDate = contact.activities[0]?.createdAt
         ? contact.activities[0].createdAt.toISOString().split("T")[0]
         : ""
+      const topDealValue = contact.deals[0]?.dealValue
 
       const values = [
         escapeCsvValue(contact.firstName),
@@ -97,13 +107,17 @@ export async function GET(request: Request) {
         escapeCsvValue(contact.phone),
         escapeCsvValue(contact.company?.name),
         escapeCsvValue(contact.jobTitle),
+        escapeCsvValue(contact.linkedinUrl),
         escapeCsvValue(contact.vertical?.join("; ")),
         escapeCsvValue(contact.subVertical?.join("; ")),
         escapeCsvValue(contact.outreachGroup),
         escapeCsvValue(contact.geoZone),
         escapeCsvValue(contact.dealOwner),
+        escapeCsvValue(contact.contactType),
         escapeCsvValue(contact.lifecycleStage),
         escapeCsvValue(contact.acquisitionSource),
+        escapeCsvValue(contact.acquisitionSourceDetail),
+        escapeCsvValue(topDealValue != null ? String(topDealValue) : ""),
         escapeCsvValue(latestActivityDate),
         escapeCsvValue(contact.pinnedNote),
       ]
