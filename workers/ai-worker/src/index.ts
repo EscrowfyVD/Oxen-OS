@@ -1,8 +1,6 @@
 /**
  * AI Worker — processes jobs that call the Claude API
  *
- * Run with: npx tsx --tsconfig workers/tsconfig.json workers/ai-worker.ts
- *
  * Handles: ai:score-lead, ai:generate-article, ai:news-scan, ai:score-news,
  *          ai:keyword-discover, ai:geo-test
  */

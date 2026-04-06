@@ -1,8 +1,6 @@
 /**
  * Sync Worker — processes email/calendar sync jobs
  *
- * Run with: npx tsx --tsconfig workers/tsconfig.json workers/sync-worker.ts
- *
  * Handles: sync:email, sync:calendar
  */
 
@@ -268,7 +266,6 @@ async function handleEmailSync(payload: Record<string, unknown>) {
 // ─── Calendar Sync Handler (placeholder) ───
 
 async function handleCalendarSync(payload: Record<string, unknown>) {
-  // Calendar sync will be implemented when the calendar write feature lands
   console.log(`[${WORKER_ID}] Calendar sync job received`, payload)
   return { status: "not_implemented_yet" }
 }

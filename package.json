@@ -10,8 +10,8 @@
     "db:push": "npx prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
     "postinstall": "npx prisma generate",
-    "worker:ai": "npx tsx --tsconfig workers/tsconfig.json workers/ai-worker.ts",
-    "worker:sync": "npx tsx --tsconfig workers/tsconfig.json workers/sync-worker.ts"
+    "worker:ai": "cd workers/ai-worker && npm start",
+    "worker:sync": "cd workers/sync-worker && npm start"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
