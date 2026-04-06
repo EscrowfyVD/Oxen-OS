@@ -11,7 +11,8 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "postinstall": "npx prisma generate",
     "worker:ai": "cd workers/ai-worker && npm start",
-    "worker:sync": "cd workers/sync-worker && npm start"
+    "worker:sync": "cd workers/sync-worker && npm start",
+    "worker:sync-schema": "cp prisma/schema.prisma workers/ai-worker/prisma/schema.prisma && cp prisma/schema.prisma workers/sync-worker/prisma/schema.prisma"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

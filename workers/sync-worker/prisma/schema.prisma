@@ -1,0 +1,1319 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── NextAuth Models ───
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Organigramme ───
+
+model Employee {
+  id          String     @id @default(cuid())
+  name        String
+  initials    String
+  role        String
+  department  String
+  location    String?
+  email       String?
+  phone       String?
+  telegram       String?
+  telegramChatId String?
+  whatsapp       String?
+  timezone    String?
+  workHours   String?
+  entity      String?
+  entityId    String?
+  orgEntity   OrgEntity? @relation(fields: [entityId], references: [id])
+  country     String?
+  startDate   DateTime?
+  bio         String?    @db.Text
+  avatarColor String
+  icon        String?
+  managerId   String?
+  manager     Employee?  @relation("Management", fields: [managerId], references: [id])
+  reports     Employee[] @relation("Management")
+  order       Int        @default(0)
+  isAdmin     Boolean    @default(false)
+  roleLevel   String     @default("member") // super_admin, admin, manager, member
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  leaveRequests   LeaveRequest[]  @relation("EmployeeLeaveRequests")
+  reviewedLeaves  LeaveRequest[]  @relation("ReviewerLeaveRequests")
+  leaveBalances   LeaveBalance[]
+  conferenceAttendances ConferenceAttendee[]
+  trainingCompletions   TrainingCompletion[]
+}
+
+// ─── Tasks (Kanban) ───
+
+model Task {
+  id               String         @id @default(cuid())
+  title            String
+  description      String?
+  tag              String
+  priority         String         @default("medium")
+  assignee         String?
+  deadline         DateTime?
+  column           String         @default("todo")
+  order            Int            @default(0)
+  supportTicketId  String?
+  supportTicket    SupportTicket? @relation(fields: [supportTicketId], references: [id])
+  contactId        String?
+  contact          CrmContact?    @relation(fields: [contactId], references: [id])
+  createdBy        String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+// ─── Organigramme (Legal Structure) ───
+
+model OrgEntity {
+  id           String      @id @default(cuid())
+  name         String
+  jurisdiction String?
+  type         String      @default("Operating Entity")
+  parentId     String?
+  parent       OrgEntity?  @relation("OrgStructure", fields: [parentId], references: [id])
+  children     OrgEntity[] @relation("OrgStructure")
+  employees    Employee[]
+  driveLinks   DriveLink[]
+  policies     Policy[]
+  risks        Risk[]
+  trainings    Training[]
+  licenses     RegulatoryLicense[]
+  incidents    ComplianceIncident[]
+  order        Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+// ─── Wiki ───
+
+model WikiPage {
+  id           String        @id @default(cuid())
+  title        String
+  slug         String        @unique
+  content      Json
+  category     String?
+  icon         String?
+  parentId     String?
+  parent       WikiPage?     @relation("WikiHierarchy", fields: [parentId], references: [id])
+  children     WikiPage[]    @relation("WikiHierarchy")
+  pinned       Boolean       @default(false)
+  archived     Boolean       @default(false)
+  order        Int           @default(0)
+  lastViewedBy String?
+  viewCount    Int           @default(0)
+  createdBy    String
+  updatedBy    String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  versions     WikiVersion[]
+  driveLinks   DriveLink[]
+}
+
+model WikiVersion {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      WikiPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  content   Json
+  editedBy  String
+  createdAt DateTime @default(now())
+}
+
+// ─── Calendar ───
+
+model CalendarEvent {
+  id            String    @id @default(cuid())
+  googleEventId String
+  title         String
+  description   String?
+  startTime     DateTime
+  endTime       DateTime
+  attendees     String[]
+  calendarOwner String
+  location      String?
+  meetLink      String?
+  callNote      CallNote?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([googleEventId, calendarOwner])
+}
+
+// ─── Internal Events (user-created meetings) ───
+
+model InternalEvent {
+  id             String    @id @default(cuid())
+  title          String
+  description    String?   @db.Text
+  startTime      DateTime
+  endTime        DateTime
+  location       String?
+  meetLink       String?
+  attendees      String[]
+  color          String?
+  type           String    @default("meeting")
+  recurring      String?
+  recurringUntil DateTime?
+  googleEventId  String?
+  createdBy      String
+  callNote       CallNote?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// ─── Call Notes ───
+
+model CallNote {
+  id              String          @id @default(cuid())
+  title           String
+  date            DateTime
+  htmlContent     String          @db.Text
+  noteData        Json?
+  eventId         String?         @unique
+  event           CalendarEvent?  @relation(fields: [eventId], references: [id])
+  internalEventId String?         @unique
+  internalEvent   InternalEvent?  @relation(fields: [internalEventId], references: [id])
+  createdBy       String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// ─── Dashboard / KPIs ───
+
+model KpiEntry {
+  id        String   @id @default(cuid())
+  metric    String
+  value     Float
+  date      DateTime
+  entity    String   @default("oxen")
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  action    String
+  detail    String
+  userId    String
+  entityId  String?
+  link      String?
+  createdAt DateTime @default(now())
+}
+
+// ─── CRM v2 — Companies, Contacts, Deals, Activities ───
+
+model Company {
+  id              String   @id @default(cuid())
+  name            String
+  website         String?
+  domain          String?  @unique
+  industry        String?
+  description     String?  @db.Text
+  hqCountry       String?
+  hqCity          String?
+  vertical        String[] // multi-select: primary verticals
+  subVertical     String[] // multi-select: sub-verticals
+  geoZone         String?  // "Malta", "Cyprus", "Luxembourg", "UK", "UAE", "Europe", "Asia", "South America", "Other"
+  // Clay enrichment
+  employeeCount   Int?
+  revenueRange    String?  // "<100K", "100K-500K", "500K-1M", "1M-5M", "5M-20M", "20M+", "Unknown"
+  fundingTotal    String?
+  techStack       String[]
+  linkedinUrl     String?
+  socialProfiles  Json?
+  // Computed
+  contactsCount   Int      @default(0)
+  activeDealsCount Int     @default(0)
+  totalRevenue    Float    @default(0)
+  // Relations
+  contacts        CrmContact[]
+  deals           Deal[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CrmContact {
+  id              String   @id @default(cuid())
+  firstName       String
+  lastName        String
+  email           String   @unique
+  phone           String?
+  linkedinUrl     String?
+  jobTitle        String?
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id])
+  // Classification
+  vertical        String[] // multi-select: 7 primary verticals
+  subVertical     String[] // multi-select: 28 sub-verticals
+  geoZone         String?  // determines deal owner auto-assignment
+  dealOwner       String?  // "Andy", "Paul Louis", "Vernon"
+  acquisitionSource       String? // "Clay / Outbound Sequence", "Conference", etc.
+  acquisitionSourceDetail String? // event name if conference, introducer name if referral
+  lifecycleStage  String   @default("new_lead") // 9 stages
+  icpFit          String?  // AI-generated: "tier_1", "tier_2", "tier_3"
+  icpScore        Int?     @default(0) // 0-100
+  icpScoredAt     DateTime?
+  icpScoreBreakdown Json?  // {vertical_match, geo_match, company_size, engagement, revenue_potential}
+  contactType     String   @default("prospect") // "prospect", "client", "introducer", "partner"
+  outreachGroup   String?
+  // Clay enrichment
+  companySize     String?
+  fundingStage    String?
+  techStack       String[]
+  annualRevenueRange String?
+  country         String?
+  city            String?
+  // Smart fields (auto-computed)
+  lastInteraction DateTime?
+  daysSinceLastContact Int?
+  nextScheduledMeeting DateTime?
+  totalInteractions Int    @default(0)
+  avgResponseTimeHours Float?
+  relationshipStrength String? // "strong", "warm", "cold", "no_relationship"
+  relationshipScore Int    @default(0) // 0-100
+  aiSummary       String?  @db.Text // AI one-liner
+  // Meta
+  doNotContact    Boolean  @default(false)
+  pinnedNote      String?  @db.Text
+  createdBy       String?
+  // Introducer self-relation
+  introducerId    String?
+  introducer      CrmContact? @relation("IntroducerReferrals", fields: [introducerId], references: [id])
+  referredContacts CrmContact[] @relation("IntroducerReferrals")
+  // Introducer-specific fields
+  introducerVertical String[]
+  introducerGeo   String?
+  totalReferrals  Int      @default(0)
+  successfulReferrals Int  @default(0)
+  referralSuccessRate Float? @default(0)
+  // Legacy compat fields (migrated from old Contact)
+  telegram        String?
+  whatsapp        String?
+  website         String?
+  // Relations
+  deals           Deal[]
+  activities      Activity[]
+  tasks           CrmTask[]
+  conferenceContacts ConferenceContact[]
+  intentSignals   IntentSignal[]
+  emails          Email[]          @relation("ContactEmails")
+  driveLinks      DriveLink[]      @relation("ContactDriveLinks")
+  financeTransactions FinanceTransaction[] @relation("ContactFinance")
+  supportTickets  SupportTicket[]
+  companyIntel    CompanyIntel[]   @relation("ContactIntel")
+  meetingBriefs   MeetingBrief[]   @relation("ContactBriefs")
+  aiInsights      AIInsight[]      @relation("ContactInsights")
+  aiFollowUps     AIFollowUp[]
+  kanbanTasks     Task[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Deal {
+  id              String   @id @default(cuid())
+  dealName        String   // default: "{firstName} {lastName} — {company.name}"
+  contactId       String
+  contact         CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id])
+  stage           String   @default("new_lead") // 9 stages
+  dealValue       Float?   // estimated monthly revenue
+  dealOwner       String   // "Andy", "Paul Louis", "Vernon"
+  acquisitionSource       String?
+  acquisitionSourceDetail String?
+  vertical        String[]
+  expectedCloseDate DateTime?
+  winProbability  Float?   // auto-set from stage, manually adjustable
+  weightedValue   Float?   // dealValue × winProbability
+  // Lost tracking
+  lostReason      String?  // REQUIRED when closed_lost
+  lostNotes       String?  @db.Text
+  // KYC
+  kycStatus       String   @default("not_started") // "not_started", "in_progress", "documents_pending", "under_review", "approved", "rejected"
+  // Aging
+  daysInCurrentStage Int   @default(0)
+  daysSinceLastActivity Int @default(0)
+  aiDealHealth    String?  // "on_track", "needs_attention", "at_risk"
+  aiDealHealthReason String?
+  aiDealHealthScoredAt DateTime?
+  // Introducer
+  introducerId    String?  // contact who introduced this deal
+  conferenceName  String?  // if source is conference
+  // Timestamps
+  stageChangedAt  DateTime @default(now())
+  closedAt        DateTime?
+  notes           String?  @db.Text
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  activities      Activity[]
+  tasks           CrmTask[]
+  playbookSteps   PlaybookStep[]
+  aiFollowUps     AIFollowUp[]
+}
+
+model PlaybookStep {
+  id          String    @id @default(cuid())
+  dealId      String
+  deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  stage       String    // which pipeline stage this step belongs to
+  title       String
+  description String?
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  completedBy String?
+  isBlocking  Boolean   @default(false)
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+}
+
+model AIFollowUp {
+  id              String     @id @default(cuid())
+  contactId       String
+  contact         CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId          String?
+  deal            Deal?      @relation(fields: [dealId], references: [id])
+  reason          String     // "conversation_stalled", "no_response_5_days", "meeting_no_followup", "proposal_no_response"
+  suggestedAction String     // "send_follow_up", "schedule_call", "send_reminder"
+  draftMessage    String?    @db.Text
+  status          String     @default("pending") // "pending", "accepted", "dismissed", "sent"
+  assignee        String     // deal owner
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Activity {
+  id              String   @id @default(cuid())
+  type            String   // "email_sent", "email_received", "meeting_calendly", "meeting_manual", "call_outbound", "call_inbound", "linkedin_message", "whatsapp_message", "clay_sequence_event", "note_added", "file_attached", "conference_encounter", "stage_change", "task_completed", "proposal_sent"
+  description     String?  @db.Text
+  contactId       String?
+  contact         CrmContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId          String?
+  deal            Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  metadata        Json?    // flexible: email subject, meeting link, call duration, etc.
+  performedBy     String?
+  isPrivate       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+}
+
+model CrmTask {
+  id              String   @id @default(cuid())
+  title           String
+  type            String   // "follow_up_email", "follow_up_call", "schedule_meeting", "send_proposal", "pre_meeting_prep", "post_meeting_summary", "conference_followup", "send_documents", "internal_discussion", "crm_data_update", "other"
+  priority        String   @default("medium") // "urgent", "high", "medium", "low"
+  dueDate         DateTime
+  assignee        String   // "Andy", "Paul Louis", "Vernon"
+  contactId       String?
+  contact         CrmContact? @relation(fields: [contactId], references: [id])
+  dealId          String?
+  deal            Deal?    @relation(fields: [dealId], references: [id])
+  status          String   @default("pending") // "pending", "completed", "cancelled"
+  outcomeNote     String?
+  isAutoGenerated Boolean  @default(false)
+  completedAt     DateTime?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String   // "contact", "deal", "company", "task", "activity"
+  entityId    String
+  action      String   // "created", "updated", "deleted", "stage_changed"
+  field       String?  // which field changed
+  oldValue    String?
+  newValue    String?
+  performedBy String
+  createdAt   DateTime @default(now())
+}
+
+model SmartView {
+  id          String   @id @default(cuid())
+  name        String
+  filters     Json     // array of filter conditions
+  filterLogic String   @default("and") // "and" | "or"
+  isShared    Boolean  @default(false)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Finance ───
+
+model FinanceEntry {
+  id          String   @id @default(cuid())
+  type        String   // "revenue", "expense", "budget"
+  category    String
+  description String?
+  amount      Float
+  currency    String   @default("EUR")
+  date        DateTime
+  entity      String   @default("oxen")
+  recurring   Boolean  @default(false)
+  notes       String?  @db.Text
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FinanceTransaction {
+  id              String    @id @default(cuid())
+  type            String    // "revenue", "expense"
+  category        String
+  description     String?
+  amount          Float
+  currency        String    @default("EUR")
+  exchangeRate    Float?    @default(1)
+  amountEur       Float?    // Normalized EUR amount
+  date            DateTime
+  entity          String    @default("oxen")
+  recurring       Boolean   @default(false)
+  recurringPeriod String?   // "monthly", "quarterly", "yearly"
+  paymentSource   String?   // "bank_transfer", "card", "crypto", "cash"
+  bankAccountName String?   // Which bank account
+  reference       String?   // Invoice/PO number
+  status          String    @default("confirmed") // "confirmed", "pending", "reconciled"
+  // Reimbursement
+  reimbursable    Boolean   @default(false)
+  reimbursedTo    String?
+  reimbursedDate  DateTime?
+  // Relations
+  contactId       String?
+  contact         CrmContact? @relation("ContactFinance", fields: [contactId], references: [id])
+  // Attachment
+  attachmentUrl   String?
+  attachmentName  String?
+  notes           String?   @db.Text
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model FinanceBudget {
+  id        String   @id @default(cuid())
+  category  String
+  amount    Float
+  month     String   // "YYYY-MM"
+  entityId  String   @default("oxen")
+  notes     String?
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, month, entityId])
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  name          String
+  bankName      String
+  currency      String   @default("EUR")
+  iban          String?
+  accountType   String   @default("operating") // "operating", "savings", "escrow", "card"
+  entity        String   @default("oxen")
+  currentBalance Float   @default(0)
+  lastUpdated   DateTime @default(now())
+  isActive      Boolean  @default(true)
+  notes         String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FinanceGoal {
+  id        String   @id @default(cuid())
+  metric    String   // "monthly_revenue", "monthly_expense", "profit_margin", "runway_months"
+  target    Float
+  entity    String   @default("oxen")
+  period    String   // "2026-Q1", "2026-03", etc.
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
+// ─── Marketing ───
+
+model SocialMetrics {
+  id          String   @id @default(cuid())
+  platform    String   // "linkedin", "twitter", "telegram", "instagram", "youtube", "tiktok"
+  date        DateTime
+  followers   Int      @default(0)
+  impressions Int      @default(0)
+  engagement  Int      @default(0)
+  clicks      Int      @default(0)
+  posts       Int      @default(0)
+  entity      String   @default("oxen")
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  @@unique([platform, date, entity])
+}
+
+model ContentIdea {
+  id               String    @id @default(cuid())
+  title            String
+  description      String?   @db.Text
+  platform         String?
+  type             String?
+  status           String    @default("idea")
+  priority         String    @default("medium")
+  scheduledFor     DateTime?
+  publishedAt      DateTime?
+  assignedTo       String?
+  tags             String[]
+  notes            String?   @db.Text
+  createdBy        String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  complianceChecks ContentComplianceCheck[]
+}
+
+model ContentComplianceCheck {
+  id              String       @id @default(cuid())
+  contentIdeaId   String?
+  contentIdea     ContentIdea? @relation(fields: [contentIdeaId], references: [id])
+  platform        String
+  contentType     String
+  contentText     String       @db.Text
+  imageUrl        String?
+  targetAudience  String?
+  jurisdictions   String[]
+
+  status          String       @default("pending")
+  overallRisk     String?
+  score           Int?
+  findings        Json?
+  summary         String?      @db.Text
+
+  checkedAt       DateTime?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+
+  sourceType      String?
+  sourceFileName  String?
+  sourceDriveId   String?
+
+  createdBy       String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model MarketingIntel {
+  id        String   @id @default(cuid())
+  type      String   // "competitor", "trend", "tool", "regulation", "opportunity"
+  title     String
+  source    String?
+  summary   String   @db.Text
+  relevance String   @default("medium")
+  tags      String[]
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
+// ─── Support Module ───
+
+model SupportTicket {
+  id              String           @id @default(cuid())
+  subject         String
+  clientName      String
+  clientEmail     String?
+  channel         String           // "telegram", "email", "whatsapp", "phone", "live_chat"
+  status          String           @default("open")       // "open", "in_progress", "waiting_client", "resolved", "closed"
+  priority        String           @default("medium")     // "urgent", "high", "medium", "low"
+  category        String?          // "account_issue", "transaction", "onboarding", "compliance", "technical", "general"
+  assignedTo      String?
+  contactId       String?
+  contact         CrmContact?      @relation(fields: [contactId], references: [id])
+  source          String    @default("manual")    // "manual", "email_auto", "website_form", "telegram"
+  slaResponseMinutes  Int?
+  slaResolutionMinutes Int?
+  slaBreached     Boolean   @default(false)
+  messages        SupportMessage[]
+  tasks           Task[]
+  resolvedAt      DateTime?
+  firstResponseAt DateTime?
+  createdBy       String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model SupportMessage {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender     String        // "client" or employee name
+  content    String        @db.Text
+  isInternal Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+}
+
+// ─── AI Sales Intelligence Module ───
+
+model CompanyIntel {
+  id             String    @id @default(cuid())
+  contactId      String
+  contact        CrmContact @relation("ContactIntel", fields: [contactId], references: [id], onDelete: Cascade)
+  companyName    String
+  website        String?
+  description    String?   @db.Text
+  industry       String?
+  employeeCount  String?
+  revenue        String?
+  headquarters   String?
+  keyPeople      Json?     // [{name, title, linkedin, email}]
+  recentNews     Json?     // [{title, source, url, date, summary, sentiment}]
+  ownership      Json?
+  creditRating   String?
+  lastResearched DateTime?
+  dataSource     String?   // "claude", "manual", "apollo", "clearbit"
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model MeetingBrief {
+  id           String    @id @default(cuid())
+  eventId      String?   @unique
+  contactId    String?
+  contact      CrmContact? @relation("ContactBriefs", fields: [contactId], references: [id])
+  title        String
+  meetingDate  DateTime
+  attendees    String[]
+  briefContent Json      // {company_context, relationship_history, recent_news, deal_status, talking_points, risks, opportunities, suggested_ask}
+  status       String    @default("generated")
+  sentVia      String?
+  createdBy    String    @default("ai")
+  createdAt    DateTime  @default(now())
+}
+
+model AIInsight {
+  id           String   @id @default(cuid())
+  type         String   // "opportunity", "risk", "buying_signal", "churn_warning", "upsell", "news_alert", "follow_up_needed", "deal_stuck"
+  title        String
+  summary      String   @db.Text
+  contactId    String?
+  contact      CrmContact? @relation("ContactInsights", fields: [contactId], references: [id])
+  severity     String   @default("medium")
+  actionable   Boolean  @default(true)
+  dismissed    Boolean  @default(false)
+  actionTaken  String?
+  linkedTaskId String?
+  source       String?  // "auto_analysis", "deal_stage_change", "system"
+  createdAt    DateTime @default(now())
+}
+
+model AIConversation {
+  id        String   @id @default(cuid())
+  messages  Json     // [{role, content, timestamp}]
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Leave / Absence Management ───
+
+model LeaveRequest {
+  id            String    @id @default(cuid())
+  employeeId    String
+  employee      Employee  @relation("EmployeeLeaveRequests", fields: [employeeId], references: [id], onDelete: Cascade)
+  type          String    // "vacation" | "sick" | "ooo"
+  startDate     DateTime
+  endDate       DateTime
+  halfDay       Boolean   @default(false)
+  halfDayPeriod String?   // "morning" | "afternoon"
+  reason        String?   @db.Text
+  status        String    @default("pending") // "pending" | "approved" | "rejected"
+  reviewedById  String?
+  reviewedBy    Employee? @relation("ReviewerLeaveRequests", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  reviewNote    String?   @db.Text
+  totalDays     Float     @default(0)
+  source        String    @default("request") // "request" | "manual" | "bulk_import"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model LeaveBalance {
+  id              String   @id @default(cuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  year            Int
+  vacationTotal   Int      @default(25)
+  vacationUsed    Float    @default(0)
+  vacationPending Float    @default(0)
+  sickTotal       Int      @default(10)
+  sickUsed        Float    @default(0)
+  oooTotal        Int      @default(15)
+  oooUsed         Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([employeeId, year])
+}
+
+model LeaveRules {
+  id                   String   @id @default(cuid())
+  generalPolicy        String?  @db.Text
+  vacationQuota        Int      @default(25)
+  vacationMinNotice    Int      @default(14)
+  vacationMaxConsecutive Int    @default(15)
+  vacationCarryOver    Int      @default(5)
+  sickQuota            Int      @default(10)
+  sickCertAfterDays    Int      @default(3)
+  oooQuota             Int      @default(15)
+  oooMinNotice         Int      @default(3)
+  oooReasonRequired    Boolean  @default(true)
+  approvalTimeline     Int      @default(2)
+  blackoutPeriods      Json?
+  updatedBy            String?
+  updatedAt            DateTime @updatedAt
+  createdAt            DateTime @default(now())
+}
+
+// ─── Email Sync ───
+
+model Email {
+  id            String   @id @default(cuid())
+  contactId     String?
+  contact       CrmContact? @relation("ContactEmails", fields: [contactId], references: [id])
+  gmailId       String   @unique
+  threadId      String?
+  from          String
+  to            String[]
+  cc            String[]
+  subject       String
+  snippet       String?
+  bodyText      String?  @db.Text
+  date          DateTime
+  labelIds      String[]
+  hasAttachment Boolean  @default(false)
+  direction     String   @default("inbound")
+  syncedBy      String
+  createdAt     DateTime @default(now())
+}
+
+// ─── Agent model removed — introducers are now CrmContact with contactType="introducer" ───
+
+// ─── Intent Signals ───
+
+model IntentSignal {
+  id          String    @id @default(cuid())
+  contactId   String
+  contact     CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  source      String
+  signalType  String
+  title       String
+  detail      String?   @db.Text
+  score       Int       @default(0)
+  expiresAt   DateTime?
+  raw         Json?
+  createdAt   DateTime  @default(now())
+}
+
+// ─── OutreachSequence removed — tracked via Activity + Clay integration ───
+
+// ─── Intelligence Hub ───
+
+model IntelResearch {
+  id            String        @id @default(cuid())
+  title         String
+  category      String        // "marketing", "ai_tools", "competitors", "regulations", "conferences", "oxen", "finance"
+  subcategory   String?
+  query         String?       @db.Text
+  sources       String[]      // ["linkedin", "twitter", "reddit", "github", etc.]
+  keywords      String[]      // search keywords
+  companies     String[]      // companies to monitor
+  regions       String[]      // geographic focus
+  language      String        @default("english")
+  type          String        // "one_time" or "recurring"
+  frequency     String?       // "daily", "weekly", "biweekly", "monthly"
+  lastRunAt     DateTime?
+  nextRunAt     DateTime?
+  status        String        @default("active") // "active", "paused", "completed", "archived"
+  archived      Boolean       @default(false)
+  scheduledDay  String?       // e.g. "monday" for weekly, "15" for monthly day-of-month
+  scheduledTime String?       // e.g. "09:00" (HH:mm)
+  createdBy     String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  results       IntelResult[]
+}
+
+model IntelResult {
+  id            String        @id @default(cuid())
+  researchId    String
+  research      IntelResearch @relation(fields: [researchId], references: [id], onDelete: Cascade)
+  title         String
+  summary       String        @db.Text
+  source        String?
+  sourceType    String?       // "linkedin", "twitter", "reddit", "github", "google", "news", "website", "review_site", "regulatory", "conference_site"
+  sentiment     String?       // "positive", "negative", "neutral"
+  relevance     String        @default("medium") // "critical", "high", "medium", "low"
+  actionable    Boolean       @default(false)
+  read          Boolean       @default(false)
+  starred       Boolean       @default(false)
+  dismissed     Boolean       @default(false)
+  metadata      Json?
+  createdAt     DateTime      @default(now())
+}
+
+// ── Conferences ──
+
+model Conference {
+  id              String   @id @default(cuid())
+  name            String
+  location        String
+  country         String?
+  startDate       DateTime
+  endDate         DateTime
+  website         String?
+  description     String?  @db.Text
+  status          String   @default("planned") // "suggested", "planned", "ongoing", "completed", "cancelled", "rejected"
+  source          String?  // "manual", "intel"
+  intelResultId   String?
+
+  currency        String   @default("EUR")
+
+  attendees       ConferenceAttendee[]
+  collectedContacts ConferenceContact[]
+  driveLinks      DriveLink[]
+  report          ConferenceReport?
+
+  color           String?
+  calendarEventId String?
+
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ConferenceAttendee {
+  id              String     @id @default(cuid())
+  conferenceId    String
+  conference      Conference @relation(fields: [conferenceId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee   @relation(fields: [employeeId], references: [id])
+  role            String?
+  confirmed       Boolean    @default(true)
+  reportSubmitted Boolean    @default(false)
+  ticketCost      Float?     @default(0)
+  hotelCost       Float?     @default(0)
+  flightCost      Float?     @default(0)
+  taxiCost        Float?     @default(0)
+  mealsCost       Float?     @default(0)
+  otherCost       Float?     @default(0)
+  budgetNotes     String?
+  createdAt       DateTime   @default(now())
+}
+
+model ConferenceContact {
+  id              String     @id @default(cuid())
+  conferenceId    String
+  conference      Conference @relation(fields: [conferenceId], references: [id], onDelete: Cascade)
+  name            String
+  company         String?
+  role            String?
+  email           String?
+  phone           String?
+  linkedin        String?
+  telegram        String?
+  notes           String?    @db.Text
+  interest        String?
+  followUpAction  String?
+  addedToCrm      Boolean    @default(false)
+  contactId       String?
+  contact         CrmContact? @relation(fields: [contactId], references: [id])
+  collectedBy     String
+  createdAt       DateTime   @default(now())
+}
+
+model ConferenceReport {
+  id              String     @id @default(cuid())
+  conferenceId    String     @unique
+  conference      Conference @relation(fields: [conferenceId], references: [id], onDelete: Cascade)
+  summary         String     @db.Text
+  keyTakeaways    Json?
+  marketInsights  String?    @db.Text
+  competitorSightings String? @db.Text
+  opportunities   String?    @db.Text
+  recommendations String?    @db.Text
+  rating          Int?
+  wikiPageId      String?
+  submittedBy     String
+  submittedAt     DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+// ─── Compliance Module ───
+
+model Policy {
+  id            String          @id @default(cuid())
+  title         String
+  code          String          @unique // e.g. "AML-001"
+  category      String          // "aml", "kyc", "data_protection", "operational", "conduct", "it_security", "hr"
+  status        String          @default("draft") // "draft", "pending_review", "approved", "active", "archived", "expired"
+  priority      String          @default("medium") // "critical", "high", "medium", "low"
+  description   String?         @db.Text
+  content       String?         @db.Text
+  entityId      String?
+  entity        OrgEntity?      @relation(fields: [entityId], references: [id])
+  ownerId       String?         // employee email who owns this policy
+  reviewerId    String?         // employee email who reviews/approves
+  approvedBy    String?
+  approvedAt    DateTime?
+  effectiveDate DateTime?
+  expiryDate    DateTime?
+  reviewDate    DateTime?       // next review due date
+  tags          String[]
+  createdBy     String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  versions      PolicyVersion[]
+}
+
+model PolicyVersion {
+  id        String   @id @default(cuid())
+  policyId  String
+  policy    Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  version   Int
+  content   String   @db.Text
+  changelog String?  @db.Text
+  createdBy String
+  createdAt DateTime @default(now())
+}
+
+model Risk {
+  id              String    @id @default(cuid())
+  title           String
+  code            String    @unique // e.g. "RISK-001"
+  category        String    // "operational", "financial", "regulatory", "cyber", "reputational", "strategic", "compliance"
+  description     String?   @db.Text
+  likelihood      Int       @default(3) // 1-5
+  impact          Int       @default(3) // 1-5
+  riskScore       Int       @default(9) // likelihood * impact
+  status          String    @default("open") // "open", "mitigating", "accepted", "closed", "monitoring"
+  mitigation      String?   @db.Text
+  residualLikelihood Int?
+  residualImpact     Int?
+  residualScore      Int?
+  ownerId         String?   // employee email
+  entityId        String?
+  entity          OrgEntity? @relation(fields: [entityId], references: [id])
+  reviewDate      DateTime?
+  lastAssessedAt  DateTime?
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Training {
+  id            String               @id @default(cuid())
+  title         String
+  code          String               @unique // e.g. "TRN-001"
+  category      String               // "aml", "kyc", "data_protection", "conduct", "it_security", "orias", "general"
+  description   String?              @db.Text
+  provider      String?              // e.g. "Internal", "ACAMS", "ORIAS"
+  durationHours Float?
+  frequency     String?              // "annual", "biannual", "quarterly", "one_time"
+  mandatory     Boolean              @default(true)
+  entityId      String?
+  entity        OrgEntity?           @relation(fields: [entityId], references: [id])
+  dueDate       DateTime?
+  status        String               @default("active") // "active", "archived"
+  createdBy     String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  completions   TrainingCompletion[]
+}
+
+model TrainingCompletion {
+  id            String    @id @default(cuid())
+  trainingId    String
+  training      Training  @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  employeeId    String
+  employee      Employee  @relation(fields: [employeeId], references: [id])
+  completedAt   DateTime?
+  expiresAt     DateTime?
+  score         Float?    // percentage score if applicable
+  certificateUrl String?
+  status        String    @default("pending") // "pending", "completed", "expired", "failed"
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([trainingId, employeeId])
+}
+
+model RegulatoryLicense {
+  id              String    @id @default(cuid())
+  name            String
+  code            String?   // license number
+  regulator       String    // "ACPR", "FCA", "BaFin", etc.
+  entityId        String?
+  entity          OrgEntity? @relation(fields: [entityId], references: [id])
+  entityName      String?   // denormalized for display
+  type            String?   // "EMI", "PI", "agent", "distributor", "SEMI"
+  status          String    @default("active") // "active", "pending", "suspended", "expired", "revoked"
+  grantedDate     DateTime?
+  expiryDate      DateTime?
+  renewalDate     DateTime?
+  conditions      String?   @db.Text
+  notes           String?   @db.Text
+  documentUrl     String?
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ComplianceIncident {
+  id              String    @id @default(cuid())
+  title           String
+  code            String    @unique // e.g. "INC-001"
+  type            String    // "sar", "breach", "complaint", "near_miss", "audit_finding", "regulatory_inquiry"
+  severity        String    @default("medium") // "critical", "high", "medium", "low"
+  status          String    @default("open") // "open", "investigating", "reported", "resolved", "closed"
+  description     String?   @db.Text
+  rootCause       String?   @db.Text
+  remediation     String?   @db.Text
+  entityId        String?
+  entity          OrgEntity? @relation(fields: [entityId], references: [id])
+  reportedBy      String
+  assignedTo      String?
+  reportedToRegulator Boolean @default(false)
+  regulatorRef    String?   // regulator reference number
+  reportedAt      DateTime?
+  resolvedAt      DateTime?
+  financialImpact Float?
+  currency        String    @default("EUR")
+  tags            String[]
+  createdBy       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ScreeningRecord {
+  id            String    @id @default(cuid())
+  subjectName   String
+  subjectType   String    // "individual", "company"
+  screeningType String    // "sanctions", "pep", "adverse_media", "kyc"
+  result        String    @default("clear") // "clear", "match", "potential_match", "pending"
+  provider      String?   // "ComplyAdvantage", "Refinitiv", "manual"
+  matchDetails  Json?     // details of any matches
+  contactId     String?
+  riskLevel     String?   // "high", "medium", "low"
+  notes         String?   @db.Text
+  screenedBy    String
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  nextScreeningDate DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// ─── Drive Links (Google Drive integration) ───
+
+model DriveLink {
+  id          String     @id @default(cuid())
+  driveFileId String
+  fileName    String
+  fileUrl     String     // webViewLink to open in Drive
+  mimeType    String
+  iconUrl     String?
+  category    String?    // "contract", "kyc", "invoice", "proposal", "legal", "compliance", "process", "other"
+  contactId   String?
+  contact     CrmContact? @relation("ContactDriveLinks", fields: [contactId], references: [id])
+  wikiPageId  String?
+  wikiPage    WikiPage?  @relation(fields: [wikiPageId], references: [id])
+  entityId    String?
+  entity      OrgEntity? @relation(fields: [entityId], references: [id])
+  conferenceId String?
+  conference  Conference? @relation(fields: [conferenceId], references: [id])
+  createdBy   String
+  createdAt   DateTime   @default(now())
+}
+
+// ─── SEO / GEO Module ───
+
+model Keyword {
+  id               String    @id @default(cuid())
+  keyword          String    @unique
+  vertical         String
+  searchVolume     Int?
+  difficulty       Int?
+  currentPosition  Int?
+  previousPosition Int?
+  targetPosition   Int?      @default(10)
+  rankingUrl       String?
+  trend            String?
+  isTracked        Boolean   @default(true)
+  lastChecked      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model NewsSource {
+  id          String     @id @default(cuid())
+  name        String
+  url         String
+  rssUrl      String?
+  category    String
+  isActive    Boolean    @default(true)
+  lastScanned DateTime?
+  createdAt   DateTime   @default(now())
+  newsItems   NewsItem[]
+}
+
+model NewsItem {
+  id             String      @id @default(cuid())
+  title          String
+  url            String      @unique
+  sourceId       String
+  source         NewsSource  @relation(fields: [sourceId], references: [id])
+  snippet        String?     @db.Text
+  publishedAt    DateTime?
+  relevanceScore Int?
+  vertical       String[]
+  status         String      @default("new")
+  clusterId      String?
+  createdAt      DateTime    @default(now())
+}
+
+model Article {
+  id                 String    @id @default(cuid())
+  title              String
+  slug               String    @unique
+  metaDescription    String?
+  content            String    @db.Text
+  vertical           String[]
+  primaryKeyword     String?
+  secondaryKeywords  String[]
+  wordCount          Int?
+  status             String    @default("queued")
+  publishedAt        DateTime?
+  scheduledFor       DateTime?
+  sourceArticles     String[]
+  organicSessions7d  Int?      @default(0)
+  organicSessions30d Int?      @default(0)
+  keywordsRanking    Int?      @default(0)
+  bestPosition       Int?
+  backlinksEarned    Int?      @default(0)
+  aiCitations        Int?      @default(0)
+  schemaJson         Json?
+  socialPost         String?   @db.Text
+  socialPosted       Boolean   @default(false)
+  generatedBy        String    @default("ai")
+  reviewedBy         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model GeoTestPrompt {
+  id         String          @id @default(cuid())
+  prompt     String          @db.Text
+  vertical   String
+  results    GeoTestResult[]
+  lastTested DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+}
+
+model GeoTestResult {
+  id               String        @id @default(cuid())
+  promptId         String
+  prompt           GeoTestPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  platform         String
+  oxenCited        Boolean       @default(false)
+  citationContext  String?       @db.Text
+  competitorsCited String[]
+  fullResponse     String?       @db.Text
+  testedAt         DateTime      @default(now())
+}
+
+model SeoAlert {
+  id           String    @id @default(cuid())
+  type         String
+  severity     String
+  title        String
+  detail       String    @db.Text
+  keywordId    String?
+  promptId     String?
+  articleId    String?
+  resolved     Boolean   @default(false)
+  resolvedBy   String?
+  resolvedAt   DateTime?
+  resolvedNote String?
+  createdAt    DateTime  @default(now())
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  type        String    // e.g. "ai:score-lead", "ai:generate-article", "sync:email"
+  status      String    @default("pending") // pending, processing, completed, failed
+  payload     Json      // Input data for the job
+  result      Json?     // Output data after completion
+  error       String?   @db.Text
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  priority    Int       @default(0) // Higher = more urgent
+  createdBy   String
+  processedBy String?   // Worker instance ID
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, type])
+  @@index([type, status, priority])
+  @@index([createdAt])
+}
