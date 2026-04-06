@@ -170,7 +170,7 @@ export async function POST(request: Request) {
       select: { id: true },
     })
     const formatDate = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
-    const msg = `🏖 *Leave Request*\n\n${employee.name} has requested ${type} leave\n${formatDate(start)} → ${formatDate(end)} \\(${totalDays} day${totalDays !== 1 ? "s" : ""}\\)\n${reason ? `Reason: ${reason}\n` : ""}\nPlease review at oxen\\.finance/absences`
+    const msg = `🏖 <b>Leave Request</b>\n\n${employee.name} has requested ${type} leave\n${formatDate(start)} → ${formatDate(end)} (${totalDays} day${totalDays !== 1 ? "s" : ""})\n${reason ? `Reason: ${reason}\n` : ""}\nPlease review at oxen.finance/absences`
     for (const admin of admins) {
       sendTelegramNotification(admin.id, msg).catch(() => {})
     }

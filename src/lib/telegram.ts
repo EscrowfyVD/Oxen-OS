@@ -8,17 +8,43 @@ const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`
 export async function sendTelegramMessage(
   chatId: string | number,
   text: string,
-  parseMode: "Markdown" | "HTML" = "Markdown",
-) {
-  const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: parseMode }),
-  })
-  return res.json()
+  parseMode: "Markdown" | "HTML" | "" = "HTML",
+): Promise<{ ok: boolean; description?: string }> {
+  try {
+    const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: parseMode || undefined,
+      }),
+    })
+
+    const result = await res.json()
+
+    if (!result.ok) {
+      console.error("[Telegram] sendMessage failed:", result.description, "chatId:", chatId)
+      // If parse mode fails, retry without formatting
+      if (parseMode && result.description?.includes("parse")) {
+        console.log("[Telegram] Retrying without parse mode...")
+        const retryRes = await fetch(`${TELEGRAM_API}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, text }),
+        })
+        return retryRes.json()
+      }
+    }
+
+    return result
+  } catch (error) {
+    console.error("[Telegram] sendMessage error:", error)
+    return { ok: false, description: String(error) }
+  }
 }
 
-// ─── High-level: send notification to an employee ───────
+// ─── High-level: send notification to an employee by ID ──
 
 export async function sendTelegramNotification(
   employeeId: string,
@@ -34,7 +60,7 @@ export async function sendTelegramNotification(
     const result = await sendTelegramMessage(employee.telegramChatId, message)
     return result.ok === true
   } catch (error) {
-    console.error("Telegram notification error:", error)
+    console.error("[Telegram] notification error:", error)
     return false
   }
 }
@@ -59,7 +85,32 @@ export async function sendTelegramNotificationByEmail(
   }
 }
 
-// ─── Format meeting brief for Telegram ──────────────────
+// ─── Notify employee by ID or email (universal helper) ───
+
+export async function notifyEmployee(
+  employeeIdOrEmail: string,
+  message: string,
+): Promise<boolean> {
+  try {
+    const employee = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { id: employeeIdOrEmail },
+          { email: { equals: employeeIdOrEmail, mode: "insensitive" } },
+        ],
+      },
+      select: { telegramChatId: true },
+    })
+    if (!employee?.telegramChatId) return false
+
+    const result = await sendTelegramMessage(employee.telegramChatId, message)
+    return result.ok === true
+  } catch {
+    return false
+  }
+}
+
+// ─── Format meeting brief for Telegram (HTML) ───────────
 
 export function formatBriefForTelegram(brief: {
   title: string
@@ -82,68 +133,70 @@ export function formatBriefForTelegram(brief: {
 
   const parts: string[] = []
 
-  parts.push(`🏛 *Meeting Brief — Oxen OS*`)
+  parts.push(`🏛 <b>Meeting Brief — Oxen OS</b>`)
   parts.push(``)
-  parts.push(`📅 *${escapeMd(brief.title)}*`)
-  parts.push(`${escapeMd(dateStr)} · ${timeStr}`)
-  parts.push(`👥 ${escapeMd(brief.attendees.join(", ") || "Not specified")}`)
+  parts.push(`📅 <b>${escHtml(brief.title)}</b>`)
+  parts.push(`${escHtml(dateStr)} · ${timeStr}`)
+  parts.push(`👥 ${escHtml(brief.attendees.join(", ") || "Not specified")}`)
 
   if (bc.company_context) {
     parts.push(``)
-    parts.push(`📊 *Company Context*`)
-    parts.push(escapeMd(String(bc.company_context)))
+    parts.push(`📊 <b>Company Context</b>`)
+    parts.push(escHtml(String(bc.company_context)))
   }
 
   if (bc.relationship_history) {
     parts.push(``)
-    parts.push(`🤝 *Relationship History*`)
-    parts.push(escapeMd(String(bc.relationship_history)))
+    parts.push(`🤝 <b>Relationship History</b>`)
+    parts.push(escHtml(String(bc.relationship_history)))
   }
 
   if (bc.deal_status) {
     parts.push(``)
-    parts.push(`💰 *Deal Status*`)
-    parts.push(escapeMd(String(bc.deal_status)))
+    parts.push(`💰 <b>Deal Status</b>`)
+    parts.push(escHtml(String(bc.deal_status)))
   }
 
   if (bc.talking_points && Array.isArray(bc.talking_points)) {
     parts.push(``)
-    parts.push(`💬 *Talking Points*`)
+    parts.push(`💬 <b>Talking Points</b>`)
     for (const tp of bc.talking_points as string[]) {
-      parts.push(`• ${escapeMd(tp)}`)
+      parts.push(`• ${escHtml(tp)}`)
     }
   }
 
   if (bc.risks && Array.isArray(bc.risks)) {
     parts.push(``)
-    parts.push(`⚠️ *Risks*`)
+    parts.push(`⚠️ <b>Risks</b>`)
     for (const r of bc.risks as string[]) {
-      parts.push(`• ${escapeMd(r)}`)
+      parts.push(`• ${escHtml(r)}`)
     }
   }
 
   if (bc.opportunities && Array.isArray(bc.opportunities)) {
     parts.push(``)
-    parts.push(`🎯 *Opportunities*`)
+    parts.push(`🎯 <b>Opportunities</b>`)
     for (const o of bc.opportunities as string[]) {
-      parts.push(`• ${escapeMd(o)}`)
+      parts.push(`• ${escHtml(o)}`)
     }
   }
 
   if (bc.suggested_ask) {
     parts.push(``)
-    parts.push(`📋 *Suggested Ask*`)
-    parts.push(escapeMd(String(bc.suggested_ask)))
+    parts.push(`📋 <b>Suggested Ask</b>`)
+    parts.push(escHtml(String(bc.suggested_ask)))
   }
 
   return parts.join("\n")
 }
 
-// ─── Escape markdown special chars for Telegram ─────────
+// ─── Escape HTML special chars for Telegram ─────────────
 
-function escapeMd(text: string): string {
-  // Telegram Markdown v1: escape _ * ` [
-  return text.replace(/([_`\[])/g, "\\$1")
+function escHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
 }
 
 // ─── Set webhook URL ────────────────────────────────────

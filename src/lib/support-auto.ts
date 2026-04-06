@@ -83,7 +83,7 @@ export async function createAutoTicket(input: AutoTicketInput): Promise<AutoTick
     if (agent?.telegramChatId) {
       await sendTelegramMessage(
         agent.telegramChatId,
-        `🎧 *New Support Ticket*\n\n📋 ${input.subject}\n👤 ${input.clientName}${input.clientEmail ? `\n📧 ${input.clientEmail}` : ""}\n📌 Priority: ${priority}\n📡 Channel: ${input.channel}\n\nAssigned to you.`,
+        `🎧 <b>New Support Ticket</b>\n\n📋 ${input.subject}\n👤 ${input.clientName}${input.clientEmail ? `\n📧 ${input.clientEmail}` : ""}\n📌 Priority: ${priority}\n📡 Channel: ${input.channel}\n\nAssigned to you.`,
       )
     }
   } catch {

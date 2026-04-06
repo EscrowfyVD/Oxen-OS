@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     if (alreadyLinked) {
       await sendTelegramMessage(
         chatIdStr,
-        `✅ Already linked to *${alreadyLinked.name}* (${alreadyLinked.email || "no email"}).`,
+        `✅ Already linked to <b>${alreadyLinked.name}</b> (${alreadyLinked.email || "no email"}).`,
       )
       return NextResponse.json({
         success: true,
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     // Confirm via Telegram
     await sendTelegramMessage(
       chatIdStr,
-      `✅ Linked to *${employee.name}*. You'll receive meeting briefs and notifications here.\n\nCommands:\n/brief — Next meeting brief\n/digest — Daily digest\n/myid — Your chat ID`,
+      `✅ Linked to <b>${employee.name}</b>. You'll receive meeting briefs and notifications here.\n\nCommands:\n/brief — Next meeting brief\n/digest — Daily digest\n/pipeline — Pipeline summary\n/tasks — Today's tasks\n/myid — Your chat ID`,
     )
 
     return NextResponse.json({

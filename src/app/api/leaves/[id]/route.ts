@@ -100,10 +100,10 @@ export async function PATCH(
   try {
     const formatDate = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
     if (status === "approved") {
-      const msg = `✅ *Leave Approved*\n\nYour ${type} leave from ${formatDate(existing.startDate)} to ${formatDate(existing.endDate)} has been approved by ${reviewer.name}\\.`
+      const msg = `✅ <b>Leave Approved</b>\n\nYour ${type} leave from ${formatDate(existing.startDate)} to ${formatDate(existing.endDate)} has been approved by ${reviewer.name}.`
       sendTelegramNotification(existing.employeeId, msg).catch(() => {})
     } else {
-      const msg = `❌ *Leave Rejected*\n\nYour ${type} leave from ${formatDate(existing.startDate)} to ${formatDate(existing.endDate)} was not approved\\.${reviewNote ? `\nNote: ${reviewNote}` : ""}`
+      const msg = `❌ <b>Leave Rejected</b>\n\nYour ${type} leave from ${formatDate(existing.startDate)} to ${formatDate(existing.endDate)} was not approved.${reviewNote ? `\nNote: ${reviewNote}` : ""}`
       sendTelegramNotification(existing.employeeId, msg).catch(() => {})
     }
   } catch { /* silent */ }

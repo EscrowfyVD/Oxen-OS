@@ -5,32 +5,75 @@ import Anthropic from "@anthropic-ai/sdk"
 
 const anthropic = new Anthropic()
 
+// ─── Telegram types ────────────────────────────────────
+
 interface TelegramUpdate {
+  update_id: number
   message?: {
     message_id: number
-    from: { id: number; first_name: string; username?: string }
+    from: { id: number; first_name: string; last_name?: string; username?: string }
     chat: { id: number; type: string }
     text?: string
     date: number
   }
+  callback_query?: {
+    id: string
+    from: { id: number; first_name: string; username?: string }
+    message?: { chat: { id: number } }
+    data?: string
+  }
 }
 
-// State for pending note-linking (in-memory, per chatId)
+// In-memory state for pending note-linking (per chatId)
 const pendingNotes = new Map<
   number,
   { summary: string; actionItems: string[]; dealUpdates: string[]; rawNote: string }
 >()
 
+// ─── Escape HTML for Telegram messages ─────────────────
+
+function esc(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+// ═══════════════════════════════════════════════════════
+//  WEBHOOK HANDLER
+// ═══════════════════════════════════════════════════════
+
 export async function POST(request: Request) {
   try {
     const update: TelegramUpdate = await request.json()
+
+    // ─── Log every incoming update ───
     const msg = update.message
+    const cbq = update.callback_query
+
+    if (msg) {
+      console.log(`[Telegram IN] message from ${msg.from.first_name} (@${msg.from.username || "?"}) chatId=${msg.chat.id}: "${msg.text || "(no text)"}"`)
+    } else if (cbq) {
+      console.log(`[Telegram IN] callback_query from ${cbq.from.first_name} data="${cbq.data}"`)
+    } else {
+      console.log(`[Telegram IN] update with no message or callback_query:`, JSON.stringify(update).slice(0, 200))
+      return NextResponse.json({ ok: true })
+    }
+
+    // ─── Handle callback queries ───
+    if (cbq) {
+      const cbChatId = cbq.message?.chat.id
+      if (cbChatId && cbq.data) {
+        await handleCallbackQuery(cbChatId, cbq.data, cbq.id)
+      }
+      return NextResponse.json({ ok: true })
+    }
+
+    // ─── Handle messages ───
     if (!msg?.text) return NextResponse.json({ ok: true })
 
     const chatId = msg.chat.id
     const text = msg.text.trim()
+    const fromName = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(" ")
 
-    // ─── Commands ───────────────────────────────────────
+    // ─── Route commands ───
     if (text.startsWith("/start")) {
       await handleStart(chatId)
     } else if (text.startsWith("/myid")) {
@@ -40,81 +83,82 @@ export async function POST(request: Request) {
     } else if (text.startsWith("/digest")) {
       await handleDigest(chatId)
     } else if (text.startsWith("/support")) {
-      const description = text.replace(/^\/support\s*/, "").trim()
-      if (!description) {
-        await sendTelegramMessage(
-          chatId,
-          "Usage: /support [describe your issue]\n\nExample: /support I need help with my account setup",
-        )
-        return NextResponse.json({ ok: true })
-      }
-
-      const employee = await prisma.employee.findFirst({
-        where: { telegramChatId: String(chatId) },
-        select: { name: true, email: true },
-      })
-
-      const { createAutoTicket } = await import("@/lib/support-auto")
-      const result = await createAutoTicket({
-        subject:
-          description.length > 100
-            ? description.substring(0, 100) + "..."
-            : description,
-        clientName: employee?.name || `Telegram User ${chatId}`,
-        clientEmail: employee?.email || null,
-        channel: "telegram",
-        message: description,
-        source: "telegram",
-      })
-
-      const ticketRef = result.ticket.id.slice(-8).toUpperCase()
+      await handleSupport(chatId, text, fromName)
+    } else if (text.startsWith("/pipeline")) {
+      await handlePipeline(chatId)
+    } else if (text.startsWith("/tasks")) {
+      await handleTasks(chatId)
+    } else if (text.startsWith("/")) {
+      // Unknown command
       await sendTelegramMessage(
         chatId,
-        `✅ Support ticket created!\n\n📋 Reference: #${ticketRef}\n📌 Priority: ${result.ticket.priority}\n👤 Assigned to: ${result.ticket.assignedTo}\n⏱ Expected response: ${result.slaLabel}\n\nOur team will follow up shortly.`,
+        "Unknown command. Available:\n/start — Link account\n/myid — Your chat ID\n/brief — Meeting brief\n/digest — Daily digest\n/pipeline — Pipeline summary\n/tasks — Today's tasks\n/support [msg] — Create ticket",
       )
-      return NextResponse.json({ ok: true })
     } else if (pendingNotes.has(chatId)) {
       // User is replying with a contact name to link their note
       await handleNoteLinking(chatId, text)
     } else {
-      // Regular text → treat as meeting note
-      await handleMeetingNote(chatId, text)
+      // Regular text message
+      await handleRegularMessage(chatId, text, fromName)
     }
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("Telegram webhook error:", error)
+    console.error("[Telegram webhook] Error:", error)
     return NextResponse.json({ ok: true }) // Always 200 so Telegram doesn't retry
   }
 }
 
-// ─── /start — Link Telegram to Employee ─────────────────
+// Also support GET for webhook verification
+export async function GET() {
+  return NextResponse.json({ status: "Telegram webhook active" })
+}
+
+// ═══════════════════════════════════════════════════════
+//  /start — Registration flow
+// ═══════════════════════════════════════════════════════
 
 async function handleStart(chatId: number) {
-  await sendTelegramMessage(
-    chatId,
-    "Welcome to Oxen OS Bot 🏛\n\nSend me your @oxen.finance email to link your account.",
-  )
-
   // Check if already linked
   const existing = await prisma.employee.findFirst({
     where: { telegramChatId: String(chatId) },
+    select: { name: true },
   })
+
   if (existing) {
     await sendTelegramMessage(
       chatId,
-      `You're already linked as *${existing.name}*. You'll receive meeting briefs and notifications here.`,
+      `Welcome back, <b>${esc(existing.name)}</b>! Your account is already linked.\n\n` +
+      `<b>Commands:</b>\n` +
+      `/brief — Next meeting brief\n` +
+      `/digest — Daily digest\n` +
+      `/pipeline — Pipeline summary\n` +
+      `/tasks — Today's tasks\n` +
+      `/support [msg] — Create support ticket\n` +
+      `/myid — Your chat ID`,
     )
+    return
   }
+
+  await sendTelegramMessage(
+    chatId,
+    `Welcome to Oxen OS Bot 🏛\n\n` +
+    `I'm your assistant for notifications, meeting briefs, and quick CRM actions.\n\n` +
+    `Send me your @oxen.finance email to link your account.`,
+  )
 }
 
-// ─── /myid — Show chat ID ───────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  /myid — Show chat ID
+// ═══════════════════════════════════════════════════════
 
 async function handleMyId(chatId: number) {
-  await sendTelegramMessage(chatId, `Your Telegram Chat ID: \`${chatId}\``, "Markdown")
+  await sendTelegramMessage(chatId, `Your Telegram Chat ID: <code>${chatId}</code>`)
 }
 
-// ─── /brief — Next upcoming meeting brief ───────────────
+// ═══════════════════════════════════════════════════════
+//  /brief — Next upcoming meeting brief
+// ═══════════════════════════════════════════════════════
 
 async function handleBrief(chatId: number) {
   const employee = await findEmployeeByChatId(chatId)
@@ -123,38 +167,44 @@ async function handleBrief(chatId: number) {
     return
   }
 
-  // Find next meeting brief where this employee's email is in attendees
-  const now = new Date()
-  const briefs = await prisma.meetingBrief.findMany({
-    where: { meetingDate: { gte: now } },
-    orderBy: { meetingDate: "asc" },
-    take: 10,
-  })
+  try {
+    const now = new Date()
+    const briefs = await prisma.meetingBrief.findMany({
+      where: { meetingDate: { gte: now } },
+      orderBy: { meetingDate: "asc" },
+      take: 10,
+    })
 
-  // Match brief to employee email
-  const myBrief = briefs.find((b) =>
-    b.attendees.some(
-      (a) =>
-        a.toLowerCase().includes(employee.email?.toLowerCase() || "___") ||
-        a.toLowerCase().includes(employee.name.toLowerCase()),
-    ),
-  )
+    // Match brief to employee email or name
+    const myBrief = briefs.find((b) =>
+      b.attendees.some(
+        (a) =>
+          a.toLowerCase().includes(employee.email?.toLowerCase() || "___") ||
+          a.toLowerCase().includes(employee.name.toLowerCase()),
+      ),
+    )
 
-  if (!myBrief) {
-    await sendTelegramMessage(chatId, "📭 No upcoming meeting briefs found for you.")
-    return
+    if (!myBrief) {
+      await sendTelegramMessage(chatId, "📭 No upcoming meeting briefs found for you.")
+      return
+    }
+
+    const formatted = formatBriefForTelegram({
+      title: myBrief.title,
+      meetingDate: myBrief.meetingDate,
+      attendees: myBrief.attendees,
+      briefContent: myBrief.briefContent as Record<string, unknown>,
+    })
+    await sendTelegramMessage(chatId, formatted)
+  } catch (error) {
+    console.error("[Telegram /brief]", error)
+    await sendTelegramMessage(chatId, "❌ Failed to fetch meeting brief. Try again later.")
   }
-
-  const formatted = formatBriefForTelegram({
-    title: myBrief.title,
-    meetingDate: myBrief.meetingDate,
-    attendees: myBrief.attendees,
-    briefContent: myBrief.briefContent as Record<string, unknown>,
-  })
-  await sendTelegramMessage(chatId, formatted)
 }
 
-// ─── /digest — Generate and send daily digest ───────────
+// ═══════════════════════════════════════════════════════
+//  /digest — Daily digest via Claude
+// ═══════════════════════════════════════════════════════
 
 async function handleDigest(chatId: number) {
   const employee = await findEmployeeByChatId(chatId)
@@ -163,15 +213,13 @@ async function handleDigest(chatId: number) {
     return
   }
 
-  await sendTelegramMessage(chatId, "⏳ Generating your daily digest...")
+  await sendTelegramMessage(chatId, "⏳ Generating your daily digest...", "")
 
   try {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
-
-    // Gather context
     const contextParts: string[] = []
 
     // Today's meetings
@@ -188,34 +236,51 @@ async function handleDigest(chatId: number) {
           )
         }
       }
-    } catch { /* calendar may not exist */ }
+    } catch {
+      /* calendar table may not exist */
+    }
 
-    // Open tasks
+    // This user's tasks
     const tasks = await prisma.task.findMany({
-      where: { column: { not: "done" } },
+      where: {
+        column: { not: "done" },
+        OR: [
+          { assignee: { contains: employee.name, mode: "insensitive" } },
+          { assignee: { contains: employee.email || "___", mode: "insensitive" } },
+        ],
+      },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: 15,
     })
     if (tasks.length > 0) {
-      contextParts.push("\n## Open Tasks")
+      contextParts.push("\n## Your Open Tasks")
       for (const t of tasks) {
-        contextParts.push(`- [${t.priority}] ${t.title} — ${t.column} ${t.assignee ? `(${t.assignee})` : ""}`)
+        const overdue = t.deadline && new Date(t.deadline) < new Date() ? " ⚠️ OVERDUE" : ""
+        contextParts.push(`- [${t.priority}] ${t.title} — ${t.column}${overdue}`)
       }
     }
 
-    // Active deals
+    // Deals owned by this employee
     const deals = await prisma.deal.findMany({
-      where: { stage: { notIn: ["closed_won", "closed_lost"] } },
-      include: { contact: { select: { firstName: true, lastName: true, company: { select: { id: true, name: true } } } } },
+      where: {
+        stage: { notIn: ["closed_won", "closed_lost"] },
+        dealOwner: { contains: employee.name, mode: "insensitive" },
+      },
+      include: {
+        contact: {
+          select: { firstName: true, lastName: true, company: { select: { name: true } } },
+        },
+      },
       orderBy: { dealValue: "desc" },
       take: 10,
     })
     if (deals.length > 0) {
-      contextParts.push("\n## Active Pipeline")
+      contextParts.push("\n## Your Active Pipeline")
       let totalValue = 0
       for (const d of deals) {
         totalValue += d.dealValue || 0
-        contextParts.push(`- ${d.dealName} (${d.contact?.company?.name || (d.contact ? `${d.contact.firstName} ${d.contact.lastName}` : "?")}) — ${d.stage} — €${d.dealValue?.toLocaleString() || "?"}`)
+        const company = d.contact?.company?.name || `${d.contact?.firstName || ""} ${d.contact?.lastName || ""}`.trim() || "?"
+        contextParts.push(`- ${d.dealName} (${company}) — ${d.stage} — €${d.dealValue?.toLocaleString() || "?"}`)
       }
       contextParts.push(`Total pipeline: €${totalValue.toLocaleString()}`)
     }
@@ -224,10 +289,10 @@ async function handleDigest(chatId: number) {
 
 ${contextParts.join("\n")}
 
-Format as plain text (no markdown formatting) with:
-1. Priority Actions — Top 3 things
+Format as plain text (no markdown, no HTML) with:
+1. Priority Actions — Top 3 things to focus on
 2. Today's Meetings — Brief on each
-3. Pipeline Pulse — Key deals
+3. Pipeline Pulse — Key deals to watch
 4. Quick Stats
 
 Keep it under 2000 characters. Be concise and actionable.`
@@ -245,35 +310,295 @@ Keep it under 2000 characters. Be concise and actionable.`
 
     await sendTelegramMessage(
       chatId,
-      `🏛 *Daily Digest — Oxen OS*\n\n${digest}`,
+      `🏛 <b>Daily Digest — Oxen OS</b>\n\n${esc(digest)}`,
     )
   } catch (error) {
-    console.error("Telegram digest error:", error)
+    console.error("[Telegram /digest]", error)
     await sendTelegramMessage(chatId, "❌ Failed to generate digest. Try again later.")
   }
 }
 
-// ─── Meeting note processing ────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  /support [message] — Create support ticket
+// ═══════════════════════════════════════════════════════
 
-async function handleMeetingNote(chatId: number, text: string) {
+async function handleSupport(chatId: number, text: string, fromName: string) {
+  const description = text.replace(/^\/support\s*/i, "").trim()
+
+  if (!description) {
+    await sendTelegramMessage(
+      chatId,
+      "Usage: /support [describe your issue]\n\nExample: /support I need help with my account setup",
+    )
+    return
+  }
+
+  try {
+    const employee = await prisma.employee.findFirst({
+      where: { telegramChatId: String(chatId) },
+      select: { name: true, email: true },
+    })
+
+    const { createAutoTicket } = await import("@/lib/support-auto")
+    const result = await createAutoTicket({
+      subject: description.length > 100 ? description.substring(0, 100) + "..." : description,
+      clientName: employee?.name || fromName || `Telegram User ${chatId}`,
+      clientEmail: employee?.email || null,
+      channel: "telegram",
+      message: description,
+      source: "telegram",
+    })
+
+    const ticketRef = result.ticket.id.slice(-8).toUpperCase()
+    await sendTelegramMessage(
+      chatId,
+      `✅ Support ticket created!\n\n` +
+      `📋 Reference: #${ticketRef}\n` +
+      `📌 Priority: ${result.ticket.priority}\n` +
+      `👤 Assigned to: ${result.ticket.assignedTo || "Unassigned"}\n` +
+      `⏱ Expected response: ${result.slaLabel}\n\n` +
+      `Our team will follow up shortly.`,
+    )
+  } catch (error) {
+    console.error("[Telegram /support]", error)
+    await sendTelegramMessage(chatId, "❌ Failed to create support ticket. Try again later.")
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  /pipeline — Quick pipeline summary
+// ═══════════════════════════════════════════════════════
+
+async function handlePipeline(chatId: number) {
   const employee = await findEmployeeByChatId(chatId)
   if (!employee) {
-    // If not linked, check if this looks like an email for account linking
-    if (text.includes("@")) {
+    await sendTelegramMessage(chatId, "❌ Your account is not linked. Send /start to set up.")
+    return
+  }
+
+  try {
+    // Get all deals owned by this employee
+    const deals = await prisma.deal.findMany({
+      where: {
+        dealOwner: { contains: employee.name, mode: "insensitive" },
+        stage: { notIn: ["closed_won", "closed_lost"] },
+      },
+      select: { stage: true, dealValue: true },
+    })
+
+    if (deals.length === 0) {
+      await sendTelegramMessage(chatId, "📊 You have no active deals in the pipeline.")
+      return
+    }
+
+    // Count and sum by stage
+    const STAGE_LABELS: Record<string, string> = {
+      new_lead: "New Lead",
+      sequence_active: "Sequence Active",
+      replied: "Replied",
+      meeting_booked: "Meeting Booked",
+      meeting_completed: "Meeting Completed",
+      proposal_sent: "Proposal Sent",
+      negotiation: "Negotiation",
+    }
+
+    const stageOrder = [
+      "new_lead", "sequence_active", "replied",
+      "meeting_booked", "meeting_completed",
+      "proposal_sent", "negotiation",
+    ]
+
+    const stageCounts: Record<string, { count: number; value: number }> = {}
+    let totalValue = 0
+
+    for (const deal of deals) {
+      if (!stageCounts[deal.stage]) stageCounts[deal.stage] = { count: 0, value: 0 }
+      stageCounts[deal.stage].count++
+      stageCounts[deal.stage].value += deal.dealValue || 0
+      totalValue += deal.dealValue || 0
+    }
+
+    let reply = `📊 <b>Your Pipeline</b>\n\n`
+
+    for (const stageId of stageOrder) {
+      const data = stageCounts[stageId]
+      if (data) {
+        const label = STAGE_LABELS[stageId] || stageId
+        const valueStr = data.value > 0 ? ` (€${data.value.toLocaleString()})` : ""
+        reply += `• ${label}: <b>${data.count}</b>${valueStr}\n`
+      }
+    }
+
+    reply += `\n<b>Total: ${deals.length} deals — €${totalValue.toLocaleString()}</b>`
+
+    // Also get closed this month
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+
+    const wonThisMonth = await prisma.deal.count({
+      where: {
+        dealOwner: { contains: employee.name, mode: "insensitive" },
+        stage: "closed_won",
+        closedAt: { gte: monthStart },
+      },
+    })
+    const lostThisMonth = await prisma.deal.count({
+      where: {
+        dealOwner: { contains: employee.name, mode: "insensitive" },
+        stage: "closed_lost",
+        closedAt: { gte: monthStart },
+      },
+    })
+
+    if (wonThisMonth > 0 || lostThisMonth > 0) {
+      reply += `\n\n<b>This month:</b> ✅ ${wonThisMonth} won · ❌ ${lostThisMonth} lost`
+    }
+
+    await sendTelegramMessage(chatId, reply)
+  } catch (error) {
+    console.error("[Telegram /pipeline]", error)
+    await sendTelegramMessage(chatId, "❌ Failed to fetch pipeline. Try again later.")
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  /tasks — Today's tasks
+// ═══════════════════════════════════════════════════════
+
+async function handleTasks(chatId: number) {
+  const employee = await findEmployeeByChatId(chatId)
+  if (!employee) {
+    await sendTelegramMessage(chatId, "❌ Your account is not linked. Send /start to set up.")
+    return
+  }
+
+  try {
+    const now = new Date()
+    const todayEnd = new Date()
+    todayEnd.setHours(23, 59, 59, 999)
+
+    // Get tasks assigned to this user that are not done
+    const allTasks = await prisma.task.findMany({
+      where: {
+        column: { not: "done" },
+        OR: [
+          { assignee: { contains: employee.name, mode: "insensitive" } },
+          { assignee: { contains: employee.email || "___", mode: "insensitive" } },
+        ],
+      },
+      orderBy: [{ deadline: "asc" }, { priority: "desc" }],
+      take: 20,
+    })
+
+    if (allTasks.length === 0) {
+      await sendTelegramMessage(chatId, "✅ No open tasks! You're all caught up.")
+      return
+    }
+
+    let overdue = 0
+    let dueToday = 0
+
+    let reply = `📋 <b>Your Tasks</b>\n\n`
+
+    for (const task of allTasks) {
+      const priorityIcon =
+        task.priority === "urgent" ? "🔴" :
+        task.priority === "high" ? "🟠" :
+        task.priority === "medium" ? "🟡" : "⚪"
+
+      let status = ""
+      if (task.deadline) {
+        const dl = new Date(task.deadline)
+        if (dl < now) {
+          status = " ⚠️ OVERDUE"
+          overdue++
+        } else if (dl <= todayEnd) {
+          status = " — due today"
+          dueToday++
+        } else {
+          status = ` — due ${dl.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+        }
+      }
+
+      reply += `${priorityIcon} ${esc(task.title)}${status}\n`
+    }
+
+    reply += `\n<b>Total: ${allTasks.length} tasks</b>`
+    if (overdue > 0) reply += ` · <b>${overdue} overdue</b>`
+    if (dueToday > 0) reply += ` · ${dueToday} due today`
+
+    await sendTelegramMessage(chatId, reply)
+  } catch (error) {
+    console.error("[Telegram /tasks]", error)
+    await sendTelegramMessage(chatId, "❌ Failed to fetch tasks. Try again later.")
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Regular messages (not commands)
+// ═══════════════════════════════════════════════════════
+
+async function handleRegularMessage(chatId: number, text: string, fromName: string) {
+  const employee = await findEmployeeByChatId(chatId)
+
+  if (!employee) {
+    // ─── Check if this is an email for account linking ───
+    if (text.includes("@") && !text.includes(" ")) {
       await handleEmailLinking(chatId, text)
       return
     }
-    await sendTelegramMessage(chatId, "❌ Your account is not linked. Send /start first.")
+
+    // ─── Non-employee: auto-create support ticket ───
+    try {
+      const { createAutoTicket } = await import("@/lib/support-auto")
+      const result = await createAutoTicket({
+        subject: text.length > 50 ? text.substring(0, 50) + "..." : text,
+        clientName: fromName || `Telegram User ${chatId}`,
+        clientEmail: null,
+        channel: "telegram",
+        message: text,
+        source: "telegram",
+      })
+
+      const ticketRef = result.ticket.id.slice(-8).toUpperCase()
+      await sendTelegramMessage(
+        chatId,
+        `✅ Your message has been forwarded to our support team.\n\nReference: #${ticketRef}\n\nWe'll respond shortly.`,
+      )
+    } catch (error) {
+      console.error("[Telegram] Auto-ticket error:", error)
+      await sendTelegramMessage(
+        chatId,
+        "Thank you for your message. To get help, use /support followed by your question.\n\nTo link your Oxen account, send /start",
+      )
+    }
     return
   }
 
-  // Short messages might be accidental
+  // ─── Employee: short messages get tips ───
   if (text.length < 20) {
-    await sendTelegramMessage(chatId, "💡 Send a meeting note or call summary (20+ chars) and I'll extract action items and key points.\n\nCommands: /brief /digest /myid")
+    await sendTelegramMessage(
+      chatId,
+      "💡 Tip: Send a meeting note or call summary (20+ chars) and I'll extract action items.\n\n" +
+      "Or use a command:\n/brief /digest /pipeline /tasks /support",
+    )
     return
   }
 
-  await sendTelegramMessage(chatId, "⏳ Processing your meeting note...")
+  // ─── Employee: process as meeting note ───
+  await handleMeetingNote(chatId, text)
+}
+
+// ═══════════════════════════════════════════════════════
+//  Meeting note processing (AI extraction)
+// ═══════════════════════════════════════════════════════
+
+async function handleMeetingNote(chatId: number, text: string) {
+  const employee = await findEmployeeByChatId(chatId)
+  if (!employee) return
+
+  await sendTelegramMessage(chatId, "⏳ Processing your meeting note...", "")
 
   try {
     const prompt = `Extract from this meeting note / call summary. Return ONLY valid JSON.
@@ -304,7 +629,15 @@ Be specific and extract all actionable items.`
 
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      await sendTelegramMessage(chatId, "❌ Could not parse the note. Try rephrasing.")
+      await sendTelegramMessage(chatId, "📝 Got it. What should I do with this note?\n\n" +
+        "1️⃣ Save as general note\n2️⃣ Link to a contact (reply with contact name)\n3️⃣ Create a task from this\n\n" +
+        "Reply with the client or company name to link, or 'skip' to save without linking.")
+      pendingNotes.set(chatId, {
+        summary: text.substring(0, 200),
+        actionItems: [],
+        dealUpdates: [],
+        rawNote: text,
+      })
       return
     }
 
@@ -319,40 +652,42 @@ Be specific and extract all actionable items.`
     pendingNotes.set(chatId, {
       summary: parsed.summary,
       actionItems: parsed.action_items.map((a) => `${a.task} → ${a.assignee}`),
-      dealUpdates: parsed.deal_updates,
+      dealUpdates: parsed.deal_updates || [],
       rawNote: text,
     })
 
     // Format reply
-    let reply = "✅ *Got it. Here's what I captured:*\n\n"
-    reply += `📝 *Summary*\n${parsed.summary}\n\n`
+    let reply = `✅ <b>Got it. Here's what I captured:</b>\n\n`
+    reply += `📝 <b>Summary</b>\n${esc(parsed.summary)}\n\n`
 
     if (parsed.action_items.length > 0) {
-      reply += `📋 *Action Items*\n`
+      reply += `📋 <b>Action Items</b>\n`
       for (const ai of parsed.action_items) {
-        reply += `• ${ai.task} → _${ai.assignee}_\n`
+        reply += `• ${esc(ai.task)} → <i>${esc(ai.assignee)}</i>\n`
       }
       reply += "\n"
     }
 
     if (parsed.deal_updates.length > 0) {
-      reply += `💰 *Deal Updates*\n`
+      reply += `💰 <b>Deal Updates</b>\n`
       for (const du of parsed.deal_updates) {
-        reply += `• ${du}\n`
+        reply += `• ${esc(du)}\n`
       }
       reply += "\n"
     }
 
-    reply += `🔗 Link this to a contact? Reply with the client or company name.`
+    reply += `🔗 Reply with a <b>client or company name</b> to link this note, or "skip" to save without linking.`
 
     await sendTelegramMessage(chatId, reply)
   } catch (error) {
-    console.error("Meeting note error:", error)
+    console.error("[Telegram] Meeting note error:", error)
     await sendTelegramMessage(chatId, "❌ Failed to process note. Try again.")
   }
 }
 
-// ─── Link note to contact ───────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  Link note to CRM contact
+// ═══════════════════════════════════════════════════════
 
 async function handleNoteLinking(chatId: number, contactQuery: string) {
   const employee = await findEmployeeByChatId(chatId)
@@ -363,7 +698,7 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
   }
 
   // Allow skip
-  if (contactQuery.toLowerCase() === "skip" || contactQuery.toLowerCase() === "no") {
+  if (["skip", "no", "cancel"].includes(contactQuery.toLowerCase())) {
     pendingNotes.delete(chatId)
     await sendTelegramMessage(chatId, "👌 Note saved without contact link.")
     return
@@ -385,14 +720,14 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
 
     if (contacts.length === 0) {
       pendingNotes.delete(chatId)
-      await sendTelegramMessage(chatId, `❌ No contact found for "${contactQuery}". Note saved without link.`)
+      await sendTelegramMessage(chatId, `❌ No contact found for "${esc(contactQuery)}". Note saved without link.`)
       return
     }
 
     // Use first match
     const contact = contacts[0]
 
-    // Create interaction
+    // Create CRM activity
     await prisma.activity.create({
       data: {
         contactId: contact.id,
@@ -427,26 +762,33 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
 
     await sendTelegramMessage(
       chatId,
-      `✅ Linked to *${contact.firstName} ${contact.lastName}* (${contact.company?.name || "?"}).\n\n📝 Interaction saved\n📋 ${tasksCreated} task${tasksCreated !== 1 ? "s" : ""} created`,
+      `✅ Linked to <b>${esc(contact.firstName)} ${esc(contact.lastName)}</b> (${esc(contact.company?.name || "?")}).\n\n` +
+      `📝 Interaction saved\n📋 ${tasksCreated} task${tasksCreated !== 1 ? "s" : ""} created`,
     )
   } catch (error) {
-    console.error("Note linking error:", error)
+    console.error("[Telegram] Note linking error:", error)
     pendingNotes.delete(chatId)
     await sendTelegramMessage(chatId, "❌ Failed to link note. Try again.")
   }
 }
 
-// ─── Email linking (from /start flow) ───────────────────
+// ═══════════════════════════════════════════════════════
+//  Email linking (from /start flow)
+// ═══════════════════════════════════════════════════════
 
 async function handleEmailLinking(chatId: number, email: string) {
   const cleaned = email.trim().toLowerCase()
+  console.log(`[Telegram] Email linking attempt: chatId=${chatId} email=${cleaned}`)
 
   const employee = await prisma.employee.findFirst({
     where: { email: { equals: cleaned, mode: "insensitive" } },
   })
 
   if (!employee) {
-    await sendTelegramMessage(chatId, `❌ No employee found with email "${cleaned}". Check and try again.`)
+    await sendTelegramMessage(
+      chatId,
+      `❌ Email not found in the system. Make sure you use your Oxen email address.`,
+    )
     return
   }
 
@@ -455,13 +797,51 @@ async function handleEmailLinking(chatId: number, email: string) {
     data: { telegramChatId: String(chatId) },
   })
 
+  console.log(`[Telegram] Linked chatId=${chatId} to employee=${employee.name} (${employee.email})`)
+
   await sendTelegramMessage(
     chatId,
-    `✅ Linked to *${employee.name}*. You'll receive meeting briefs and notifications here.\n\nCommands:\n/brief — Next meeting brief\n/digest — Daily digest\n/myid — Your chat ID`,
+    `✅ Account linked to <b>${esc(employee.name)}</b>. You'll now receive notifications here.\n\n` +
+    `<b>Commands:</b>\n` +
+    `/brief — Next meeting brief\n` +
+    `/digest — Daily digest\n` +
+    `/pipeline — Pipeline summary\n` +
+    `/tasks — Today's tasks\n` +
+    `/support [msg] — Create support ticket\n` +
+    `/myid — Your chat ID`,
   )
 }
 
-// ─── Helpers ────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  Callback query handler (inline keyboard buttons)
+// ═══════════════════════════════════════════════════════
+
+async function handleCallbackQuery(chatId: number, data: string, queryId: string) {
+  console.log(`[Telegram] Callback query: chatId=${chatId} data=${data}`)
+
+  // Answer the callback to stop loading spinner
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ""
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ callback_query_id: queryId }),
+  })
+
+  // Route callback data
+  if (data === "cmd_brief") {
+    await handleBrief(chatId)
+  } else if (data === "cmd_digest") {
+    await handleDigest(chatId)
+  } else if (data === "cmd_pipeline") {
+    await handlePipeline(chatId)
+  } else if (data === "cmd_tasks") {
+    await handleTasks(chatId)
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Helpers
+// ═══════════════════════════════════════════════════════
 
 async function findEmployeeByChatId(chatId: number) {
   return prisma.employee.findFirst({
