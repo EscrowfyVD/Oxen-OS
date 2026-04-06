@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useRouter } from "next/navigation"
 import PipelineView from "@/components/crm/PipelineView"
 import TableView from "@/components/crm/TableView"
 import CardView from "@/components/crm/CardView"
@@ -44,6 +45,8 @@ interface Filters {
 }
 
 export default function CrmPage() {
+  const router = useRouter()
+
   /* ── Access control ── */
   const [accessChecked, setAccessChecked] = useState(false)
   const [hasAccess, setHasAccess] = useState(false)
@@ -395,7 +398,13 @@ export default function CrmPage() {
               ).map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setSubNav(tab.id)}
+                  onClick={() => {
+                    if (tab.id === "contacts") {
+                      router.push("/crm/contacts")
+                      return
+                    }
+                    setSubNav(tab.id)
+                  }}
                   style={{
                     padding: "6px 14px",
                     fontSize: 11,
