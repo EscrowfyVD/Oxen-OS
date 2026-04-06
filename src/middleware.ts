@@ -4,9 +4,11 @@ import type { NextRequest } from "next/server"
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // Allow auth API routes, login page, and static assets
+  // Allow auth API routes, webhooks, login page, and static assets
   if (
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/telegram") ||
+    pathname.startsWith("/api/webhooks") ||
     pathname === "/login" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
