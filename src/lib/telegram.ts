@@ -115,8 +115,10 @@ export async function notifyEmployee(
 export function formatBriefForTelegram(brief: {
   title: string
   meetingDate: Date | string
+  endTime?: Date | string | null
   attendees: string[]
   briefContent: Record<string, unknown>
+  eventId?: string
 }): string {
   const bc = brief.briefContent
   const date = new Date(brief.meetingDate)
@@ -131,12 +133,27 @@ export function formatBriefForTelegram(brief: {
     minute: "2-digit",
   })
 
+  // Calculate duration
+  let durationStr = ""
+  if (brief.endTime) {
+    const end = new Date(brief.endTime)
+    const diffMs = end.getTime() - date.getTime()
+    const diffMin = Math.round(diffMs / 60000)
+    if (diffMin >= 60) {
+      const hrs = Math.floor(diffMin / 60)
+      const mins = diffMin % 60
+      durationStr = mins > 0 ? `${hrs}h${mins}m` : `${hrs}h`
+    } else {
+      durationStr = `${diffMin}min`
+    }
+  }
+
   const parts: string[] = []
 
-  parts.push(`🏛 <b>Meeting Brief — Oxen OS</b>`)
+  parts.push(`🏛 <b>Meeting Brief</b>`)
   parts.push(``)
   parts.push(`📅 <b>${escHtml(brief.title)}</b>`)
-  parts.push(`${escHtml(dateStr)} · ${timeStr}`)
+  parts.push(`🕐 ${escHtml(dateStr)} · ${timeStr}${durationStr ? ` — ${durationStr}` : ""}`)
   parts.push(`👥 ${escHtml(brief.attendees.join(", ") || "Not specified")}`)
 
   if (bc.company_context) {
@@ -186,6 +203,9 @@ export function formatBriefForTelegram(brief: {
     parts.push(`📋 <b>Suggested Ask</b>`)
     parts.push(escHtml(String(bc.suggested_ask)))
   }
+
+  parts.push(``)
+  parts.push(`Open in OS: https://oxen-os-production.up.railway.app/calendar`)
 
   return parts.join("\n")
 }

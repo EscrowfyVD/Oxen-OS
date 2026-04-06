@@ -168,14 +168,16 @@ async function handleBrief(chatId: number) {
   }
 
   try {
+    // Find next upcoming meeting for this employee
     const now = new Date()
+
+    // 1. Check existing briefs first
     const briefs = await prisma.meetingBrief.findMany({
       where: { meetingDate: { gte: now } },
       orderBy: { meetingDate: "asc" },
       take: 10,
     })
 
-    // Match brief to employee email or name
     const myBrief = briefs.find((b) =>
       b.attendees.some(
         (a) =>
@@ -184,18 +186,103 @@ async function handleBrief(chatId: number) {
       ),
     )
 
-    if (!myBrief) {
-      await sendTelegramMessage(chatId, "📭 No upcoming meeting briefs found for you.")
+    if (myBrief) {
+      const formatted = formatBriefForTelegram({
+        title: myBrief.title,
+        meetingDate: myBrief.meetingDate,
+        attendees: myBrief.attendees,
+        briefContent: myBrief.briefContent as Record<string, unknown>,
+      })
+      await sendTelegramMessage(chatId, formatted)
       return
     }
 
-    const formatted = formatBriefForTelegram({
-      title: myBrief.title,
-      meetingDate: myBrief.meetingDate,
-      attendees: myBrief.attendees,
-      briefContent: myBrief.briefContent as Record<string, unknown>,
-    })
-    await sendTelegramMessage(chatId, formatted)
+    // 2. No brief exists — check for upcoming calendar events
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    let nextEvent = null
+    try {
+      const events = await prisma.calendarEvent.findMany({
+        where: {
+          startTime: { gte: now, lte: tomorrow },
+          attendees: { hasSome: [employee.email || "___"] },
+        },
+        orderBy: { startTime: "asc" },
+        take: 1,
+      })
+      nextEvent = events[0] || null
+    } catch {
+      // Calendar may not be available
+    }
+
+    if (!nextEvent) {
+      // Fallback: search all events for attendee name match
+      try {
+        const allEvents = await prisma.calendarEvent.findMany({
+          where: { startTime: { gte: now, lte: tomorrow } },
+          orderBy: { startTime: "asc" },
+          take: 20,
+        })
+        nextEvent = allEvents.find((e) =>
+          e.attendees.some(
+            (a) =>
+              a.toLowerCase().includes(employee.email?.toLowerCase() || "___") ||
+              a.toLowerCase().includes(employee.name.toLowerCase()),
+          ),
+        ) || null
+      } catch {
+        // silently ignore
+      }
+    }
+
+    if (!nextEvent) {
+      await sendTelegramMessage(chatId, "📭 No upcoming meetings found in the next 24 hours.")
+      return
+    }
+
+    // 3. Generate brief on-the-fly
+    await sendTelegramMessage(chatId, "⏳ Generating brief for your next meeting...", "")
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXTAUTH_URL || "https://oxen-os-production.up.railway.app"}/api/telegram/check-upcoming`,
+        { method: "POST" },
+      )
+      if (res.ok) {
+        // Re-check for the brief that was just generated
+        const newBrief = await prisma.meetingBrief.findFirst({
+          where: {
+            OR: [
+              { eventId: nextEvent.googleEventId },
+              { title: nextEvent.title, meetingDate: { gte: new Date(nextEvent.startTime.getTime() - 60000), lte: new Date(nextEvent.startTime.getTime() + 60000) } },
+            ],
+          },
+        })
+
+        if (newBrief) {
+          const formatted = formatBriefForTelegram({
+            title: newBrief.title,
+            meetingDate: newBrief.meetingDate,
+            attendees: newBrief.attendees,
+            briefContent: newBrief.briefContent as Record<string, unknown>,
+          })
+          await sendTelegramMessage(chatId, formatted)
+          return
+        }
+      }
+    } catch {
+      // Generation attempt failed
+    }
+
+    // 4. Ultimate fallback — basic meeting info
+    const timeStr = new Date(nextEvent.startTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+    await sendTelegramMessage(
+      chatId,
+      `📅 <b>Next Meeting</b>\n\n` +
+      `<b>${nextEvent.title}</b>\n` +
+      `🕐 ${timeStr}\n` +
+      `👥 ${nextEvent.attendees.join(", ")}\n\n` +
+      `<i>Could not generate a full brief. Check the CRM for context.</i>`,
+    )
   } catch (error) {
     console.error("[Telegram /brief]", error)
     await sendTelegramMessage(chatId, "❌ Failed to fetch meeting brief. Try again later.")

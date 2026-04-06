@@ -14,6 +14,12 @@ const STALE_TIMEOUT = parseInt(process.env.STALE_JOB_TIMEOUT_MS || "300000", 10)
 
 const SYNC_JOB_TYPES = ["sync:email", "sync:calendar"]
 
+// ─── Cron Scheduling ───
+const APP_URL = process.env.APP_URL || process.env.NEXTAUTH_URL || "https://oxen-os-production.up.railway.app"
+let lastCheckUpcoming = 0
+let lastMondayDigest = ""
+let lastFridayDigest = ""
+
 // ─── Job Claiming ───
 
 async function claimNextJob() {
@@ -296,11 +302,71 @@ async function resetStaleJobs() {
   }
 }
 
+// ─── Scheduled Tasks (cron-like) ───────────────────────
+
+async function runScheduledTasks() {
+  const now = new Date()
+  const day = now.getUTCDay()    // 0=Sun, 1=Mon, ..., 5=Fri
+  const hour = now.getUTCHours()
+  const minute = now.getUTCMinutes()
+  const dateKey = now.toISOString().slice(0, 10) // "2026-04-06"
+
+  // Check upcoming meetings every 15 minutes
+  if (now.getTime() - lastCheckUpcoming >= 15 * 60 * 1000) {
+    lastCheckUpcoming = now.getTime()
+    try {
+      console.log(`[${WORKER_ID}] Running check-upcoming...`)
+      const res = await fetch(`${APP_URL}/api/telegram/check-upcoming`, { method: "POST" })
+      const data = await res.json()
+      console.log(`[${WORKER_ID}] check-upcoming result:`, JSON.stringify(data))
+    } catch (err) {
+      console.error(`[${WORKER_ID}] check-upcoming failed:`, err)
+    }
+  }
+
+  // Monday 8:00 AM UTC — weekly kickoff digest
+  if (day === 1 && hour === 8 && minute < 15 && lastMondayDigest !== dateKey) {
+    lastMondayDigest = dateKey
+    try {
+      console.log(`[${WORKER_ID}] Sending Monday digest...`)
+      const res = await fetch(`${APP_URL}/api/telegram/weekly-digest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "monday" }),
+      })
+      const data = await res.json()
+      console.log(`[${WORKER_ID}] Monday digest result:`, JSON.stringify(data))
+    } catch (err) {
+      console.error(`[${WORKER_ID}] Monday digest failed:`, err)
+    }
+  }
+
+  // Friday 17:00 UTC — end of week summary
+  if (day === 5 && hour === 17 && minute < 15 && lastFridayDigest !== dateKey) {
+    lastFridayDigest = dateKey
+    try {
+      console.log(`[${WORKER_ID}] Sending Friday digest...`)
+      const res = await fetch(`${APP_URL}/api/telegram/weekly-digest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "friday" }),
+      })
+      const data = await res.json()
+      console.log(`[${WORKER_ID}] Friday digest result:`, JSON.stringify(data))
+    } catch (err) {
+      console.error(`[${WORKER_ID}] Friday digest failed:`, err)
+    }
+  }
+}
+
 let running = true
 
 async function poll() {
   while (running) {
     try {
+      // Run scheduled tasks (cron-like)
+      await runScheduledTasks()
+
       await resetStaleJobs()
 
       const job = await claimNextJob()
@@ -327,7 +393,7 @@ async function poll() {
 process.on("SIGINT", () => { console.log(`[${WORKER_ID}] Shutting down...`); running = false })
 process.on("SIGTERM", () => { console.log(`[${WORKER_ID}] Shutting down...`); running = false })
 
-console.log(`[${WORKER_ID}] Starting Sync Worker (poll every ${POLL_INTERVAL}ms)`)
+console.log(`[${WORKER_ID}] Starting Sync Worker (poll every ${POLL_INTERVAL}ms, cron: check-upcoming/15min, monday-digest/Mon-8am, friday-digest/Fri-5pm)`)
 poll().then(() => {
   console.log(`[${WORKER_ID}] Worker stopped`)
   prisma.$disconnect()
