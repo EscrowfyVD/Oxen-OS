@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useCallback } from "react"
+import React, { useEffect, useState, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import WikiPageCard, { WikiPage, getCategoryColor } from "@/components/wiki/WikiPageCard"
@@ -496,6 +496,194 @@ function DriveBrowser() {
   )
 }
 
+/* ── Sentinel AI Answer Card ── */
+function SentinelCard({
+  answer,
+  sources,
+  onDismiss,
+}: {
+  answer: string
+  sources: Array<{ title: string; slug: string }>
+  onDismiss: () => void
+}) {
+  const [thumbs, setThumbs] = useState<"up" | "down" | null>(null)
+
+  const renderAnswer = (text: string) => {
+    // Simple markdown-like rendering: bold, paragraphs, lists
+    const lines = text.split("\n")
+    const elements: React.ReactNode[] = []
+    let listItems: string[] = []
+    let listType: "ul" | "ol" | null = null
+
+    const flushList = () => {
+      if (listItems.length > 0 && listType) {
+        const Tag = listType
+        elements.push(
+          <Tag key={`list-${elements.length}`} style={{ margin: "8px 0", paddingLeft: 20 }}>
+            {listItems.map((item, i) => (
+              <li key={i} style={{ marginBottom: 4 }}>
+                <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
+              </li>
+            ))}
+          </Tag>
+        )
+        listItems = []
+        listType = null
+      }
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      const bulletMatch = line.match(/^[\s]*[-*]\s+(.+)/)
+      const numberedMatch = line.match(/^[\s]*\d+[.)]\s+(.+)/)
+
+      if (bulletMatch) {
+        if (listType !== "ul") {
+          flushList()
+          listType = "ul"
+        }
+        listItems.push(bulletMatch[1])
+      } else if (numberedMatch) {
+        if (listType !== "ol") {
+          flushList()
+          listType = "ol"
+        }
+        listItems.push(numberedMatch[1])
+      } else {
+        flushList()
+        if (line.trim()) {
+          elements.push(
+            <p
+              key={`p-${i}`}
+              style={{ margin: "6px 0" }}
+              dangerouslySetInnerHTML={{
+                __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>"),
+              }}
+            />
+          )
+        }
+      }
+    }
+    flushList()
+
+    return elements
+  }
+
+  return (
+    <div
+      className="fade-in"
+      style={{
+        background: "rgba(192,139,136,0.06)",
+        border: "1px solid rgba(192,139,136,0.2)",
+        borderLeft: "3px solid #C08B88",
+        borderRadius: 12,
+        padding: "20px 24px",
+        marginBottom: 24,
+        position: "relative",
+        backdropFilter: "blur(12px)",
+      }}
+    >
+      {/* Dismiss button */}
+      <button
+        onClick={onDismiss}
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 12,
+          background: "none",
+          border: "none",
+          color: TEXT_TERTIARY,
+          fontSize: 18,
+          cursor: "pointer",
+          padding: 4,
+          lineHeight: 1,
+          transition: "color 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = FROST }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_TERTIARY }}
+      >
+        &times;
+      </button>
+
+      {/* Sentinel label */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ROSE_GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        <span style={{ fontSize: 12, fontWeight: 600, color: ROSE_GOLD, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+          Sentinel
+        </span>
+      </div>
+
+      {/* Answer content */}
+      <div style={{ fontSize: 13, color: FROST, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.7 }}>
+        {renderAnswer(answer)}
+      </div>
+
+      {/* Source links */}
+      {sources.length > 0 && (
+        <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid rgba(192,139,136,0.12)" }}>
+          <span style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+            Based on:{" "}
+          </span>
+          {sources.map((s, i) => (
+            <span key={s.slug}>
+              <Link
+                href={`/wiki/${s.slug}`}
+                style={{ fontSize: 11, color: ROSE_GOLD, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", transition: "opacity 0.15s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7" }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1" }}
+              >
+                {s.title}
+              </Link>
+              {i < sources.length - 1 && (
+                <span style={{ color: TEXT_TERTIARY, fontSize: 10 }}>, </span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Helpful buttons */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+        <span style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+          Was this helpful?
+        </span>
+        <button
+          onClick={() => setThumbs("up")}
+          style={{
+            background: thumbs === "up" ? "rgba(52,211,153,0.1)" : "transparent",
+            border: `1px solid ${thumbs === "up" ? "rgba(52,211,153,0.3)" : CARD_BORDER}`,
+            borderRadius: 4,
+            padding: "3px 8px",
+            cursor: "pointer",
+            fontSize: 12,
+            color: thumbs === "up" ? "#34D399" : TEXT_TERTIARY,
+            transition: "all 0.15s",
+          }}
+        >
+          +
+        </button>
+        <button
+          onClick={() => setThumbs("down")}
+          style={{
+            background: thumbs === "down" ? "rgba(248,113,113,0.1)" : "transparent",
+            border: `1px solid ${thumbs === "down" ? "rgba(248,113,113,0.3)" : CARD_BORDER}`,
+            borderRadius: 4,
+            padding: "3px 8px",
+            cursor: "pointer",
+            fontSize: 12,
+            color: thumbs === "down" ? "#F87171" : TEXT_TERTIARY,
+            transition: "all 0.15s",
+          }}
+        >
+          -
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /* ── Main Wiki List Page ── */
 export default function WikiListPage() {
   const router = useRouter()
@@ -504,6 +692,9 @@ export default function WikiListPage() {
   const [activeCategory, setActiveCategory] = useState("All")
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<"pages" | "drive">("pages")
+  const [aiQuestion, setAiQuestion] = useState("")
+  const [aiAnswer, setAiAnswer] = useState<{ answer: string; sources: Array<{ title: string; slug: string }> } | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
 
   useEffect(() => {
     fetch("/api/wiki")
@@ -560,6 +751,29 @@ export default function WikiListPage() {
       }
     } catch {
       /* silent */
+    }
+  }
+
+  const handleAskSentinel = async () => {
+    if (!aiQuestion.trim() || aiLoading) return
+    setAiLoading(true)
+    setAiAnswer(null)
+    try {
+      const res = await fetch("/api/wiki/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: aiQuestion }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        setAiAnswer({ answer: `Error: ${data.error}`, sources: [] })
+      } else {
+        setAiAnswer({ answer: data.answer, sources: data.sources ?? [] })
+      }
+    } catch {
+      setAiAnswer({ answer: "Failed to connect to Sentinel. Please try again.", sources: [] })
+    } finally {
+      setAiLoading(false)
     }
   }
 
@@ -706,6 +920,135 @@ export default function WikiListPage() {
             )}
           </div>
         </div>
+
+        {/* ── Sentinel AI Search Bar ── */}
+        <div className="fade-in" style={{ marginBottom: 20, animationDelay: "0.03s" }}>
+          <div style={{ position: "relative" }}>
+            <div style={{
+              position: "absolute",
+              left: 14,
+              top: "50%",
+              transform: "translateY(-50%)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              pointerEvents: "none",
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ROSE_GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <span style={{ fontSize: 10, color: ROSE_GOLD, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Ask Sentinel
+              </span>
+            </div>
+            <input
+              type="text"
+              placeholder="Ask a question about our internal documentation..."
+              value={aiQuestion}
+              onChange={(e) => setAiQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAskSentinel()
+              }}
+              style={{
+                width: "100%",
+                padding: "12px 44px 12px 140px",
+                borderRadius: 10,
+                border: "1px solid rgba(192,139,136,0.2)",
+                background: "rgba(192,139,136,0.04)",
+                color: FROST,
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 13,
+                outline: "none",
+                transition: "border-color 0.2s, box-shadow 0.2s",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "rgba(192,139,136,0.4)"
+                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(192,139,136,0.08)"
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "rgba(192,139,136,0.2)"
+                e.currentTarget.style.boxShadow = "none"
+              }}
+            />
+            <button
+              onClick={handleAskSentinel}
+              disabled={aiLoading || !aiQuestion.trim()}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                padding: "6px 12px",
+                borderRadius: 6,
+                border: "1px solid rgba(192,139,136,0.3)",
+                background: aiQuestion.trim() ? "rgba(192,139,136,0.15)" : "transparent",
+                color: aiQuestion.trim() ? ROSE_GOLD : TEXT_TERTIARY,
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: 11,
+                fontWeight: 500,
+                cursor: aiQuestion.trim() ? "pointer" : "default",
+                transition: "all 0.15s",
+                opacity: aiLoading ? 0.5 : 1,
+              }}
+            >
+              {aiLoading ? "..." : "Ask"}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Sentinel Loading State ── */}
+        {aiLoading && (
+          <div
+            style={{
+              background: "rgba(192,139,136,0.06)",
+              border: "1px solid rgba(192,139,136,0.2)",
+              borderLeft: "3px solid #C08B88",
+              borderRadius: 12,
+              padding: "24px",
+              marginBottom: 24,
+              backdropFilter: "blur(12px)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ROSE_GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: 600, color: ROSE_GOLD, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+                Sentinel
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {[1, 2, 3].map((n) => (
+                <div
+                  key={n}
+                  style={{
+                    height: 12,
+                    borderRadius: 6,
+                    background: "rgba(192,139,136,0.08)",
+                    width: `${100 - n * 15}%`,
+                    animation: "pulse 1.5s ease-in-out infinite",
+                    animationDelay: `${n * 0.15}s`,
+                  }}
+                />
+              ))}
+            </div>
+            <style>{`
+              @keyframes pulse {
+                0%, 100% { opacity: 0.4; }
+                50% { opacity: 1; }
+              }
+            `}</style>
+          </div>
+        )}
+
+        {/* ── Sentinel AI Answer ── */}
+        {aiAnswer && !aiLoading && (
+          <SentinelCard
+            answer={aiAnswer.answer}
+            sources={aiAnswer.sources}
+            onDismiss={() => setAiAnswer(null)}
+          />
+        )}
 
         {/* ── Pages Tab ── */}
         {activeTab === "pages" && (

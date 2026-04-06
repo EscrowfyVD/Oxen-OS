@@ -306,6 +306,7 @@ model CrmContact {
   icpScoredAt     DateTime?
   icpScoreBreakdown Json?  // {vertical_match, geo_match, company_size, engagement, revenue_potential}
   contactType     String   @default("prospect") // "prospect", "client", "introducer", "partner"
+  outreachGroup   String?
   // Clay enrichment
   companySize     String?
   fundingStage    String?
@@ -881,6 +882,8 @@ model IntelResearch {
   nextRunAt     DateTime?
   status        String        @default("active") // "active", "paused", "completed", "archived"
   archived      Boolean       @default(false)
+  scheduledDay  String?       // e.g. "monday" for weekly, "15" for monthly day-of-month
+  scheduledTime String?       // e.g. "09:00" (HH:mm)
   createdBy     String
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

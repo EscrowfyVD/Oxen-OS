@@ -27,28 +27,41 @@ export async function GET() {
   const isManager = canAccess(roleLevel, "manager")
 
   // ── 1. KPI Stats ──
-  const [activeClients, pipelineAgg, totalDeals, userTasks] = await Promise.all([
-    prisma.crmContact.count({ where: { lifecycleStage: "closed_won" } }),
+  const now2 = new Date()
+  const monthStart = new Date(now2.getFullYear(), now2.getMonth(), 1)
+  const monthEnd = new Date(now2.getFullYear(), now2.getMonth() + 1, 1)
+
+  const [activeClients, pipelineAgg, monthlyVolumeAgg, userTasks] = await Promise.all([
+    // Active clients = contacts whose lifecycleStage is "client" (set when deal is closed_won)
+    prisma.crmContact.count({ where: { lifecycleStage: "client" } }),
     prisma.deal.aggregate({
       where: { stage: { notIn: ["closed_won", "closed_lost"] } },
       _sum: { dealValue: true },
     }),
-    prisma.deal.count({
-      where: { stage: { notIn: ["closed_won", "closed_lost"] } },
+    // Monthly volume = sum of dealValue for deals closed_won this month
+    prisma.deal.aggregate({
+      where: {
+        stage: "closed_won",
+        updatedAt: { gte: monthStart, lt: monthEnd },
+      },
+      _sum: { dealValue: true },
     }),
+    // Safe query: when employee is null, count all open tasks (no assignee filter)
     prisma.task.count({
       where: {
         column: { in: ["todo", "inprogress"] },
-        ...(employee?.name ? { assignee: { contains: employee.name, mode: "insensitive" as const } } : {}),
+        ...(employee?.name
+          ? { assignee: { contains: employee.name, mode: "insensitive" as const } }
+          : {}),
       },
     }),
   ])
 
   const stats = {
-    activeClients,
+    activeClients: activeClients ?? 0,
     pipelineValue: pipelineAgg._sum.dealValue ?? 0,
-    totalDeals,
-    userOpenTasks: userTasks,
+    monthlyVolume: monthlyVolumeAgg._sum.dealValue ?? 0,
+    userOpenTasks: userTasks ?? 0,
   }
 
   // ── 2. Recent Activity (last 15) ──

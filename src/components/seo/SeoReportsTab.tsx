@@ -177,6 +177,23 @@ function PieCenterLabel({ cx, cy, total }: { cx: number; cy: number; total: numb
   )
 }
 
+/* ── Empty-state placeholder ── */
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        color: TEXT_SECONDARY,
+        fontSize: 13,
+        fontFamily: "'DM Sans', sans-serif",
+        padding: "20px 0",
+        textAlign: "center",
+      }}
+    >
+      {message}
+    </div>
+  )
+}
+
 /* ── Component ── */
 export default function SeoReportsTab() {
   const [keywordReport, setKeywordReport] = useState<KeywordReport | null>(null)
@@ -187,26 +204,30 @@ export default function SeoReportsTab() {
   useEffect(() => {
     async function fetchAll() {
       setLoading(true)
-      const results = await Promise.allSettled([
-        fetch("/api/seo/reports/keywords").then((r) => {
-          if (!r.ok) throw new Error("keywords fetch failed")
-          return r.json()
-        }),
-        fetch("/api/seo/reports/articles").then((r) => {
-          if (!r.ok) throw new Error("articles fetch failed")
-          return r.json()
-        }),
-        fetch("/api/seo/reports/geo").then((r) => {
-          if (!r.ok) throw new Error("geo fetch failed")
-          return r.json()
-        }),
-      ])
+      try {
+        const results = await Promise.allSettled([
+          fetch("/api/seo/reports/keywords").then((r) => {
+            if (!r.ok) throw new Error("keywords fetch failed")
+            return r.json()
+          }),
+          fetch("/api/seo/reports/articles").then((r) => {
+            if (!r.ok) throw new Error("articles fetch failed")
+            return r.json()
+          }),
+          fetch("/api/seo/reports/geo").then((r) => {
+            if (!r.ok) throw new Error("geo fetch failed")
+            return r.json()
+          }),
+        ])
 
-      if (results[0].status === "fulfilled") setKeywordReport(results[0].value)
-      if (results[1].status === "fulfilled") setArticleReport(results[1].value)
-      if (results[2].status === "fulfilled") setGeoReport(results[2].value)
-
-      setLoading(false)
+        if (results[0].status === "fulfilled") setKeywordReport(results[0].value)
+        if (results[1].status === "fulfilled") setArticleReport(results[1].value)
+        if (results[2].status === "fulfilled") setGeoReport(results[2].value)
+      } catch {
+        // All three remain null -- each section will show its "No data" state
+      } finally {
+        setLoading(false)
+      }
     }
     fetchAll()
   }, [])
@@ -224,18 +245,17 @@ export default function SeoReportsTab() {
   }
 
   /* ── Pie data ── */
-  const pieData = keywordReport
+  const posDist = keywordReport?.positionDistribution
+  const pieData = posDist
     ? [
-        { name: "Page 1 (1-10)", value: keywordReport.positionDistribution.page1, color: POSITION_COLORS.page1 },
-        { name: "Page 2 (11-20)", value: keywordReport.positionDistribution.page2, color: POSITION_COLORS.page2 },
-        { name: "Page 3+ (21+)", value: keywordReport.positionDistribution.page3Plus, color: POSITION_COLORS.page3 },
-        { name: "Not ranking", value: keywordReport.positionDistribution.notRanking, color: POSITION_COLORS.notRanking },
+        { name: "Page 1 (1-10)", value: posDist.page1 ?? 0, color: POSITION_COLORS.page1 },
+        { name: "Page 2 (11-20)", value: posDist.page2 ?? 0, color: POSITION_COLORS.page2 },
+        { name: "Page 3+ (21+)", value: posDist.page3Plus ?? 0, color: POSITION_COLORS.page3 },
+        { name: "Not ranking", value: posDist.notRanking ?? 0, color: POSITION_COLORS.notRanking },
       ]
     : []
 
-  const netPage1 = keywordReport
-    ? keywordReport.gainedPage1 - keywordReport.lostPage1
-    : 0
+  const netPage1 = (keywordReport?.gainedPage1 ?? 0) - (keywordReport?.lostPage1 ?? 0)
 
   /* ── Bar data for verticals ── */
   const verticalBarData = (keywordReport?.perVertical ?? []).map((v) => ({
@@ -265,65 +285,67 @@ export default function SeoReportsTab() {
       <div style={cardStyle}>
         <div style={sectionTitle}>SEO Performance</div>
 
-        {/* Row 1: Pie + Stats */}
-        <div style={{ display: "flex", gap: 32, alignItems: "center", marginBottom: 28, flexWrap: "wrap" }}>
-          {keywordReport && (
-            <>
-              <div style={{ width: 200, height: 200, flexShrink: 0 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      dataKey="value"
-                      strokeWidth={0}
-                    >
-                      {pieData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      itemStyle={{ color: TEXT_PRIMARY }}
-                    />
-                    <text
-                      x="50%"
-                      y="46%"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      style={{ fontFamily: "'Bellfair', serif", fontSize: 26 }}
-                      fill={TEXT_PRIMARY}
-                    >
-                      {keywordReport.totalKeywords}
-                    </text>
-                    <text
-                      x="50%"
-                      y="57%"
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9 }}
-                      fill={TEXT_TERTIARY}
-                    >
-                      keywords
-                    </text>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+        {keywordReport ? (
+          <>
+            {/* Row 1: Pie + Stats */}
+            <div style={{ display: "flex", gap: 32, alignItems: "center", marginBottom: 28, flexWrap: "wrap" }}>
+              {pieData.length > 0 && (
+                <div style={{ width: 200, height: 200, flexShrink: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        dataKey="value"
+                        strokeWidth={0}
+                      >
+                        {pieData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        itemStyle={{ color: TEXT_PRIMARY }}
+                      />
+                      <text
+                        x="50%"
+                        y="46%"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        style={{ fontFamily: "'Bellfair', serif", fontSize: 26 }}
+                        fill={TEXT_PRIMARY}
+                      >
+                        {keywordReport.totalKeywords ?? 0}
+                      </text>
+                      <text
+                        x="50%"
+                        y="57%"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 9 }}
+                        fill={TEXT_TERTIARY}
+                      >
+                        keywords
+                      </text>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
 
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div>
                   <div style={kpiLabel}>Gained Page 1</div>
                   <div style={{ ...kpiValue, fontSize: 22, color: GREEN }}>
-                    +{keywordReport.gainedPage1}
+                    +{keywordReport.gainedPage1 ?? 0}
                   </div>
                 </div>
                 <div>
                   <div style={kpiLabel}>Lost Page 1</div>
                   <div style={{ ...kpiValue, fontSize: 22, color: RED }}>
-                    -{keywordReport.lostPage1}
+                    -{keywordReport.lostPage1 ?? 0}
                   </div>
                 </div>
                 <div>
@@ -342,174 +364,178 @@ export default function SeoReportsTab() {
               </div>
 
               {/* Legend */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginLeft: "auto" }}>
-                {pieData.map((d) => (
-                  <div
-                    key={d.name}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      fontSize: 11,
-                      fontFamily: "'DM Sans', sans-serif",
-                      color: TEXT_SECONDARY,
-                    }}
-                  >
+              {pieData.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginLeft: "auto" }}>
+                  {pieData.map((d) => (
                     <div
+                      key={d.name}
                       style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 3,
-                        background: d.color,
-                        flexShrink: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 11,
+                        fontFamily: "'DM Sans', sans-serif",
+                        color: TEXT_SECONDARY,
                       }}
-                    />
-                    {d.name}: {d.value}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Row 2: Vertical keyword health bar chart */}
-        {verticalBarData.length > 0 && (
-          <div style={{ marginBottom: 28 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: TEXT_SECONDARY,
-                fontFamily: "'DM Sans', sans-serif",
-                marginBottom: 12,
-              }}
-            >
-              Keywords on Page 1 by Vertical
-            </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={verticalBarData} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" stroke={CARD_BORDER} />
-                <XAxis
-                  dataKey="vertical"
-                  tick={{ fill: TEXT_TERTIARY, fontSize: 10, fontFamily: "'DM Sans', sans-serif" }}
-                  axisLine={{ stroke: CARD_BORDER }}
-                  tickLine={false}
-                  interval={0}
-                  angle={-20}
-                  textAnchor="end"
-                  height={50}
-                />
-                <YAxis
-                  tick={{ fill: TEXT_TERTIARY, fontSize: 10 }}
-                  axisLine={{ stroke: CARD_BORDER }}
-                  tickLine={false}
-                />
-                <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-                <Bar dataKey="keywords" radius={[4, 4, 0, 0]}>
-                  {verticalBarData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
+                    >
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 3,
+                          background: d.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      {d.name}: {d.value}
+                    </div>
                   ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+                </div>
+              )}
+            </div>
 
-        {/* Row 3: Top performing articles */}
-        {keywordReport && keywordReport.topArticles.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: TEXT_SECONDARY,
-                fontFamily: "'DM Sans', sans-serif",
-                marginBottom: 10,
-              }}
-            >
-              Top Performing Articles
-            </div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    {["Title", "Sessions (30d)", "Best Position", "Keywords Ranking"].map((h) => (
-                      <th key={h} style={tableHeader}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {keywordReport.topArticles.map((a, i) => (
-                    <tr key={i}>
-                      <td style={{ ...tableCell, color: TEXT_PRIMARY, fontWeight: 500, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {a.title}
-                      </td>
-                      <td style={tableCell}>{a.sessions30d.toLocaleString()}</td>
-                      <td style={tableCell}>{a.bestPosition}</td>
-                      <td style={tableCell}>{a.keywordsRanking}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Content decay */}
-        {keywordReport && keywordReport.contentDecay.length > 0 && (
-          <div>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: TEXT_SECONDARY,
-                fontFamily: "'DM Sans', sans-serif",
-                marginBottom: 10,
-              }}
-            >
-              Content Decay
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {keywordReport.contentDecay.map((d, i) => (
+            {/* Row 2: Vertical keyword health bar chart */}
+            {verticalBarData.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
                 <div
-                  key={i}
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "6px 10px",
-                    background: "rgba(248,113,113,0.06)",
-                    borderRadius: 8,
-                    border: `1px solid ${RED}22`,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: TEXT_SECONDARY,
+                    fontFamily: "'DM Sans', sans-serif",
+                    marginBottom: 12,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontFamily: "'DM Sans', sans-serif",
-                      color: TEXT_PRIMARY,
-                      maxWidth: "70%",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {d.title}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontFamily: "'Bellfair', serif",
-                      color: RED,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {d.trafficDrop}%
-                  </span>
+                  Keywords on Page 1 by Vertical
                 </div>
-              ))}
-            </div>
-          </div>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={verticalBarData} barSize={28}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={CARD_BORDER} />
+                    <XAxis
+                      dataKey="vertical"
+                      tick={{ fill: TEXT_TERTIARY, fontSize: 10, fontFamily: "'DM Sans', sans-serif" }}
+                      axisLine={{ stroke: CARD_BORDER }}
+                      tickLine={false}
+                      interval={0}
+                      angle={-20}
+                      textAnchor="end"
+                      height={50}
+                    />
+                    <YAxis
+                      tick={{ fill: TEXT_TERTIARY, fontSize: 10 }}
+                      axisLine={{ stroke: CARD_BORDER }}
+                      tickLine={false}
+                    />
+                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                    <Bar dataKey="keywords" radius={[4, 4, 0, 0]}>
+                      {verticalBarData.map((entry, i) => (
+                        <Cell key={i} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Row 3: Top performing articles */}
+            {(keywordReport.topArticles ?? []).length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: TEXT_SECONDARY,
+                    fontFamily: "'DM Sans', sans-serif",
+                    marginBottom: 10,
+                  }}
+                >
+                  Top Performing Articles
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        {["Title", "Sessions (30d)", "Best Position", "Keywords Ranking"].map((h) => (
+                          <th key={h} style={tableHeader}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(keywordReport.topArticles ?? []).map((a, i) => (
+                        <tr key={i}>
+                          <td style={{ ...tableCell, color: TEXT_PRIMARY, fontWeight: 500, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {a.title ?? "Untitled"}
+                          </td>
+                          <td style={tableCell}>{(a.sessions30d ?? 0).toLocaleString()}</td>
+                          <td style={tableCell}>{a.bestPosition ?? "—"}</td>
+                          <td style={tableCell}>{a.keywordsRanking ?? 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Content decay */}
+            {(keywordReport.contentDecay ?? []).length > 0 && (
+              <div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: TEXT_SECONDARY,
+                    fontFamily: "'DM Sans', sans-serif",
+                    marginBottom: 10,
+                  }}
+                >
+                  Content Decay
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {(keywordReport.contentDecay ?? []).map((d, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "6px 10px",
+                        background: "rgba(248,113,113,0.06)",
+                        borderRadius: 8,
+                        border: `1px solid ${RED}22`,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontFamily: "'DM Sans', sans-serif",
+                          color: TEXT_PRIMARY,
+                          maxWidth: "70%",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {d.title ?? "Untitled"}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontFamily: "'Bellfair', serif",
+                          color: RED,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {d.trafficDrop ?? 0}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <EmptyState message="No SEO data yet." />
         )}
       </div>
 
@@ -520,48 +546,52 @@ export default function SeoReportsTab() {
         {geoReport ? (
           <>
             {/* Citation rate trend */}
-            <div style={{ marginBottom: 28 }}>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: TEXT_SECONDARY,
-                  fontFamily: "'DM Sans', sans-serif",
-                  marginBottom: 12,
-                }}
-              >
-                Citation Rate Trend (8 weeks)
+            {(geoReport.citationTrend ?? []).length > 0 ? (
+              <div style={{ marginBottom: 28 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: TEXT_SECONDARY,
+                    fontFamily: "'DM Sans', sans-serif",
+                    marginBottom: 12,
+                  }}
+                >
+                  Citation Rate Trend (8 weeks)
+                </div>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={geoReport.citationTrend ?? []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={CARD_BORDER} />
+                    <XAxis
+                      dataKey="week"
+                      tick={{ fill: TEXT_TERTIARY, fontSize: 10, fontFamily: "'DM Sans', sans-serif" }}
+                      axisLine={{ stroke: CARD_BORDER }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: TEXT_TERTIARY, fontSize: 10 }}
+                      axisLine={{ stroke: CARD_BORDER }}
+                      tickLine={false}
+                      unit="%"
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(value: unknown) => [`${value}%`, "Citation Rate"]}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="rate"
+                      stroke={ROSE_GOLD}
+                      strokeWidth={2}
+                      dot={{ fill: ROSE_GOLD, r: 3 }}
+                      activeDot={{ r: 5, fill: ROSE_GOLD }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={geoReport.citationTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CARD_BORDER} />
-                  <XAxis
-                    dataKey="week"
-                    tick={{ fill: TEXT_TERTIARY, fontSize: 10, fontFamily: "'DM Sans', sans-serif" }}
-                    axisLine={{ stroke: CARD_BORDER }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: TEXT_TERTIARY, fontSize: 10 }}
-                    axisLine={{ stroke: CARD_BORDER }}
-                    tickLine={false}
-                    unit="%"
-                  />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(value: unknown) => [`${value}%`, "Citation Rate"]}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="rate"
-                    stroke={ROSE_GOLD}
-                    strokeWidth={2}
-                    dot={{ fill: ROSE_GOLD, r: 3 }}
-                    activeDot={{ r: 5, fill: ROSE_GOLD }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            ) : (
+              <EmptyState message="No citation trend data yet." />
+            )}
 
             {/* Share of voice */}
             {sovData.length > 0 && (
@@ -611,7 +641,7 @@ export default function SeoReportsTab() {
             )}
 
             {/* Per-vertical citation rates */}
-            {geoReport.perVertical.length > 0 && (
+            {(geoReport.perVertical ?? []).length > 0 && (
               <div style={{ marginBottom: 20 }}>
                 <div
                   style={{
@@ -625,7 +655,7 @@ export default function SeoReportsTab() {
                   Citation Rates by Vertical
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {geoReport.perVertical.map((v) => {
+                  {(geoReport.perVertical ?? []).map((v) => {
                     const barColor = VERTICAL_COLORS[v.vertical] ?? TEXT_TERTIARY
                     return (
                       <div key={v.vertical}>
@@ -652,7 +682,7 @@ export default function SeoReportsTab() {
                               color: TEXT_PRIMARY,
                             }}
                           >
-                            {v.citationRate}%
+                            {v.citationRate ?? 0}%
                           </span>
                         </div>
                         <div
@@ -666,7 +696,7 @@ export default function SeoReportsTab() {
                         >
                           <div
                             style={{
-                              width: `${Math.min(v.citationRate, 100)}%`,
+                              width: `${Math.min(v.citationRate ?? 0, 100)}%`,
                               height: "100%",
                               borderRadius: 4,
                               background: barColor,
@@ -686,27 +716,19 @@ export default function SeoReportsTab() {
               <div>
                 <div style={kpiLabel}>Lost this month</div>
                 <div style={{ ...kpiValue, fontSize: 20, color: RED }}>
-                  {geoReport.lostThisMonth}
+                  {geoReport.lostThisMonth ?? 0}
                 </div>
               </div>
               <div>
                 <div style={kpiLabel}>Gained this month</div>
                 <div style={{ ...kpiValue, fontSize: 20, color: GREEN }}>
-                  {geoReport.gainedThisMonth}
+                  {geoReport.gainedThisMonth ?? 0}
                 </div>
               </div>
             </div>
           </>
         ) : (
-          <div
-            style={{
-              color: TEXT_SECONDARY,
-              fontSize: 13,
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            No GEO data available.
-          </div>
+          <EmptyState message="No GEO data available." />
         )}
       </div>
 
@@ -727,21 +749,21 @@ export default function SeoReportsTab() {
             >
               <div>
                 <div style={kpiLabel}>Published this month</div>
-                <div style={kpiValue}>{articleReport.publishedThisMonth}</div>
+                <div style={kpiValue}>{articleReport.publishedThisMonth ?? 0}</div>
               </div>
               <div>
                 <div style={kpiLabel}>Total articles</div>
-                <div style={kpiValue}>{articleReport.totalArticles}</div>
+                <div style={kpiValue}>{articleReport.totalArticles ?? 0}</div>
               </div>
               <div>
                 <div style={kpiLabel}>Avg word count</div>
                 <div style={kpiValue}>
-                  {articleReport.averageWordCount.toLocaleString()}
+                  {(articleReport.averageWordCount ?? 0).toLocaleString()}
                 </div>
               </div>
               <div>
                 <div style={kpiLabel}>Queue depth</div>
-                <div style={kpiValue}>{articleReport.queueDepth}</div>
+                <div style={kpiValue}>{articleReport.queueDepth ?? 0}</div>
               </div>
             </div>
 
@@ -793,15 +815,7 @@ export default function SeoReportsTab() {
             )}
           </>
         ) : (
-          <div
-            style={{
-              color: TEXT_SECONDARY,
-              fontSize: 13,
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            No article data available.
-          </div>
+          <EmptyState message="No article data available." />
         )}
       </div>
     </div>

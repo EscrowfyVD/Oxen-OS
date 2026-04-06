@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { generateHTML } from "@tiptap/react"
@@ -96,6 +96,11 @@ export default function WikiViewPage() {
   const [showVersions, setShowVersions] = useState(false)
   const [previewVersion, setPreviewVersion] = useState<WikiVersion | null>(null)
   const [previewHtml, setPreviewHtml] = useState("")
+  const [askOpen, setAskOpen] = useState(false)
+  const [askQuestion, setAskQuestion] = useState("")
+  const [askLoading, setAskLoading] = useState(false)
+  const [askAnswer, setAskAnswer] = useState<{ answer: string; sources: Array<{ title: string; slug: string }> } | null>(null)
+  const [askThumbs, setAskThumbs] = useState<"up" | "down" | null>(null)
 
   const fetchPage = () => {
     if (!slug) return
@@ -172,6 +177,77 @@ export default function WikiViewPage() {
       const newSlug = data.page?.slug || data.slug
       if (newSlug) router.push(`/wiki/${newSlug}/edit`)
     } catch { /* silent */ }
+  }
+
+  const handleAskAboutPage = async () => {
+    if (!askQuestion.trim() || askLoading) return
+    setAskLoading(true)
+    setAskAnswer(null)
+    setAskThumbs(null)
+    try {
+      const res = await fetch("/api/wiki/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: askQuestion, pageSlug: slug }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        setAskAnswer({ answer: `Error: ${data.error}`, sources: [] })
+      } else {
+        setAskAnswer({ answer: data.answer, sources: data.sources ?? [] })
+      }
+    } catch {
+      setAskAnswer({ answer: "Failed to connect to Sentinel. Please try again.", sources: [] })
+    } finally {
+      setAskLoading(false)
+    }
+  }
+
+  const renderAskAnswer = (text: string) => {
+    const lines = text.split("\n")
+    const elements: React.ReactNode[] = []
+    let listItems: string[] = []
+    let listType: "ul" | "ol" | null = null
+
+    const flushList = () => {
+      if (listItems.length > 0 && listType) {
+        const Tag = listType
+        elements.push(
+          <Tag key={`list-${elements.length}`} style={{ margin: "8px 0", paddingLeft: 20 }}>
+            {listItems.map((item, i) => (
+              <li key={i} style={{ marginBottom: 4 }}>
+                <span dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
+              </li>
+            ))}
+          </Tag>
+        )
+        listItems = []
+        listType = null
+      }
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      const bulletMatch = line.match(/^[\s]*[-*]\s+(.+)/)
+      const numberedMatch = line.match(/^[\s]*\d+[.)]\s+(.+)/)
+
+      if (bulletMatch) {
+        if (listType !== "ul") { flushList(); listType = "ul" }
+        listItems.push(bulletMatch[1])
+      } else if (numberedMatch) {
+        if (listType !== "ol") { flushList(); listType = "ol" }
+        listItems.push(numberedMatch[1])
+      } else {
+        flushList()
+        if (line.trim()) {
+          elements.push(
+            <p key={`p-${i}`} style={{ margin: "6px 0" }} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
+          )
+        }
+      }
+    }
+    flushList()
+    return elements
   }
 
   if (!page) {
@@ -417,6 +493,244 @@ export default function WikiViewPage() {
                 </div>
               </Link>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Floating "Ask about this page" Button + Popover ── */}
+      {!askOpen && (
+        <button
+          onClick={() => setAskOpen(true)}
+          style={{
+            position: "fixed",
+            bottom: 28,
+            right: 28,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 18px",
+            borderRadius: 50,
+            border: "1px solid rgba(192,139,136,0.3)",
+            background: "rgba(15,17,24,0.9)",
+            backdropFilter: "blur(12px)",
+            color: ROSE_GOLD,
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+            zIndex: 900,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(192,139,136,0.12)"
+            e.currentTarget.style.borderColor = "rgba(192,139,136,0.5)"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(15,17,24,0.9)"
+            e.currentTarget.style.borderColor = "rgba(192,139,136,0.3)"
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ROSE_GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          Ask about this page
+        </button>
+      )}
+
+      {askOpen && (
+        <div
+          className="fade-in"
+          style={{
+            position: "fixed",
+            bottom: 28,
+            right: 28,
+            width: 420,
+            maxWidth: "calc(100vw - 56px)",
+            maxHeight: "70vh",
+            display: "flex",
+            flexDirection: "column",
+            borderRadius: 14,
+            border: "1px solid rgba(192,139,136,0.2)",
+            background: "rgba(15,17,24,0.95)",
+            backdropFilter: "blur(16px)",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+            zIndex: 900,
+            overflow: "hidden",
+          }}
+        >
+          {/* Popover Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid rgba(192,139,136,0.12)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ROSE_GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: 600, color: ROSE_GOLD, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+                Ask Sentinel
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setAskOpen(false)
+                setAskAnswer(null)
+                setAskQuestion("")
+                setAskThumbs(null)
+              }}
+              style={{ background: "none", border: "none", color: TEXT_TERTIARY, fontSize: 18, cursor: "pointer", padding: 4, lineHeight: 1, transition: "color 0.15s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = FROST }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = TEXT_TERTIARY }}
+            >
+              &times;
+            </button>
+          </div>
+
+          {/* Scrollable answer area */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px" }}>
+            {askLoading && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "8px 0" }}>
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    style={{
+                      height: 12,
+                      borderRadius: 6,
+                      background: "rgba(192,139,136,0.08)",
+                      width: `${100 - n * 15}%`,
+                      animation: "sentinelPulse 1.5s ease-in-out infinite",
+                      animationDelay: `${n * 0.15}s`,
+                    }}
+                  />
+                ))}
+                <style>{`
+                  @keyframes sentinelPulse {
+                    0%, 100% { opacity: 0.4; }
+                    50% { opacity: 1; }
+                  }
+                `}</style>
+              </div>
+            )}
+
+            {askAnswer && !askLoading && (
+              <div>
+                <div style={{ fontSize: 13, color: FROST, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.7 }}>
+                  {renderAskAnswer(askAnswer.answer)}
+                </div>
+
+                {askAnswer.sources.length > 0 && (
+                  <div style={{ marginTop: 14, paddingTop: 10, borderTop: "1px solid rgba(192,139,136,0.12)" }}>
+                    <span style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+                      Based on:{" "}
+                    </span>
+                    {askAnswer.sources.map((s, i) => (
+                      <span key={s.slug}>
+                        <Link
+                          href={`/wiki/${s.slug}`}
+                          style={{ fontSize: 11, color: ROSE_GOLD, textDecoration: "none", fontFamily: "'DM Sans', sans-serif" }}
+                        >
+                          {s.title}
+                        </Link>
+                        {i < askAnswer.sources.length - 1 && (
+                          <span style={{ color: TEXT_TERTIARY, fontSize: 10 }}>, </span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Helpful buttons */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                  <span style={{ fontSize: 10, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif" }}>
+                    Was this helpful?
+                  </span>
+                  <button
+                    onClick={() => setAskThumbs("up")}
+                    style={{
+                      background: askThumbs === "up" ? "rgba(52,211,153,0.1)" : "transparent",
+                      border: `1px solid ${askThumbs === "up" ? "rgba(52,211,153,0.3)" : CARD_BORDER}`,
+                      borderRadius: 4,
+                      padding: "3px 8px",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: askThumbs === "up" ? GREEN : TEXT_TERTIARY,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => setAskThumbs("down")}
+                    style={{
+                      background: askThumbs === "down" ? "rgba(248,113,113,0.1)" : "transparent",
+                      border: `1px solid ${askThumbs === "down" ? "rgba(248,113,113,0.3)" : CARD_BORDER}`,
+                      borderRadius: 4,
+                      padding: "3px 8px",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: askThumbs === "down" ? RED : TEXT_TERTIARY,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    -
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!askLoading && !askAnswer && (
+              <div style={{ textAlign: "center", padding: "16px 0", color: TEXT_TERTIARY, fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
+                Ask a question about this wiki page
+              </div>
+            )}
+          </div>
+
+          {/* Input area */}
+          <div style={{ padding: "12px 18px", borderTop: "1px solid rgba(192,139,136,0.12)" }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text"
+                placeholder="Type your question..."
+                value={askQuestion}
+                onChange={(e) => setAskQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAskAboutPage()
+                }}
+                autoFocus
+                style={{
+                  flex: 1,
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: `1px solid ${CARD_BORDER}`,
+                  background: "rgba(255,255,255,0.04)",
+                  color: FROST,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 13,
+                  outline: "none",
+                  transition: "border-color 0.2s",
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(192,139,136,0.3)" }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = CARD_BORDER }}
+              />
+              <button
+                onClick={handleAskAboutPage}
+                disabled={askLoading || !askQuestion.trim()}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(192,139,136,0.3)",
+                  background: askQuestion.trim() ? "rgba(192,139,136,0.15)" : "transparent",
+                  color: askQuestion.trim() ? ROSE_GOLD : TEXT_TERTIARY,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: askQuestion.trim() ? "pointer" : "default",
+                  transition: "all 0.15s",
+                  opacity: askLoading ? 0.5 : 1,
+                  flexShrink: 0,
+                }}
+              >
+                {askLoading ? "..." : "Ask"}
+              </button>
+            </div>
           </div>
         </div>
       )}

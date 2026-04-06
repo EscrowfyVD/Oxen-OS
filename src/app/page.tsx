@@ -56,7 +56,7 @@ interface DashboardData {
   stats: {
     activeClients: number
     pipelineValue: number
-    totalDeals: number
+    monthlyVolume: number
     userOpenTasks: number
   }
   activityFeed: ActivityItem[]
@@ -116,10 +116,10 @@ export default function DashboardPage() {
 
   const stats = data?.stats
   const kpiCards = [
-    { label: "Active Clients", value: stats?.activeClients ?? 0, prefix: "", color: KPI_COLORS[0] },
-    { label: "Pipeline Value", value: stats?.pipelineValue ?? 0, prefix: "\u20AC", color: KPI_COLORS[1] },
-    { label: "Total Deals", value: stats?.totalDeals ?? 0, prefix: "", color: KPI_COLORS[2] },
-    { label: "Your Open Tasks", value: stats?.userOpenTasks ?? 0, prefix: "", color: KPI_COLORS[3] },
+    { label: "Active Clients", value: Number(stats?.activeClients) || 0, prefix: "", color: KPI_COLORS[0] },
+    { label: "Pipeline Value", value: Number(stats?.pipelineValue) || 0, prefix: "\u20AC", color: KPI_COLORS[1] },
+    { label: "Monthly Volume", value: Number(stats?.monthlyVolume) || 0, prefix: "\u20AC", color: KPI_COLORS[2] },
+    { label: "Your Open Tasks", value: Number(stats?.userOpenTasks) || 0, prefix: "", color: KPI_COLORS[3] },
   ]
 
   const handleQuickAction = (action: QuickAction) => {

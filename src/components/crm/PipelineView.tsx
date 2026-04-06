@@ -11,6 +11,8 @@ import {
   getAgingColor,
   fmtCurrency,
   CRM_COLORS,
+  OUTREACH_GROUPS,
+  OUTREACH_GROUP_COLORS,
 } from "@/lib/crm-config"
 import {
   CARD_BG,
@@ -34,6 +36,7 @@ export interface PipelineDeal {
     lastName: string
     email?: string | null
     companyId?: string | null
+    outreachGroup?: string | null
   } | null
   companyId?: string | null
   company?: { id: string; name: string; domain?: string | null } | null
@@ -410,7 +413,19 @@ function DealCard({
         </div>
       )}
 
-      {/* Row 3: vertical tags */}
+      {/* Row 3: outreach group badge */}
+      {deal.contact?.outreachGroup && (() => {
+        const gObj = OUTREACH_GROUPS.find((g) => g.id === deal.contact?.outreachGroup)
+        return gObj ? (
+          <div style={{ marginBottom: 6 }}>
+            <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 8, background: `${gObj.color}18`, color: gObj.color, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, whiteSpace: "nowrap" }}>
+              {gObj.short}
+            </span>
+          </div>
+        ) : null
+      })()}
+
+      {/* Row 4: vertical tags */}
       {verticals.length > 0 && (
         <div
           style={{

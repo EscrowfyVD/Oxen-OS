@@ -209,10 +209,13 @@ type Research = {
   query: string | null
   type: string
   frequency: string | null
+  scheduledDay: string | null
+  scheduledTime: string | null
   lastRunAt: string | null
   nextRunAt: string | null
   status: string
   archived: boolean
+  createdBy: string
   createdAt: string
   resultCount: number
   unreadCount: number
@@ -250,6 +253,9 @@ export default function IntelPage() {
   const [employees, setEmployees] = useState<{ id: string; name: string; email: string }[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [runningCron, setRunningCron] = useState(false)
+  const [currentUserEmail, setCurrentUserEmail] = useState("")
+  const [currentUserName, setCurrentUserName] = useState("")
+  const [viewMode, setViewMode] = useState<"all" | "mine">("mine")
 
   // New improvement states
   const [showArchived, setShowArchived] = useState(false)
@@ -275,6 +281,8 @@ export default function IntelPage() {
   const [formCompanyInput, setFormCompanyInput] = useState("")
   const [formRegions, setFormRegions] = useState<string[]>(["europe", "uae", "uk", "malta", "cyprus"])
   const [formLanguage, setFormLanguage] = useState("english")
+  const [formScheduledDay, setFormScheduledDay] = useState<string | null>(null)
+  const [formScheduledTime, setFormScheduledTime] = useState("09:00")
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -282,7 +290,13 @@ export default function IntelPage() {
       .then((r) => r.json())
       .then((d) => {
         const rl = d.employee?.roleLevel ?? "member"
-        if (rl === "super_admin" || rl === "admin") setIsAdmin(true)
+        const admin = rl === "super_admin" || rl === "admin"
+        if (admin) {
+          setIsAdmin(true)
+          setViewMode("all")
+        }
+        if (d.employee?.email) setCurrentUserEmail(d.employee.email)
+        if (d.employee?.name) setCurrentUserName(d.employee.name)
       })
       .catch(() => {})
     fetch("/api/team")
@@ -398,6 +412,8 @@ export default function IntelPage() {
           language: formLanguage,
           type: formType,
           frequency: formType === "recurring" ? formFrequency : null,
+          scheduledDay: formType === "recurring" ? formScheduledDay : null,
+          scheduledTime: formType === "recurring" ? formScheduledTime : null,
         }),
       })
       const data = await res.json()
@@ -420,6 +436,8 @@ export default function IntelPage() {
       setFormCompanyInput("")
       setFormRegions(["europe", "uae", "uk", "malta", "cyprus"])
       setFormLanguage("english")
+      setFormScheduledDay(null)
+      setFormScheduledTime("09:00")
       fetchResearches()
 
       // Auto-run the research
@@ -570,6 +588,14 @@ export default function IntelPage() {
 
   const categories = ["all", "marketing", "ai_tools", "competitors", "regulations", "conferences", "oxen", "finance"]
 
+  // Filter researches based on viewMode
+  const filteredResearches = viewMode === "mine"
+    ? researches.filter((r) => {
+        const cb = (r.createdBy || "").toLowerCase()
+        return cb === currentUserEmail.toLowerCase() || cb === currentUserName.toLowerCase()
+      })
+    : researches
+
   const resultGroups = groupResultsByDate(results)
 
   return (
@@ -696,6 +722,33 @@ export default function IntelPage() {
             </div>
           </div>
 
+          {/* All / My Researches toggle */}
+          <div className="flex" style={{ marginBottom: 10, borderRadius: 6, overflow: "hidden", border: `1px solid ${CARD_BORDER}` }}>
+            {(["all", "mine"] as const).map((mode) => {
+              const active = viewMode === mode
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  style={{
+                    flex: 1,
+                    padding: "5px 0",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    border: "none",
+                    background: active ? `${ROSE_GOLD}15` : "transparent",
+                    color: active ? ROSE_GOLD : TEXT_TERTIARY,
+                    borderBottom: active ? `2px solid ${ROSE_GOLD}` : "2px solid transparent",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {mode === "all" ? "All Researches" : "My Researches"}
+                </button>
+              )
+            })}
+          </div>
+
           {/* Bulk actions bar */}
           {bulkSelect && selectedIds.size > 0 && (
             <div className="flex items-center gap-2" style={{ marginBottom: 8, padding: "6px 10px", borderRadius: 6, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
@@ -710,7 +763,7 @@ export default function IntelPage() {
           )}
 
           {/* Delete completed button */}
-          {researches.some((r) => r.status === "completed") && (
+          {filteredResearches.some((r) => r.status === "completed") && (
             <button
               onClick={() => setShowDeleteConfirm("completed")}
               style={{
@@ -752,7 +805,7 @@ export default function IntelPage() {
           </div>
 
           <div style={{ marginTop: 8 }}>
-            {researches.map((r) => {
+            {filteredResearches.map((r) => {
               const active = selectedResearch === r.id
               const catColor = CATEGORY_COLORS[r.category] || TEXT_SECONDARY
               const statusDot = r.status === "active" ? "#22C55E" : r.status === "paused" ? "#F59E0B" : r.status === "archived" ? "#818CF8" : TEXT_TERTIARY
@@ -912,9 +965,9 @@ export default function IntelPage() {
               )
             })}
 
-            {researches.length === 0 && (
+            {filteredResearches.length === 0 && (
               <div style={{ padding: "40px 20px", textAlign: "center", color: TEXT_TERTIARY, fontSize: 13 }}>
-                No researches yet.
+                {viewMode === "mine" ? "No researches by you yet." : "No researches yet."}
                 <br />
                 Click &quot;+ New Research&quot; to start.
               </div>
@@ -1982,7 +2035,7 @@ export default function IntelPage() {
                 <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Frequency</span>
                 <select
                   value={formFrequency}
-                  onChange={(e) => setFormFrequency(e.target.value)}
+                  onChange={(e) => { setFormFrequency(e.target.value); setFormScheduledDay(null) }}
                   style={{
                     width: "100%",
                     padding: "8px 12px",
@@ -2000,6 +2053,149 @@ export default function IntelPage() {
                   <option value="monthly">Monthly</option>
                 </select>
               </label>
+            )}
+
+            {/* Schedule — Day picker for weekly/biweekly */}
+            {formType === "recurring" && (formFrequency === "weekly" || formFrequency === "biweekly") && (
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Day of the week</span>
+                <div className="flex gap-1" style={{ flexWrap: "wrap" }}>
+                  {[
+                    { value: "monday", label: "Mon" },
+                    { value: "tuesday", label: "Tue" },
+                    { value: "wednesday", label: "Wed" },
+                    { value: "thursday", label: "Thu" },
+                    { value: "friday", label: "Fri" },
+                    { value: "saturday", label: "Sat" },
+                    { value: "sunday", label: "Sun" },
+                  ].map((d) => {
+                    const sel = formScheduledDay === d.value
+                    return (
+                      <button
+                        key={d.value}
+                        type="button"
+                        onClick={() => setFormScheduledDay(sel ? null : d.value)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 6,
+                          border: sel ? `1px solid ${ROSE_GOLD}` : `1px solid ${CARD_BORDER}`,
+                          background: sel ? `${ROSE_GOLD}15` : "transparent",
+                          color: sel ? ROSE_GOLD : TEXT_TERTIARY,
+                          fontSize: 11,
+                          fontWeight: sel ? 600 : 400,
+                          cursor: "pointer",
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        {d.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Schedule — Day of month picker for monthly */}
+            {formType === "recurring" && formFrequency === "monthly" && (
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Day of the month</span>
+                <select
+                  value={formScheduledDay || ""}
+                  onChange={(e) => setFormScheduledDay(e.target.value || null)}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${CARD_BORDER}`,
+                    background: "#0A0C10",
+                    color: TEXT_PRIMARY,
+                    fontSize: 13,
+                    outline: "none",
+                  }}
+                >
+                  <option value="">Select day...</option>
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={String(d)}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Schedule — Time picker for all recurring */}
+            {formType === "recurring" && (
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ fontSize: 12, color: TEXT_SECONDARY, display: "block", marginBottom: 6 }}>Time</span>
+                <div className="flex gap-2 items-center">
+                  <select
+                    value={formScheduledTime.split(":")[0]}
+                    onChange={(e) => setFormScheduledTime(`${e.target.value}:${formScheduledTime.split(":")[1]}`)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${CARD_BORDER}`,
+                      background: "#0A0C10",
+                      color: TEXT_PRIMARY,
+                      fontSize: 13,
+                      outline: "none",
+                      width: 80,
+                    }}
+                  >
+                    {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <span style={{ color: TEXT_TERTIARY, fontSize: 14 }}>:</span>
+                  <select
+                    value={formScheduledTime.split(":")[1]}
+                    onChange={(e) => setFormScheduledTime(`${formScheduledTime.split(":")[0]}:${e.target.value}`)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${CARD_BORDER}`,
+                      background: "#0A0C10",
+                      color: TEXT_PRIMARY,
+                      fontSize: 13,
+                      outline: "none",
+                      width: 80,
+                    }}
+                  >
+                    {["00", "15", "30", "45"].map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Schedule summary line */}
+            {formType === "recurring" && (
+              <div style={{
+                marginBottom: 16,
+                padding: "8px 12px",
+                borderRadius: 8,
+                background: "rgba(129,140,248,0.08)",
+                border: "1px solid rgba(129,140,248,0.15)",
+              }}>
+                <span style={{ fontSize: 12, color: "#818CF8" }}>
+                  {(() => {
+                    const time = formScheduledTime || "09:00"
+                    if (formFrequency === "daily") return `Runs daily at ${time}`
+                    if (formFrequency === "weekly")
+                      return formScheduledDay
+                        ? `Runs every ${formScheduledDay.charAt(0).toUpperCase() + formScheduledDay.slice(1)} at ${time}`
+                        : `Runs every week at ${time}`
+                    if (formFrequency === "biweekly")
+                      return formScheduledDay
+                        ? `Runs every other ${formScheduledDay.charAt(0).toUpperCase() + formScheduledDay.slice(1)} at ${time}`
+                        : `Runs every 2 weeks at ${time}`
+                    if (formFrequency === "monthly")
+                      return formScheduledDay
+                        ? `Runs on the ${formScheduledDay}${["1","21"].includes(formScheduledDay) ? "st" : ["2","22"].includes(formScheduledDay) ? "nd" : ["3","23"].includes(formScheduledDay) ? "rd" : "th"} of each month at ${time}`
+                        : `Runs monthly at ${time}`
+                    return `Runs ${formFrequency} at ${time}`
+                  })()}
+                </span>
+              </div>
             )}
 
             {/* Submit */}

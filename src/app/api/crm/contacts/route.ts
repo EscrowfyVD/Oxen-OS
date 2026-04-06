@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   const geoZone = searchParams.get("geoZone")
   const dealOwner = searchParams.get("dealOwner")
   const contactType = searchParams.get("contactType")
+  const outreachGroup = searchParams.get("outreachGroup")
   const q = searchParams.get("q")
   const sortBy = searchParams.get("sortBy") || "createdAt"
   const sortDir = (searchParams.get("sortDir") || "desc") as "asc" | "desc"
@@ -38,6 +39,9 @@ export async function GET(request: Request) {
   }
   if (contactType && contactType !== "all") {
     where.contactType = contactType
+  }
+  if (outreachGroup && outreachGroup !== "all") {
+    where.outreachGroup = outreachGroup
   }
   if (q) {
     where.OR = [
@@ -94,6 +98,7 @@ export async function POST(request: Request) {
       country, city, doNotContact, pinnedNote,
       telegram, whatsapp, website, introducerId,
       introducerVertical, introducerGeo,
+      outreachGroup,
     } = body
 
     if (!firstName || !lastName || !email) {
@@ -148,6 +153,7 @@ export async function POST(request: Request) {
         introducerId: introducerId ?? null,
         introducerVertical: introducerVertical ?? [],
         introducerGeo: introducerGeo ?? null,
+        outreachGroup: outreachGroup ?? null,
         createdBy: userId,
       },
       include: {

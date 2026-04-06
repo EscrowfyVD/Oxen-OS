@@ -2,6 +2,60 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
+const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+
+/**
+ * Compute the exact next run datetime for a recurring research
+ * using scheduledDay and scheduledTime when available, falling back to simple offsets.
+ */
+function computeNextRunAt(
+  from: Date,
+  frequency: string,
+  scheduledDay: string | null,
+  scheduledTime: string | null,
+): Date {
+  // Parse time (default 09:00)
+  const [hours, minutes] = (scheduledTime || "09:00").split(":").map(Number)
+
+  if (frequency === "daily") {
+    const next = new Date(from)
+    next.setDate(next.getDate() + 1)
+    next.setHours(hours, minutes, 0, 0)
+    return next
+  }
+
+  if (frequency === "weekly" || frequency === "biweekly") {
+    const targetDayIndex = scheduledDay ? DAY_NAMES.indexOf(scheduledDay.toLowerCase()) : -1
+    const next = new Date(from)
+    if (targetDayIndex >= 0) {
+      // Advance to the next occurrence of the target day
+      const currentDay = next.getDay()
+      let daysUntil = targetDayIndex - currentDay
+      if (daysUntil <= 0) daysUntil += 7
+      if (frequency === "biweekly") daysUntil += 7
+      next.setDate(next.getDate() + daysUntil)
+    } else {
+      next.setDate(next.getDate() + (frequency === "biweekly" ? 14 : 7))
+    }
+    next.setHours(hours, minutes, 0, 0)
+    return next
+  }
+
+  if (frequency === "monthly") {
+    const targetDay = scheduledDay ? parseInt(scheduledDay, 10) : null
+    const next = new Date(from)
+    next.setMonth(next.getMonth() + 1)
+    if (targetDay && targetDay >= 1 && targetDay <= 28) {
+      next.setDate(targetDay)
+    }
+    next.setHours(hours, minutes, 0, 0)
+    return next
+  }
+
+  // Fallback: 7 days
+  return new Date(from.getTime() + 604800000)
+}
+
 export async function GET(request: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -55,7 +109,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = await request.json()
-  const { title, category, subcategory, query, type, frequency, sources, keywords, companies, regions, language } = body
+  const { title, category, subcategory, query, type, frequency, sources, keywords, companies, regions, language, scheduledDay, scheduledTime } = body
 
   if (!title || !category || !type) {
     return NextResponse.json({ error: "title, category, and type are required" }, { status: 400 })
@@ -80,13 +134,7 @@ export async function POST(request: Request) {
   const now = new Date()
   let nextRunAt: Date | null = null
   if (type === "recurring" && frequency) {
-    const ms: Record<string, number> = {
-      daily: 86400000,
-      weekly: 604800000,
-      biweekly: 1209600000,
-      monthly: 2592000000,
-    }
-    nextRunAt = new Date(now.getTime() + (ms[frequency] || 604800000))
+    nextRunAt = computeNextRunAt(now, frequency, scheduledDay || null, scheduledTime || null)
   }
 
   const research = await prisma.intelResearch.create({
@@ -102,6 +150,8 @@ export async function POST(request: Request) {
       language: language || "english",
       type,
       frequency: type === "recurring" ? frequency : null,
+      scheduledDay: type === "recurring" ? (scheduledDay || null) : null,
+      scheduledTime: type === "recurring" ? (scheduledTime || null) : null,
       nextRunAt,
       createdBy: session.user?.email ?? "unknown",
     },

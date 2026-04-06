@@ -5,6 +5,53 @@ import Anthropic from "@anthropic-ai/sdk"
 
 const anthropic = new Anthropic()
 
+const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+
+function computeNextRunAt(
+  from: Date,
+  frequency: string,
+  scheduledDay: string | null,
+  scheduledTime: string | null,
+): Date {
+  const [hours, minutes] = (scheduledTime || "09:00").split(":").map(Number)
+
+  if (frequency === "daily") {
+    const next = new Date(from)
+    next.setDate(next.getDate() + 1)
+    next.setHours(hours, minutes, 0, 0)
+    return next
+  }
+
+  if (frequency === "weekly" || frequency === "biweekly") {
+    const targetDayIndex = scheduledDay ? DAY_NAMES.indexOf(scheduledDay.toLowerCase()) : -1
+    const next = new Date(from)
+    if (targetDayIndex >= 0) {
+      const currentDay = next.getDay()
+      let daysUntil = targetDayIndex - currentDay
+      if (daysUntil <= 0) daysUntil += 7
+      if (frequency === "biweekly") daysUntil += 7
+      next.setDate(next.getDate() + daysUntil)
+    } else {
+      next.setDate(next.getDate() + (frequency === "biweekly" ? 14 : 7))
+    }
+    next.setHours(hours, minutes, 0, 0)
+    return next
+  }
+
+  if (frequency === "monthly") {
+    const targetDay = scheduledDay ? parseInt(scheduledDay, 10) : null
+    const next = new Date(from)
+    next.setMonth(next.getMonth() + 1)
+    if (targetDay && targetDay >= 1 && targetDay <= 28) {
+      next.setDate(targetDay)
+    }
+    next.setHours(hours, minutes, 0, 0)
+    return next
+  }
+
+  return new Date(from.getTime() + 604800000)
+}
+
 const SYSTEM_PROMPT = `You are Sentinel's intelligence engine for Oxen Finance, a premium B2B banking and payment infrastructure platform serving iGaming, crypto, family offices, and luxury sectors.
 
 Perform the following research and return structured results as a JSON array. Each result must have:
@@ -74,17 +121,12 @@ export async function POST() {
         }
       }
 
-      const ms: Record<string, number> = {
-        daily: 86400000,
-        weekly: 604800000,
-        biweekly: 1209600000,
-        monthly: 2592000000,
-      }
+      const nextRunAt = computeNextRunAt(now, research.frequency || "weekly", research.scheduledDay, research.scheduledTime)
       await prisma.intelResearch.update({
         where: { id: research.id },
         data: {
           lastRunAt: now,
-          nextRunAt: new Date(now.getTime() + (ms[research.frequency || "weekly"] || 604800000)),
+          nextRunAt,
         },
       })
 

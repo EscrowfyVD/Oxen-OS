@@ -51,6 +51,7 @@ export async function GET(request: Request) {
           lastName: true,
           email: true,
           companyId: true,
+          outreachGroup: true,
         },
       },
       company: {

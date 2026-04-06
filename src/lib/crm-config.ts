@@ -167,6 +167,35 @@ export function getAgingLabel(days: number): string {
   return "On Track"
 }
 
+// ─── Outreach Groups ───
+export const OUTREACH_GROUPS = [
+  { id: "group_1", label: "GROUP 1 — STRUCTURAL ARCHITECTS", short: "Structural Architects", description: "Fiduciaries, CSPs, Company Formation Agents", color: "#818CF8" },
+  { id: "group_2", label: "GROUP 2 — LEGAL DEAL-FLOW", short: "Legal Deal-Flow", description: "Corporate Lawyers, M&A, International Contracts", color: "#C08B88" },
+  { id: "group_3", label: "GROUP 3 — INVESTMENT GATEKEEPERS", short: "Investment Gatekeepers", description: "Golden Visa, CBI, RBI Specialists", color: "#34D399" },
+  { id: "group_4", label: "GROUP 4 — WEALTH INTERMEDIARIES", short: "Wealth Intermediaries", description: "Multi-Family Offices (MFOs)", color: "#FBBF24" },
+  { id: "group_5", label: "GROUP 5 — COMPLIANCE & ACCOUNTING", short: "Compliance & Accounting", description: "Accountants, Tax Lawyers, CFO-as-a-Service", color: "#A78BFA" },
+  { id: "group_6", label: "GROUP 6 — HIGH-TICKET SETTLEMENT", short: "High-Ticket Settlement", description: "Luxury Brokers: Yachts, Private Jets, Art, Real Estate", color: "#F87171" },
+  { id: "group_7a", label: "GROUP 7A — LIFESTYLE INTERMEDIARIES", short: "Lifestyle Intermediaries", description: "Luxury Concierges", color: "#22D3EE" },
+  { id: "group_7b", label: "GROUP 7B — MOBILITY INTERMEDIARIES", short: "Mobility Intermediaries", description: "Relocation Agencies", color: "#60A5FA" },
+]
+
+export const OUTREACH_GROUP_COLORS: Record<string, string> = {}
+for (const g of OUTREACH_GROUPS) OUTREACH_GROUP_COLORS[g.id] = g.color
+
+// Auto-suggest group based on sub-vertical
+export function suggestGroupFromSubVertical(subVertical: string): string | null {
+  const lower = subVertical.toLowerCase()
+  if (lower.includes("trustee") || lower.includes("fiduciar") || lower.includes("csp") || lower.includes("company formation")) return "group_1"
+  if (lower.includes("lawyer") || lower.includes("legal") || lower.includes("m&a") || lower.includes("contract")) return "group_2"
+  if (lower.includes("golden visa") || lower.includes("cbi") || lower.includes("rbi") || lower.includes("investment migration")) return "group_3"
+  if (lower.includes("family office") || lower.includes("mfo") || lower.includes("multi-family")) return "group_4"
+  if (lower.includes("accountant") || lower.includes("tax") || lower.includes("cfo") || lower.includes("audit")) return "group_5"
+  if (lower.includes("yacht") || lower.includes("jet") || lower.includes("art deal") || lower.includes("real estate") || lower.includes("luxury")) return "group_6"
+  if (lower.includes("concierge")) return "group_7a"
+  if (lower.includes("relocation")) return "group_7b"
+  return null
+}
+
 // ─── Contact Types ───
 export const CONTACT_TYPES = ["prospect", "client", "introducer", "partner"] as const
 export type ContactType = (typeof CONTACT_TYPES)[number]

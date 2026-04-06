@@ -6,6 +6,7 @@ import {
   STAGE_COLORS, STAGE_LABELS, LIFECYCLE_STAGES,
   VERTICALS, GEO_ZONES, DEAL_OWNERS, CONTACT_TYPES,
   OWNER_COLORS, CRM_COLORS,
+  OUTREACH_GROUPS, OUTREACH_GROUP_COLORS,
 } from "@/lib/crm-config"
 
 /* ── Design Tokens ── */
@@ -30,6 +31,7 @@ interface CrmContact {
   geoZone: string | null
   dealOwner: string | null
   vertical: string[]
+  outreachGroup: string | null
   lastInteraction: string | null
   totalInteractions: number
   createdAt: string
@@ -79,6 +81,7 @@ export default function ContactListPage() {
 
   // Filters
   const [search, setSearch] = useState("")
+  const [outreachGroup, setOutreachGroup] = useState("all")
   const [lifecycleStage, setLifecycleStage] = useState("all")
   const [dealOwner, setDealOwner] = useState("all")
   const [vertical, setVertical] = useState("all")
@@ -97,6 +100,7 @@ export default function ContactListPage() {
     params.set("sortBy", sortBy)
     params.set("sortDir", sortDir)
     if (search) params.set("q", search)
+    if (outreachGroup !== "all") params.set("outreachGroup", outreachGroup)
     if (lifecycleStage !== "all") params.set("lifecycleStage", lifecycleStage)
     if (dealOwner !== "all") params.set("dealOwner", dealOwner)
     if (vertical !== "all") params.set("vertical", vertical)
@@ -110,7 +114,7 @@ export default function ContactListPage() {
       setPagination(data.pagination ?? { page: 1, limit: 50, total: 0, totalPages: 1 })
     } catch { /* ignore */ }
     setLoading(false)
-  }, [search, lifecycleStage, dealOwner, vertical, geoZone, contactType, sortBy, sortDir])
+  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, sortBy, sortDir])
 
   useEffect(() => { fetchContacts(1) }, [fetchContacts])
 
@@ -187,6 +191,10 @@ export default function ContactListPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{ flex: "1 1 220px", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "7px 12px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", minWidth: 200 }}
           />
+          <select value={outreachGroup} onChange={(e) => setOutreachGroup(e.target.value)} style={selectStyle}>
+            <option value="all">All Groups</option>
+            {OUTREACH_GROUPS.map((g) => <option key={g.id} value={g.id}>{g.short}</option>)}
+          </select>
           <select value={lifecycleStage} onChange={(e) => setLifecycleStage(e.target.value)} style={selectStyle}>
             <option value="all">All Stages</option>
             {LIFECYCLE_STAGES.map((s) => <option key={s} value={s}>{STAGE_LABELS[s] || s}</option>)}
@@ -218,6 +226,7 @@ export default function ContactListPage() {
               <thead>
                 <tr>
                   <th style={thStyle} onClick={() => handleSort("firstName")}>Name{sortArrow("firstName")}</th>
+                  <th style={thStyle}>Group</th>
                   <th style={thStyle} onClick={() => handleSort("company")}>Company{sortArrow("company")}</th>
                   <th style={thStyle} onClick={() => handleSort("email")}>Email{sortArrow("email")}</th>
                   <th style={thStyle} onClick={() => handleSort("lifecycleStage")}>Stage{sortArrow("lifecycleStage")}</th>
@@ -231,17 +240,18 @@ export default function ContactListPage() {
               <tbody>
                 {loading && contacts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ ...tdStyle, textAlign: "center", padding: "40px 12px", color: TEXT3 }}>Loading...</td>
+                    <td colSpan={10} style={{ ...tdStyle, textAlign: "center", padding: "40px 12px", color: TEXT3 }}>Loading...</td>
                   </tr>
                 ) : contacts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ ...tdStyle, textAlign: "center", padding: "40px 12px", color: TEXT3 }}>No contacts found</td>
+                    <td colSpan={10} style={{ ...tdStyle, textAlign: "center", padding: "40px 12px", color: TEXT3 }}>No contacts found</td>
                   </tr>
                 ) : (
                   contacts.map((c) => {
                     const stageColor = STAGE_COLORS[c.lifecycleStage] || "#9CA3AF"
                     const stageLabel = STAGE_LABELS[c.lifecycleStage] || c.lifecycleStage || "—"
                     const ownerColor = OWNER_COLORS[c.dealOwner || ""] || "#9CA3AF"
+                    const groupObj = c.outreachGroup ? OUTREACH_GROUPS.find((g) => g.id === c.outreachGroup) : null
                     return (
                       <tr
                         key={c.id}
@@ -252,6 +262,11 @@ export default function ContactListPage() {
                       >
                         <td style={tdStyle}>
                           <div style={{ fontWeight: 500 }}>{c.firstName} {c.lastName}</div>
+                        </td>
+                        <td style={tdStyle}>
+                          {groupObj ? (
+                            <Badge label={groupObj.short} color={groupObj.color} />
+                          ) : <span style={{ fontSize: 11, color: TEXT3 }}>—</span>}
                         </td>
                         <td style={{ ...tdStyle, color: TEXT2 }}>{c.company?.name || "—"}</td>
                         <td style={{ ...tdStyle, color: TEXT2, fontSize: 12 }}>{c.email || "—"}</td>

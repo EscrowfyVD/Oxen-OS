@@ -37,6 +37,7 @@ type NavItem = {
   count: number | null
   pageKey?: string
   hasSubNav?: boolean
+  section?: "main" | "internal"
 }
 
 const CRM_SUB_ITEMS = [
@@ -49,21 +50,23 @@ const CRM_SUB_ITEMS = [
 ]
 
 const NAV_ITEMS: NavItem[] = [
+  // ── MAIN ──
   { label: "Dashboard", href: "/", icon: LayoutDashboard, badge: null, count: null },
   { label: "Sentinel", href: "/ai", icon: Shield, badge: null, count: null },
   { label: "Tasks", href: "/tasks", icon: CheckSquare, badge: null, count: 12 },
   { label: "Calendar", href: "/calendar", icon: CalendarDays, badge: null, count: null },
-  { label: "Wiki", href: "/wiki", icon: BookOpen, badge: null, count: null },
-  { label: "Organigramme", href: "/org", icon: Building2, badge: null, count: null },
-  { label: "Team", href: "/team", icon: Users, badge: null, count: null },
-  { label: "Absences", href: "/absences", icon: Palmtree, badge: null, count: null },
-  { label: "Finance", href: "/finance", icon: Wallet, badge: null, count: null, pageKey: "finance" },
-  { label: "Marketing", href: "/marketing", icon: Megaphone, badge: null, count: null, pageKey: "marketing" },
-  { label: "Support", href: "/support", icon: Headphones, badge: null, count: null },
   { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null, pageKey: "crm", hasSubNav: true },
+  { label: "Marketing", href: "/marketing", icon: Megaphone, badge: null, count: null, pageKey: "marketing" },
   { label: "Intel", href: "/intel", icon: Search, badge: null, count: null },
   { label: "Conferences", href: "/conferences", icon: Tent, badge: null, count: null },
+  { label: "Finance", href: "/finance", icon: Wallet, badge: null, count: null, pageKey: "finance" },
   { label: "Compliance", href: "/compliance", icon: ShieldCheck, badge: null, count: null, pageKey: "compliance" },
+  { label: "Support", href: "/support", icon: Headphones, badge: null, count: null },
+  // ── INTERNAL ──
+  { label: "Organigramme", href: "/org", icon: Building2, badge: null, count: null, section: "internal" },
+  { label: "Team", href: "/team", icon: Users, badge: null, count: null, section: "internal" },
+  { label: "Wiki", href: "/wiki", icon: BookOpen, badge: null, count: null, section: "internal" },
+  { label: "Absences", href: "/absences", icon: Palmtree, badge: null, count: null, section: "internal" },
 ]
 
 export default function Sidebar() {
@@ -217,11 +220,19 @@ export default function Sidebar() {
 
         {/* Nav items */}
         <nav className="flex-1 overflow-y-auto" style={{ padding: 0 }}>
-          {navItems.map((item) => {
+          {navItems.map((item, index) => {
             const active = isActive(item.href)
             const crmExpanded = item.hasSubNav && pathname.startsWith("/crm")
+            const isFirstInternal =
+              item.section === "internal" &&
+              (index === 0 || navItems[index - 1].section !== "internal")
             return (
               <div key={item.href}>
+                {isFirstInternal && (
+                  <div className="nav-section-label">
+                    Internal
+                  </div>
+                )}
                 <Link
                   href={item.href}
                   onClick={() => setMobileOpen(false)}

@@ -72,7 +72,9 @@ export async function GET(request: Request) {
 
   // ── KPIs ──
 
-  const [activeDeals, pipelineAgg, meetingsThisWeek, overdueTasks] =
+  const INTERNAL_TITLE_PATTERNS = /team call|internal|standup|stand-up/i
+
+  const [activeDeals, pipelineAgg, calendarEventsRaw, overdueTasks] =
     await Promise.all([
       // Active deals count
       prisma.deal.count({
@@ -91,11 +93,12 @@ export async function GET(request: Request) {
         },
       }),
 
-      // Calendar events this week (no owner filter — can't filter easily)
-      prisma.calendarEvent.count({
+      // Calendar events this week — fetched for in-memory filtering
+      prisma.calendarEvent.findMany({
         where: {
           startTime: { gte: weekStart, lte: weekEnd },
         },
+        select: { title: true, attendees: true },
       }),
 
       // Overdue tasks
@@ -107,6 +110,17 @@ export async function GET(request: Request) {
         },
       }),
     ])
+
+  // Only count external meetings:
+  //  - Exclude events whose title matches internal patterns
+  //  - Keep only events with at least one non-@oxen.finance attendee
+  const meetingsThisWeek = calendarEventsRaw.filter((event) => {
+    if (INTERNAL_TITLE_PATTERNS.test(event.title)) return false
+    const hasExternalAttendee = event.attendees.some(
+      (email) => !email.toLowerCase().endsWith("@oxen.finance")
+    )
+    return hasExternalAttendee
+  }).length
 
   const kpis = {
     activeDeals,

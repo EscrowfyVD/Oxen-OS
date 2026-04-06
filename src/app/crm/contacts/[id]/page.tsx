@@ -7,6 +7,7 @@ import {
   ICP_FITS, RELATIONSHIP_STRENGTHS, OWNER_COLORS, KYC_STATUSES,
   VERTICALS, SUB_VERTICALS, GEO_ZONES, DEAL_OWNERS,
   ACQUISITION_SOURCES, CRM_COLORS, fmtCurrency,
+  OUTREACH_GROUPS, OUTREACH_GROUP_COLORS,
 } from "@/lib/crm-config"
 import SupportTab from "@/components/crm/SupportTab"
 
@@ -313,6 +314,7 @@ export default function ContactDetailPage() {
 
             {/* Badges row */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, alignItems: "center" }}>
+              {(() => { const gObj = contact.outreachGroup ? OUTREACH_GROUPS.find((g) => g.id === contact.outreachGroup) : null; return gObj ? <Badge label={gObj.short} color={gObj.color} /> : null })()}
               <Badge label={stageLabel} color={stageColor} />
               {icpObj && <Badge label={icpObj.label} color={icpObj.color} bg={icpObj.bg} />}
               {relObj && <Badge label={relObj.label} color={relObj.color} bg={relObj.bg} />}
@@ -565,6 +567,19 @@ export default function ContactDetailPage() {
           {/* ── Classification Card ── */}
           <GlassCard>
             <h4 style={{ fontSize: 12, color: ROSE, textTransform: "uppercase", letterSpacing: 0.8, margin: "0 0 14px", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Classification</h4>
+
+            {/* Outreach Group */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: TEXT3, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>Outreach Group</div>
+              <select
+                value={contact.outreachGroup || ""}
+                onChange={(e) => patchContact({ outreachGroup: e.target.value || null })}
+                style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${contact.outreachGroup ? (OUTREACH_GROUP_COLORS[contact.outreachGroup] || CARD_BORDER) + "60" : CARD_BORDER}`, borderRadius: 8, color: contact.outreachGroup ? (OUTREACH_GROUP_COLORS[contact.outreachGroup] || TEXT) : TEXT2, padding: "6px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}
+              >
+                <option value="">No Group</option>
+                {OUTREACH_GROUPS.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+              </select>
+            </div>
 
             {/* Verticals */}
             <div style={{ marginBottom: 12 }}>

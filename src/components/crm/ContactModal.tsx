@@ -10,6 +10,7 @@ import {
   DEAL_OWNERS,
   getOwnerForGeo,
   CRM_COLORS,
+  OUTREACH_GROUPS,
 } from "@/lib/crm-config"
 
 /* ── Types ── */
@@ -23,6 +24,7 @@ interface CrmContact {
   linkedinUrl: string
   jobTitle: string
   company: string
+  outreachGroup: string
   verticals: string[]
   subVerticals: string[]
   geoZone: string
@@ -89,7 +91,7 @@ const grid3: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 
 export default function ContactModal({ mode, contact, onSave, onClose }: ContactModalProps) {
   const [form, setForm] = useState<CrmContact>({
     firstName: "", lastName: "", email: "", phone: "", linkedinUrl: "",
-    jobTitle: "", company: "", verticals: [], subVerticals: [], geoZone: "",
+    jobTitle: "", company: "", outreachGroup: "", verticals: [], subVerticals: [], geoZone: "",
     acquisitionSource: "", acquisitionSourceDetail: "", contactType: "prospect",
     dealOwner: "", telegram: "", whatsapp: "", website: "", country: "", city: "",
     pinnedNote: "", doNotContact: false,
@@ -232,6 +234,15 @@ export default function ContactModal({ mode, contact, onSave, onClose }: Contact
               ))}
             </div>
           )}
+        </div>
+
+        {/* ── Outreach Group ── */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>Outreach Group</label>
+          <select style={inputStyle} value={form.outreachGroup} onChange={(e) => set("outreachGroup", e.target.value)}>
+            <option value="">Select group...</option>
+            {OUTREACH_GROUPS.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+          </select>
         </div>
 
         {/* ── Classification ── */}

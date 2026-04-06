@@ -77,6 +77,7 @@ export async function PATCH(
       "telegram", "whatsapp", "website",
       "relationshipStrength", "relationshipScore", "aiSummary",
       "introducerId", "introducerVertical", "introducerGeo",
+      "outreachGroup",
       "lastInteraction", "nextScheduledMeeting",
       "totalInteractions", "avgResponseTimeHours",
     ] as const
