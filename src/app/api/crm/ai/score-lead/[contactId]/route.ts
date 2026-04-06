@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
 import { VERTICALS, GEO_ZONES } from "@/lib/crm-config"
+import { ENABLE_WORKERS, JOB_TYPES } from "@/lib/worker-config"
+import { createJob } from "@/lib/job-queue"
 
 const anthropic = new Anthropic()
 
@@ -20,6 +22,16 @@ export async function POST(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { contactId } = await params
+
+  // Worker mode: queue the job instead of processing inline
+  if (ENABLE_WORKERS) {
+    const job = await createJob({
+      type: JOB_TYPES.AI_SCORE_LEAD,
+      payload: { contactId },
+      createdBy: session.user?.email ?? "unknown",
+    })
+    return NextResponse.json({ jobId: job.id, status: "queued" }, { status: 202 })
+  }
 
   try {
     const contact = await prisma.crmContact.findUnique({

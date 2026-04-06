@@ -1295,3 +1295,25 @@ model SeoAlert {
   resolvedNote String?
   createdAt    DateTime  @default(now())
 }
+
+model Job {
+  id          String    @id @default(cuid())
+  type        String    // e.g. "ai:score-lead", "ai:generate-article", "sync:email"
+  status      String    @default("pending") // pending, processing, completed, failed
+  payload     Json      // Input data for the job
+  result      Json?     // Output data after completion
+  error       String?   @db.Text
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  priority    Int       @default(0) // Higher = more urgent
+  createdBy   String
+  processedBy String?   // Worker instance ID
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, type])
+  @@index([type, status, priority])
+  @@index([createdAt])
+}

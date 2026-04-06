@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
+import { ENABLE_WORKERS, JOB_TYPES } from "@/lib/worker-config"
+import { createJob } from "@/lib/job-queue"
 
 const client = new Anthropic()
 
@@ -58,6 +60,16 @@ export async function POST(req: Request) {
   const isInternal = req.headers.get("x-internal-call") === "true"
   if (!session?.user && !isInternal) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  // Worker mode: queue the scan job
+  if (ENABLE_WORKERS) {
+    const job = await createJob({
+      type: JOB_TYPES.AI_NEWS_SCAN,
+      payload: { maxScored: 10 },
+      createdBy: session?.user?.email ?? "system",
+    })
+    return NextResponse.json({ jobId: job.id, status: "queued" }, { status: 202 })
   }
 
   const sources = await prisma.newsSource.findMany({

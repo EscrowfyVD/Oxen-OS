@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
+import { ENABLE_WORKERS, JOB_TYPES } from "@/lib/worker-config"
+import { createJob } from "@/lib/job-queue"
 
 const client = new Anthropic()
 
@@ -88,6 +90,16 @@ export async function POST(request: Request) {
 
   const body = await request.json()
   const { topic, newsItemIds, vertical, keywordId } = body
+
+  // Worker mode: queue the generation job
+  if (ENABLE_WORKERS) {
+    const job = await createJob({
+      type: JOB_TYPES.AI_GENERATE_ARTICLE,
+      payload: { topic, newsItemIds, vertical, keywordId },
+      createdBy: session.user?.email ?? "unknown",
+    })
+    return NextResponse.json({ jobId: job.id, status: "queued" }, { status: 202 })
+  }
 
   // Gather context
   let sourceArticles: { id: string; title: string; snippet: string; url: string }[] = []

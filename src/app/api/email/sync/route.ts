@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { refreshAccessToken } from "@/lib/google-calendar"
+import { ENABLE_WORKERS, JOB_TYPES } from "@/lib/worker-config"
+import { createJob } from "@/lib/job-queue"
 
 interface GmailMessage {
   id: string
@@ -126,6 +128,16 @@ export async function POST() {
       { error: "No valid access token." },
       { status: 401 }
     )
+  }
+
+  // Worker mode: queue the sync job
+  if (ENABLE_WORKERS) {
+    const job = await createJob({
+      type: JOB_TYPES.SYNC_EMAIL,
+      payload: { userId, userEmail },
+      createdBy: userEmail,
+    })
+    return NextResponse.json({ jobId: job.id, status: "queued" }, { status: 202 })
   }
 
   try {
