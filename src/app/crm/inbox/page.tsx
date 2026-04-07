@@ -83,7 +83,7 @@ export default function CrmInboxPage() {
   const stageLabel = (stage: string) => STAGE_LABELS[stage] ?? stage
 
   return (
-    <div style={{ padding: "32px 40px", minHeight: "100vh", background: "#060709" }}>
+    <div style={{ padding: "32px 40px", minHeight: "100vh", background: "var(--void)" }}>
       {/* Header */}
       <div className="flex items-center justify-between" style={{ marginBottom: 28 }}>
         <div>
@@ -139,7 +139,7 @@ export default function CrmInboxPage() {
                       fontFamily: "'DM Sans', sans-serif",
                       fontWeight: 500,
                       borderBottom: `1px solid ${CARD_BORDER}`,
-                      background: "rgba(255,255,255,0.02)",
+                      background: "var(--surface-subtle)",
                     }}
                   >
                     {h}
@@ -167,7 +167,7 @@ export default function CrmInboxPage() {
                       transition: "background 0.15s",
                       borderBottom: `1px solid ${CARD_BORDER}`,
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-subtle)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
                     {/* Icon */}

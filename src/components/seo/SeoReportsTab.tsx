@@ -7,11 +7,11 @@ import {
 } from "recharts"
 
 /* ── Design tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const CARD_BG = "var(--card-bg)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const AMBER = "#FBBF24"
@@ -33,7 +33,7 @@ const POSITION_COLORS = {
   page1: GREEN,
   page2: AMBER,
   page3: RED,
-  notRanking: "rgba(240,240,242,0.2)",
+  notRanking: "var(--text-tertiary)",
 }
 
 /* ── Types ── */
@@ -108,7 +108,7 @@ const kpiValue: React.CSSProperties = {
 }
 
 const tooltipStyle: React.CSSProperties = {
-  background: "rgba(15,17,24,0.95)",
+  background: "var(--card-bg-solid)",
   border: `1px solid ${CARD_BORDER}`,
   borderRadius: 8,
   fontSize: 11,
@@ -690,7 +690,7 @@ export default function SeoReportsTab() {
                             width: "100%",
                             height: 8,
                             borderRadius: 4,
-                            background: "rgba(240,240,242,0.06)",
+                            background: "var(--surface-input)",
                             overflow: "hidden",
                           }}
                         >

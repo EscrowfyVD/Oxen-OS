@@ -71,7 +71,7 @@ interface DealForOwner {
 const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) => {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: "rgba(15,17,24,0.95)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: "8px 12px" }}>
+    <div style={{ background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: "8px 12px" }}>
       <p style={{ fontSize: 11, color: TEXT_SECONDARY, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>{label}</p>
       <p style={{ fontSize: 14, color: TEXT_PRIMARY, margin: "4px 0 0", fontFamily: "'Bellfair', serif" }}>
         {fmtCurrencyFull(payload[0].value)}
@@ -174,14 +174,14 @@ export default function CrmReportsPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "80px 40px", color: TEXT_TERTIARY, textAlign: "center", background: "#060709", minHeight: "100vh" }}>
+      <div style={{ padding: "80px 40px", color: TEXT_TERTIARY, textAlign: "center", background: "var(--void)", minHeight: "100vh" }}>
         Loading reports...
       </div>
     )
   }
 
   return (
-    <div style={{ padding: "32px 40px", minHeight: "100vh", background: "#060709" }}>
+    <div style={{ padding: "32px 40px", minHeight: "100vh", background: "var(--void)" }}>
       {/* Header */}
       <h1
         style={{
@@ -241,11 +241,11 @@ export default function CrmReportsPage() {
           </h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={pipelineChartData} barSize={36}>
-              <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke="var(--surface-elevated)" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="name"
                 tick={{ fill: TEXT_TERTIARY, fontSize: 10, fontFamily: "'DM Sans', sans-serif" }}
-                axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+                axisLine={{ stroke: "var(--card-border)" }}
                 tickLine={false}
               />
               <YAxis
@@ -273,7 +273,7 @@ export default function CrmReportsPage() {
             {sourceChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={sourceChartData} barSize={28} layout="vertical">
-                  <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" horizontal={false} />
+                  <CartesianGrid stroke="var(--surface-elevated)" strokeDasharray="3 3" horizontal={false} />
                   <XAxis
                     type="number"
                     tick={{ fill: TEXT_TERTIARY, fontSize: 10, fontFamily: "'DM Sans', sans-serif" }}
@@ -309,7 +309,7 @@ export default function CrmReportsPage() {
             {verticalChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={verticalChartData} barSize={28} layout="vertical">
-                  <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" horizontal={false} />
+                  <CartesianGrid stroke="var(--surface-elevated)" strokeDasharray="3 3" horizontal={false} />
                   <XAxis
                     type="number"
                     tick={{ fill: TEXT_TERTIARY, fontSize: 10, fontFamily: "'DM Sans', sans-serif" }}

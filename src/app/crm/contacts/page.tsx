@@ -244,7 +244,7 @@ export default function ContactListPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div>
-              <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, color: "#fff", margin: 0, lineHeight: 1.2 }}>Contacts</h1>
+              <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, color: "var(--text-primary)", margin: 0, lineHeight: 1.2 }}>Contacts</h1>
               <p style={{ fontSize: 12, color: TEXT3, marginTop: 4, fontFamily: "'DM Sans', sans-serif" }}>
                 {pagination.total} contact{pagination.total !== 1 ? "s" : ""} in database
               </p>

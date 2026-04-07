@@ -22,13 +22,13 @@ import {
 } from "@/lib/crm-config"
 
 /* ── Design tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT = "#F0F0F2"
-const TEXT_SEC = "rgba(240,240,242,0.55)"
-const TEXT_TER = "rgba(240,240,242,0.3)"
+const CARD_BG = "var(--card-bg-solid)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT = "var(--text-primary)"
+const TEXT_SEC = "var(--text-secondary)"
+const TEXT_TER = "var(--text-tertiary)"
 const ROSE = "#C08B88"
-const BG = "#050507"
+const BG = "var(--void)"
 
 const glassCard: React.CSSProperties = {
   background: CARD_BG,
@@ -115,7 +115,7 @@ const ChartTooltip = ({
   return (
     <div
       style={{
-        background: "rgba(15,17,24,0.95)",
+        background: "var(--card-bg-solid)",
         border: `1px solid ${CARD_BORDER}`,
         borderRadius: 8,
         padding: "10px 14px",
@@ -237,7 +237,7 @@ export default function ForecastPage() {
     padding: "7px 12px",
     fontSize: 11,
     fontFamily: "'DM Sans', sans-serif",
-    background: "rgba(255,255,255,0.06)",
+    background: "var(--surface-input)",
     border: `1px solid ${CARD_BORDER}`,
     borderRadius: 8,
     color: TEXT,
@@ -314,7 +314,7 @@ export default function ForecastPage() {
           style={{
             ...glassCard,
             borderTop: "2px solid rgba(52,211,153,0.5)",
-            background: "linear-gradient(180deg, rgba(52,211,153,0.06) 0%, rgba(15,17,24,0.6) 40%)",
+            background: "linear-gradient(180deg, rgba(52,211,153,0.06) 0%, var(--card-bg-solid) 40%)",
           }}
         >
           <span style={labelStyle}>Best Case</span>
@@ -345,7 +345,7 @@ export default function ForecastPage() {
           style={{
             ...glassCard,
             borderTop: `2px solid rgba(192,139,136,0.5)`,
-            background: `linear-gradient(180deg, rgba(192,139,136,0.06) 0%, rgba(15,17,24,0.6) 40%)`,
+            background: `linear-gradient(180deg, rgba(192,139,136,0.06) 0%, var(--card-bg-solid) 40%)`,
           }}
         >
           <span style={labelStyle}>Expected</span>
@@ -376,7 +376,7 @@ export default function ForecastPage() {
           style={{
             ...glassCard,
             borderTop: "2px solid rgba(156,163,175,0.4)",
-            background: "linear-gradient(180deg, rgba(156,163,175,0.04) 0%, rgba(15,17,24,0.6) 40%)",
+            background: "linear-gradient(180deg, rgba(156,163,175,0.04) 0%, var(--card-bg-solid) 40%)",
           }}
         >
           <span style={labelStyle}>Worst Case</span>
@@ -659,7 +659,7 @@ function StageRow({
         onClick={() => setExpanded(!expanded)}
         style={{ cursor: "pointer" }}
         onMouseEnter={(e) =>
-          (e.currentTarget.style.background = "rgba(255,255,255,0.02)")
+          (e.currentTarget.style.background = "var(--surface-subtle)")
         }
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
@@ -734,7 +734,7 @@ function StageRow({
             }}
             style={{ cursor: "pointer" }}
             onMouseEnter={(e) =>
-              (e.currentTarget.style.background = "rgba(255,255,255,0.03)")
+              (e.currentTarget.style.background = "var(--surface-subtle)")
             }
             onMouseLeave={(e) =>
               (e.currentTarget.style.background = "transparent")
@@ -743,7 +743,7 @@ function StageRow({
             <td
               style={{
                 padding: "7px 22px 7px 48px",
-                borderBottom: `1px solid rgba(255,255,255,0.03)`,
+                borderBottom: `1px solid var(--surface-elevated)`,
               }}
             >
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -764,7 +764,7 @@ function StageRow({
                   padding: "7px 18px",
                   fontSize: 11,
                   color: TEXT_TER,
-                  borderBottom: `1px solid rgba(255,255,255,0.03)`,
+                  borderBottom: `1px solid var(--surface-elevated)`,
                 }}
               >
                 {m.label === monthLabel ? (
@@ -799,7 +799,7 @@ function StageRow({
                 fontSize: 11,
                 color: TEXT_SEC,
                 fontFamily: "'Bellfair', serif",
-                borderBottom: `1px solid rgba(255,255,255,0.03)`,
+                borderBottom: `1px solid var(--surface-elevated)`,
               }}
             >
               {deal.weightedValue != null

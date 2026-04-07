@@ -4,11 +4,11 @@ import { useState, useEffect, useCallback } from "react"
 import { BarChart, ResponsiveContainer, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts"
 
 /* ── Design tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const CARD_BG = "var(--card-bg)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const AMBER = "#FBBF24"
@@ -283,7 +283,7 @@ function SovTooltip({ active, payload }: { active?: boolean; payload?: { value: 
   if (!active || !payload?.length) return null
   const d = payload[0]
   return (
-    <div style={{ background: "rgba(15,17,24,0.95)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: "8px 14px", fontSize: 12, fontFamily: dm, color: TEXT_PRIMARY }}>
+    <div style={{ background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: "8px 14px", fontSize: 12, fontFamily: dm, color: TEXT_PRIMARY }}>
       <div style={{ fontWeight: 600, marginBottom: 2 }}>{d.payload.company}</div>
       <div style={{ color: TEXT_SECONDARY }}>{d.value} citation{d.value !== 1 ? "s" : ""}</div>
     </div>

@@ -24,11 +24,11 @@ import {
 } from "@/lib/crm-config"
 
 /* ── Design tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const CARD_BG = "var(--card-bg-solid)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 
@@ -292,7 +292,7 @@ export default function CrmPage() {
     borderRadius: 20,
     cursor: "pointer",
     transition: "all 0.15s ease",
-    background: active ? ROSE_GOLD : "rgba(255,255,255,0.06)",
+    background: active ? ROSE_GOLD : "var(--card-border)",
     color: active ? "#060709" : TEXT_SECONDARY,
   })
 
@@ -300,7 +300,7 @@ export default function CrmPage() {
     padding: "7px 12px",
     fontSize: 11,
     fontFamily: "'DM Sans', sans-serif",
-    background: "rgba(255,255,255,0.06)",
+    background: "var(--surface-input)",
     border: `1px solid ${CARD_BORDER}`,
     borderRadius: 8,
     color: TEXT_PRIMARY,
@@ -318,7 +318,7 @@ export default function CrmPage() {
     padding: "7px 12px",
     fontSize: 11,
     fontFamily: "'DM Sans', sans-serif",
-    background: "rgba(255,255,255,0.06)",
+    background: "var(--surface-input)",
     border: `1px solid ${CARD_BORDER}`,
     borderRadius: 8,
     color: TEXT_PRIMARY,
@@ -334,7 +334,7 @@ export default function CrmPage() {
           position: "sticky",
           top: 0,
           zIndex: 100,
-          background: "rgba(6,7,9,0.92)",
+          background: "var(--header-bg)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderBottom: `1px solid ${CARD_BORDER}`,
@@ -357,7 +357,7 @@ export default function CrmPage() {
                   fontFamily: "'Bellfair', serif",
                   fontSize: 32,
                   fontWeight: 400,
-                  color: "#FFFFFF",
+                  color: "var(--text-primary)",
                   lineHeight: 1.2,
                   margin: 0,
                 }}
@@ -382,7 +382,7 @@ export default function CrmPage() {
               style={{
                 display: "flex",
                 gap: 2,
-                background: "rgba(255,255,255,0.04)",
+                background: "var(--surface-elevated)",
                 borderRadius: 8,
                 padding: 3,
               }}
@@ -454,7 +454,7 @@ export default function CrmPage() {
                 fontSize: 12,
                 fontFamily: "'DM Sans', sans-serif",
                 fontWeight: 600,
-                background: "rgba(255,255,255,0.08)",
+                background: "var(--surface-input)",
                 color: TEXT_PRIMARY,
                 border: `1px solid ${CARD_BORDER}`,
                 borderRadius: 8,
@@ -462,10 +462,10 @@ export default function CrmPage() {
                 transition: "all 0.15s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.12)"
+                e.currentTarget.style.background = "var(--surface-hover)"
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.08)"
+                e.currentTarget.style.background = "var(--surface-input)"
               }}
             >
               + New Contact
@@ -533,7 +533,7 @@ export default function CrmPage() {
                       background:
                         filters.owner === owner
                           ? "rgba(192,139,136,0.2)"
-                          : "rgba(255,255,255,0.04)",
+                          : "var(--surface-elevated)",
                       color:
                         filters.owner === owner ? ROSE_GOLD : TEXT_TERTIARY,
                     }}
@@ -568,7 +568,7 @@ export default function CrmPage() {
                       top: "100%",
                       left: 0,
                       marginTop: 4,
-                      background: "#0F1118",
+                      background: "var(--card-bg-solid)",
                       border: `1px solid ${CARD_BORDER}`,
                       borderRadius: 10,
                       padding: 6,
@@ -597,7 +597,7 @@ export default function CrmPage() {
                             transition: "background 0.1s",
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "rgba(255,255,255,0.06)"
+                            e.currentTarget.style.background = "var(--surface-hover)"
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.background = "transparent"
@@ -824,7 +824,7 @@ export default function CrmPage() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "#0F1118",
+              background: "var(--card-bg-solid)",
               border: `1px solid ${CARD_BORDER}`,
               borderRadius: 16,
               padding: "28px 32px",
@@ -837,7 +837,7 @@ export default function CrmPage() {
               style={{
                 fontFamily: "'Bellfair', serif",
                 fontSize: 22,
-                color: "#FFFFFF",
+                color: "var(--text-primary)",
                 margin: "0 0 8px",
               }}
             >
@@ -913,7 +913,7 @@ export default function CrmPage() {
                 padding: "8px 12px",
                 fontSize: 12,
                 fontFamily: "'DM Sans', sans-serif",
-                background: "rgba(255,255,255,0.06)",
+                background: "var(--surface-input)",
                 border: `1px solid ${CARD_BORDER}`,
                 borderRadius: 8,
                 color: TEXT_PRIMARY,
@@ -932,7 +932,7 @@ export default function CrmPage() {
                   fontSize: 12,
                   fontFamily: "'DM Sans', sans-serif",
                   fontWeight: 600,
-                  background: "rgba(255,255,255,0.06)",
+                  background: "var(--surface-input)",
                   color: TEXT_SECONDARY,
                   border: "none",
                   borderRadius: 8,

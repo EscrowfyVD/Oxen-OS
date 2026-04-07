@@ -19,9 +19,9 @@ const SUB_TABS: { id: SeoSubTab; label: string }[] = [
   { id: "reports", label: "Reports" },
 ]
 
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 
 export default function SeoModule() {

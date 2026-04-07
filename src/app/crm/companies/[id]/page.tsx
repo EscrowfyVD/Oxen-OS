@@ -180,7 +180,7 @@ export default function CompanyDetailPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "80px 40px", color: TEXT_TERTIARY, textAlign: "center", background: "#060709", minHeight: "100vh" }}>
+      <div style={{ padding: "80px 40px", color: TEXT_TERTIARY, textAlign: "center", background: "var(--void)", minHeight: "100vh" }}>
         Loading company...
       </div>
     )
@@ -188,7 +188,7 @@ export default function CompanyDetailPage() {
 
   if (!company) {
     return (
-      <div style={{ padding: "80px 40px", color: TEXT_TERTIARY, textAlign: "center", background: "#060709", minHeight: "100vh" }}>
+      <div style={{ padding: "80px 40px", color: TEXT_TERTIARY, textAlign: "center", background: "var(--void)", minHeight: "100vh" }}>
         Company not found
       </div>
     )
@@ -198,7 +198,7 @@ export default function CompanyDetailPage() {
   const stageLabel = (stage: string) => STAGE_LABELS[stage] ?? stage
 
   return (
-    <div style={{ padding: "32px 40px", minHeight: "100vh", background: "#060709" }}>
+    <div style={{ padding: "32px 40px", minHeight: "100vh", background: "var(--void)" }}>
       {/* Back button */}
       <button
         onClick={() => router.push("/crm/companies")}

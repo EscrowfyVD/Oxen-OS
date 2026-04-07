@@ -41,10 +41,10 @@ interface DraftContent {
 
 // ─── Design tokens ──────────────────────────────────────
 
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT = "#F0F0F2"
-const TEXT_SEC = "rgba(240,240,242,0.55)"
+const CARD_BG = "var(--card-bg)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT = "var(--text-primary)"
+const TEXT_SEC = "var(--text-secondary)"
 const ROSE = "#C08B88"
 const AMBER = "#FBBF24"
 const GREEN = "#34D399"
@@ -177,7 +177,7 @@ export default function FollowUpCards({ assignee }: { assignee?: string }) {
     padding: "16px",
     backdropFilter: "blur(20px)",
     WebkitBackdropFilter: "blur(20px)",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px var(--surface-hover)",
   }
 
   const stageBadgeStyle: React.CSSProperties = {
@@ -215,8 +215,8 @@ export default function FollowUpCards({ assignee }: { assignee?: string }) {
   const btnBase: React.CSSProperties = {
     padding: "6px 14px",
     borderRadius: "8px",
-    border: "1px solid rgba(255,255,255,0.1)",
-    background: "rgba(255,255,255,0.05)",
+    border: "1px solid var(--card-border)",
+    background: "var(--surface-input)",
     color: TEXT,
     fontSize: "13px",
     fontWeight: 500,
@@ -227,7 +227,7 @@ export default function FollowUpCards({ assignee }: { assignee?: string }) {
   const textareaStyle: React.CSSProperties = {
     width: "100%",
     minHeight: "100px",
-    background: "rgba(255,255,255,0.04)",
+    background: "var(--surface-elevated)",
     border: `1px solid ${CARD_BORDER}`,
     borderRadius: "8px",
     color: TEXT,
@@ -349,7 +349,7 @@ export default function FollowUpCards({ assignee }: { assignee?: string }) {
                     (e.currentTarget.style.background = "rgba(52,211,153,0.1)")
                   }
                   onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "rgba(255,255,255,0.05)")
+                    (e.currentTarget.style.background = "var(--surface-input)")
                   }
                 >
                   {"\u2709\uFE0F"} Send
@@ -367,7 +367,7 @@ export default function FollowUpCards({ assignee }: { assignee?: string }) {
                     (e.currentTarget.style.background = "rgba(251,191,36,0.1)")
                   }
                   onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "rgba(255,255,255,0.05)")
+                    (e.currentTarget.style.background = "var(--surface-input)")
                   }
                 >
                   {"\u270F\uFE0F"} {isEditing ? "Done" : "Edit"}
@@ -383,7 +383,7 @@ export default function FollowUpCards({ assignee }: { assignee?: string }) {
                     (e.currentTarget.style.background = "rgba(248,113,113,0.1)")
                   }
                   onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "rgba(255,255,255,0.05)")
+                    (e.currentTarget.style.background = "var(--surface-input)")
                   }
                 >
                   {"\u{1F507}"} Dismiss

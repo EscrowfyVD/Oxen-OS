@@ -8,12 +8,12 @@ import {
 } from "lucide-react"
 
 /* ── Design tokens ── */
-const VOID = "#060709"
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "rgba(240,240,242,0.92)"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.35)"
+const VOID = "var(--void)"
+const CARD_BG = "var(--card-bg-solid)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const ROSE_GOLD_HOVER = "#D4A5A2"
 
@@ -184,7 +184,7 @@ const btnPrimary: React.CSSProperties = {
 }
 
 const btnGhost: React.CSSProperties = {
-  background: "rgba(255,255,255,0.04)",
+  background: "var(--surface-hover)",
   color: TEXT_SECONDARY,
   border: `1px solid ${CARD_BORDER}`,
   borderRadius: 6,
@@ -195,7 +195,7 @@ const btnGhost: React.CSSProperties = {
 }
 
 const inputStyle: React.CSSProperties = {
-  background: "rgba(255,255,255,0.04)",
+  background: "var(--surface-input)",
   border: `1px solid ${CARD_BORDER}`,
   borderRadius: 6,
   padding: "8px 12px",
@@ -302,7 +302,7 @@ export default function ConferenceDetailPage() {
       {/* ── Header ── */}
       <div style={{
         padding: "16px 32px",
-        background: "rgba(6,7,9,0.88)",
+        background: "var(--header-bg)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
         borderBottom: `1px solid ${CARD_BORDER}`,
@@ -321,7 +321,7 @@ export default function ConferenceDetailPage() {
             </button>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, color: "#FFFFFF", margin: 0, lineHeight: 1.2 }}>
+                <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, color: TEXT_PRIMARY, margin: 0, lineHeight: 1.2 }}>
                   {conf.name}
                 </h1>
                 <span style={{
@@ -385,7 +385,7 @@ export default function ConferenceDetailPage() {
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               style={{
-                background: activeTab === tab.key ? "rgba(255,255,255,0.06)" : "transparent",
+                background: activeTab === tab.key ? "var(--card-border)" : "transparent",
                 border: "none",
                 borderBottom: activeTab === tab.key ? `2px solid ${accentColor}` : "2px solid transparent",
                 color: activeTab === tab.key ? TEXT_PRIMARY : TEXT_TERTIARY,
@@ -426,7 +426,7 @@ export default function ConferenceDetailPage() {
             style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}`, borderRadius: 16, width: "100%", maxWidth: 440, padding: 28 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 20, fontWeight: 400, color: "#fff", margin: "0 0 12px" }}>
+            <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 20, fontWeight: 400, color: TEXT_PRIMARY, margin: "0 0 12px" }}>
               Delete Conference
             </h3>
             <p style={{ fontSize: 13, color: TEXT_SECONDARY, lineHeight: 1.6, margin: "0 0 24px" }}>
@@ -563,7 +563,7 @@ function EditConferenceModal({
       >
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(192,139,136,0.03)", position: "sticky", top: 0, zIndex: 10 }}>
-          <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, fontWeight: 400, color: "#fff", margin: 0 }}>Edit Conference</h3>
+          <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, fontWeight: 400, color: TEXT_PRIMARY, margin: 0 }}>Edit Conference</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", color: TEXT_TERTIARY, fontSize: 18, cursor: "pointer", padding: 4 }}>
             <X size={18} />
           </button>
@@ -774,7 +774,7 @@ function OverviewTab({ conf, employees, onUpdate }: { conf: Conference; employee
         </div>
 
         {showAddAttendee && (
-          <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", padding: 12, background: "rgba(255,255,255,0.02)", borderRadius: 8 }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", padding: 12, background: "var(--surface-subtle)", borderRadius: 8 }}>
             <select style={{ ...selectStyle, flex: 1 }} value={newEmployeeId} onChange={e => setNewEmployeeId(e.target.value)}>
               <option value="">Select employee...</option>
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
@@ -800,7 +800,7 @@ function OverviewTab({ conf, employees, onUpdate }: { conf: Conference; employee
             return (
               <div key={att.id} style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "10px 12px", borderRadius: 8, background: "rgba(255,255,255,0.02)",
+                padding: "10px 12px", borderRadius: 8, background: "var(--surface-subtle)",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{
@@ -1016,7 +1016,7 @@ function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void 
               const total = rowTotal(a.id)
               return (
                 <tr key={a.id} style={{ transition: "background 0.1s" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-subtle)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                   <td style={{ ...tdStyle, textAlign: "left", fontWeight: 500 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1057,7 +1057,7 @@ function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void 
                               padding: "8px 12px", cursor: "pointer", textAlign: "right",
                               borderRadius: 4, transition: "background 0.1s",
                             }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                            onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-hover)")}
                             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                           >
                             {val > 0 ? `${sym}${val.toLocaleString()}` : <span style={{ color: TEXT_TERTIARY }}>—</span>}
@@ -1085,7 +1085,7 @@ function BudgetTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void 
               )
             })}
             {/* Totals row */}
-            <tr style={{ background: "rgba(255,255,255,0.02)" }}>
+            <tr style={{ background: "var(--surface-subtle)" }}>
               <td style={{ ...tdStyle, textAlign: "left", fontWeight: 700, color: TEXT_PRIMARY, borderBottom: "none" }}>TOTAL</td>
               {FIELDS.map(f => (
                 <td key={f.key} style={{ ...tdStyle, fontWeight: 700, color: TEXT_PRIMARY, borderBottom: "none" }}>
@@ -1187,7 +1187,7 @@ function ContactsTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => voi
 
       {/* Add contact form */}
       {showForm && (
-        <div style={{ ...cardStyle, background: "rgba(255,255,255,0.02)" }}>
+        <div style={{ ...cardStyle, background: "var(--surface-subtle)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <input style={inputStyle} placeholder="Name *" value={form.name} onChange={e => updateForm("name", e.target.value)} />
             <input style={inputStyle} placeholder="Company" value={form.company} onChange={e => updateForm("company", e.target.value)} />
@@ -1207,7 +1207,7 @@ function ContactsTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => voi
             <span style={{ fontSize: 12, color: TEXT_TERTIARY }}>Interest:</span>
             {INTEREST_OPTIONS.map(opt => (
               <button key={opt.value} onClick={() => updateForm("interestLevel", opt.value)} style={{
-                background: form.interestLevel === opt.value ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
+                background: form.interestLevel === opt.value ? "var(--surface-elevated)" : "var(--surface-subtle)",
                 border: form.interestLevel === opt.value ? `1px solid ${ROSE_GOLD}` : `1px solid ${CARD_BORDER}`,
                 color: TEXT_PRIMARY, borderRadius: 6, padding: "6px 12px", fontSize: 13, cursor: "pointer",
                 fontFamily: "'DM Sans', sans-serif",

@@ -167,7 +167,7 @@ export default function CalendarView({
                     minHeight: 100,
                   }}
                   onMouseEnter={(e) => {
-                    if (onDayClick) e.currentTarget.style.background = "rgba(255,255,255,0.02)"
+                    if (onDayClick) e.currentTarget.style.background = "var(--surface-subtle)"
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = isToday ? "rgba(192,139,136,0.04)" : "transparent"
@@ -343,7 +343,7 @@ export default function CalendarView({
             gridTemplateColumns:
               viewMode === "week" ? "56px repeat(7, 1fr)" : "56px 1fr",
             borderBottom: "1px solid var(--border)",
-            background: "rgba(255,255,255,0.01)",
+            background: "var(--surface-subtle)",
           }}
         >
           <div

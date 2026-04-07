@@ -52,8 +52,8 @@ export default function WikiPageCard({ page }: WikiPageCardProps) {
       style={{
         display: "block",
         textDecoration: "none",
-        background: "rgba(15,17,24,0.6)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--card-bg)",
+        border: "1px solid var(--card-border)",
         borderRadius: 14,
         overflow: "hidden",
         transition: "all 0.25s ease",
@@ -64,14 +64,14 @@ export default function WikiPageCard({ page }: WikiPageCardProps) {
         e.currentTarget.style.transform = "translateY(-1px)"
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"
+        e.currentTarget.style.borderColor = "var(--card-border)"
         e.currentTarget.style.transform = "translateY(0)"
       }}
     >
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent 0%, rgba(192,139,136,0.15) 50%, transparent 100%)" }} />
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderBottom: "1px solid var(--surface-hover)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {page.pinned && <span style={{ fontSize: 10, color: "#FBBF24" }} title="Pinned">{"\uD83D\uDCCC"}</span>}
           {page.category && (
@@ -80,7 +80,7 @@ export default function WikiPageCard({ page }: WikiPageCardProps) {
             </span>
           )}
         </div>
-        <span style={{ fontSize: 10, color: "rgba(240,240,242,0.3)", fontFamily: "'DM Sans', sans-serif" }}>
+        <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "'DM Sans', sans-serif" }}>
           {formattedDate}
         </span>
       </div>
@@ -89,11 +89,11 @@ export default function WikiPageCard({ page }: WikiPageCardProps) {
       <div style={{ padding: "14px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 18 }}>{page.icon || "\uD83D\uDCDD"}</span>
-          <h3 style={{ fontSize: 14, fontWeight: 500, color: "#F0F0F2", fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>
             {page.title}
           </h3>
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10, color: "rgba(240,240,242,0.3)", fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10, color: "var(--text-tertiary)", fontFamily: "'DM Sans', sans-serif" }}>
           <span>by {page.updatedBy}</span>
           {page.viewCount > 0 && <span>{page.viewCount} views</span>}
         </div>

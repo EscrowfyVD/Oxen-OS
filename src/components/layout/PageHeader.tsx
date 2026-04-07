@@ -12,7 +12,7 @@ export default function PageHeader({ title, description, actions }: PageHeaderPr
       className="sticky-header flex items-center justify-between"
       style={{
         padding: "16px 32px",
-        background: "rgba(6,7,9,0.88)",
+        background: "var(--header-bg)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
         borderBottom: "1px solid var(--card-border)",
@@ -27,7 +27,7 @@ export default function PageHeader({ title, description, actions }: PageHeaderPr
             fontFamily: "'Bellfair', serif",
             fontSize: 28,
             fontWeight: 400,
-            color: "#FFFFFF",
+            color: "var(--text-primary)",
             lineHeight: 1.2,
             margin: 0,
           }}

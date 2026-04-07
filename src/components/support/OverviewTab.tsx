@@ -31,7 +31,7 @@ const kpiValue: React.CSSProperties = {
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: "#1A1D27", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: "8px 12px", fontSize: 11 }}>
+    <div style={{ background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: "8px 12px", fontSize: 11 }}>
       <div style={{ color: TEXT_TERTIARY, marginBottom: 4 }}>{label}</div>
       {payload.map((p) => (
         <div key={p.name} style={{ color: p.color, marginBottom: 2 }}>
@@ -137,7 +137,7 @@ export default function OverviewTab({ stats, daily }: OverviewTabProps) {
                   <Pie data={channelData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={2}>
                     {channelData.map((d) => <Cell key={d.name} fill={d.color} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ background: "#1A1D27", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, fontSize: 11 }} />
+                  <Tooltip contentStyle={{ background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, fontSize: 11 }} />
                 </PieChart>
               </ResponsiveContainer>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 8 }}>
@@ -165,7 +165,7 @@ export default function OverviewTab({ stats, daily }: OverviewTabProps) {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
             <XAxis type="number" tick={{ fill: TEXT_TERTIARY, fontSize: 9 }} axisLine={false} tickLine={false} />
             <YAxis dataKey="category" type="category" tick={{ fill: TEXT_SECONDARY, fontSize: 10 }} axisLine={false} tickLine={false} width={100} />
-            <Tooltip contentStyle={{ background: "#1A1D27", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, fontSize: 11 }} />
+            <Tooltip contentStyle={{ background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, fontSize: 11 }} />
             <Bar dataKey="count" fill={ROSE_GOLD} radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>

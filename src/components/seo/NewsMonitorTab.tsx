@@ -3,11 +3,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 
 /* ── Design tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const CARD_BG = "var(--card-bg)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const AMBER = "#FBBF24"
@@ -34,7 +34,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   new: { label: "New", color: CYAN, bg: "rgba(34,211,238,0.12)" },
   queued: { label: "Queued", color: AMBER, bg: "rgba(251,191,36,0.12)" },
   used: { label: "Used", color: GREEN, bg: "rgba(52,211,153,0.12)" },
-  irrelevant: { label: "Irrelevant", color: TEXT_TERTIARY, bg: "rgba(240,240,242,0.06)" },
+  irrelevant: { label: "Irrelevant", color: TEXT_TERTIARY, bg: "var(--surface-input)" },
 }
 
 /* ── Types ── */

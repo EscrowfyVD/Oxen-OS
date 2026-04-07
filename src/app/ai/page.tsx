@@ -10,10 +10,10 @@ import BriefModal from "@/components/ai/BriefModal"
 import CallNotesModal from "@/components/calendar/CallNotesModal"
 import type { AIInsight, MeetingBrief, CalendarEvent } from "@/components/ai/types"
 
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "rgba(240,240,242,0.92)"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 
 export default function AIPage() {
@@ -188,7 +188,7 @@ function AIPageInner() {
   }
 
   return (
-    <div className="page-content" style={{ padding: 0, background: "#060709", minHeight: "100vh" }}>
+    <div className="page-content" style={{ padding: 0, background: "var(--void)", minHeight: "100vh" }}>
       {/* Header */}
       <div
         className="fade-in"
@@ -226,7 +226,7 @@ function AIPageInner() {
                 style={{
                   padding: "7px 14px", borderRadius: 8, fontSize: 11, fontWeight: 500,
                   fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
-                  background: teamView ? "rgba(192,139,136,0.12)" : "rgba(255,255,255,0.04)",
+                  background: teamView ? "rgba(192,139,136,0.12)" : "var(--surface-elevated)",
                   border: `1px solid ${teamView ? "rgba(192,139,136,0.3)" : CARD_BORDER}`,
                   color: teamView ? ROSE_GOLD : TEXT_SECONDARY,
                   transition: "all 0.2s",
@@ -242,7 +242,7 @@ function AIPageInner() {
               style={{
                 padding: "7px 16px", borderRadius: 8, fontSize: 11, fontWeight: 500,
                 fontFamily: "'DM Sans', sans-serif", cursor: loadingDigest ? "wait" : "pointer",
-                background: "rgba(255,255,255,0.04)", border: `1px solid ${CARD_BORDER}`,
+                background: "var(--surface-elevated)", border: `1px solid ${CARD_BORDER}`,
                 color: TEXT_SECONDARY,
               }}
             >
@@ -257,7 +257,7 @@ function AIPageInner() {
         {/* Digest (if generated) */}
         {digest && (
           <div className="fade-in" style={{
-            background: "linear-gradient(135deg, rgba(192,139,136,0.04), rgba(15,17,24,1))",
+            background: "linear-gradient(135deg, rgba(192,139,136,0.04), var(--card-bg-solid))",
             border: "1px solid rgba(192,139,136,0.12)", borderRadius: 14,
             padding: 20, position: "relative",
           }}>
@@ -312,7 +312,7 @@ function AIPageInner() {
         {/* Section 4: Intel Highlights */}
         {intelHighlights.length > 0 && (
           <div className="fade-in" style={{
-            background: "rgba(255,255,255,0.02)",
+            background: "var(--surface-subtle)",
             border: `1px solid ${CARD_BORDER}`,
             borderRadius: 14,
             padding: 20,
@@ -341,7 +341,7 @@ function AIPageInner() {
                   <div key={item.id} style={{
                     padding: "10px 14px",
                     borderRadius: 8,
-                    background: "rgba(255,255,255,0.02)",
+                    background: "var(--surface-subtle)",
                     border: `1px solid ${CARD_BORDER}`,
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>

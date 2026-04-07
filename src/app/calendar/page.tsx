@@ -484,7 +484,7 @@ export default function CalendarPage() {
               className="flex items-center justify-between"
               style={{
                 padding: "12px 16px",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
+                borderBottom: "1px solid var(--surface-elevated)",
                 background: "rgba(192,139,136,0.02)",
               }}
             >
@@ -576,7 +576,7 @@ export default function CalendarPage() {
               className="flex items-start justify-between"
               style={{
                 padding: "14px 16px",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
+                borderBottom: "1px solid var(--surface-elevated)",
                 background: "rgba(192,139,136,0.02)",
               }}
             >
@@ -631,7 +631,7 @@ export default function CalendarPage() {
                       padding: "2px 8px",
                       borderRadius: 4,
                       background: selectedEvent.source === "google"
-                        ? "rgba(255,255,255,0.06)"
+                        ? "var(--card-border)"
                         : "rgba(155,127,212,0.12)",
                       color: selectedEvent.source === "google"
                         ? "var(--text-dim)"
@@ -796,7 +796,7 @@ export default function CalendarPage() {
               style={{
                 padding: "7px 14px",
                 background: "var(--bg-input, #0A0C10)",
-                border: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+                border: "1px solid var(--card-border)",
                 borderRadius: 8,
                 color: "var(--text)",
                 fontSize: 12,
@@ -829,7 +829,7 @@ export default function CalendarPage() {
                 <div
                   style={{
                     padding: "14px 16px",
-                    borderBottom: "1px solid rgba(255,255,255,0.03)",
+                    borderBottom: "1px solid var(--surface-elevated)",
                     background: "rgba(192,139,136,0.02)",
                   }}
                 >
@@ -851,7 +851,7 @@ export default function CalendarPage() {
                   <div
                     style={{
                       fontSize: 11,
-                      color: "var(--text-tertiary, rgba(240,240,242,0.3))",
+                      color: "var(--text-tertiary)",
                       display: "flex",
                       alignItems: "center",
                       gap: 8,
@@ -871,7 +871,7 @@ export default function CalendarPage() {
                     <div
                       style={{
                         fontSize: 10,
-                        color: "var(--text-dim, rgba(240,240,242,0.3))",
+                        color: "var(--text-dim)",
                         marginTop: 6,
                         overflow: "hidden",
                         textOverflow: "ellipsis",

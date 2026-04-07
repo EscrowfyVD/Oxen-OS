@@ -7,16 +7,16 @@ import {
   AlertTriangle, CheckCircle2, FileText, DollarSign, Edit3, X,
 } from "lucide-react"
 
-const cardBg = "rgba(15,17,24,0.6)"
-const cardBorder = "rgba(255,255,255,0.06)"
+const cardBg = "var(--card-bg)"
+const cardBorder = "var(--card-border)"
 const roseGold = "#C08B88"
-const void_ = "#060709"
-const textPrimary = "rgba(240,240,242,0.92)"
-const textSecondary = "rgba(240,240,242,0.55)"
-const textTertiary = "rgba(240,240,242,0.35)"
+const void_ = "var(--void)"
+const textPrimary = "var(--text-primary)"
+const textSecondary = "var(--text-secondary)"
+const textTertiary = "var(--text-tertiary)"
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "10px 14px", background: "rgba(255,255,255,0.04)",
+  width: "100%", padding: "10px 14px", background: "var(--surface-input)",
   border: `1px solid ${cardBorder}`, borderRadius: 10, color: textPrimary,
   fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif",
 }

@@ -44,13 +44,13 @@ function ToolbarButton({ onClick, active, children, title }: ToolbarButtonProps)
         cursor: "pointer",
         border: "none",
         background: active ? "rgba(192,139,136,0.15)" : "transparent",
-        color: active ? "#C08B88" : "rgba(240,240,242,0.55)",
+        color: active ? "#C08B88" : "var(--text-secondary)",
         fontFamily: "'DM Sans', sans-serif",
         transition: "all 0.15s ease",
         lineHeight: 1,
       }}
       onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.04)"
+        if (!active) e.currentTarget.style.background = "var(--surface-elevated)"
       }}
       onMouseLeave={(e) => {
         if (!active) e.currentTarget.style.background = "transparent"

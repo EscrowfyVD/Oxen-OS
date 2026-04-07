@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation"
 import { getAvatarGradient } from "@/lib/avatar"
 
 /* ── Design tokens ── */
-const FROST = "#FFFFFF"
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const FROST = "var(--text-primary)"
+const CARD_BG = "var(--card-bg-solid)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const AMBER = "#FBBF24"
@@ -156,7 +156,7 @@ export default function OrgPage() {
     padding: "6px 10px",
     borderRadius: 6,
     border: `1px solid rgba(192,139,136,0.25)`,
-    background: "rgba(255,255,255,0.04)",
+    background: "var(--surface-hover)",
     color: TEXT_PRIMARY,
     fontFamily: "'DM Sans', sans-serif",
     fontSize: 12,
@@ -407,7 +407,7 @@ export default function OrgPage() {
                 height: 22,
                 borderRadius: 5,
                 border: `1px solid ${CARD_BORDER}`,
-                background: "rgba(255,255,255,0.04)",
+                background: "var(--surface-hover)",
                 color: TEXT_SECONDARY,
                 fontSize: 10,
                 cursor: "pointer",
@@ -506,7 +506,7 @@ export default function OrgPage() {
               borderRadius: 10,
               background: isHolding
                 ? "rgba(192,139,136,0.15)"
-                : "rgba(255,255,255,0.05)",
+                : "var(--surface-elevated)",
               color: isHolding ? ROSE_GOLD : TEXT_SECONDARY,
               fontFamily: "'DM Sans', sans-serif",
               fontWeight: 500,

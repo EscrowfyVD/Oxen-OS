@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 
 export default function WikiNewPage() {
   const router = useRouter()

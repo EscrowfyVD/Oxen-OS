@@ -82,7 +82,7 @@ export const ROLE_COLORS: Record<RoleLevel, { bg: string; text: string; gradient
   super_admin: { bg: "linear-gradient(135deg, #C08B88, #D4A5A2)", text: "#060709", gradient: true },
   admin: { bg: "rgba(251,191,36,0.15)", text: "#FBBF24" },
   manager: { bg: "rgba(129,140,248,0.15)", text: "#818CF8" },
-  member: { bg: "rgba(255,255,255,0.06)", text: "rgba(240,240,242,0.55)" },
+  member: { bg: "rgba(255,255,255,0.06)", text: "var(--text-secondary)" },
 }
 
 export const ROLE_LABELS: Record<RoleLevel, string> = {

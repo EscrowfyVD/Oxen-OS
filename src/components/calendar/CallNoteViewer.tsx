@@ -71,7 +71,7 @@ export default function CallNoteViewer({
         className="w-full border-none"
         style={{
           height: "calc(100% - 44px)",
-          background: "#060709",
+          background: "var(--void)",
         }}
         title="Call Note"
         sandbox="allow-scripts allow-same-origin"

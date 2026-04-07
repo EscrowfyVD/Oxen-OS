@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 
 /* ── Design tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const CARD_BG = "var(--card-bg-solid)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const AMBER = "#FBBF24"
@@ -16,7 +16,7 @@ const RED = "#F87171"
 const PURPLE = "#A78BFA"
 const YELLOW = "#FDE68A"
 const TEAL = "#5BB8A8"
-const FROST = "#FFFFFF"
+const FROST = "var(--text-primary)"
 
 /* ── Tag color palette (7 tags) ── */
 const TAG_COLORS: Record<string, { bg: string; text: string }> = {
@@ -165,7 +165,7 @@ function TaskCard({
   showOverdueBadge?: boolean
   viewMode?: ViewMode
 }) {
-  const tagStyle = TAG_COLORS[task.tag] || { bg: "rgba(255,255,255,0.06)", text: TEXT_SECONDARY }
+  const tagStyle = TAG_COLORS[task.tag] || { bg: "var(--card-border)", text: TEXT_SECONDARY }
   const priorityColor = PRIORITY_COLORS[task.priority] || TEXT_TERTIARY
   const overdue = showOverdueBadge && isOverdue(task.deadline) && task.column !== "done"
   const dueToday = isDueToday(task.deadline) && task.column !== "done"
@@ -182,7 +182,7 @@ function TaskCard({
       onDragStart={handleDragStart}
       onClick={onClick}
       style={{
-        background: "rgba(255,255,255,0.02)",
+        background: "var(--surface-subtle)",
         border: `1px solid ${dueToday ? "rgba(251,191,36,0.35)" : CARD_BORDER}`,
         borderRadius: 8,
         padding: "12px 14px",
@@ -746,7 +746,7 @@ export default function TasksPage() {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "16px 32px",
-          background: "rgba(6,7,9,0.88)",
+          background: "var(--header-bg)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderBottom: `1px solid ${CARD_BORDER}`,
@@ -943,7 +943,7 @@ export default function TasksPage() {
                         gap: 8,
                         marginBottom: 12,
                         paddingBottom: 8,
-                        borderBottom: "1px solid rgba(255,255,255,0.03)",
+                        borderBottom: "1px solid var(--surface-subtle)",
                       }}
                     >
                       <div
@@ -1116,7 +1116,7 @@ export default function TasksPage() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "16px 20px",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
+                borderBottom: "1px solid var(--surface-subtle)",
                 position: "sticky",
                 top: 0,
                 background: CARD_BG,
@@ -1300,7 +1300,7 @@ export default function TasksPage() {
                           border: `1px solid ${
                             editingTask.column === col.id
                               ? col.accent
-                              : "rgba(255,255,255,0.06)"
+                              : "var(--card-border)"
                           }`,
                           borderRadius: 6,
                           background:

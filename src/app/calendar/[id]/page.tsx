@@ -122,10 +122,10 @@ export default function CallNotePage() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#060709",
+          background: "var(--void)",
         }}
       >
-        <div style={{ fontSize: 13, color: "rgba(240,240,242,0.3)" }}>
+        <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
           Loading call notes...
         </div>
       </div>
@@ -140,7 +140,7 @@ export default function CallNotePage() {
   })
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#060709" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--void)" }}>
       {/* Thin header bar */}
       <header
         style={{
@@ -150,8 +150,8 @@ export default function CallNotePage() {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 16px",
-          background: "#0D0F14",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          background: "var(--card-bg-solid)",
+          borderBottom: "1px solid var(--card-border)",
           zIndex: 100,
         }}
       >
@@ -163,7 +163,7 @@ export default function CallNotePage() {
               background: "none",
               border: "none",
               cursor: "pointer",
-              color: "rgba(240,240,242,0.55)",
+              color: "var(--text-secondary)",
               fontSize: 13,
               fontFamily: "'DM Sans', sans-serif",
               display: "flex",
@@ -174,7 +174,7 @@ export default function CallNotePage() {
               transition: "color 0.15s",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.color = "#C08B88" }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(240,240,242,0.55)" }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "" }}
           >
             {"\u2190"} Calendar
           </button>
@@ -183,7 +183,7 @@ export default function CallNotePage() {
             style={{
               width: 1,
               height: 20,
-              background: "rgba(255,255,255,0.06)",
+              background: "var(--card-border)",
             }}
           />
 
@@ -192,7 +192,7 @@ export default function CallNotePage() {
               style={{
                 fontSize: 14,
                 fontWeight: 600,
-                color: "#F0F0F2",
+                color: "var(--text-primary)",
                 fontFamily: "'DM Sans', sans-serif",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -204,7 +204,7 @@ export default function CallNotePage() {
             <span
               style={{
                 fontSize: 11,
-                color: "rgba(240,240,242,0.3)",
+                color: "var(--text-tertiary)",
                 fontFamily: "'DM Sans', sans-serif",
                 flexShrink: 0,
               }}
@@ -219,10 +219,10 @@ export default function CallNotePage() {
           <button
             onClick={handleOpenNewTab}
             style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.06)",
+              background: "var(--surface-elevated)",
+              border: "1px solid var(--card-border)",
               cursor: "pointer",
-              color: "rgba(240,240,242,0.55)",
+              color: "var(--text-secondary)",
               fontSize: 11,
               fontFamily: "'DM Sans', sans-serif",
               fontWeight: 500,
@@ -264,7 +264,7 @@ export default function CallNotePage() {
           flex: 1,
           width: "100%",
           border: "none",
-          background: "#060709",
+          background: "var(--void)",
         }}
         title={callNote.title}
         sandbox="allow-scripts allow-same-origin"

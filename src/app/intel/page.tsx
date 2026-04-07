@@ -10,12 +10,12 @@ import {
 } from "lucide-react"
 
 /* ── Design tokens ── */
-const VOID = "#060709"
-const CARD_BG = "rgba(255,255,255,0.03)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "rgba(240,240,242,0.92)"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const VOID = "var(--void)"
+const CARD_BG = "var(--surface-subtle)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -176,14 +176,14 @@ const ALL_REGIONS = [
 const SENTIMENT_COLORS: Record<string, { bg: string; text: string }> = {
   positive: { bg: "rgba(34,197,94,0.12)", text: "#22C55E" },
   negative: { bg: "rgba(239,68,68,0.12)", text: "#EF4444" },
-  neutral: { bg: "rgba(255,255,255,0.06)", text: TEXT_TERTIARY },
+  neutral: { bg: "var(--card-border)", text: TEXT_TERTIARY },
 }
 
 const RELEVANCE_COLORS: Record<string, { bg: string; text: string }> = {
   critical: { bg: "rgba(239,68,68,0.2)", text: "#EF4444" },
   high: { bg: "rgba(239,68,68,0.12)", text: "#F87171" },
   medium: { bg: "rgba(245,158,11,0.12)", text: "#F59E0B" },
-  low: { bg: "rgba(255,255,255,0.06)", text: TEXT_TERTIARY },
+  low: { bg: "var(--card-border)", text: TEXT_TERTIARY },
 }
 
 const FILTER_OPTIONS = [
@@ -876,7 +876,7 @@ export default function IntelPage() {
                       fontSize: 10,
                       padding: "1px 6px",
                       borderRadius: 4,
-                      background: r.type === "recurring" ? "rgba(129,140,248,0.12)" : "rgba(255,255,255,0.06)",
+                      background: r.type === "recurring" ? "rgba(129,140,248,0.12)" : "var(--card-border)",
                       color: r.type === "recurring" ? "#818CF8" : TEXT_TERTIARY,
                     }}>
                       {r.type === "recurring" ? `↻ ${r.frequency}` : "one-time"}
@@ -985,7 +985,7 @@ export default function IntelPage() {
             marginBottom: 12,
             padding: "8px 12px",
             borderRadius: 8,
-            background: "rgba(255,255,255,0.02)",
+            background: "var(--surface-subtle)",
             border: `1px solid ${CARD_BORDER}`,
             flexWrap: "wrap",
           }}>
@@ -1068,7 +1068,7 @@ export default function IntelPage() {
                 return (
                   <div style={{
                     padding: "10px 14px", borderRadius: 8, marginBottom: 8,
-                    background: "rgba(255,255,255,0.02)", border: `1px solid ${CARD_BORDER}`,
+                    background: "var(--surface-subtle)", border: `1px solid ${CARD_BORDER}`,
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     flexWrap: "wrap", gap: 8,
                   }}>
@@ -1202,7 +1202,7 @@ export default function IntelPage() {
                                   fontSize: 10,
                                   padding: "1px 6px",
                                   borderRadius: 4,
-                                  background: "rgba(255,255,255,0.06)",
+                                  background: "var(--card-border)",
                                   color: TEXT_TERTIARY,
                                 }}>
                                   {r.sourceType}
@@ -1592,7 +1592,7 @@ export default function IntelPage() {
           top: contextMenu.y,
           left: contextMenu.x,
           zIndex: 200,
-          background: "rgba(15,17,24,0.6)",
+          background: "var(--card-bg-solid)",
           border: `1px solid ${CARD_BORDER}`,
           borderRadius: 8,
           padding: 4,
@@ -1639,7 +1639,7 @@ export default function IntelPage() {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 400,
-              background: "rgba(15,17,24,0.6)",
+              background: "var(--card-bg-solid)",
               border: `1px solid ${CARD_BORDER}`,
               borderRadius: 14,
               padding: 28,
@@ -1723,7 +1723,7 @@ export default function IntelPage() {
               width: 520,
               maxHeight: "85vh",
               overflowY: "auto",
-              background: "rgba(15,17,24,0.6)",
+              background: "var(--card-bg-solid)",
               border: `1px solid ${CARD_BORDER}`,
               borderRadius: 14,
               padding: 28,
@@ -2245,7 +2245,7 @@ export default function IntelPage() {
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 420,
-              background: "rgba(15,17,24,0.6)",
+              background: "var(--card-bg-solid)",
               border: `1px solid ${CARD_BORDER}`,
               borderRadius: 14,
               padding: 28,

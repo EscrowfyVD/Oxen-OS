@@ -138,10 +138,10 @@ export default function EventModal({ mode, event, onClose, onSave, onDelete }: E
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "10px 14px",
-    background: "var(--bg-input, #0A0C10)",
-    border: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+    background: "var(--bg-input)",
+    border: "1px solid var(--card-border)",
     borderRadius: 10,
-    color: "var(--text, #F0F0F2)",
+    color: "var(--text)",
     fontSize: 13,
     fontFamily: "'DM Sans', sans-serif",
     outline: "none",
@@ -153,7 +153,7 @@ export default function EventModal({ mode, event, onClose, onSave, onDelete }: E
     fontWeight: 600,
     letterSpacing: "0.08em",
     textTransform: "uppercase",
-    color: "var(--text-tertiary, rgba(240,240,242,0.3))",
+    color: "var(--text-tertiary)",
     marginBottom: 6,
     display: "block",
   }
@@ -180,8 +180,8 @@ export default function EventModal({ mode, event, onClose, onSave, onDelete }: E
           width: "100%",
           maxWidth: 560,
           maxHeight: "90vh",
-          background: "var(--card-bg, #0F1118)",
-          border: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+          background: "var(--card-bg)",
+          border: "1px solid var(--card-border)",
           borderRadius: 16,
           display: "flex",
           flexDirection: "column",
@@ -192,7 +192,7 @@ export default function EventModal({ mode, event, onClose, onSave, onDelete }: E
         <div
           style={{
             padding: "18px 24px",
-            borderBottom: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+            borderBottom: "1px solid var(--card-border)",
             background: "rgba(192,139,136,0.03)",
             display: "flex",
             alignItems: "center",
@@ -337,10 +337,10 @@ export default function EventModal({ mode, event, onClose, onSave, onDelete }: E
                         borderRadius: 8,
                         border: type === t.value
                           ? `1px solid ${EVENT_TYPE_COLORS[t.value]}`
-                          : "1px solid var(--card-border, rgba(255,255,255,0.06))",
+                          : "1px solid var(--card-border)",
                         background: type === t.value
                           ? `${EVENT_TYPE_COLORS[t.value]}15`
-                          : "var(--bg-input, #0A0C10)",
+                          : "var(--bg-input)",
                         cursor: "pointer",
                         fontSize: 11,
                         color: "var(--text)",
@@ -484,9 +484,9 @@ export default function EventModal({ mode, event, onClose, onSave, onDelete }: E
                       style={{
                         maxHeight: 120,
                         overflowY: "auto",
-                        border: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+                        border: "1px solid var(--card-border)",
                         borderRadius: 8,
-                        background: "var(--bg-input, #0A0C10)",
+                        background: "var(--bg-input)",
                       }}
                     >
                       {filteredEmployees.map((emp) => {
@@ -505,7 +505,7 @@ export default function EventModal({ mode, event, onClose, onSave, onDelete }: E
                               width: "100%",
                               padding: "6px 10px",
                               border: "none",
-                              borderBottom: "1px solid rgba(255,255,255,0.03)",
+                              borderBottom: "1px solid var(--surface-hover)",
                               background: isSelected ? "rgba(192,139,136,0.08)" : "transparent",
                               cursor: "pointer",
                               fontSize: 11,
@@ -564,10 +564,10 @@ export default function EventModal({ mode, event, onClose, onSave, onDelete }: E
                         borderRadius: 8,
                         border: recurring === opt.value
                           ? "1px solid var(--rose)"
-                          : "1px solid var(--card-border, rgba(255,255,255,0.06))",
+                          : "1px solid var(--card-border)",
                         background: recurring === opt.value
                           ? "rgba(192,139,136,0.1)"
-                          : "var(--bg-input, #0A0C10)",
+                          : "var(--bg-input)",
                         cursor: "pointer",
                         fontSize: 11,
                         color: "var(--text)",
@@ -626,7 +626,7 @@ export default function EventModal({ mode, event, onClose, onSave, onDelete }: E
         <div
           style={{
             padding: "14px 24px",
-            borderTop: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+            borderTop: "1px solid var(--card-border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",

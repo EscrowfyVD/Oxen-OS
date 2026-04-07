@@ -167,7 +167,7 @@ export default function PipelineView({
               flexDirection: "column",
               background: isDropTarget
                 ? "rgba(192,139,136,0.08)"
-                : "rgba(255,255,255,0.02)",
+                : "var(--surface-subtle)",
               border: `1px solid ${isDropTarget ? "rgba(192,139,136,0.3)" : CARD_BORDER}`,
               borderRadius: 12,
               transition: "all 0.2s ease",
@@ -225,7 +225,7 @@ export default function PipelineView({
                     fontSize: 10,
                     color: TEXT_TERTIARY,
                     fontFamily: "'DM Sans', sans-serif",
-                    background: "rgba(255,255,255,0.06)",
+                    background: "var(--card-border)",
                     padding: "1px 6px",
                     borderRadius: 8,
                   }}
@@ -404,7 +404,7 @@ function DealCard({
           style={{
             fontFamily: "'Bellfair', serif",
             fontSize: 16,
-            color: "#FFFFFF",
+            color: "var(--text-primary)",
             lineHeight: 1,
             marginBottom: 8,
           }}
@@ -458,7 +458,7 @@ function DealCard({
                 fontSize: 9,
                 padding: "2px 6px",
                 borderRadius: 8,
-                background: "rgba(255,255,255,0.06)",
+                background: "var(--card-border)",
                 color: TEXT_TERTIARY,
                 fontFamily: "'DM Sans', sans-serif",
               }}

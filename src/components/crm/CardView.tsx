@@ -166,7 +166,7 @@ export default function CardView({ deals, onDealClick }: CardViewProps) {
                   style={{
                     fontFamily: "'Bellfair', serif",
                     fontSize: 18,
-                    color: "#FFFFFF",
+                    color: "var(--text-primary)",
                     lineHeight: 1,
                   }}
                 >
@@ -206,7 +206,7 @@ export default function CardView({ deals, onDealClick }: CardViewProps) {
                       fontSize: 9,
                       padding: "2px 6px",
                       borderRadius: 8,
-                      background: "rgba(255,255,255,0.06)",
+                      background: "var(--card-border)",
                       color: TEXT_TERTIARY,
                       fontFamily: "'DM Sans', sans-serif",
                     }}

@@ -83,10 +83,10 @@ export default function CallNotesModal({ event, onClose, onSuccess }: CallNotesM
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "10px 14px",
-    background: "var(--bg-input, #0A0C10)",
-    border: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+    background: "var(--bg-input)",
+    border: "1px solid var(--card-border)",
     borderRadius: 10,
-    color: "var(--text, #F0F0F2)",
+    color: "var(--text)",
     fontSize: 13,
     fontFamily: "'DM Sans', sans-serif",
     outline: "none",
@@ -98,7 +98,7 @@ export default function CallNotesModal({ event, onClose, onSuccess }: CallNotesM
     fontWeight: 600,
     letterSpacing: "0.08em",
     textTransform: "uppercase" as const,
-    color: "var(--text-tertiary, rgba(240,240,242,0.3))",
+    color: "var(--text-tertiary)",
     marginBottom: 6,
     display: "block",
   }
@@ -125,8 +125,8 @@ export default function CallNotesModal({ event, onClose, onSuccess }: CallNotesM
           width: "100%",
           maxWidth: 640,
           maxHeight: "90vh",
-          background: "var(--card-bg, #0F1118)",
-          border: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+          background: "var(--card-bg)",
+          border: "1px solid var(--card-border)",
           borderRadius: 16,
           display: "flex",
           flexDirection: "column",
@@ -137,7 +137,7 @@ export default function CallNotesModal({ event, onClose, onSuccess }: CallNotesM
         <div
           style={{
             padding: "18px 24px",
-            borderBottom: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+            borderBottom: "1px solid var(--card-border)",
             background: "rgba(192,139,136,0.03)",
             display: "flex",
             alignItems: "center",
@@ -165,7 +165,7 @@ export default function CallNotesModal({ event, onClose, onSuccess }: CallNotesM
                 style={{
                   fontSize: 15,
                   fontWeight: 600,
-                  color: "var(--text, #F0F0F2)",
+                  color: "var(--text)",
                   margin: 0,
                   fontFamily: "'DM Sans', sans-serif",
                 }}
@@ -175,7 +175,7 @@ export default function CallNotesModal({ event, onClose, onSuccess }: CallNotesM
               <p
                 style={{
                   fontSize: 11,
-                  color: "var(--text-tertiary, rgba(240,240,242,0.3))",
+                  color: "var(--text-tertiary)",
                   margin: 0,
                 }}
               >
@@ -191,7 +191,7 @@ export default function CallNotesModal({ event, onClose, onSuccess }: CallNotesM
                 border: "none",
                 cursor: "pointer",
                 fontSize: 16,
-                color: "var(--text-tertiary, rgba(240,240,242,0.3))",
+                color: "var(--text-tertiary)",
                 padding: 4,
               }}
             >
@@ -323,7 +323,7 @@ export default function CallNotesModal({ event, onClose, onSuccess }: CallNotesM
         <div
           style={{
             padding: "16px 24px",
-            borderTop: "1px solid var(--card-border, rgba(255,255,255,0.06))",
+            borderTop: "1px solid var(--card-border)",
             background: "rgba(192,139,136,0.02)",
             flexShrink: 0,
           }}
@@ -352,8 +352,8 @@ export default function CallNotesModal({ event, onClose, onSuccess }: CallNotesM
                   padding: "10px 20px",
                   borderRadius: 10,
                   background: "transparent",
-                  border: "1px solid var(--card-border, rgba(255,255,255,0.06))",
-                  color: "var(--text-tertiary, rgba(240,240,242,0.3))",
+                  border: "1px solid var(--card-border)",
+                  color: "var(--text-tertiary)",
                   fontSize: 13,
                   fontWeight: 500,
                   fontFamily: "'DM Sans', sans-serif",

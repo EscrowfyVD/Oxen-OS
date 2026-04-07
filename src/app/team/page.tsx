@@ -6,12 +6,12 @@ import { ROLE_COLORS, ROLE_LABELS, canAccess, type RoleLevel } from "@/lib/permi
 import { AVATAR_THEMES, AVATAR_THEME_NAMES, getAvatarGradient, getLeastUsedTheme } from "@/lib/avatar"
 
 /* ── Design tokens ── */
-const FROST = "#FFFFFF"
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const FROST = "var(--text-primary)"
+const CARD_BG = "var(--card-bg-solid)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const RED = "#F87171"
@@ -377,7 +377,7 @@ export default function TeamPage() {
                 padding: "8px 14px",
                 borderRadius: 8,
                 border: `1px solid ${CARD_BORDER}`,
-                background: "rgba(255,255,255,0.04)",
+                background: "var(--surface-hover)",
                 color: TEXT_PRIMARY,
                 fontFamily: "'DM Sans', sans-serif",
                 fontSize: 12,
@@ -526,7 +526,7 @@ export default function TeamPage() {
                       style={{
                         fontFamily: emp.icon ? "inherit" : "'Bellfair', serif",
                         fontSize: emp.icon ? 18 : 14,
-                        color: FROST,
+                        color: "#fff",
                         fontWeight: 400,
                         lineHeight: 1,
                       }}
@@ -732,7 +732,7 @@ export default function TeamPage() {
                       height: 28,
                       borderRadius: 6,
                       border: `1px solid ${CARD_BORDER}`,
-                      background: "rgba(255,255,255,0.04)",
+                      background: "var(--surface-hover)",
                       color: TEXT_SECONDARY,
                       fontSize: 12,
                       cursor: "pointer",
@@ -856,7 +856,7 @@ export default function TeamPage() {
                     flexShrink: 0,
                   }}
                 >
-                  <span style={{ fontFamily: form.icon ? "inherit" : "'Bellfair', serif", fontSize: form.icon ? 22 : 18, color: FROST, lineHeight: 1 }}>
+                  <span style={{ fontFamily: form.icon ? "inherit" : "'Bellfair', serif", fontSize: form.icon ? 22 : 18, color: "#fff", lineHeight: 1 }}>
                     {form.icon || (form.name ? getInitials(form.name) : "?")}
                   </span>
                 </div>
@@ -1166,7 +1166,7 @@ export default function TeamPage() {
 const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: 10,
-  color: "rgba(240,240,242,0.3)",
+  color: "var(--text-tertiary)",
   textTransform: "uppercase",
   letterSpacing: 1,
   marginBottom: 4,

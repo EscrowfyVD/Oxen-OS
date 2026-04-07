@@ -5,16 +5,16 @@ import { useRouter } from "next/navigation"
 import Counter from "@/components/dashboard/Counter"
 import { getAvatarGradient } from "@/lib/avatar"
 
-/* ── Design tokens ── */
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+/* ── Design tokens (CSS-variable-backed for light/dark) ── */
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
-const GREEN = "#34D399"
-const AMBER = "#FBBF24"
-const INDIGO = "#818CF8"
-const FROST = "#FFFFFF"
+const GREEN = "var(--green)"
+const AMBER = "var(--amber)"
+const INDIGO = "var(--indigo)"
+const FROST = "var(--text-primary)"
 
 /* ── Types ── */
 interface ActivityItem {
@@ -147,7 +147,7 @@ export default function DashboardPage() {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "16px 32px",
-          background: "rgba(6,7,9,0.88)",
+          background: "var(--header-bg)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderBottom: `1px solid ${CARD_BORDER}`,
@@ -309,8 +309,8 @@ export default function DashboardPage() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "14px 20px",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
-                background: "rgba(255,255,255,0.01)",
+                borderBottom: "1px solid var(--card-border)",
+                background: "var(--surface-subtle)",
               }}
             >
               <span
@@ -343,7 +343,7 @@ export default function DashboardPage() {
                       padding: "10px 0",
                       borderBottom:
                         i < data.activityFeed.length - 1
-                          ? "1px solid rgba(255,255,255,0.03)"
+                          ? "1px solid var(--card-border)"
                           : "none",
                       cursor: item.link ? "pointer" : "default",
                       transition: "background 0.15s",
@@ -354,7 +354,7 @@ export default function DashboardPage() {
                       paddingRight: 4,
                     }}
                     onMouseEnter={(e) => {
-                      if (item.link) e.currentTarget.style.background = "rgba(255,255,255,0.02)"
+                      if (item.link) e.currentTarget.style.background = "var(--surface-hover)"
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = "transparent"
@@ -411,8 +411,8 @@ export default function DashboardPage() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "14px 20px",
-                borderBottom: "1px solid rgba(255,255,255,0.03)",
-                background: "rgba(255,255,255,0.01)",
+                borderBottom: "1px solid var(--card-border)",
+                background: "var(--surface-subtle)",
               }}
             >
               <span
@@ -444,7 +444,7 @@ export default function DashboardPage() {
                       padding: "10px 0",
                       borderBottom:
                         i < data.schedule.length - 1
-                          ? "1px solid rgba(255,255,255,0.03)"
+                          ? "1px solid var(--card-border)"
                           : "none",
                     }}
                   >
@@ -501,7 +501,7 @@ export default function DashboardPage() {
                                 fontSize: 7,
                                 fontWeight: 600,
                                 color: "#fff",
-                                border: "1.5px solid var(--bg-card, #0F1118)",
+                                border: "1.5px solid var(--card-bg-solid, var(--void))",
                                 marginLeft: j > 0 ? -6 : 0,
                                 zIndex: 5 - j,
                                 position: "relative",
@@ -532,7 +532,7 @@ export default function DashboardPage() {
               <div
                 style={{
                   paddingTop: 10,
-                  borderTop: "1px solid rgba(255,255,255,0.03)",
+                  borderTop: "1px solid var(--card-border)",
                   marginTop: 4,
                 }}
               >

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Search, X } from "lucide-react"
 import { CRM_COLORS } from "@/lib/crm-config"
 
-const CARD_BG = "rgba(15,17,24,0.95)"
+const CARD_BG = "var(--card-bg-solid)"
 const CARD_BORDER = CRM_COLORS.card_border
 const TEXT_PRIMARY = CRM_COLORS.text_primary
 const TEXT_SECONDARY = CRM_COLORS.text_secondary
@@ -210,7 +210,7 @@ export default function CommandPaletteProvider({
               background: CARD_BG,
               border: `1px solid ${CARD_BORDER}`,
               borderRadius: 16,
-              boxShadow: "0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px var(--surface-elevated)",
               overflow: "hidden",
             }}
           >
@@ -245,7 +245,7 @@ export default function CommandPaletteProvider({
               <button
                 onClick={() => setOpen(false)}
                 style={{
-                  background: "rgba(255,255,255,0.06)",
+                  background: "var(--card-border)",
                   border: "none",
                   borderRadius: 4,
                   padding: "2px 6px",
@@ -277,7 +277,7 @@ export default function CommandPaletteProvider({
                     gap: 10,
                     width: "100%",
                     padding: "10px 18px",
-                    background: i === selectedIndex ? "rgba(255,255,255,0.04)" : "transparent",
+                    background: i === selectedIndex ? "var(--surface-elevated)" : "transparent",
                     border: "none",
                     cursor: "pointer",
                     textAlign: "left",

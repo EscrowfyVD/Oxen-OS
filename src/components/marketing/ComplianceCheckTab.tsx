@@ -4,12 +4,12 @@ import { useState, useEffect, useCallback } from "react"
 import { ShieldCheck, Plus, X, Loader2, ChevronDown, ChevronRight, Upload, FileText, ExternalLink } from "lucide-react"
 
 /* ── Design tokens ── */
-const VOID = "#060709"
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "rgba(240,240,242,0.92)"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.35)"
+const VOID = "var(--void)"
+const CARD_BG = "var(--card-bg)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 
 /* ── Types ── */
@@ -311,7 +311,7 @@ function CheckModal({
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <ShieldCheck size={20} color={ROSE_GOLD} />
-            <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, fontWeight: 400, color: "#fff", margin: 0 }}>
+            <h3 style={{ fontFamily: "'Bellfair', serif", fontSize: 18, fontWeight: 400, color: TEXT_PRIMARY, margin: 0 }}>
               {step === "input" ? "Check New Content" : "Compliance Results"}
             </h3>
           </div>

@@ -116,7 +116,7 @@ export default function TicketDetailPage() {
 
   if (loading) {
     return (
-      <div className="page-content" style={{ padding: 40, background: "#060709", minHeight: "100vh" }}>
+      <div className="page-content" style={{ padding: 40, background: "var(--void)", minHeight: "100vh" }}>
         <div style={{ textAlign: "center", color: TEXT_TERTIARY, fontSize: 13 }}>Loading ticket...</div>
       </div>
     )
@@ -124,7 +124,7 @@ export default function TicketDetailPage() {
 
   if (!ticket) {
     return (
-      <div className="page-content" style={{ padding: 40, background: "#060709", minHeight: "100vh" }}>
+      <div className="page-content" style={{ padding: 40, background: "var(--void)", minHeight: "100vh" }}>
         <div style={{ textAlign: "center", color: TEXT_TERTIARY, fontSize: 13 }}>Ticket not found</div>
         <div style={{ textAlign: "center", marginTop: 16 }}>
           <Link href="/support" style={{ color: ROSE_GOLD, fontSize: 12 }}>Back to Support</Link>
@@ -138,7 +138,7 @@ export default function TicketDetailPage() {
   const chDef = CHANNELS.find((c) => c.id === ticket.channel)
 
   return (
-    <div className="page-content fade-in" style={{ padding: 0, background: "#060709", minHeight: "100vh" }}>
+    <div className="page-content fade-in" style={{ padding: 0, background: "var(--void)", minHeight: "100vh" }}>
       {/* Top Bar */}
       <div style={{
         padding: "16px 28px", borderBottom: `1px solid ${CARD_BORDER}`,

@@ -84,7 +84,7 @@ export default function CompaniesListPage() {
       .reduce((s, d) => s + (d.dealValue ?? 0), 0)
 
   const selectStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.04)",
+    background: "var(--surface-input)",
     border: `1px solid ${CARD_BORDER}`,
     borderRadius: 8,
     padding: "8px 12px",
@@ -96,7 +96,7 @@ export default function CompaniesListPage() {
   }
 
   return (
-    <div style={{ padding: "32px 40px", minHeight: "100vh", background: "#060709" }}>
+    <div style={{ padding: "32px 40px", minHeight: "100vh", background: "var(--void)" }}>
       {/* Header */}
       <div className="flex items-center justify-between" style={{ marginBottom: 28 }}>
         <div>
@@ -163,7 +163,7 @@ export default function CompaniesListPage() {
             style={{
               width: "100%",
               padding: "10px 12px 10px 36px",
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--surface-input)",
               border: `1px solid ${CARD_BORDER}`,
               borderRadius: 10,
               fontSize: 13,

@@ -1,13 +1,13 @@
 /* ── CRO Revenue Intelligence Design Tokens & Constants ── */
 
-export const CARD_BG = "rgba(15,17,24,0.6)"
-export const CARD_BG_SOLID = "#0F1118"
-export const CARD_BORDER = "rgba(255,255,255,0.06)"
+export const CARD_BG = "var(--card-bg)"
+export const CARD_BG_SOLID = "var(--card-bg-solid)"
+export const CARD_BORDER = "var(--card-border)"
 export const GLASS_BLUR = "blur(20px)"
 export const GLASS_SHADOW = "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)"
-export const TEXT_PRIMARY = "#F0F0F2"
-export const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-export const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+export const TEXT_PRIMARY = "var(--text-primary)"
+export const TEXT_SECONDARY = "var(--text-secondary)"
+export const TEXT_TERTIARY = "var(--text-tertiary)"
 export const ROSE_GOLD = "#C08B88"
 export const GREEN = "#34D399"
 export const AMBER = "#FBBF24"
@@ -44,7 +44,7 @@ export const HEALTH_STATUSES = [
   { id: "watch", label: "Watch", color: AMBER, bg: "rgba(251,191,36,0.12)" },
   { id: "at_risk", label: "At Risk", color: RED, bg: "rgba(248,113,113,0.12)" },
   { id: "declining", label: "Declining", color: ROSE_GOLD, bg: "rgba(192,139,136,0.12)" },
-  { id: "churned", label: "Churned", color: TEXT_TERTIARY, bg: "rgba(240,240,242,0.06)" },
+  { id: "churned", label: "Churned", color: TEXT_TERTIARY, bg: "var(--surface-input)" },
 ]
 
 export const HEALTH_COLORS: Record<string, { bg: string; text: string }> = {
@@ -52,7 +52,7 @@ export const HEALTH_COLORS: Record<string, { bg: string; text: string }> = {
   watch:     { bg: "rgba(251,191,36,0.12)", text: AMBER },
   at_risk:   { bg: "rgba(248,113,113,0.12)", text: RED },
   declining: { bg: "rgba(192,139,136,0.12)", text: ROSE_GOLD },
-  churned:   { bg: "rgba(240,240,242,0.06)", text: TEXT_TERTIARY },
+  churned:   { bg: "var(--surface-input)", text: TEXT_TERTIARY },
 }
 
 /* ── Segments ── */
@@ -83,7 +83,7 @@ export const SECTOR_COLORS: Record<string, { bg: string; text: string }> = {
 
 /* ── Status colors ── */
 export const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  lead:         { bg: "rgba(240,240,242,0.06)", text: TEXT_SECONDARY },
+  lead:         { bg: "var(--surface-input)", text: TEXT_SECONDARY },
   qualified:    { bg: "rgba(129,140,248,0.12)", text: INDIGO },
   proposal:     { bg: "rgba(251,191,36,0.12)", text: AMBER },
   negotiation:  { bg: "rgba(192,139,136,0.12)", text: ROSE_GOLD },
@@ -93,7 +93,7 @@ export const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 /* ── Deal stage colors ── */
 export const STAGE_COLORS: Record<string, { bg: string; text: string }> = {
-  discovery:    { bg: "rgba(240,240,242,0.06)", text: TEXT_SECONDARY },
+  discovery:    { bg: "var(--surface-input)", text: TEXT_SECONDARY },
   demo:         { bg: "rgba(129,140,248,0.12)", text: INDIGO },
   proposal:     { bg: "rgba(251,191,36,0.12)", text: AMBER },
   negotiation:  { bg: "rgba(192,139,136,0.12)", text: ROSE_GOLD },
@@ -146,7 +146,7 @@ export const SIGNAL_TYPE_COLORS: Record<string, { bg: string; text: string }> = 
 
 /* ── Outreach status colors ── */
 export const OUTREACH_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  new:           { bg: "rgba(240,240,242,0.06)", text: TEXT_SECONDARY },
+  new:           { bg: "var(--surface-input)", text: TEXT_SECONDARY },
   enriched:      { bg: "rgba(129,140,248,0.12)", text: INDIGO },
   sequenced:     { bg: "rgba(251,191,36,0.12)", text: AMBER },
   replied:       { bg: "rgba(192,139,136,0.12)", text: ROSE_GOLD },

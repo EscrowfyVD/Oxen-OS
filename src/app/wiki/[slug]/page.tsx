@@ -19,11 +19,11 @@ import Underline from "@tiptap/extension-underline"
 import { getCategoryColor } from "@/components/wiki/WikiPageCard"
 import DriveDocuments from "@/components/drive/DriveDocuments"
 
-const FROST = "#F0F0F2"
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const FROST = "var(--text-primary)"
+const CARD_BG = "var(--card-bg-solid)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const RED = "#F87171"
@@ -411,7 +411,7 @@ export default function WikiViewPage() {
             border-radius: 0 10px 10px 0;
           }
           .wiki-content pre {
-            background: #060709;
+            background: var(--void);
             border: 1px solid ${CARD_BORDER};
             border-radius: 10px;
             padding: 16px;
@@ -420,12 +420,12 @@ export default function WikiViewPage() {
             color: ${FROST};
             overflow-x: auto;
           }
-          .wiki-content code { background: rgba(255,255,255,0.05); border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 0.9em; }
+          .wiki-content code { background: var(--surface-elevated); border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 0.9em; }
           .wiki-content img { max-width: 100%; border-radius: 10px; margin: 8px 0; border: 1px solid ${CARD_BORDER}; }
           .wiki-content hr { border: none; border-top: 1px solid ${CARD_BORDER}; margin: 1.5em 0; }
           .wiki-content table { border-collapse: collapse; width: 100%; margin: 0.75em 0; }
           .wiki-content th, .wiki-content td { border: 1px solid ${CARD_BORDER}; padding: 8px 12px; text-align: left; font-size: 13px; }
-          .wiki-content th { background: rgba(255,255,255,0.03); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: ${TEXT_SECONDARY}; }
+          .wiki-content th { background: var(--surface-subtle); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: ${TEXT_SECONDARY}; }
           .wiki-content ul[data-type="taskList"] { list-style: none; padding-left: 0; }
           .wiki-content ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 8px; }
           .wiki-content ul[data-type="taskList"] li label input[type="checkbox"] { appearance: none; width: 16px; height: 16px; border: 1.5px solid rgba(192,139,136,0.4); border-radius: 4px; background: transparent; margin-top: 3px; }
@@ -511,7 +511,7 @@ export default function WikiViewPage() {
             padding: "10px 18px",
             borderRadius: 50,
             border: "1px solid rgba(192,139,136,0.3)",
-            background: "rgba(15,17,24,0.9)",
+            background: "var(--card-bg-solid)",
             backdropFilter: "blur(12px)",
             color: ROSE_GOLD,
             fontFamily: "'DM Sans', sans-serif",
@@ -527,7 +527,7 @@ export default function WikiViewPage() {
             e.currentTarget.style.borderColor = "rgba(192,139,136,0.5)"
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(15,17,24,0.9)"
+            e.currentTarget.style.background = "var(--card-bg-solid)"
             e.currentTarget.style.borderColor = "rgba(192,139,136,0.3)"
           }}
         >
@@ -552,7 +552,7 @@ export default function WikiViewPage() {
             flexDirection: "column",
             borderRadius: 14,
             border: "1px solid rgba(192,139,136,0.2)",
-            background: "rgba(15,17,24,0.95)",
+            background: "var(--card-bg-solid)",
             backdropFilter: "blur(16px)",
             boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
             zIndex: 900,
@@ -700,7 +700,7 @@ export default function WikiViewPage() {
                   padding: "10px 14px",
                   borderRadius: 8,
                   border: `1px solid ${CARD_BORDER}`,
-                  background: "rgba(255,255,255,0.04)",
+                  background: "var(--surface-hover)",
                   color: FROST,
                   fontFamily: "'DM Sans', sans-serif",
                   fontSize: 13,
@@ -826,7 +826,7 @@ export default function WikiViewPage() {
                       borderBottom: `1px solid ${CARD_BORDER}`,
                     }}
                     onMouseEnter={(e) => {
-                      if (previewVersion?.id !== v.id) e.currentTarget.style.background = "rgba(255,255,255,0.03)"
+                      if (previewVersion?.id !== v.id) e.currentTarget.style.background = "var(--surface-subtle)"
                     }}
                     onMouseLeave={(e) => {
                       if (previewVersion?.id !== v.id) e.currentTarget.style.background = "transparent"

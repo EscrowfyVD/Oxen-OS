@@ -136,7 +136,7 @@ export default function TableView({ deals, onDealClick }: TableViewProps) {
     userSelect: "none",
     whiteSpace: "nowrap",
     borderBottom: `1px solid ${CARD_BORDER}`,
-    background: "rgba(255,255,255,0.02)",
+    background: "var(--surface-subtle)",
     position: "sticky" as const,
     top: 0,
     zIndex: 2,

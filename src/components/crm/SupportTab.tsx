@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react"
 
 /* ── Design Tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT = "#F0F0F2"
-const TEXT_SEC = "rgba(240,240,242,0.55)"
+const CARD_BG = "var(--card-bg)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT = "var(--text-primary)"
+const TEXT_SEC = "var(--text-secondary)"
 
 const GLASS: React.CSSProperties = {
   background: CARD_BG,

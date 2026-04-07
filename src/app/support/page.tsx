@@ -10,10 +10,10 @@ import { fmtDuration } from "@/components/support/constants"
 import type { SupportTicket, SupportStats, DailyStats, Employee } from "@/components/support/types"
 
 /* ── Design tokens ── */
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "#F0F0F2"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const GREEN = "#34D399"
 
 type TabId = "overview" | "tickets" | "reports"
@@ -100,7 +100,7 @@ export default function SupportPage() {
     : "Loading support data..."
 
   return (
-    <div className="page-content" style={{ padding: 0, background: "#060709", minHeight: "100vh" }}>
+    <div className="page-content" style={{ padding: 0, background: "var(--void)", minHeight: "100vh" }}>
       {/* Header */}
       <div
         className="fade-in"

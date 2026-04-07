@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation"
 import PageHeader from "@/components/layout/PageHeader"
 
 /* ── Design tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_PRIMARY = "rgba(240,240,242,0.92)"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.35)"
+const CARD_BG = "var(--card-bg-solid)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE = "#C08B88"
 const ROSE_HOVER = "#D4A5A2"
 const ROSE_DIM = "rgba(192,139,136,0.15)"
@@ -131,7 +131,7 @@ const cardStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "9px 14px",
-  background: "#0A0C10",
+  background: "var(--surface-input)",
   border: `1px solid ${CARD_BORDER}`,
   borderRadius: 8,
   color: TEXT_PRIMARY,
@@ -156,7 +156,7 @@ const btnPrimary: React.CSSProperties = {
   background: ROSE,
   border: "none",
   borderRadius: 10,
-  color: "#fff",
+  color: "#fff", /* white on colored button */
   fontSize: 13,
   fontWeight: 600,
   fontFamily: "'DM Sans', sans-serif",
@@ -166,7 +166,7 @@ const btnPrimary: React.CSSProperties = {
 
 const btnSecondary: React.CSSProperties = {
   padding: "8px 16px",
-  background: "rgba(255,255,255,0.04)",
+  background: "var(--surface-hover)",
   border: `1px solid ${CARD_BORDER}`,
   borderRadius: 8,
   color: TEXT_PRIMARY,
@@ -484,7 +484,7 @@ export default function ConferencesPage() {
         style={{
           padding: "0 32px",
           borderBottom: `1px solid ${CARD_BORDER}`,
-          background: "rgba(6,7,9,0.5)",
+          background: "var(--header-bg)",
         }}
       >
         {tabs.map((tab) => (
@@ -541,7 +541,7 @@ export default function ConferencesPage() {
                         borderLeft: `3px solid ${isPast ? TEXT_TERTIARY : clr.solid}`,
                         position: "relative",
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.opacity = "1"; const del = e.currentTarget.querySelector("[data-del]") as HTMLElement; if (del) del.style.opacity = "1" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-subtle)"; e.currentTarget.style.opacity = "1"; const del = e.currentTarget.querySelector("[data-del]") as HTMLElement; if (del) del.style.opacity = "1" }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = CARD_BG; e.currentTarget.style.opacity = isPast ? "0.5" : "1"; const del = e.currentTarget.querySelector("[data-del]") as HTMLElement; if (del) del.style.opacity = "0" }}
                     >
                       <button
@@ -644,7 +644,7 @@ export default function ConferencesPage() {
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
                     {Array.from({ length: firstDay }).map((_, i) => (
-                      <div key={`e-${i}`} style={{ minHeight: 100, borderRight: `1px solid ${CARD_BORDER}`, borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.01)" }} />
+                      <div key={`e-${i}`} style={{ minHeight: 100, borderRight: `1px solid ${CARD_BORDER}`, borderBottom: `1px solid ${CARD_BORDER}`, background: "var(--surface-subtle)" }} />
                     ))}
                     {Array.from({ length: daysInMonth }).map((_, i) => {
                       const day = i + 1
@@ -1080,7 +1080,7 @@ export default function ConferencesPage() {
             )}
             {pastConferences.length > 0 && (
               <div style={cardStyle}>
-                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 80px 160px", gap: 12, padding: "12px 20px", borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.02)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 80px 160px", gap: 12, padding: "12px 20px", borderBottom: `1px solid ${CARD_BORDER}`, background: "var(--surface-subtle)" }}>
                   {["Conference", "Dates", "Location", "Team", "Status"].map((h) => (
                     <span key={h} style={{ fontSize: 10, fontWeight: 600, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</span>
                   ))}
@@ -1274,7 +1274,7 @@ function AddConferenceModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between" style={{ padding: "20px 24px", borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(192,139,136,0.03)", position: "sticky", top: 0, zIndex: 10 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 400, fontFamily: "'Bellfair', serif", color: "#fff", margin: 0 }}>Add Conference</h3>
+          <h3 style={{ fontSize: 18, fontWeight: 400, fontFamily: "'Bellfair', serif", color: TEXT_PRIMARY, margin: 0 }}>Add Conference</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", color: TEXT_TERTIARY, fontSize: 18, cursor: "pointer", padding: 4 }}>&#x2715;</button>
         </div>
 

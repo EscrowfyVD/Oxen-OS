@@ -71,16 +71,16 @@ interface Employee {
 }
 
 /* ── style constants ── */
-const cardBg = "rgba(15,17,24,0.6)"
-const cardBorder = "rgba(255,255,255,0.06)"
+const cardBg = "var(--card-bg-solid)"
+const cardBorder = "var(--card-border)"
 const roseGold = "#C08B88"
-const void_ = "#060709"
-const textPrimary = "rgba(240,240,242,0.92)"
-const textSecondary = "rgba(240,240,242,0.55)"
-const textTertiary = "rgba(240,240,242,0.35)"
+const void_ = "var(--void)"
+const textPrimary = "var(--text-primary)"
+const textSecondary = "var(--text-secondary)"
+const textTertiary = "var(--text-tertiary)"
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "10px 14px", background: "rgba(255,255,255,0.04)",
+  width: "100%", padding: "10px 14px", background: "var(--surface-input)",
   border: `1px solid ${cardBorder}`, borderRadius: 10, color: textPrimary,
   fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif",
 }
@@ -93,7 +93,7 @@ const btnPrimary: React.CSSProperties = {
   fontFamily: "'DM Sans', sans-serif",
 }
 const btnSecondary: React.CSSProperties = {
-  padding: "10px 20px", background: "rgba(255,255,255,0.06)", color: textPrimary,
+  padding: "10px 20px", background: "var(--card-border)", color: textPrimary,
   border: `1px solid ${cardBorder}`, borderRadius: 10, fontSize: 13, fontWeight: 500,
   cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
 }
@@ -180,7 +180,7 @@ function Modal({ open, onClose, title, children, width }: {
       background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
     }} onClick={onClose}>
       <div style={{
-        background: "#0D0F14", border: `1px solid ${cardBorder}`, borderRadius: 16,
+        background: "var(--card-bg-solid)", border: `1px solid ${cardBorder}`, borderRadius: 16,
         width: width || 560, maxHeight: "85vh", overflow: "auto", padding: 0,
         animation: "slideUp 0.3s ease",
       }} onClick={(e) => e.stopPropagation()}>
@@ -433,7 +433,7 @@ export default function CompliancePage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 2, marginBottom: 28, background: "rgba(255,255,255,0.03)", borderRadius: 14, padding: 4, width: "fit-content" }}>
+      <div style={{ display: "flex", gap: 2, marginBottom: 28, background: "var(--surface-elevated)", borderRadius: 14, padding: 4, width: "fit-content" }}>
         {TABS.map((t) => {
           const active = tab === t.key
           return (
@@ -613,13 +613,13 @@ function OverviewTab({ overview }: { overview: OverviewData | null }) {
               {overview.upcomingDeadlines.slice(0, 8).map((d, i) => (
                 <div key={i} style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 8,
+                  padding: "10px 14px", background: "var(--surface-subtle)", borderRadius: 8,
                 }}>
                   <div>
                     <span style={{ fontSize: 12, color: textPrimary, fontWeight: 500 }}>{d.title}</span>
                     <span style={{
                       fontSize: 10, color: textTertiary, marginLeft: 8,
-                      padding: "2px 6px", background: "rgba(255,255,255,0.06)", borderRadius: 4,
+                      padding: "2px 6px", background: "var(--card-border)", borderRadius: 4,
                     }}>{d.type}</span>
                   </div>
                   <span style={{ fontSize: 11, color: roseGold }}>{new Date(d.date).toLocaleDateString()}</span>
@@ -659,7 +659,7 @@ function ComplianceBar({ label, value, total, color }: { label: string; value: n
         <span style={{ fontSize: 12, color: textSecondary }}>{label}</span>
         <span style={{ fontSize: 12, fontWeight: 600, color: textPrimary }}>{pct}%</span>
       </div>
-      <div style={{ height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ height: 6, background: "var(--card-border)", borderRadius: 3, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3, transition: "width 0.5s ease" }} />
       </div>
       <div style={{ fontSize: 10, color: textTertiary, marginTop: 4 }}>{value} / {total}</div>
@@ -746,13 +746,13 @@ function PendingContentReview() {
           return (
             <div key={c.id} style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "10px 14px", background: "rgba(255,255,255,0.03)", borderRadius: 8,
+              padding: "10px 14px", background: "var(--surface-subtle)", borderRadius: 8,
               border: `1px solid ${cardBorder}`,
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, color: textPrimary, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview}</div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "rgba(255,255,255,0.06)", color: textSecondary, textTransform: "capitalize" }}>{c.platform}</span>
+                  <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "var(--card-border)", color: textSecondary, textTransform: "capitalize" }}>{c.platform}</span>
                   <span style={{ fontSize: 10, color: riskColor, fontWeight: 600 }}>
                     {c.status === "rejected" ? "❌ Rejected" : "⚠️ Needs Changes"} · {c.score !== null ? `${c.score}/100` : ""}
                   </span>
@@ -935,7 +935,7 @@ function TrainingTab({ trainings, employees, onRefresh }: { trainings: TrainingI
               {/* Completion circle */}
               <div style={{
                 width: 48, height: 48, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-                background: `conic-gradient(${rateColor} ${rate * 3.6}deg, rgba(255,255,255,0.06) 0deg)`,
+                background: `conic-gradient(${rateColor} ${rate * 3.6}deg, var(--card-border) 0deg)`,
                 position: "relative", flexShrink: 0,
               }}>
                 <div style={{
@@ -976,7 +976,7 @@ function TrainingTab({ trainings, employees, onRefresh }: { trainings: TrainingI
                     return (
                       <div key={emp.id} style={{
                         display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-                        background: "rgba(255,255,255,0.03)", borderRadius: 8,
+                        background: "var(--surface-subtle)", borderRadius: 8,
                       }}>
                         <div style={{
                           width: 28, height: 28, borderRadius: "50%", background: emp.avatarColor || "rgba(255,255,255,0.1)",

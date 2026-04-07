@@ -8,11 +8,11 @@ import type { JSONContent } from "@tiptap/react"
 
 const CATEGORIES = ["Process", "Legal", "Product", "HR", "Finance", "Compliance", "General"]
 
-const FROST = "#F0F0F2"
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT_SECONDARY = "rgba(240,240,242,0.55)"
-const TEXT_TERTIARY = "rgba(240,240,242,0.3)"
+const FROST = "var(--text-primary)"
+const CARD_BG = "var(--card-bg-solid)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
 const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 const AMBER = "#FBBF24"
@@ -118,7 +118,7 @@ export default function WikiEditPage() {
   }
 
   return (
-    <div className="page-content" style={{ padding: 0, background: "#060709", minHeight: "100vh" }}>
+    <div className="page-content" style={{ padding: 0, background: "var(--void)", minHeight: "100vh" }}>
       {/* Top bar */}
       <div
         style={{
@@ -127,7 +127,7 @@ export default function WikiEditPage() {
           justifyContent: "space-between",
           padding: "12px 24px",
           borderBottom: `1px solid ${CARD_BORDER}`,
-          background: "rgba(15,17,24,0.8)",
+          background: "var(--header-bg)",
           backdropFilter: "blur(8px)",
           position: "sticky",
           top: 0,
@@ -186,7 +186,7 @@ export default function WikiEditPage() {
                 transition: "background 0.15s",
                 lineHeight: 1,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-hover)" }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
               title="Change icon"
             >
@@ -223,7 +223,7 @@ export default function WikiEditPage() {
                       cursor: "pointer",
                       transition: "background 0.1s",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--card-border)" }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = icon === emoji ? "rgba(192,139,136,0.15)" : "transparent" }}
                   >
                     {emoji}

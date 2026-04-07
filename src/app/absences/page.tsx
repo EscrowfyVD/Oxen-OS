@@ -204,7 +204,7 @@ export default function AbsencesPage() {
         className="sticky-header"
         style={{
           padding: "24px 32px 0",
-          background: "rgba(6,7,9,0.88)",
+          background: "var(--header-bg)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           borderBottom: `1px solid ${CARD_BORDER}`,

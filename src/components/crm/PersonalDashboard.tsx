@@ -14,11 +14,11 @@ import {
 } from "@/lib/crm-config"
 
 /* ── Design Tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT = "#F0F0F2"
-const TEXT_SEC = "rgba(240,240,242,0.55)"
-const TEXT_TER = "rgba(240,240,242,0.3)"
+const CARD_BG = "var(--card-bg)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT = "var(--text-primary)"
+const TEXT_SEC = "var(--text-secondary)"
+const TEXT_TER = "var(--text-tertiary)"
 const ROSE = "#C08B88"
 const GREEN = "#34D399"
 const AMBER = "#FBBF24"
@@ -30,7 +30,7 @@ const GLASS: React.CSSProperties = {
   borderRadius: 14,
   backdropFilter: "blur(20px)",
   WebkitBackdropFilter: "blur(20px)",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px var(--surface-hover)",
 }
 
 /* ── Helpers ── */
@@ -302,7 +302,7 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
             fontFamily: "'Bellfair', serif",
             fontSize: 32,
             fontWeight: 400,
-            color: "#FFFFFF",
+            color: "var(--text-primary)",
             margin: 0,
             lineHeight: 1.2,
           }}>
@@ -351,7 +351,7 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
                 borderRadius: 6,
                 cursor: automationRunning ? "not-allowed" : "pointer",
                 transition: "all 0.15s ease",
-                background: "rgba(255,255,255,0.06)",
+                background: "var(--card-border)",
                 color: automationRunning ? TEXT_TER : TEXT_SEC,
                 display: "flex",
                 alignItems: "center",
@@ -377,7 +377,7 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
             <div style={{
               display: "flex",
               gap: 2,
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--surface-elevated)",
               borderRadius: 8,
               padding: 3,
             }}>
@@ -559,7 +559,7 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
                   borderRadius: 8,
                   transition: "background 0.15s ease",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-elevated)" }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
               >
                 {/* Left: label + count */}
@@ -586,7 +586,7 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
                 </div>
 
                 {/* Bar */}
-                <div style={{ flex: 1, height: 20, background: "rgba(255,255,255,0.04)", borderRadius: 6, overflow: "hidden" }}>
+                <div style={{ flex: 1, height: 20, background: "var(--surface-elevated)", borderRadius: 6, overflow: "hidden" }}>
                   <div style={{
                     width: `${pct}%`,
                     height: "100%",
@@ -725,7 +725,7 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
                     borderRadius: 8,
                     transition: "background 0.1s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-hover)" }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
                 >
                   <span style={{ fontSize: 14, lineHeight: "20px", flexShrink: 0 }}>
@@ -794,7 +794,7 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
                     borderRadius: 8,
                     transition: "background 0.1s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-hover)" }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
@@ -926,7 +926,7 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
                   cursor: "pointer",
                   transition: "background 0.1s",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-hover)" }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
@@ -1014,7 +1014,7 @@ export default function PersonalDashboard({ ownerName, isAdmin, onStageClick }: 
 
             return (
               <div key={metric.label} style={{
-                background: "rgba(255,255,255,0.03)",
+                background: "var(--surface-hover)",
                 borderRadius: 10,
                 padding: "14px 16px",
               }}>
@@ -1105,7 +1105,7 @@ function TaskSection({
               cursor: "pointer",
               transition: "background 0.1s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--surface-hover)" }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
           >
             {/* Dot */}
@@ -1148,7 +1148,7 @@ function TaskSection({
               fontSize: 9,
               color: TEXT_TER,
               fontFamily: "'DM Sans', sans-serif",
-              background: "rgba(255,255,255,0.05)",
+              background: "var(--surface-input)",
               padding: "2px 7px",
               borderRadius: 8,
               flexShrink: 0,
@@ -1181,7 +1181,7 @@ function SkeletonDashboard() {
     width: typeof w === "number" ? w : w,
     height: h,
     borderRadius: 8,
-    background: "linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%)",
+    background: "linear-gradient(90deg, var(--surface-elevated) 25%, var(--card-border) 50%, var(--surface-elevated) 75%)",
     backgroundSize: "200% 100%",
     animation: "oxen-skeleton-pulse 1.5s ease-in-out infinite",
   })
@@ -1233,7 +1233,7 @@ function SkeletonDashboard() {
         <div style={skeletonBlock(130, 16)} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginTop: 18 }}>
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div key={i} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: "14px 16px" }}>
+            <div key={i} style={{ background: "var(--surface-hover)", borderRadius: 10, padding: "14px 16px" }}>
               <div style={skeletonBlock(80, 10)} />
               <div style={{ ...skeletonBlock(50, 24), marginTop: 8 }} />
               <div style={{ ...skeletonBlock(100, 10), marginTop: 8 }} />

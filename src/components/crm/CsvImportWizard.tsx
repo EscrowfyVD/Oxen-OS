@@ -4,11 +4,11 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import Papa from "papaparse"
 
 /* ── Design Tokens ── */
-const CARD_BG = "rgba(15,17,24,0.6)"
-const CARD_BORDER = "rgba(255,255,255,0.06)"
-const TEXT = "#F0F0F2"
-const TEXT2 = "rgba(240,240,242,0.55)"
-const TEXT3 = "rgba(240,240,242,0.3)"
+const CARD_BG = "var(--card-bg)"
+const CARD_BORDER = "var(--card-border)"
+const TEXT = "var(--text-primary)"
+const TEXT2 = "var(--text-secondary)"
+const TEXT3 = "var(--text-tertiary)"
 const ROSE = "#C08B88"
 const GREEN = "#34D399"
 const AMBER = "#FBBF24"
@@ -19,7 +19,7 @@ const GLASS: React.CSSProperties = {
   borderRadius: 14,
   backdropFilter: "blur(20px)",
   WebkitBackdropFilter: "blur(20px)",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px var(--surface-hover)",
 }
 
 /* ── CRM Field Options ── */
@@ -482,13 +482,13 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
 
   const btnSecondary: React.CSSProperties = {
     ...btnBase,
-    background: "rgba(255,255,255,0.06)",
+    background: "var(--card-border)",
     color: TEXT2,
     border: `1px solid ${CARD_BORDER}`,
   }
 
   const selectStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.06)",
+    background: "var(--card-border)",
     border: `1px solid ${CARD_BORDER}`,
     borderRadius: 8,
     color: TEXT,
@@ -515,7 +515,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
                 fontSize: 12,
                 fontWeight: 700,
                 fontFamily: "'DM Sans', sans-serif",
-                background: i <= step ? ROSE : "rgba(255,255,255,0.08)",
+                background: i <= step ? ROSE : "var(--card-border)",
                 color: i <= step ? "#fff" : TEXT3,
                 transition: "all 0.2s",
               }}
@@ -681,7 +681,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
               letterSpacing: 0.8,
               color: TEXT3,
               fontFamily: "'DM Sans', sans-serif",
-              background: "rgba(15,17,24,0.8)",
+              background: "var(--card-bg-solid)",
             }}
           >
             CSV Column
@@ -695,7 +695,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
               letterSpacing: 0.8,
               color: TEXT3,
               fontFamily: "'DM Sans', sans-serif",
-              background: "rgba(15,17,24,0.8)",
+              background: "var(--card-bg-solid)",
             }}
           >
             CRM Field
@@ -709,7 +709,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
               letterSpacing: 0.8,
               color: TEXT3,
               fontFamily: "'DM Sans', sans-serif",
-              background: "rgba(15,17,24,0.8)",
+              background: "var(--card-bg-solid)",
             }}
           >
             Sample Data
@@ -773,7 +773,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
                       fontSize: 11,
                       color: TEXT2,
                       fontFamily: "'DM Sans', sans-serif",
-                      background: "rgba(255,255,255,0.04)",
+                      background: "var(--surface-elevated)",
                       borderRadius: 4,
                       maxWidth: 180,
                       overflow: "hidden",
@@ -809,7 +809,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
       borderBottom: `1px solid ${CARD_BORDER}`,
       position: "sticky" as const,
       top: 0,
-      background: "rgba(15,17,24,0.95)",
+      background: "var(--card-bg-solid)",
       zIndex: 1,
     }
 
@@ -1063,7 +1063,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
           style={{
             width: "100%",
             height: 8,
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--card-border)",
             borderRadius: 4,
             overflow: "hidden",
           }}

@@ -12,7 +12,7 @@ import {
 import SupportTab from "@/components/crm/SupportTab"
 
 /* ── Design Tokens ── */
-const BG = "#060709"
+const BG = "var(--void)"
 const CARD_BG = CRM_COLORS.card_bg
 const CARD_BORDER = CRM_COLORS.card_border
 const TEXT = CRM_COLORS.text_primary
@@ -75,7 +75,7 @@ function SectionHeader({ label }: { label: string }) {
    ══════════════════════════════════════════════════════════════ */
 
 const fieldLabelStyle: React.CSSProperties = { fontSize: 10, color: TEXT3, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }
-const fieldInputStyle: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${ROSE}40`, borderRadius: 6, color: TEXT, padding: "6px 8px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" }
+const fieldInputStyle: React.CSSProperties = { width: "100%", background: "var(--surface-input)", border: `1px solid ${ROSE}40`, borderRadius: 6, color: TEXT, padding: "6px 8px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" }
 const fieldValueStyle: React.CSSProperties = { fontSize: 13, color: TEXT, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", padding: "5px 0", borderBottom: `1px dashed ${CARD_BORDER}`, minHeight: 24 }
 
 /* ── Inline Text Field with save flash ── */
@@ -149,7 +149,7 @@ function EditableSelect({ label, value, options, onSave, placeholder }: { label:
       <select
         value={value}
         onChange={(e) => handleChange(e.target.value)}
-        style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: value ? TEXT : TEXT3, padding: "6px 8px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}
+        style={{ width: "100%", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: value ? TEXT : TEXT3, padding: "6px 8px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}
       >
         <option value="">{placeholder || "Select..."}</option>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -192,10 +192,10 @@ function EditableMultiSelect({ label, values, options, onSave, color }: { label:
         )) : <span style={{ fontSize: 11, color: TEXT3, padding: "3px 0" }}>None selected</span>}
       </div>
       {open && (
-        <div style={{ marginTop: 8, maxHeight: 180, overflowY: "auto", background: "rgba(255,255,255,0.03)", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, padding: 6 }}>
+        <div style={{ marginTop: 8, maxHeight: 180, overflowY: "auto", background: "var(--surface-subtle)", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, padding: 6 }}>
           {options.map((o) => (
             <label key={o} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", cursor: "pointer", borderRadius: 4, fontSize: 12, color: values.includes(o) ? TEXT : TEXT2, fontFamily: "'DM Sans', sans-serif" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-elevated)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
               <input type="checkbox" checked={values.includes(o)} onChange={() => toggle(o)} style={{ accentColor: color }} />
@@ -237,7 +237,7 @@ function AddActivityModal({ contactId, onClose, onSaved }: { contactId: string; 
         <h3 style={{ fontSize: 18, fontFamily: "'Bellfair', serif", color: TEXT, margin: "0 0 16px" }}>Log Activity</h3>
         <div style={{ marginBottom: 14 }}>
           <label style={{ fontSize: 11, color: TEXT3, textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 4 }}>Type</label>
-          <select value={type} onChange={(e) => setType(e.target.value)} style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>
+          <select value={type} onChange={(e) => setType(e.target.value)} style={{ width: "100%", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>
             {LOGGABLE_TYPES.map((t) => {
               const at = ACTIVITY_TYPES.find((a) => a.id === t)
               return <option key={t} value={t}>{at ? `${at.icon} ${at.label}` : t}</option>
@@ -246,7 +246,7 @@ function AddActivityModal({ contactId, onClose, onSaved }: { contactId: string; 
         </div>
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 11, color: TEXT3, textTransform: "uppercase", letterSpacing: 0.8, display: "block", marginBottom: 4 }}>Description</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", resize: "vertical" }} placeholder="What happened?" />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} style={{ width: "100%", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", resize: "vertical" }} placeholder="What happened?" />
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "transparent", color: TEXT2, fontSize: 12, cursor: "pointer" }}>Cancel</button>
@@ -483,7 +483,7 @@ export default function ContactDetailPage() {
   return (
     <div className="page-content" style={{ padding: 0, background: BG, minHeight: "100vh" }}>
       {/* ════ HEADER ════ */}
-      <div style={{ padding: "20px 32px 18px", borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(6,7,9,0.88)", backdropFilter: "blur(24px)", position: "sticky", top: 0, zIndex: 100 }}>
+      <div style={{ padding: "20px 32px 18px", borderBottom: `1px solid ${CARD_BORDER}`, background: "var(--header-bg)", backdropFilter: "blur(24px)", position: "sticky", top: 0, zIndex: 100 }}>
         {/* Back link */}
         <button onClick={() => router.push("/crm/contacts")} style={{ background: "none", border: "none", color: TEXT3, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginBottom: 10, padding: 0 }}>
           &larr; All Contacts
@@ -492,7 +492,7 @@ export default function ContactDetailPage() {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
           <div style={{ flex: 1 }}>
             {/* Name */}
-            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, color: "#fff", margin: 0, lineHeight: 1.2 }}>
+            <h1 style={{ fontFamily: "'Bellfair', serif", fontSize: 32, fontWeight: 400, color: TEXT, margin: 0, lineHeight: 1.2 }}>
               {fullName || "Unnamed Contact"}
             </h1>
             {/* Company + Title */}
@@ -537,10 +537,10 @@ export default function ContactDetailPage() {
                 onClick={handleDoNotContactToggle}
                 style={{
                   width: 36, height: 20, borderRadius: 10, position: "relative", cursor: "pointer", transition: "background 0.2s",
-                  background: contact.doNotContact ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.1)",
+                  background: contact.doNotContact ? "rgba(248,113,113,0.4)" : "var(--surface-input)",
                 }}
               >
-                <div style={{ width: 16, height: 16, borderRadius: "50%", background: contact.doNotContact ? "#F87171" : "rgba(255,255,255,0.3)", position: "absolute", top: 2, left: contact.doNotContact ? 18 : 2, transition: "left 0.2s" }} />
+                <div style={{ width: 16, height: 16, borderRadius: "50%", background: contact.doNotContact ? "#F87171" : "var(--text-tertiary)", position: "absolute", top: 2, left: contact.doNotContact ? 18 : 2, transition: "left 0.2s" }} />
               </div>
             </label>
           </div>
@@ -559,7 +559,7 @@ export default function ContactDetailPage() {
               </button>
             </div>
             {editingNote ? (
-              <textarea value={noteVal} onChange={(e) => setNoteVal(e.target.value)} rows={3} style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${ROSE}30`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", resize: "vertical", outline: "none" }} />
+              <textarea value={noteVal} onChange={(e) => setNoteVal(e.target.value)} rows={3} style={{ width: "100%", background: "var(--surface-input)", border: `1px solid ${ROSE}30`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", resize: "vertical", outline: "none" }} />
             ) : (
               <p style={{ fontSize: 13, color: TEXT, lineHeight: 1.6, margin: 0, fontFamily: "'DM Sans', sans-serif", whiteSpace: "pre-wrap" }}>{contact.pinnedNote}</p>
             )}
@@ -567,7 +567,7 @@ export default function ContactDetailPage() {
         )}
 
         {/* Tab bar */}
-        <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3 }}>
+        <div style={{ display: "flex", gap: 2, background: "var(--surface-elevated)", borderRadius: 8, padding: 3 }}>
           {TAB_LIST.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ padding: "7px 16px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, border: "none", borderRadius: 6, cursor: "pointer", transition: "all 0.15s", background: activeTab === tab.id ? `${ROSE}22` : "transparent", color: activeTab === tab.id ? TEXT : TEXT2 }}>
               {tab.label}
@@ -697,7 +697,7 @@ export default function ContactDetailPage() {
                           <select
                             value={selectedCampaign}
                             onChange={(e) => setSelectedCampaign(e.target.value)}
-                            style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}
+                            style={{ width: "100%", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}
                           >
                             <option value="">Choose a campaign...</option>
                             {lemlistCampaigns.map((c: { id: string; name: string }) => (
@@ -777,7 +777,7 @@ export default function ContactDetailPage() {
                       <span style={{ fontSize: 10, color: TEXT3, textTransform: "uppercase", letterSpacing: 0.8 }}>Score</span>
                       <span style={{ fontSize: 12, color: TEXT, fontFamily: "'Bellfair', serif" }}>{contact.relationshipScore}/100</span>
                     </div>
-                    <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                    <div style={{ height: 6, borderRadius: 3, background: "var(--surface-input)", overflow: "hidden" }}>
                       <div style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, contact.relationshipScore)}%`, background: `linear-gradient(90deg, ${ROSE}, #34D399)`, transition: "width 0.5s" }} />
                     </div>
                   </div>
@@ -846,7 +846,7 @@ export default function ContactDetailPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <h3 style={{ fontSize: 15, color: TEXT, margin: 0, fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Activity Timeline</h3>
-                <select value={activityFilter} onChange={(e) => setActivityFilter(e.target.value)} style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT2, padding: "4px 8px", fontSize: 11, fontFamily: "'DM Sans', sans-serif" }}>
+                <select value={activityFilter} onChange={(e) => setActivityFilter(e.target.value)} style={{ background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT2, padding: "4px 8px", fontSize: 11, fontFamily: "'DM Sans', sans-serif" }}>
                   <option value="all">All Types</option>
                   {ACTIVITY_TYPES.map((a) => <option key={a.id} value={a.id}>{a.icon} {a.label}</option>)}
                 </select>
