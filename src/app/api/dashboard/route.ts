@@ -57,11 +57,15 @@ export async function GET() {
     }),
   ])
 
+  const safe = (v: unknown): number => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
+  }
   const stats = {
-    activeClients: activeClients ?? 0,
-    pipelineValue: pipelineAgg._sum.dealValue ?? 0,
-    monthlyVolume: monthlyVolumeAgg._sum.dealValue ?? 0,
-    userOpenTasks: userTasks ?? 0,
+    activeClients: safe(activeClients),
+    pipelineValue: safe(pipelineAgg._sum.dealValue),
+    monthlyVolume: safe(monthlyVolumeAgg._sum.dealValue),
+    userOpenTasks: safe(userTasks),
   }
 
   // ── 2. Recent Activity (last 15) ──

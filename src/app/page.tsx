@@ -115,11 +115,15 @@ export default function DashboardPage() {
   }, [])
 
   const stats = data?.stats
+  const safeNum = (v: unknown): number => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
+  }
   const kpiCards = [
-    { label: "Active Clients", value: Number(stats?.activeClients) || 0, prefix: "", color: KPI_COLORS[0] },
-    { label: "Pipeline Value", value: Number(stats?.pipelineValue) || 0, prefix: "\u20AC", color: KPI_COLORS[1] },
-    { label: "Monthly Volume", value: Number(stats?.monthlyVolume) || 0, prefix: "\u20AC", color: KPI_COLORS[2] },
-    { label: "Your Open Tasks", value: Number(stats?.userOpenTasks) || 0, prefix: "", color: KPI_COLORS[3] },
+    { label: "Active Clients", value: safeNum(stats?.activeClients), prefix: "", color: KPI_COLORS[0] },
+    { label: "Pipeline Value", value: safeNum(stats?.pipelineValue), prefix: "\u20AC", color: KPI_COLORS[1] },
+    { label: "Monthly Volume", value: safeNum(stats?.monthlyVolume), prefix: "\u20AC", color: KPI_COLORS[2] },
+    { label: "Your Open Tasks", value: safeNum(stats?.userOpenTasks), prefix: "", color: KPI_COLORS[3] },
   ]
 
   const handleQuickAction = (action: QuickAction) => {
