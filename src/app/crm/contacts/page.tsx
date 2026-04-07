@@ -3,15 +3,17 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
-  STAGE_COLORS, STAGE_LABELS, LIFECYCLE_STAGES,
+  STAGE_LABELS, LIFECYCLE_STAGES,
   VERTICALS, GEO_ZONES, DEAL_OWNERS, CONTACT_TYPES,
-  OWNER_COLORS, CRM_COLORS,
-  OUTREACH_GROUPS, OUTREACH_GROUP_COLORS,
+  CRM_COLORS,
+  OUTREACH_GROUPS,
 } from "@/lib/crm-config"
 import CsvImportWizard from "@/components/crm/CsvImportWizard"
 import KanbanBoard from "@/components/crm/KanbanBoard"
 import type { KanbanContact } from "@/components/crm/KanbanBoard"
 import ContactSlideOver from "@/components/crm/ContactSlideOver"
+import InlineEditableTable from "@/components/crm/InlineEditableTable"
+import type { TableContact } from "@/components/crm/InlineEditableTable"
 
 /* ── Design Tokens ── */
 const BG = "#060709"
@@ -29,18 +31,26 @@ interface CrmContact {
   firstName: string
   lastName: string
   email: string | null
+  phone: string | null
+  linkedinUrl: string | null
+  jobTitle: string | null
   company: { id: string; name: string; website?: string | null } | null
+  companyId: string | null
   lifecycleStage: string
   contactType: string
   geoZone: string | null
   dealOwner: string | null
   vertical: string[]
+  subVertical: string[]
   outreachGroup: string | null
   acquisitionSource: string | null
   acquisitionSourceDetail: string | null
-  jobTitle: string | null
   lastInteraction: string | null
   totalInteractions: number
+  city: string | null
+  country: string | null
+  icpFit: string | null
+  relationshipStrength: string | null
   createdAt: string
 }
 
@@ -55,28 +65,6 @@ interface Pagination {
 
 /* ── Sort State ── */
 type SortField = "firstName" | "company" | "email" | "lifecycleStage" | "contactType" | "geoZone" | "dealOwner" | "lastInteraction" | "totalInteractions" | "createdAt"
-
-function relativeTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return "Never"
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return "Just now"
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days < 30) return `${days}d ago`
-  return `${Math.floor(days / 30)}mo ago`
-}
-
-/* ── Badge ── */
-function Badge({ label, color, bg }: { label: string; color: string; bg?: string }) {
-  return (
-    <span style={{ display: "inline-block", padding: "2px 8px", fontSize: 10, fontWeight: 500, fontFamily: "'DM Sans', sans-serif", borderRadius: 16, background: bg || `${color}18`, color, letterSpacing: 0.2, whiteSpace: "nowrap" }}>
-      {label}
-    </span>
-  )
-}
 
 /* ════════════════════════════════════════════════════════════════
    CONTACT LIST PAGE
@@ -171,20 +159,6 @@ export default function ContactListPage() {
     else fetchKanbanContacts()
   }, [fetchContacts, fetchKanbanContacts, viewMode])
 
-  const handleSort = (field: SortField) => {
-    if (sortBy === field) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
-    } else {
-      setSortBy(field)
-      setSortDir("asc")
-    }
-  }
-
-  const sortArrow = (field: SortField) => {
-    if (sortBy !== field) return ""
-    return sortDir === "asc" ? " ↑" : " ↓"
-  }
-
   const handleKanbanStageChange = async (contactId: string, newStage: string) => {
     try {
       const res = await fetch(`/api/crm/contacts/${contactId}`, {
@@ -199,6 +173,59 @@ export default function ContactListPage() {
     } catch { /* ignore */ }
   }
 
+  /* ═══ Inline table callbacks ═══ */
+  const handleCellSave = useCallback(async (contactId: string, data: Record<string, unknown>): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/crm/contacts/${contactId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+      if (res.ok) {
+        // Optimistic update
+        const updated = await res.json()
+        setContacts(prev => prev.map(c => c.id === contactId ? { ...c, ...updated.contact } : c))
+        return true
+      }
+      return false
+    } catch { return false }
+  }, [])
+
+  const handleCreateContact = useCallback(async (data: Record<string, unknown>): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/crm/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+      if (res.ok) {
+        fetchContacts(pagination.page)
+        return ((await res.json()).contact?.id) || null
+      }
+      return null
+    } catch { return null }
+  }, [fetchContacts, pagination.page])
+
+  const handleDeleteContacts = useCallback(async (ids: string[]): Promise<boolean> => {
+    try {
+      const results = await Promise.all(ids.map(id => fetch(`/api/crm/contacts/${id}`, { method: "DELETE" })))
+      const ok = results.every(r => r.ok)
+      if (ok) fetchContacts(pagination.page)
+      return ok
+    } catch { return false }
+  }, [fetchContacts, pagination.page])
+
+  const handleBulkUpdate = useCallback(async (ids: string[], data: Record<string, unknown>): Promise<boolean> => {
+    try {
+      const results = await Promise.all(ids.map(id =>
+        fetch(`/api/crm/contacts/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })
+      ))
+      const ok = results.every(r => r.ok)
+      if (ok) fetchContacts(pagination.page)
+      return ok
+    } catch { return false }
+  }, [fetchContacts, pagination.page])
+
   const selectStyle: React.CSSProperties = {
     background: "rgba(255,255,255,0.06)",
     border: `1px solid ${CARD_BORDER}`,
@@ -208,29 +235,6 @@ export default function ContactListPage() {
     fontSize: 12,
     fontFamily: "'DM Sans', sans-serif",
     minWidth: 100,
-  }
-
-  const thStyle: React.CSSProperties = {
-    padding: "10px 12px",
-    textAlign: "left",
-    fontSize: 10,
-    color: TEXT3,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-    fontWeight: 600,
-    fontFamily: "'DM Sans', sans-serif",
-    cursor: "pointer",
-    userSelect: "none",
-    whiteSpace: "nowrap",
-    borderBottom: `1px solid ${CARD_BORDER}`,
-  }
-
-  const tdStyle: React.CSSProperties = {
-    padding: "10px 12px",
-    fontSize: 13,
-    fontFamily: "'DM Sans', sans-serif",
-    borderBottom: `1px solid ${CARD_BORDER}`,
-    color: TEXT,
   }
 
   return (
@@ -341,106 +345,20 @@ export default function ContactListPage() {
       {viewMode === "list" ? (
         <div style={{ padding: "20px 32px" }}>
           <div style={{ ...GLASS, overflow: "hidden" }}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={thStyle} onClick={() => handleSort("firstName")}>Name{sortArrow("firstName")}</th>
-                    <th style={thStyle}>Group</th>
-                    <th style={thStyle} onClick={() => handleSort("company")}>Company{sortArrow("company")}</th>
-                    <th style={thStyle} onClick={() => handleSort("email")}>Email{sortArrow("email")}</th>
-                    <th style={thStyle} onClick={() => handleSort("lifecycleStage")}>Stage{sortArrow("lifecycleStage")}</th>
-                    <th style={thStyle} onClick={() => handleSort("contactType")}>Type{sortArrow("contactType")}</th>
-                    <th style={thStyle} onClick={() => handleSort("geoZone")}>Geo{sortArrow("geoZone")}</th>
-                    <th style={thStyle} onClick={() => handleSort("dealOwner")}>Owner{sortArrow("dealOwner")}</th>
-                    <th style={thStyle} onClick={() => handleSort("lastInteraction")}>Last Contact{sortArrow("lastInteraction")}</th>
-                    <th style={thStyle} onClick={() => handleSort("totalInteractions")}>Interactions{sortArrow("totalInteractions")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading && contacts.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} style={{ ...tdStyle, textAlign: "center", padding: "40px 12px", color: TEXT3 }}>Loading...</td>
-                    </tr>
-                  ) : contacts.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} style={{ ...tdStyle, textAlign: "center", padding: "40px 12px", color: TEXT3 }}>No contacts found</td>
-                    </tr>
-                  ) : (
-                    contacts.map((c) => {
-                      const stageColor = STAGE_COLORS[c.lifecycleStage] || "#9CA3AF"
-                      const stageLabel = STAGE_LABELS[c.lifecycleStage] || c.lifecycleStage || "—"
-                      const ownerColor = OWNER_COLORS[c.dealOwner || ""] || "#9CA3AF"
-                      const groupObj = c.outreachGroup ? OUTREACH_GROUPS.find((g) => g.id === c.outreachGroup) : null
-                      return (
-                        <tr
-                          key={c.id}
-                          onClick={() => setSelectedContactId(c.id)}
-                          style={{ cursor: "pointer", transition: "background 0.15s" }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                        >
-                          <td style={tdStyle}>
-                            <div style={{ fontWeight: 500 }}>{c.firstName} {c.lastName}</div>
-                          </td>
-                          <td style={tdStyle}>
-                            {groupObj ? (
-                              <Badge label={groupObj.short} color={groupObj.color} />
-                            ) : <span style={{ fontSize: 11, color: TEXT3 }}>—</span>}
-                          </td>
-                          <td style={{ ...tdStyle, color: TEXT2 }}>{c.company?.name || "—"}</td>
-                          <td style={{ ...tdStyle, color: TEXT2, fontSize: 12 }}>{c.email || "—"}</td>
-                          <td style={tdStyle}><Badge label={stageLabel} color={stageColor} /></td>
-                          <td style={tdStyle}>
-                            {c.contactType ? (
-                              <Badge label={c.contactType} color="#A78BFA" bg="rgba(167,139,250,0.12)" />
-                            ) : "—"}
-                          </td>
-                          <td style={{ ...tdStyle, color: TEXT2, fontSize: 12 }}>{c.geoZone || "—"}</td>
-                          <td style={tdStyle}>
-                            {c.dealOwner ? (
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <div style={{ width: 18, height: 18, borderRadius: "50%", background: ownerColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
-                                  {c.dealOwner.charAt(0)}
-                                </div>
-                                <span style={{ fontSize: 12, color: TEXT2 }}>{c.dealOwner}</span>
-                              </div>
-                            ) : "—"}
-                          </td>
-                          <td style={{ ...tdStyle, fontSize: 12, color: TEXT2 }}>{relativeTime(c.lastInteraction)}</td>
-                          <td style={{ ...tdStyle, textAlign: "center" }}>
-                            <span style={{ fontFamily: "'Bellfair', serif", fontSize: 14, color: TEXT }}>{c.totalInteractions}</span>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, padding: "14px 0", borderTop: `1px solid ${CARD_BORDER}` }}>
-                <button
-                  onClick={() => fetchContacts(pagination.page - 1)}
-                  disabled={pagination.page <= 1}
-                  style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "transparent", color: pagination.page <= 1 ? TEXT3 : TEXT2, fontSize: 12, cursor: pagination.page <= 1 ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif" }}
-                >
-                  Previous
-                </button>
-                <span style={{ fontSize: 12, color: TEXT2, fontFamily: "'DM Sans', sans-serif" }}>
-                  Page {pagination.page} of {pagination.totalPages}
-                </span>
-                <button
-                  onClick={() => fetchContacts(pagination.page + 1)}
-                  disabled={pagination.page >= pagination.totalPages}
-                  style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "transparent", color: pagination.page >= pagination.totalPages ? TEXT3 : TEXT2, fontSize: 12, cursor: pagination.page >= pagination.totalPages ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif" }}
-                >
-                  Next
-                </button>
-              </div>
-            )}
+            <InlineEditableTable
+              contacts={contacts as unknown as TableContact[]}
+              loading={loading}
+              pagination={pagination}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={(field, dir) => { setSortBy(field as SortField); setSortDir(dir) }}
+              onPageChange={(page) => fetchContacts(page)}
+              onCellSave={handleCellSave}
+              onCreateContact={handleCreateContact}
+              onDeleteContacts={handleDeleteContacts}
+              onBulkUpdate={handleBulkUpdate}
+              onContactClick={(id) => setSelectedContactId(id)}
+            />
           </div>
         </div>
       ) : (
