@@ -37,79 +37,42 @@ export async function GET() {
   let firstCampaignId: string | null = null
   if (campaignsResult.status === 200 && Array.isArray(campaignsResult.body)) {
     const campaigns = campaignsResult.body as Array<{ _id: string; name: string }>
-    if (campaigns.length > 0) {
-      firstCampaignId = campaigns[0]._id
-    }
+    if (campaigns.length > 0) firstCampaignId = campaigns[0]._id
   }
 
-  // 2. If we have a campaign, try multiple lead endpoints
-  const leadsResults: Record<string, unknown> = {}
-  let firstLeadId: string | null = null
+  // 2. Lead list + contact detail
+  const results: Record<string, unknown> = {}
   let firstContactId: string | null = null
 
   if (firstCampaignId) {
-    // Standard leads endpoint (list — returns _id, state, contactId)
+    // Lead list (returns _id, state, contactId)
     const leadListResult = await safeFetch(
       `${BASE}/campaigns/${firstCampaignId}/leads?offset=0&limit=5`, auth,
     )
-    leadsResults.lead_list = leadListResult
+    results.lead_list = leadListResult
 
-    // Extract first lead ID and contactId
     if (leadListResult.status === 200 && Array.isArray(leadListResult.body)) {
       const items = leadListResult.body as Array<{ _id: string; contactId?: string }>
-      if (items.length > 0) {
-        firstLeadId = items[0]._id
-        firstContactId = items[0].contactId ?? null
-      }
+      if (items.length > 0) firstContactId = items[0].contactId ?? null
     }
 
-    // Fetch individual lead detail
-    if (firstLeadId) {
-      leadsResults.lead_detail_global = await safeFetch(
-        `${BASE}/leads/${firstLeadId}`, auth,
-      )
-      leadsResults.lead_detail_campaign = await safeFetch(
-        `${BASE}/campaigns/${firstCampaignId}/leads/${firstLeadId}`, auth,
-      )
-    }
-
-    // People / Contacts API using contactId
+    // Contact detail via /api/contacts/{contactId} (the working endpoint)
     if (firstContactId) {
-      leadsResults.people_detail = await safeFetch(
-        `${BASE}/people/${firstContactId}`, auth,
-      )
-      leadsResults.contacts_detail = await safeFetch(
+      results.contact_detail = await safeFetch(
         `${BASE}/contacts/${firstContactId}`, auth,
       )
-      leadsResults.hooks_detail = await safeFetch(
-        `${BASE}/hooks/${firstContactId}`, auth,
-      )
     }
 
-    // Export endpoint
-    leadsResults.export = await safeFetch(
-      `${BASE}/campaigns/${firstCampaignId}/export`, auth,
-    )
-
     // Campaign detail
-    leadsResults.campaign_detail = await safeFetch(
+    results.campaign_detail = await safeFetch(
       `${BASE}/campaigns/${firstCampaignId}`, auth,
     )
   }
 
-  // 3. Auth verification
-  const authCheck = {
-    format: "Basic :<API_KEY> (base64 encoded)",
-    headerPreview: `Basic ${auth.replace("Basic ", "").slice(0, 8)}...`,
-    decoded_prefix: Buffer.from(auth.replace("Basic ", ""), "base64").toString("utf8").slice(0, 5) + "...",
-  }
-
   return NextResponse.json({
-    authCheck,
     campaigns: campaignsResult,
     firstCampaignId,
-    firstLeadId,
     firstContactId,
-    leads: leadsResults,
+    results,
   })
 }
