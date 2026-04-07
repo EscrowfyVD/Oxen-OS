@@ -3,34 +3,86 @@ import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { getLemlistCampaigns, lemlistAuth, isLemlistConfigured } from "@/lib/lemlist"
 
-interface LemlistLead {
+const BASE = "https://api.lemlist.com/api"
+
+interface LeadListItem {
   _id: string
-  email: string
+  state?: string
+  contactId?: string
+  [key: string]: unknown
+}
+
+interface LeadDetail {
+  _id: string
+  email?: string
   firstName?: string
   lastName?: string
-  status?: string
-  campaignId?: string
+  state?: string
   createdAt?: string
   [key: string]: unknown
 }
 
-const STATUS_MAP: Record<string, string> = {
+const STATE_MAP: Record<string, string> = {
+  scanned: "active",
+  contacted: "active",
   interested: "replied",
   notInterested: "completed",
-  contacted: "active",
   paused: "paused",
   bounced: "bounced",
   unsubscribed: "unsubscribed",
 }
 
-function mapLemlistStatus(lemlistStatus: string | undefined): string {
-  if (!lemlistStatus) return "active"
-  return STATUS_MAP[lemlistStatus] ?? "active"
+function mapLeadState(state: string | undefined): string {
+  if (!state) return "active"
+  return STATE_MAP[state] ?? "active"
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// Fetch full lead details — tries /leads/{id} then /campaigns/{cid}/leads/{id}
+async function fetchLeadDetail(
+  leadId: string,
+  campaignId: string,
+  auth: string,
+): Promise<LeadDetail | null> {
+  // Primary: GET /api/leads/{leadId}
+  try {
+    const res = await fetch(`${BASE}/leads/${leadId}`, {
+      headers: { Authorization: auth },
+    })
+    if (res.ok) {
+      const data: LeadDetail = await res.json()
+      if (data.email) return data
+      // If no email in response, log and try fallback
+      console.log(`[Lemlist Sync] /leads/${leadId} returned no email, keys: ${Object.keys(data).join(", ")}`)
+    } else {
+      console.log(`[Lemlist Sync] /leads/${leadId} status: ${res.status}`)
+    }
+  } catch (err) {
+    console.error(`[Lemlist Sync] /leads/${leadId} error:`, err)
+  }
+
+  // Fallback: GET /api/campaigns/{campaignId}/leads/{leadId}
+  try {
+    const res = await fetch(`${BASE}/campaigns/${campaignId}/leads/${leadId}`, {
+      headers: { Authorization: auth },
+    })
+    if (res.ok) {
+      const data: LeadDetail = await res.json()
+      if (data.email) return data
+      console.log(`[Lemlist Sync] /campaigns/.../leads/${leadId} returned no email, keys: ${Object.keys(data).join(", ")}`)
+    }
+  } catch {
+    // silent fallback failure
+  }
+
+  return null
 }
 
 // POST /api/lemlist/sync — pull campaign enrollment data from Lemlist into CRM
 export async function POST(request: Request) {
-  // Allow both authenticated user calls and internal cron calls
   const authHeader = request.headers.get("authorization")
   const cronSecret = process.env.CRON_SECRET || ""
   const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`
@@ -47,9 +99,12 @@ export async function POST(request: Request) {
     )
   }
 
+  const auth = lemlistAuth()
+
   try {
     const campaigns = await getLemlistCampaigns()
-    console.log(`[Lemlist Sync] Found ${campaigns.length} campaigns:`, JSON.stringify(campaigns.map(c => ({ _id: c._id, name: c.name }))))
+    console.log(`[Lemlist Sync] Found ${campaigns.length} campaigns:`,
+      JSON.stringify(campaigns.map(c => ({ _id: c._id, name: c.name }))))
 
     if (campaigns.length === 0) {
       return NextResponse.json({ synced: 0, notFound: 0, campaigns: 0 })
@@ -57,157 +112,131 @@ export async function POST(request: Request) {
 
     let synced = 0
     let notFound = 0
+    let noEmail = 0
     const debugLog: Array<Record<string, unknown>> = []
 
     for (const campaign of campaigns) {
       console.log(`[Lemlist Sync] Processing campaign: ${campaign.name} (${campaign._id})`)
 
-      // Try multiple endpoint patterns — Lemlist API can vary
-      let leads: LemlistLead[] = []
-      let leadsSource = ""
+      // Step 1: Get lead list (returns _id, state, contactId — no email)
+      let leadList: LeadListItem[] = []
+      const listUrl = `${BASE}/campaigns/${campaign._id}/leads?offset=0&limit=100`
+      console.log(`[Lemlist Sync] Fetching lead list: ${listUrl}`)
 
-      // Attempt 1: /leads with pagination
-      const url1 = `https://api.lemlist.com/api/campaigns/${campaign._id}/leads?offset=0&limit=100`
-      console.log(`[Lemlist Sync] Fetching leads from: ${url1}`)
       try {
-        const res = await fetch(url1, { headers: { Authorization: lemlistAuth() } })
-        console.log(`[Lemlist Sync] /leads response status: ${res.status}`)
+        const res = await fetch(listUrl, { headers: { Authorization: auth } })
         if (res.ok) {
           const raw = await res.json()
-          console.log(`[Lemlist Sync] /leads raw response type: ${typeof raw}, isArray: ${Array.isArray(raw)}, length: ${Array.isArray(raw) ? raw.length : "n/a"}`)
-          if (Array.isArray(raw) && raw.length > 0) {
-            console.log(`[Lemlist Sync] /leads first item keys: ${Object.keys(raw[0]).join(", ")}`)
-            console.log(`[Lemlist Sync] /leads first item: ${JSON.stringify(raw[0]).slice(0, 500)}`)
-            leads = raw
-            leadsSource = "leads_paginated"
-          } else if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-            // Response might be an object wrapping the leads
-            console.log(`[Lemlist Sync] /leads response keys: ${Object.keys(raw).join(", ")}`)
-            console.log(`[Lemlist Sync] /leads response preview: ${JSON.stringify(raw).slice(0, 500)}`)
-            // Check common wrapper fields
-            const possibleArrays = Object.entries(raw).filter(([, v]) => Array.isArray(v))
-            if (possibleArrays.length > 0) {
-              const [key, arr] = possibleArrays[0]
-              console.log(`[Lemlist Sync] Found array in field "${key}" with ${(arr as unknown[]).length} items`)
-              leads = arr as LemlistLead[]
-              leadsSource = `leads_wrapped:${key}`
-            }
+          if (Array.isArray(raw)) {
+            leadList = raw
           }
+        } else {
+          console.error(`[Lemlist Sync] Lead list ${res.status} for ${campaign.name}`)
         }
       } catch (err) {
-        console.error(`[Lemlist Sync] /leads fetch error:`, err)
+        console.error(`[Lemlist Sync] Lead list error for ${campaign.name}:`, err)
       }
 
-      // Attempt 2: /export endpoint if /leads returned nothing
-      if (leads.length === 0) {
-        const url2 = `https://api.lemlist.com/api/campaigns/${campaign._id}/export`
-        console.log(`[Lemlist Sync] Trying export endpoint: ${url2}`)
-        try {
-          const res = await fetch(url2, { headers: { Authorization: lemlistAuth() } })
-          console.log(`[Lemlist Sync] /export response status: ${res.status}`)
-          if (res.ok) {
-            const raw = await res.json()
-            console.log(`[Lemlist Sync] /export raw type: ${typeof raw}, isArray: ${Array.isArray(raw)}, length: ${Array.isArray(raw) ? raw.length : "n/a"}`)
-            if (Array.isArray(raw) && raw.length > 0) {
-              console.log(`[Lemlist Sync] /export first item keys: ${Object.keys(raw[0]).join(", ")}`)
-              console.log(`[Lemlist Sync] /export first item: ${JSON.stringify(raw[0]).slice(0, 500)}`)
-              leads = raw
-              leadsSource = "export"
-            } else if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-              console.log(`[Lemlist Sync] /export response keys: ${Object.keys(raw).join(", ")}`)
-              const possibleArrays = Object.entries(raw).filter(([, v]) => Array.isArray(v))
-              if (possibleArrays.length > 0) {
-                const [key, arr] = possibleArrays[0]
-                leads = arr as LemlistLead[]
-                leadsSource = `export_wrapped:${key}`
+      // Handle pagination — keep fetching until we get less than 100
+      if (leadList.length === 100) {
+        let offset = 100
+        let hasMore = true
+        while (hasMore) {
+          try {
+            const res = await fetch(
+              `${BASE}/campaigns/${campaign._id}/leads?offset=${offset}&limit=100`,
+              { headers: { Authorization: auth } },
+            )
+            if (res.ok) {
+              const page = await res.json()
+              if (Array.isArray(page) && page.length > 0) {
+                leadList.push(...page)
+                offset += page.length
+                if (page.length < 100) hasMore = false
+              } else {
+                hasMore = false
               }
+            } else {
+              hasMore = false
             }
+          } catch {
+            hasMore = false
           }
-        } catch (err) {
-          console.error(`[Lemlist Sync] /export fetch error:`, err)
+          await delay(200)
         }
       }
 
-      // Attempt 3: v2 API
-      if (leads.length === 0) {
-        const url3 = `https://api.lemlist.com/api/campaigns/${campaign._id}/leads?version=2`
-        console.log(`[Lemlist Sync] Trying v2 API: ${url3}`)
-        try {
-          const res = await fetch(url3, { headers: { Authorization: lemlistAuth() } })
-          console.log(`[Lemlist Sync] v2 response status: ${res.status}`)
-          if (res.ok) {
-            const raw = await res.json()
-            console.log(`[Lemlist Sync] v2 raw type: ${typeof raw}, isArray: ${Array.isArray(raw)}, length: ${Array.isArray(raw) ? raw.length : "n/a"}`)
-            if (Array.isArray(raw) && raw.length > 0) {
-              console.log(`[Lemlist Sync] v2 first item: ${JSON.stringify(raw[0]).slice(0, 500)}`)
-              leads = raw
-              leadsSource = "v2"
-            } else if (raw && typeof raw === "object") {
-              console.log(`[Lemlist Sync] v2 response keys: ${Object.keys(raw).join(", ")}`)
-              console.log(`[Lemlist Sync] v2 response preview: ${JSON.stringify(raw).slice(0, 500)}`)
-            }
-          }
-        } catch (err) {
-          console.error(`[Lemlist Sync] v2 fetch error:`, err)
+      console.log(`[Lemlist Sync] Found ${leadList.length} leads in ${campaign.name}`)
+      if (leadList.length > 0) {
+        console.log(`[Lemlist Sync] First lead keys: ${Object.keys(leadList[0]).join(", ")}`)
+        console.log(`[Lemlist Sync] First lead: ${JSON.stringify(leadList[0]).slice(0, 500)}`)
+      }
+
+      if (leadList.length === 0) {
+        debugLog.push({ campaignId: campaign._id, campaignName: campaign.name, leadsInList: 0, synced: 0, notFound: 0, noEmail: 0 })
+        continue
+      }
+
+      // Step 2: Fetch full details for each lead (to get email)
+      const leadsWithEmail: LeadDetail[] = []
+      let campaignNoEmail = 0
+
+      for (let i = 0; i < leadList.length; i++) {
+        const item = leadList[i]
+        console.log(`[Lemlist Sync] Fetching lead detail ${i + 1}/${leadList.length} (${item._id})`)
+
+        const detail = await fetchLeadDetail(item._id, campaign._id, auth)
+        if (detail?.email) {
+          // Merge state from list if detail doesn't have it
+          if (!detail.state && item.state) detail.state = item.state
+          leadsWithEmail.push(detail)
+        } else {
+          campaignNoEmail++
+          noEmail++
         }
+
+        // Rate limit: 200ms between requests
+        if (i < leadList.length - 1) await delay(200)
       }
 
-      const campaignDebug: Record<string, unknown> = {
-        campaignId: campaign._id,
-        campaignName: campaign.name,
-        leadsFound: leads.length,
-        leadsSource: leadsSource || "none",
-      }
+      console.log(`[Lemlist Sync] Got email for ${leadsWithEmail.length}/${leadList.length} leads in ${campaign.name}`)
 
-      if (leads.length === 0) {
-        console.log(`[Lemlist Sync] No leads found for campaign ${campaign.name} after trying all endpoints`)
-        debugLog.push(campaignDebug)
+      if (leadsWithEmail.length === 0) {
+        debugLog.push({ campaignId: campaign._id, campaignName: campaign.name, leadsInList: leadList.length, leadsWithEmail: 0, noEmail: campaignNoEmail, synced: 0, notFound: 0 })
         continue
       }
 
-      // Log all lead emails for debugging
-      const leadEmails = leads.map(l => l.email).filter(Boolean)
-      console.log(`[Lemlist Sync] Lead emails in ${campaign.name}: ${JSON.stringify(leadEmails)}`)
+      // Step 3: Batch-match by email
+      const emails = leadsWithEmail
+        .map((l) => l.email!.toLowerCase())
+        .filter(Boolean)
 
-      // Batch-match leads by email
-      const emails = leads
-        .map((l) => l.email?.toLowerCase())
-        .filter((e): e is string => Boolean(e))
-
-      if (emails.length === 0) {
-        console.log(`[Lemlist Sync] No valid emails in leads for ${campaign.name}`)
-        debugLog.push({ ...campaignDebug, validEmails: 0 })
-        continue
-      }
-
-      // Fetch matching contacts in one query
       const contacts = await prisma.crmContact.findMany({
         where: { email: { in: emails, mode: "insensitive" } },
         select: { id: true, email: true },
       })
 
-      console.log(`[Lemlist Sync] Matched ${contacts.length}/${emails.length} emails to CRM contacts`)
+      console.log(`[Lemlist Sync] Matched ${contacts.length}/${emails.length} to CRM contacts`)
 
       const contactByEmail = new Map(
         contacts.map((c) => [c.email.toLowerCase(), c.id]),
       )
 
+      // Step 4: Update matched contacts
       let campaignSynced = 0
       let campaignNotFound = 0
 
-      // Update each matched contact
-      for (const lead of leads) {
-        const email = lead.email?.toLowerCase()
-        if (!email) continue
-
+      for (const lead of leadsWithEmail) {
+        const email = lead.email!.toLowerCase()
         const contactId = contactByEmail.get(email)
+
         if (!contactId) {
           notFound++
           campaignNotFound++
           continue
         }
 
-        const mappedStatus = mapLemlistStatus(lead.status)
+        const mappedStatus = mapLeadState(lead.state)
 
         await prisma.crmContact.update({
           where: { id: contactId },
@@ -223,16 +252,24 @@ export async function POST(request: Request) {
         campaignSynced++
       }
 
-      debugLog.push({ ...campaignDebug, matched: contacts.length, synced: campaignSynced, notFound: campaignNotFound })
+      debugLog.push({
+        campaignId: campaign._id,
+        campaignName: campaign.name,
+        leadsInList: leadList.length,
+        leadsWithEmail: leadsWithEmail.length,
+        noEmail: campaignNoEmail,
+        matched: contacts.length,
+        synced: campaignSynced,
+        notFound: campaignNotFound,
+      })
     }
 
-    console.log(
-      `[Lemlist Sync] Done: synced=${synced}, notFound=${notFound}, campaigns=${campaigns.length}`,
-    )
+    console.log(`[Lemlist Sync] Done: synced=${synced}, notFound=${notFound}, noEmail=${noEmail}, campaigns=${campaigns.length}`)
 
     return NextResponse.json({
       synced,
       notFound,
+      noEmail,
       campaigns: campaigns.length,
       debug: debugLog,
     })

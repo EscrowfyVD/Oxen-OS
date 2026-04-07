@@ -44,35 +44,46 @@ export async function GET() {
 
   // 2. If we have a campaign, try multiple lead endpoints
   const leadsResults: Record<string, unknown> = {}
+  let firstLeadId: string | null = null
 
   if (firstCampaignId) {
-    // Standard leads endpoint
-    leadsResults.leads = await safeFetch(
-      `${BASE}/campaigns/${firstCampaignId}/leads`, auth,
+    // Standard leads endpoint (list — returns _id, state, contactId)
+    const leadListResult = await safeFetch(
+      `${BASE}/campaigns/${firstCampaignId}/leads?offset=0&limit=5`, auth,
     )
+    leadsResults.lead_list = leadListResult
 
-    // Paginated leads
-    leadsResults.leads_paginated = await safeFetch(
-      `${BASE}/campaigns/${firstCampaignId}/leads?offset=0&limit=100`, auth,
-    )
+    // Extract first lead ID for detail fetch
+    if (leadListResult.status === 200 && Array.isArray(leadListResult.body)) {
+      const items = leadListResult.body as Array<{ _id: string }>
+      if (items.length > 0) firstLeadId = items[0]._id
+    }
+
+    // If we have a lead ID, fetch individual detail
+    if (firstLeadId) {
+      // Primary: GET /api/leads/{leadId}
+      leadsResults.lead_detail_global = await safeFetch(
+        `${BASE}/leads/${firstLeadId}`, auth,
+      )
+
+      // Fallback: GET /api/campaigns/{cid}/leads/{leadId}
+      leadsResults.lead_detail_campaign = await safeFetch(
+        `${BASE}/campaigns/${firstCampaignId}/leads/${firstLeadId}`, auth,
+      )
+    }
 
     // Export endpoint
     leadsResults.export = await safeFetch(
       `${BASE}/campaigns/${firstCampaignId}/export`, auth,
     )
 
-    // v2 API
-    leadsResults.leads_v2 = await safeFetch(
-      `${BASE}/campaigns/${firstCampaignId}/leads?version=2`, auth,
-    )
-
-    // Campaign detail (to see structure)
+    // Campaign detail
     leadsResults.campaign_detail = await safeFetch(
       `${BASE}/campaigns/${firstCampaignId}`, auth,
     )
   }
 
-  // 3. Auth verification — check if auth header format is correct
+  // 3. Auth verification
   const authCheck = {
     format: "Basic :<API_KEY> (base64 encoded)",
     headerPreview: `Basic ${auth.replace("Basic ", "").slice(0, 8)}...`,
@@ -83,6 +94,7 @@ export async function GET() {
     authCheck,
     campaigns: campaignsResult,
     firstCampaignId,
+    firstLeadId,
     leads: leadsResults,
   })
 }
