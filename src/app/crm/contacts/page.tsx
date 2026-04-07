@@ -86,6 +86,8 @@ export default function ContactListPage() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
   const [lemlistContacts, setLemlistContacts] = useState<TableContact[] | null>(null)
   const [lemlistMode, setLemlistMode] = useState<"selected" | "all">("selected")
+  const [syncing, setSyncing] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   // View mode (persisted in localStorage)
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -249,6 +251,26 @@ export default function ContactListPage() {
     } catch { return false }
   }, [fetchContacts, pagination.page])
 
+  const handleSyncLemlist = useCallback(async () => {
+    setSyncing(true)
+    setToast(null)
+    try {
+      const res = await fetch("/api/lemlist/sync", { method: "POST" })
+      const data = await res.json()
+      if (res.ok) {
+        setToast(`Synced ${data.synced} contacts from ${data.campaigns} campaigns. ${data.notFound} contacts not found in CRM.`)
+        if (viewMode === "list") fetchContacts(pagination.page)
+        else fetchKanbanContacts()
+      } else {
+        setToast(`Sync failed: ${data.error || "Unknown error"}`)
+      }
+    } catch {
+      setToast("Sync failed: network error")
+    }
+    setSyncing(false)
+    setTimeout(() => setToast(null), 8000)
+  }, [fetchContacts, fetchKanbanContacts, pagination.page, viewMode])
+
   const selectStyle: React.CSSProperties = {
     background: "var(--surface-input)",
     border: `1px solid ${CARD_BORDER}`,
@@ -332,6 +354,14 @@ export default function ContactListPage() {
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
               Push to Lemlist
+            </button>
+            <button
+              onClick={handleSyncLemlist}
+              disabled={syncing}
+              style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-input)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: syncing ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6, opacity: syncing ? 0.6 : 1 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={syncing ? { animation: "spin 1s linear infinite" } : undefined}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              {syncing ? "Syncing..." : "Sync Lemlist"}
             </button>
             <button onClick={() => router.push("/crm?tab=clients")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${ROSE}, #A07070)`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
               + New Contact
@@ -442,6 +472,13 @@ export default function ContactListPage() {
           else fetchKanbanContacts()
         }}
       />
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999, background: "var(--surface-elevated)", border: `1px solid ${CARD_BORDER}`, borderRadius: 10, padding: "12px 20px", color: TEXT, fontSize: 13, fontFamily: "'DM Sans', sans-serif", boxShadow: "0 8px 32px rgba(0,0,0,0.3)", maxWidth: 420, animation: "slideUp 0.25s ease-out" }}>
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

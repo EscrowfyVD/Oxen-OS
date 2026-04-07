@@ -19,6 +19,7 @@ const APP_URL = process.env.APP_URL || process.env.NEXTAUTH_URL || "https://os.o
 let lastCheckUpcoming = 0
 let lastMondayDigest = ""
 let lastFridayDigest = ""
+let lastLemlistSync = ""
 
 // ─── Job Claiming ───
 
@@ -357,6 +358,26 @@ async function runScheduledTasks() {
       console.error(`[${WORKER_ID}] Friday digest failed:`, err)
     }
   }
+
+  // Daily 7:00 AM UTC — Lemlist sync
+  if (hour === 7 && minute < 15 && lastLemlistSync !== dateKey) {
+    lastLemlistSync = dateKey
+    try {
+      console.log(`[${WORKER_ID}] Running daily Lemlist sync...`)
+      const cronSecret = process.env.CRON_SECRET || ""
+      const res = await fetch(`${APP_URL}/api/lemlist/sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+        },
+      })
+      const data = await res.json()
+      console.log(`[${WORKER_ID}] Lemlist sync result:`, JSON.stringify(data))
+    } catch (err) {
+      console.error(`[${WORKER_ID}] Lemlist sync failed:`, err)
+    }
+  }
 }
 
 let running = true
@@ -393,7 +414,7 @@ async function poll() {
 process.on("SIGINT", () => { console.log(`[${WORKER_ID}] Shutting down...`); running = false })
 process.on("SIGTERM", () => { console.log(`[${WORKER_ID}] Shutting down...`); running = false })
 
-console.log(`[${WORKER_ID}] Starting Sync Worker (poll every ${POLL_INTERVAL}ms, cron: check-upcoming/15min, monday-digest/Mon-8am, friday-digest/Fri-5pm)`)
+console.log(`[${WORKER_ID}] Starting Sync Worker (poll every ${POLL_INTERVAL}ms, cron: check-upcoming/15min, monday-digest/Mon-8am, friday-digest/Fri-5pm, lemlist-sync/daily-7am)`)
 poll().then(() => {
   console.log(`[${WORKER_ID}] Worker stopped`)
   prisma.$disconnect()
