@@ -20,6 +20,7 @@ export async function GET(request: Request) {
   const dealOwner = searchParams.get("dealOwner")
   const contactType = searchParams.get("contactType")
   const outreachGroup = searchParams.get("outreachGroup")
+  const lemlistCampaign = searchParams.get("lemlistCampaign")
   const q = searchParams.get("q")
   const sortBy = searchParams.get("sortBy") || "createdAt"
   const sortDir = (searchParams.get("sortDir") || "desc") as "asc" | "desc"
@@ -43,6 +44,15 @@ export async function GET(request: Request) {
   }
   if (outreachGroup && outreachGroup !== "all") {
     where.outreachGroup = outreachGroup
+  }
+  if (lemlistCampaign && lemlistCampaign !== "all") {
+    if (lemlistCampaign === "not_enrolled") {
+      where.lemlistCampaignId = null
+    } else if (lemlistCampaign === "completed") {
+      where.lemlistStatus = "completed"
+    } else {
+      where.lemlistCampaignName = lemlistCampaign
+    }
   }
   if (q) {
     where.OR = [

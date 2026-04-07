@@ -118,6 +118,19 @@ export async function POST(request: Request) {
     // Log activity on the contact
     const userId = session.user?.email ?? "unknown"
 
+    // Fetch campaign step count
+    let totalSteps: number | null = null
+    try {
+      const seqRes = await fetch(
+        `${LEMLIST_BASE_URL}/campaigns/${campaignId}`,
+        { headers: { Authorization: getLemlistAuthHeader() } },
+      )
+      if (seqRes.ok) {
+        const seqData = await seqRes.json()
+        if (Array.isArray(seqData.sequence)) totalSteps = seqData.sequence.length
+      }
+    } catch { /* non-critical */ }
+
     await prisma.$transaction([
       prisma.activity.create({
         data: {
@@ -132,6 +145,12 @@ export async function POST(request: Request) {
         data: {
           lastInteraction: new Date(),
           totalInteractions: contact.totalInteractions + 1,
+          lemlistCampaignId: campaignId,
+          lemlistCampaignName: campaignName,
+          lemlistStatus: "active",
+          lemlistStep: 0,
+          lemlistTotalSteps: totalSteps,
+          lemlistEnrolledAt: new Date(),
         },
       }),
     ])

@@ -52,6 +52,12 @@ interface CrmContact {
   country: string | null
   icpFit: string | null
   relationshipStrength: string | null
+  lemlistCampaignId: string | null
+  lemlistCampaignName: string | null
+  lemlistStatus: string | null
+  lemlistStep: number | null
+  lemlistTotalSteps: number | null
+  lemlistEnrolledAt: string | null
   createdAt: string
 }
 
@@ -106,6 +112,8 @@ export default function ContactListPage() {
   const [vertical, setVertical] = useState("all")
   const [geoZone, setGeoZone] = useState("all")
   const [contactType, setContactType] = useState("all")
+  const [lemlistCampaign, setLemlistCampaign] = useState("all")
+  const [lemlistCampaigns, setLemlistCampaigns] = useState<string[]>([])
 
   // Sort
   const [sortBy, setSortBy] = useState<SortField>("createdAt")
@@ -125,6 +133,7 @@ export default function ContactListPage() {
     if (vertical !== "all") params.set("vertical", vertical)
     if (geoZone !== "all") params.set("geoZone", geoZone)
     if (contactType !== "all") params.set("contactType", contactType)
+    if (lemlistCampaign !== "all") params.set("lemlistCampaign", lemlistCampaign)
 
     try {
       const res = await fetch(`/api/crm/contacts?${params.toString()}`)
@@ -133,7 +142,7 @@ export default function ContactListPage() {
       setPagination(data.pagination ?? { page: 1, limit: 50, total: 0, totalPages: 1 })
     } catch { /* ignore */ }
     setLoading(false)
-  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, sortBy, sortDir])
+  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign, sortBy, sortDir])
 
   const fetchKanbanContacts = useCallback(async () => {
     setKanbanLoading(true)
@@ -147,6 +156,7 @@ export default function ContactListPage() {
     if (vertical !== "all") params.set("vertical", vertical)
     if (geoZone !== "all") params.set("geoZone", geoZone)
     if (contactType !== "all") params.set("contactType", contactType)
+    if (lemlistCampaign !== "all") params.set("lemlistCampaign", lemlistCampaign)
 
     try {
       const res = await fetch(`/api/crm/contacts?${params.toString()}`)
@@ -155,7 +165,17 @@ export default function ContactListPage() {
       setPagination(data.pagination ?? { page: 1, limit: 500, total: 0, totalPages: 1 })
     } catch { /* ignore */ }
     setKanbanLoading(false)
-  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType])
+  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign])
+
+  // Fetch distinct Lemlist campaign names for filter dropdown
+  useEffect(() => {
+    fetch("/api/lemlist/campaigns")
+      .then(r => r.ok ? r.json() : [])
+      .then((campaigns: { _id: string; name: string }[]) => {
+        setLemlistCampaigns(campaigns.map(c => c.name).filter(Boolean))
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (viewMode === "list") fetchContacts(1)
@@ -281,6 +301,7 @@ export default function ContactListPage() {
                 if (vertical !== "all") params.set("vertical", vertical)
                 if (geoZone !== "all") params.set("geoZone", geoZone)
                 if (contactType !== "all") params.set("contactType", contactType)
+                if (lemlistCampaign !== "all") params.set("lemlistCampaign", lemlistCampaign)
                 const res = await fetch(`/api/crm/contacts/export?${params}`)
                 const blob = await res.blob()
                 const url = URL.createObjectURL(blob)
@@ -350,6 +371,12 @@ export default function ContactListPage() {
           <select value={contactType} onChange={(e) => setContactType(e.target.value)} style={selectStyle}>
             <option value="all">All Types</option>
             {CONTACT_TYPES.map((t) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+          </select>
+          <select value={lemlistCampaign} onChange={(e) => setLemlistCampaign(e.target.value)} style={selectStyle}>
+            <option value="all">All Campaigns</option>
+            <option value="not_enrolled">Not Enrolled</option>
+            <option value="completed">Completed</option>
+            {lemlistCampaigns.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
       </div>

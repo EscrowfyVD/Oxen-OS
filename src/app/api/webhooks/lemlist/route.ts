@@ -134,23 +134,44 @@ export async function POST(request: Request) {
       hooked: "replied",
     }
 
-    const newStage = stageMap[event]
-
-    if (newStage) {
-      await prisma.crmContact.update({
-        where: { id: contact.id },
-        data: {
-          lifecycleStage: newStage,
-          lastInteraction: new Date(),
-        },
-      })
-    } else {
-      // Still update lastInteraction for any event
-      await prisma.crmContact.update({
-        where: { id: contact.id },
-        data: { lastInteraction: new Date() },
-      })
+    // Map Lemlist events to lemlistStatus
+    const lemlistStatusMap: Record<string, string> = {
+      emailsSent: "active",
+      emailsOpened: "active",
+      emailsClicked: "active",
+      emailsReplied: "replied",
+      emailsBounced: "bounced",
+      emailsUnsubscribed: "unsubscribed",
+      contacted: "active",
+      interested: "replied",
+      hooked: "replied",
     }
+
+    const newStage = stageMap[event]
+    const newLemlistStatus = lemlistStatusMap[event]
+
+    // Build update data
+    const updateData: Record<string, unknown> = { lastInteraction: new Date() }
+    if (newStage) updateData.lifecycleStage = newStage
+    if (newLemlistStatus) updateData.lemlistStatus = newLemlistStatus
+    if (campaignName) updateData.lemlistCampaignName = campaignName
+
+    // Increment step for emailsSent events
+    if (event === "emailsSent" && typeof contact.lemlistStep === "number") {
+      updateData.lemlistStep = contact.lemlistStep + 1
+      // Check if sequence is done
+      if (
+        typeof contact.lemlistTotalSteps === "number" &&
+        contact.lemlistStep + 1 >= contact.lemlistTotalSteps
+      ) {
+        updateData.lemlistStatus = "completed"
+      }
+    }
+
+    await prisma.crmContact.update({
+      where: { id: contact.id },
+      data: updateData,
+    })
 
     // Log as activity
     await prisma.activity.create({

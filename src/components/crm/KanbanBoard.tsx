@@ -85,6 +85,12 @@ export interface KanbanContact {
   jobTitle: string | null
   lastInteraction: string | null
   totalInteractions: number
+  lemlistCampaignId: string | null
+  lemlistCampaignName: string | null
+  lemlistStatus: string | null
+  lemlistStep: number | null
+  lemlistTotalSteps: number | null
+  lemlistEnrolledAt: string | null
   createdAt: string
 }
 
@@ -297,6 +303,48 @@ export default function KanbanBoard({ contacts, loading, onStageChange, onContac
                               {c.dealOwner}
                             </span>
                           )}
+
+                          {/* Lemlist campaign */}
+                          {c.lemlistCampaignName && (() => {
+                            const lBadge: React.CSSProperties = {
+                              fontSize: 9, padding: "1px 6px", borderRadius: 8, display: "inline-flex",
+                              alignItems: "center", gap: 3, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+                              whiteSpace: "nowrap", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis",
+                            }
+                            if (c.lemlistStatus === "active") {
+                              return (
+                                <span style={{ ...lBadge, background: "rgba(52,211,153,0.1)", color: "#34D399" }}>
+                                  {"\uD83D\uDCE7"} {c.lemlistCampaignName} — Step {c.lemlistStep ?? "?"}/{c.lemlistTotalSteps ?? "?"}
+                                </span>
+                              )
+                            }
+                            if (c.lemlistStatus === "completed") {
+                              return (
+                                <span style={{ ...lBadge, background: "var(--surface-input)", color: TEXT3 }}>
+                                  {"\u2705"} {c.lemlistCampaignName} — Done
+                                </span>
+                              )
+                            }
+                            if (c.lemlistStatus === "replied") {
+                              return (
+                                <span style={{ ...lBadge, background: "rgba(192,139,136,0.12)", color: ROSE }}>
+                                  {"\uD83D\uDCAC"} {c.lemlistCampaignName} — Replied
+                                </span>
+                              )
+                            }
+                            if (c.lemlistStatus === "bounced") {
+                              return (
+                                <span style={{ ...lBadge, background: "rgba(248,113,113,0.1)", color: "#F87171" }}>
+                                  {"\u26A0\uFE0F"} {c.lemlistCampaignName} — Bounced
+                                </span>
+                              )
+                            }
+                            return (
+                              <span style={{ ...lBadge, background: "var(--surface-input)", color: TEXT3 }}>
+                                {c.lemlistCampaignName}
+                              </span>
+                            )
+                          })()}
                         </div>
                       </div>
                     )

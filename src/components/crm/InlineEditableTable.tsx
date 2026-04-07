@@ -48,6 +48,12 @@ export interface TableContact {
   country: string | null
   icpFit: string | null
   relationshipStrength: string | null
+  lemlistCampaignId: string | null
+  lemlistCampaignName: string | null
+  lemlistStatus: string | null
+  lemlistStep: number | null
+  lemlistTotalSteps: number | null
+  lemlistEnrolledAt: string | null
   createdAt: string
 }
 
@@ -118,6 +124,7 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
     options: ICP_FITS.map(f => ({ value: f.id, label: f.label, color: f.color })) },
   { key: "relationshipStrength", label: "Rel. Strength", type: "select", field: "relationshipStrength", width: 135, minWidth: 100, defaultVisible: false,
     options: RELATIONSHIP_STRENGTHS.map(r => ({ value: r.id, label: r.label, color: r.color })) },
+  { key: "lemlistCampaign", label: "Campaign", type: "readonly" as const, field: "lemlistCampaignName", width: 200, minWidth: 140, defaultVisible: false },
   { key: "contactType", label: "Type", type: "select", field: "contactType", width: 110, minWidth: 80, defaultVisible: false,
     options: CONTACT_TYPES.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) })) },
 ]
@@ -515,6 +522,50 @@ export default function InlineEditableTable({
       return (
         <span style={{ display: "inline-block", padding: "2px 8px", fontSize: 10, fontWeight: 500, fontFamily: FONT, borderRadius: 16, background: `${color}18`, color, whiteSpace: "nowrap" }}>
           {opt?.label || str}
+        </span>
+      )
+    }
+
+    if (col.key === "lemlistCampaign") {
+      const campaignName = contact.lemlistCampaignName
+      const status = contact.lemlistStatus
+      if (!campaignName) return <span style={{ color: TEXT3, fontSize: 12 }}>—</span>
+      const badgeBase: React.CSSProperties = {
+        display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px",
+        fontSize: 10, fontWeight: 500, borderRadius: 12, fontFamily: FONT,
+      }
+      if (status === "active") {
+        return (
+          <span style={{ ...badgeBase, background: "rgba(52,211,153,0.1)", color: "#34D399" }}>
+            {"\uD83D\uDCE7"} {campaignName} — Step {contact.lemlistStep ?? "?"}/{contact.lemlistTotalSteps ?? "?"}
+          </span>
+        )
+      }
+      if (status === "completed") {
+        return (
+          <span style={{ ...badgeBase, background: "var(--surface-input)", color: TEXT3 }}>
+            {"\u2705"} {campaignName} — Done
+          </span>
+        )
+      }
+      if (status === "replied") {
+        return (
+          <span style={{ ...badgeBase, background: "rgba(192,139,136,0.12)", color: ROSE }}>
+            {"\uD83D\uDCAC"} {campaignName} — Replied
+          </span>
+        )
+      }
+      if (status === "bounced") {
+        return (
+          <span style={{ ...badgeBase, background: "rgba(248,113,113,0.1)", color: "#F87171" }}>
+            {"\u26A0\uFE0F"} {campaignName} — Bounced
+          </span>
+        )
+      }
+      // Fallback for other statuses
+      return (
+        <span style={{ ...badgeBase, background: "var(--surface-input)", color: TEXT3 }}>
+          {campaignName}
         </span>
       )
     }

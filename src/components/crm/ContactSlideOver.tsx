@@ -183,6 +183,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
   const [selCampaign, setSelCampaign] = useState("")
   const [enrolling, setEnrolling] = useState(false)
   const [showSeq, setShowSeq] = useState(false)
+  const [removingFromSeq, setRemovingFromSeq] = useState(false)
 
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -267,6 +268,30 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
       if (data.ok) { setShowSeq(false); setSelCampaign(""); fetchContact(); fetchActivities(); onContactUpdated?.() }
     } catch { /* */ }
     setEnrolling(false)
+  }
+
+  /* ── Remove from Lemlist Sequence ── */
+  const handleRemoveFromSequence = async () => {
+    if (!contactId || removingFromSeq) return
+    setRemovingFromSeq(true)
+    try {
+      const res = await fetch("/api/lemlist/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactId }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setContact((prev: typeof contact) => ({
+          ...prev,
+          lemlistCampaignId: null,
+          lemlistCampaignName: null,
+          lemlistStatus: null,
+        }))
+        onContactUpdated?.()
+      }
+    } catch { /* */ }
+    setRemovingFromSeq(false)
   }
 
   /* ── Add Note ── */
@@ -504,6 +529,70 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
                     <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34D399" }} />
                     <span style={{ fontSize: 11, color: "#34D399", fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>Active in Lemlist</span>
                   </div>
+                </div>
+              )}
+
+              {/* Lemlist Sequence */}
+              {contact.lemlistCampaignName && (
+                <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(192,139,136,0.06)", borderRadius: 6, border: `1px solid ${ROSE}20` }}>
+                  <div style={{ fontSize: 10, color: ROSE, textTransform: "uppercase", letterSpacing: 0.7, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, marginBottom: 8 }}>
+                    ✉️ Lemlist Sequence
+                  </div>
+
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={lbl}>Campaign</div>
+                    <div style={{ fontSize: 12, color: TEXT, fontFamily: "'DM Sans', sans-serif" }}>{contact.lemlistCampaignName}</div>
+                  </div>
+
+                  {contact.lemlistStatus && (
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={lbl}>Status</div>
+                      <Badge
+                        label={contact.lemlistStatus}
+                        color={
+                          contact.lemlistStatus === "active" ? "#34D399"
+                          : contact.lemlistStatus === "completed" ? "#9CA3AF"
+                          : contact.lemlistStatus === "replied" ? ROSE
+                          : contact.lemlistStatus === "bounced" ? "#F87171"
+                          : TEXT2
+                        }
+                      />
+                    </div>
+                  )}
+
+                  {contact.lemlistStep != null && contact.lemlistTotalSteps != null && (
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={lbl}>Progress</div>
+                      <div style={{ fontSize: 12, color: TEXT, fontFamily: "'DM Sans', sans-serif" }}>Step {contact.lemlistStep} of {contact.lemlistTotalSteps}</div>
+                    </div>
+                  )}
+
+                  {contact.lemlistEnrolledAt && (
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={lbl}>Enrolled</div>
+                      <div style={{ fontSize: 12, color: TEXT, fontFamily: "'DM Sans', sans-serif" }}>{fmtDate(contact.lemlistEnrolledAt)}</div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleRemoveFromSequence}
+                    disabled={removingFromSeq}
+                    style={{
+                      marginTop: 6,
+                      padding: "5px 12px",
+                      borderRadius: 6,
+                      border: "1px solid rgba(248,113,113,0.3)",
+                      background: "rgba(248,113,113,0.08)",
+                      color: "#F87171",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      cursor: removingFromSeq ? "not-allowed" : "pointer",
+                      fontFamily: "'DM Sans', sans-serif",
+                      opacity: removingFromSeq ? 0.5 : 1,
+                    }}
+                  >
+                    {removingFromSeq ? "Removing..." : "Remove from Sequence"}
+                  </button>
                 </div>
               )}
 

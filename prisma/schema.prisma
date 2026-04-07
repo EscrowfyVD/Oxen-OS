@@ -337,6 +337,13 @@ model CrmContact {
   totalReferrals  Int      @default(0)
   successfulReferrals Int  @default(0)
   referralSuccessRate Float? @default(0)
+  // Lemlist sequence tracking
+  lemlistCampaignId    String?
+  lemlistCampaignName  String?
+  lemlistStatus        String?   // "active", "paused", "completed", "replied", "bounced", "unsubscribed"
+  lemlistStep          Int?
+  lemlistTotalSteps    Int?
+  lemlistEnrolledAt    DateTime?
   // Legacy compat fields (migrated from old Contact)
   telegram        String?
   whatsapp        String?
