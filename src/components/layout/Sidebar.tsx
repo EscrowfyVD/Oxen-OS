@@ -22,8 +22,6 @@ import {
   Tent,
   Settings,
   LogOut,
-  ChevronDown,
-  ChevronRight,
   type LucideIcon,
 } from "lucide-react"
 import { Sun, Moon, Monitor } from "lucide-react"
@@ -38,18 +36,8 @@ type NavItem = {
   badge: string | null
   count: number | null
   pageKey?: string
-  hasSubNav?: boolean
   section?: "main" | "internal"
 }
-
-const CRM_SUB_ITEMS = [
-  { label: "Pipeline", href: "/crm" },
-  { label: "Contacts", href: "/crm/contacts" },
-  { label: "Companies", href: "/crm/companies" },
-  { label: "Inbox", href: "/crm/inbox" },
-  { label: "Reports", href: "/crm/reports" },
-  { label: "Forecast", href: "/crm/forecast" },
-]
 
 const NAV_ITEMS: NavItem[] = [
   // ── MAIN ──
@@ -57,7 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Sentinel", href: "/ai", icon: Shield, badge: null, count: null },
   { label: "Tasks", href: "/tasks", icon: CheckSquare, badge: null, count: 12 },
   { label: "Calendar", href: "/calendar", icon: CalendarDays, badge: null, count: null },
-  { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null, pageKey: "crm", hasSubNav: true },
+  { label: "CRM", href: "/crm", icon: Handshake, badge: null, count: null, pageKey: "crm" },
   { label: "Marketing", href: "/marketing", icon: Megaphone, badge: null, count: null, pageKey: "marketing" },
   { label: "Intel", href: "/intel", icon: Search, badge: null, count: null },
   { label: "Conferences", href: "/conferences", icon: Tent, badge: null, count: null },
@@ -225,7 +213,6 @@ export default function Sidebar() {
         <nav className="flex-1 overflow-y-auto" style={{ padding: 0 }}>
           {navItems.map((item, index) => {
             const active = isActive(item.href)
-            const crmExpanded = item.hasSubNav && pathname.startsWith("/crm")
             const isFirstInternal =
               item.section === "internal" &&
               (index === 0 || navItems[index - 1].section !== "internal")
@@ -264,49 +251,7 @@ export default function Sidebar() {
                       {item.badge}
                     </span>
                   )}
-                  {item.hasSubNav && (
-                    <span style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
-                      {crmExpanded ? (
-                        <ChevronDown size={13} strokeWidth={1.8} style={{ color: "var(--text-tertiary)" }} />
-                      ) : (
-                        <ChevronRight size={13} strokeWidth={1.8} style={{ color: "var(--text-tertiary)" }} />
-                      )}
-                    </span>
-                  )}
                 </Link>
-
-                {/* CRM sub-navigation */}
-                {crmExpanded && (
-                  <div style={{ padding: "2px 0 4px" }}>
-                    {CRM_SUB_ITEMS.map((sub) => {
-                      const subActive =
-                        sub.href === "/crm"
-                          ? pathname === "/crm"
-                          : pathname.startsWith(sub.href)
-                      return (
-                        <Link
-                          key={sub.href}
-                          href={sub.href}
-                          onClick={() => setMobileOpen(false)}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            padding: "6px 16px 6px 48px",
-                            fontSize: 11,
-                            fontFamily: "'DM Sans', sans-serif",
-                            color: subActive ? "var(--text-primary)" : "var(--text-secondary)",
-                            textDecoration: "none",
-                            borderLeft: subActive ? "2px solid var(--rose-gold)" : "2px solid transparent",
-                            transition: "color 0.15s, border-color 0.15s",
-                            fontWeight: subActive ? 500 : 400,
-                          }}
-                        >
-                          {sub.label}
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
             )
           })}

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react"
 import Papa from "papaparse"
+import ExcelJS from "exceljs"
 
 /* ── Design Tokens ── */
 const CARD_BG = "var(--card-bg)"
@@ -283,33 +284,68 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
+  /* ── Auto-map helper ── */
+  const applyAutoMap = useCallback((hdrs: string[], rws: string[][]) => {
+    setHeaders(hdrs)
+    setRows(rws)
+    const autoMapping: Record<string, string> = {}
+    hdrs.forEach((h) => {
+      const key = h.trim().toLowerCase()
+      if (AUTO_MAP[key]) autoMapping[h] = AUTO_MAP[key]
+    })
+    setMapping(autoMapping)
+    setStep(1)
+  }, [])
+
   /* ── Parse CSV ── */
-  const handleFile = useCallback((file: File) => {
-    if (!file.name.endsWith(".csv")) return
-    setFileName(file.name)
+  const parseCsv = useCallback((file: File) => {
     Papa.parse(file, {
       skipEmptyLines: true,
       complete: (results) => {
         const data = results.data as string[][]
         if (data.length < 2) return
-        const hdrs = data[0]
-        const rws = data.slice(1)
-        setHeaders(hdrs)
-        setRows(rws)
-
-        // Auto-map
-        const autoMapping: Record<string, string> = {}
-        hdrs.forEach((h) => {
-          const key = h.trim().toLowerCase()
-          if (AUTO_MAP[key]) {
-            autoMapping[h] = AUTO_MAP[key]
-          }
-        })
-        setMapping(autoMapping)
-        setStep(1)
+        applyAutoMap(data[0], data.slice(1))
       },
     })
-  }, [])
+  }, [applyAutoMap])
+
+  /* ── Parse XLSX ── */
+  const parseXlsx = useCallback(async (file: File) => {
+    const buffer = await file.arrayBuffer()
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(buffer)
+    const sheet = workbook.worksheets[0]
+    if (!sheet || sheet.rowCount < 2) return
+
+    const hdrs: string[] = []
+    const rws: string[][] = []
+
+    sheet.eachRow((row, rowNum) => {
+      const cells = row.values as (string | number | boolean | null | undefined)[]
+      // ExcelJS row.values is 1-indexed (index 0 is undefined)
+      const vals = cells.slice(1).map((v) => (v != null ? String(v) : ""))
+      if (rowNum === 1) {
+        hdrs.push(...vals)
+      } else {
+        rws.push(vals)
+      }
+    })
+
+    if (hdrs.length === 0) return
+    applyAutoMap(hdrs, rws)
+  }, [applyAutoMap])
+
+  /* ── Handle file (CSV or XLSX) ── */
+  const handleFile = useCallback((file: File) => {
+    const ext = file.name.toLowerCase()
+    if (!ext.endsWith(".csv") && !ext.endsWith(".xlsx") && !ext.endsWith(".xls")) return
+    setFileName(file.name)
+    if (ext.endsWith(".csv")) {
+      parseCsv(file)
+    } else {
+      parseXlsx(file)
+    }
+  }, [parseCsv, parseXlsx])
 
   /* ── Build mapped contacts from raw data ── */
   const buildMappedContacts = useCallback((): MappedContact[] => {
@@ -434,7 +470,8 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
 
   const modalStyle: React.CSSProperties = {
     ...GLASS,
-    width: "min(96vw, 1100px)",
+    width: "min(96vw, 900px)",
+    minHeight: "min(600px, 85vh)",
     maxHeight: "92vh",
     display: "flex",
     flexDirection: "column",
@@ -500,14 +537,14 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
 
   /* ── Step Indicator ── */
   const renderStepIndicator = () => (
-    <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 0, flex: 1, justifyContent: "center" }}>
       {STEPS.map((label, i) => (
         <div key={label} style={{ display: "flex", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
               style={{
-                width: 28,
-                height: 28,
+                width: 30,
+                height: 30,
                 borderRadius: "50%",
                 display: "flex",
                 alignItems: "center",
@@ -524,7 +561,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
             </div>
             <span
               style={{
-                fontSize: 12,
+                fontSize: 13,
                 fontFamily: "'DM Sans', sans-serif",
                 color: i === step ? TEXT : TEXT3,
                 fontWeight: i === step ? 600 : 400,
@@ -536,10 +573,10 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
           {i < STEPS.length - 1 && (
             <div
               style={{
-                width: 40,
+                width: 48,
                 height: 1,
                 background: i < step ? ROSE : CARD_BORDER,
-                margin: "0 12px",
+                margin: "0 16px",
               }}
             />
           )}
@@ -558,8 +595,9 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        minHeight: 340,
-        gap: 20,
+        flex: 1,
+        minHeight: 400,
+        gap: 24,
       }}
     >
       <div
@@ -576,29 +614,29 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
         }}
         style={{
           width: "100%",
-          maxWidth: 480,
+          maxWidth: 560,
           border: `2px dashed ${dragOver ? ROSE : CARD_BORDER}`,
-          borderRadius: 16,
-          padding: "60px 40px",
+          borderRadius: 20,
+          padding: "80px 48px",
           textAlign: "center",
-          background: dragOver ? "rgba(192,139,136,0.06)" : "transparent",
+          background: dragOver ? "rgba(192,139,136,0.06)" : "var(--surface-subtle)",
           transition: "all 0.2s",
           cursor: "pointer",
         }}
         onClick={() => fileInputRef.current?.click()}
       >
-        <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }}>
+        <div style={{ fontSize: 56, marginBottom: 20, opacity: 0.5 }}>
           {"\u2B06\uFE0F"}
         </div>
         <p
           style={{
             fontFamily: "'Bellfair', serif",
-            fontSize: 20,
+            fontSize: 22,
             color: TEXT,
-            margin: "0 0 8px",
+            margin: "0 0 10px",
           }}
         >
-          Drop your CSV file here
+          Drop your CSV or Excel file here
         </p>
         <p
           style={{
@@ -608,14 +646,14 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
             margin: 0,
           }}
         >
-          or click to browse
+          Supports .csv, .xlsx, and .xls files
         </p>
       </div>
 
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv"
+        accept=".csv,.xlsx,.xls"
         style={{ display: "none" }}
         onChange={(e) => {
           const file = e.target.files?.[0]
@@ -627,7 +665,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
         onClick={() => fileInputRef.current?.click()}
         style={btnPrimary}
       >
-        Choose CSV File
+        Choose CSV or Excel File
       </button>
     </div>
   )
@@ -648,7 +686,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
             margin: "0 0 4px",
           }}
         >
-          Map CSV Columns to CRM Fields
+          Map Columns to CRM Fields
         </p>
         <p
           style={{
