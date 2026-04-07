@@ -205,7 +205,7 @@ export function formatBriefForTelegram(brief: {
   }
 
   parts.push(``)
-  parts.push(`Open in OS: https://oxen-os-production.up.railway.app/calendar`)
+  parts.push(`Open in OS: https://os.oxen.finance/calendar`)
 
   return parts.join("\n")
 }

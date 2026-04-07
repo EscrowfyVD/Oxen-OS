@@ -244,7 +244,7 @@ async function handleBrief(chatId: number) {
 
     try {
       const res = await fetch(
-        `${process.env.NEXTAUTH_URL || "https://oxen-os-production.up.railway.app"}/api/telegram/check-upcoming`,
+        `${process.env.NEXTAUTH_URL || "https://os.oxen.finance"}/api/telegram/check-upcoming`,
         { method: "POST" },
       )
       if (res.ok) {

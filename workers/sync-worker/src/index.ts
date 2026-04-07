@@ -15,7 +15,7 @@ const STALE_TIMEOUT = parseInt(process.env.STALE_JOB_TIMEOUT_MS || "300000", 10)
 const SYNC_JOB_TYPES = ["sync:email", "sync:calendar"]
 
 // ─── Cron Scheduling ───
-const APP_URL = process.env.APP_URL || process.env.NEXTAUTH_URL || "https://oxen-os-production.up.railway.app"
+const APP_URL = process.env.APP_URL || process.env.NEXTAUTH_URL || "https://os.oxen.finance"
 let lastCheckUpcoming = 0
 let lastMondayDigest = ""
 let lastFridayDigest = ""

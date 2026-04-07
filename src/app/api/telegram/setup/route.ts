@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { setWebhook } from "@/lib/telegram"
 
-const WEBHOOK_URL = process.env.TELEGRAM_WEBHOOK_URL || "https://oxen-os-production.up.railway.app/api/telegram/webhook"
+const WEBHOOK_URL = process.env.TELEGRAM_WEBHOOK_URL || "https://os.oxen.finance/api/telegram/webhook"
 
 export async function POST() {
   const session = await auth()
