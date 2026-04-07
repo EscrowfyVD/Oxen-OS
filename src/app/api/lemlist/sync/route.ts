@@ -41,41 +41,46 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-// Fetch full lead details — tries /leads/{id} then /campaigns/{cid}/leads/{id}
-async function fetchLeadDetail(
+// Fetch email for a lead via its contactId — tries /people, /contacts, then lead endpoints
+async function fetchLeadEmail(
   leadId: string,
+  contactId: string | undefined,
   campaignId: string,
   auth: string,
 ): Promise<LeadDetail | null> {
-  // Primary: GET /api/leads/{leadId}
-  try {
-    const res = await fetch(`${BASE}/leads/${leadId}`, {
-      headers: { Authorization: auth },
-    })
-    if (res.ok) {
-      const data: LeadDetail = await res.json()
-      if (data.email) return data
-      // If no email in response, log and try fallback
-      console.log(`[Lemlist Sync] /leads/${leadId} returned no email, keys: ${Object.keys(data).join(", ")}`)
-    } else {
-      console.log(`[Lemlist Sync] /leads/${leadId} status: ${res.status}`)
-    }
-  } catch (err) {
-    console.error(`[Lemlist Sync] /leads/${leadId} error:`, err)
+  const endpoints: Array<{ label: string; url: string }> = []
+
+  // Primary: People API using contactId
+  if (contactId) {
+    endpoints.push(
+      { label: "people", url: `${BASE}/people/${contactId}` },
+      { label: "contacts", url: `${BASE}/contacts/${contactId}` },
+      { label: "hooks", url: `${BASE}/hooks/${contactId}` },
+    )
   }
 
-  // Fallback: GET /api/campaigns/{campaignId}/leads/{leadId}
-  try {
-    const res = await fetch(`${BASE}/campaigns/${campaignId}/leads/${leadId}`, {
-      headers: { Authorization: auth },
-    })
-    if (res.ok) {
-      const data: LeadDetail = await res.json()
-      if (data.email) return data
-      console.log(`[Lemlist Sync] /campaigns/.../leads/${leadId} returned no email, keys: ${Object.keys(data).join(", ")}`)
+  // Fallback: lead detail endpoints
+  endpoints.push(
+    { label: "leads", url: `${BASE}/leads/${leadId}` },
+    { label: "campaign_leads", url: `${BASE}/campaigns/${campaignId}/leads/${leadId}` },
+  )
+
+  for (const ep of endpoints) {
+    try {
+      const res = await fetch(ep.url, { headers: { Authorization: auth } })
+      if (res.ok) {
+        const data: LeadDetail = await res.json()
+        if (data.email) {
+          console.log(`[Lemlist Sync] Got email from ${ep.label}: ${data.email}`)
+          return data
+        }
+        console.log(`[Lemlist Sync] ${ep.label} (${ep.url}) — no email, keys: ${Object.keys(data).join(", ")}`)
+      } else {
+        console.log(`[Lemlist Sync] ${ep.label} status: ${res.status}`)
+      }
+    } catch {
+      // try next endpoint
     }
-  } catch {
-    // silent fallback failure
   }
 
   return null
@@ -183,9 +188,9 @@ export async function POST(request: Request) {
 
       for (let i = 0; i < leadList.length; i++) {
         const item = leadList[i]
-        console.log(`[Lemlist Sync] Fetching lead detail ${i + 1}/${leadList.length} (${item._id})`)
+        console.log(`[Lemlist Sync] Fetching lead detail ${i + 1}/${leadList.length} (_id=${item._id}, contactId=${item.contactId ?? "none"})`)
 
-        const detail = await fetchLeadDetail(item._id, campaign._id, auth)
+        const detail = await fetchLeadEmail(item._id, item.contactId, campaign._id, auth)
         if (detail?.email) {
           // Merge state from list if detail doesn't have it
           if (!detail.state && item.state) detail.state = item.state

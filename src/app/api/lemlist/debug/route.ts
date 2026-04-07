@@ -45,6 +45,7 @@ export async function GET() {
   // 2. If we have a campaign, try multiple lead endpoints
   const leadsResults: Record<string, unknown> = {}
   let firstLeadId: string | null = null
+  let firstContactId: string | null = null
 
   if (firstCampaignId) {
     // Standard leads endpoint (list — returns _id, state, contactId)
@@ -53,22 +54,35 @@ export async function GET() {
     )
     leadsResults.lead_list = leadListResult
 
-    // Extract first lead ID for detail fetch
+    // Extract first lead ID and contactId
     if (leadListResult.status === 200 && Array.isArray(leadListResult.body)) {
-      const items = leadListResult.body as Array<{ _id: string }>
-      if (items.length > 0) firstLeadId = items[0]._id
+      const items = leadListResult.body as Array<{ _id: string; contactId?: string }>
+      if (items.length > 0) {
+        firstLeadId = items[0]._id
+        firstContactId = items[0].contactId ?? null
+      }
     }
 
-    // If we have a lead ID, fetch individual detail
+    // Fetch individual lead detail
     if (firstLeadId) {
-      // Primary: GET /api/leads/{leadId}
       leadsResults.lead_detail_global = await safeFetch(
         `${BASE}/leads/${firstLeadId}`, auth,
       )
-
-      // Fallback: GET /api/campaigns/{cid}/leads/{leadId}
       leadsResults.lead_detail_campaign = await safeFetch(
         `${BASE}/campaigns/${firstCampaignId}/leads/${firstLeadId}`, auth,
+      )
+    }
+
+    // People / Contacts API using contactId
+    if (firstContactId) {
+      leadsResults.people_detail = await safeFetch(
+        `${BASE}/people/${firstContactId}`, auth,
+      )
+      leadsResults.contacts_detail = await safeFetch(
+        `${BASE}/contacts/${firstContactId}`, auth,
+      )
+      leadsResults.hooks_detail = await safeFetch(
+        `${BASE}/hooks/${firstContactId}`, auth,
       )
     }
 
@@ -95,6 +109,7 @@ export async function GET() {
     campaigns: campaignsResult,
     firstCampaignId,
     firstLeadId,
+    firstContactId,
     leads: leadsResults,
   })
 }
