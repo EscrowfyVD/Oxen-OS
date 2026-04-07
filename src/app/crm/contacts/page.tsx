@@ -16,7 +16,7 @@ import InlineEditableTable from "@/components/crm/InlineEditableTable"
 import type { TableContact } from "@/components/crm/InlineEditableTable"
 
 /* ── Design Tokens ── */
-const BG = "#060709"
+const BG = "var(--void)"
 const CARD_BG = CRM_COLORS.card_bg
 const CARD_BORDER = CRM_COLORS.card_border
 const TEXT = CRM_COLORS.text_primary
@@ -227,7 +227,7 @@ export default function ContactListPage() {
   }, [fetchContacts, pagination.page])
 
   const selectStyle: React.CSSProperties = {
-    background: "rgba(255,255,255,0.06)",
+    background: "var(--surface-input)",
     border: `1px solid ${CARD_BORDER}`,
     borderRadius: 8,
     color: TEXT2,
@@ -240,7 +240,7 @@ export default function ContactListPage() {
   return (
     <div className="page-content" style={{ padding: 0, background: BG, minHeight: "100vh" }}>
       {/* ════ HEADER ════ */}
-      <div style={{ padding: "16px 32px", borderBottom: `1px solid ${CARD_BORDER}`, background: "rgba(6,7,9,0.88)", backdropFilter: "blur(24px)", position: "sticky", top: 0, zIndex: 100 }}>
+      <div style={{ padding: "16px 32px", borderBottom: `1px solid ${CARD_BORDER}`, background: "var(--header-bg)", backdropFilter: "blur(24px)", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div>
@@ -250,7 +250,7 @@ export default function ContactListPage() {
               </p>
             </div>
             {/* View Toggle */}
-            <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", borderRadius: 8, padding: 3, marginLeft: 8 }}>
+            <div style={{ display: "flex", background: "var(--surface-elevated)", borderRadius: 8, padding: 3, marginLeft: 8 }}>
               <button
                 onClick={() => switchView("list")}
                 style={{ padding: "6px 14px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 500, border: "none", borderRadius: 6, cursor: "pointer", transition: "all 0.15s", background: viewMode === "list" ? `${ROSE}22` : "transparent", color: viewMode === "list" ? TEXT : TEXT3, display: "flex", alignItems: "center", gap: 5 }}
@@ -287,14 +287,14 @@ export default function ContactListPage() {
                 a.click()
                 URL.revokeObjectURL(url)
               }}
-              style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.06)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+              style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-input)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Export CSV
             </button>
             <button
               onClick={() => setShowImportWizard(true)}
-              style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.06)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+              style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-input)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               Import CSV
@@ -312,7 +312,7 @@ export default function ContactListPage() {
             placeholder="Search name, email, company..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ flex: "1 1 220px", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "7px 12px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", minWidth: 200 }}
+            style={{ flex: "1 1 220px", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "7px 12px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", minWidth: 200 }}
           />
           <select value={outreachGroup} onChange={(e) => setOutreachGroup(e.target.value)} style={selectStyle}>
             <option value="all">All Groups</option>

@@ -544,7 +544,7 @@ export default function InlineEditableTable({
      ═════════════════════════════════════════ */
   function renderEditor(contact: TableContact, col: ColumnDef) {
     const inputStyle: React.CSSProperties = {
-      width: "100%", background: "rgba(255,255,255,0.06)", border: `1.5px solid ${EDIT_BORDER}`,
+      width: "100%", background: "var(--surface-input)", border: `1.5px solid ${EDIT_BORDER}`,
       borderRadius: 4, color: TEXT, padding: "4px 8px", fontSize: 13, fontFamily: FONT,
       outline: "none",
     }
@@ -583,7 +583,7 @@ export default function InlineEditableTable({
       const selected = (editValue as string[]) || []
       return (
         <div ref={msDropdownRef} style={{ position: "relative" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 3, minHeight: 26, padding: "2px 4px", border: `1.5px solid ${EDIT_BORDER}`, borderRadius: 4, background: "rgba(255,255,255,0.06)", cursor: "pointer" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 3, minHeight: 26, padding: "2px 4px", border: `1.5px solid ${EDIT_BORDER}`, borderRadius: 4, background: "var(--surface-input)", cursor: "pointer" }}>
             {selected.length === 0 && <span style={{ fontSize: 12, color: TEXT3, padding: "2px 4px" }}>Select...</span>}
             {selected.map(v => (
               <span key={v} style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 6px", fontSize: 10, fontWeight: 500, fontFamily: FONT, borderRadius: 10, background: `${ROSE}20`, color: ROSE }}>
@@ -597,7 +597,7 @@ export default function InlineEditableTable({
           </div>
           <div style={{
             position: "absolute", top: "100%", left: 0, zIndex: 60, width: Math.max(col.width, 200),
-            maxHeight: 220, overflowY: "auto", background: "rgba(15,17,24,0.98)", border: `1px solid ${CARD_BORDER}`,
+            maxHeight: 220, overflowY: "auto", background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`,
             borderRadius: 8, marginTop: 2, boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
           }}>
             {col.options.map(o => {
@@ -610,7 +610,7 @@ export default function InlineEditableTable({
                     else setEditValue([...selected, o.value])
                   }}
                   style={{ padding: "6px 10px", fontSize: 12, fontFamily: FONT, color: checked ? TEXT : TEXT2, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, background: checked ? "rgba(192,139,136,0.08)" : "transparent" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-input)")}
                   onMouseLeave={e => (e.currentTarget.style.background = checked ? "rgba(192,139,136,0.08)" : "transparent")}
                 >
                   <div style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${checked ? ROSE : CARD_BORDER}`, background: checked ? `${ROSE}30` : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: ROSE, flexShrink: 0 }}>
@@ -641,7 +641,7 @@ export default function InlineEditableTable({
           {(companyResults.length > 0 || companyLoading) && (
             <div style={{
               position: "absolute", top: "100%", left: 0, zIndex: 60, width: Math.max(col.width, 200),
-              maxHeight: 200, overflowY: "auto", background: "rgba(15,17,24,0.98)", border: `1px solid ${CARD_BORDER}`,
+              maxHeight: 200, overflowY: "auto", background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`,
               borderRadius: 8, marginTop: 2, boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
             }}>
               {companyLoading && <div style={{ padding: "8px 12px", fontSize: 12, color: TEXT3, fontFamily: FONT }}>Searching...</div>}
@@ -650,7 +650,7 @@ export default function InlineEditableTable({
                   key={c.id}
                   onClick={() => { setEditValue(c); setTimeout(() => saveEdit(), 20) }}
                   style={{ padding: "7px 12px", fontSize: 12, fontFamily: FONT, color: TEXT, cursor: "pointer" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-input)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >
                   {c.name}
@@ -680,7 +680,7 @@ export default function InlineEditableTable({
     return (
       <div style={{
         position: "absolute", right: 0, top: "100%", zIndex: 80, width: 260,
-        background: "rgba(15,17,24,0.98)", border: `1px solid ${CARD_BORDER}`, borderRadius: 10,
+        background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`, borderRadius: 10,
         boxShadow: "0 12px 36px rgba(0,0,0,0.6)", padding: "10px 0", maxHeight: 400, overflowY: "auto",
       }}>
         <div style={{ padding: "6px 14px 10px", fontSize: 11, fontWeight: 600, color: TEXT3, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 0.6 }}>Columns</div>
@@ -732,13 +732,13 @@ export default function InlineEditableTable({
         <div style={{ position: "relative" }}>
           <button
             onClick={() => setBulkAction(bulkAction === "owner" ? null : "owner")}
-            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT2, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: FONT }}
+            style={{ background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT2, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: FONT }}
           >Change Owner</button>
           {bulkAction === "owner" && (
-            <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 70, background: "rgba(15,17,24,0.98)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, marginTop: 4, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+            <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 70, background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, marginTop: 4, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
               {DEAL_OWNERS.map(o => (
                 <div key={o} onClick={() => handleBulk("dealOwner", o)} style={{ padding: "7px 16px", fontSize: 12, fontFamily: FONT, color: TEXT, cursor: "pointer", whiteSpace: "nowrap" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-input)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >{o}</div>
               ))}
@@ -750,13 +750,13 @@ export default function InlineEditableTable({
         <div style={{ position: "relative" }}>
           <button
             onClick={() => setBulkAction(bulkAction === "stage" ? null : "stage")}
-            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT2, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: FONT }}
+            style={{ background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT2, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: FONT }}
           >Change Stage</button>
           {bulkAction === "stage" && (
-            <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 70, background: "rgba(15,17,24,0.98)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, marginTop: 4, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", maxHeight: 250, overflowY: "auto" }}>
+            <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 70, background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, marginTop: 4, boxShadow: "0 8px 24px rgba(0,0,0,0.5)", maxHeight: 250, overflowY: "auto" }}>
               {LIFECYCLE_STAGES.map(s => (
                 <div key={s} onClick={() => handleBulk("lifecycleStage", s)} style={{ padding: "7px 16px", fontSize: 12, fontFamily: FONT, color: STAGE_COLORS[s] || TEXT, cursor: "pointer", whiteSpace: "nowrap" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-input)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                 >{STAGE_LABELS[s] || s}</div>
               ))}
@@ -767,7 +767,7 @@ export default function InlineEditableTable({
         {/* Export */}
         <button
           onClick={() => handleBulk("export")}
-          style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT2, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: FONT }}
+          style={{ background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT2, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: FONT }}
         >Export</button>
 
         {/* Delete */}
@@ -860,7 +860,7 @@ export default function InlineEditableTable({
                   <tr
                     key={contact.id}
                     style={{ transition: "background 0.15s", background: isSelected ? "rgba(192,139,136,0.05)" : "transparent" }}
-                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.025)" }}
+                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = "var(--surface-hover)" }}
                     onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = "transparent" }}
                   >
                     {/* Checkbox */}
@@ -921,7 +921,7 @@ export default function InlineEditableTable({
                             value={newRowData.firstName || ""}
                             onChange={e => setNewRowData(p => ({ ...p, firstName: e.target.value }))}
                             onKeyDown={e => { if (e.key === "Enter") saveNewRow(); if (e.key === "Escape") setAddingRow(false) }}
-                            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 4, color: TEXT, padding: "4px 6px", fontSize: 12, fontFamily: FONT, outline: "none", minWidth: 0 }}
+                            style={{ flex: 1, background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 4, color: TEXT, padding: "4px 6px", fontSize: 12, fontFamily: FONT, outline: "none", minWidth: 0 }}
                             autoFocus
                           />
                           <input
@@ -929,7 +929,7 @@ export default function InlineEditableTable({
                             value={newRowData.lastName || ""}
                             onChange={e => setNewRowData(p => ({ ...p, lastName: e.target.value }))}
                             onKeyDown={e => { if (e.key === "Enter") saveNewRow(); if (e.key === "Escape") setAddingRow(false) }}
-                            style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 4, color: TEXT, padding: "4px 6px", fontSize: 12, fontFamily: FONT, outline: "none", minWidth: 0 }}
+                            style={{ flex: 1, background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 4, color: TEXT, padding: "4px 6px", fontSize: 12, fontFamily: FONT, outline: "none", minWidth: 0 }}
                           />
                         </div>
                       </td>
@@ -943,7 +943,7 @@ export default function InlineEditableTable({
                           value={newRowData.email || ""}
                           onChange={e => setNewRowData(p => ({ ...p, email: e.target.value }))}
                           onKeyDown={e => { if (e.key === "Enter") saveNewRow(); if (e.key === "Escape") setAddingRow(false) }}
-                          style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 4, color: TEXT, padding: "4px 6px", fontSize: 12, fontFamily: FONT, outline: "none" }}
+                          style={{ width: "100%", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 4, color: TEXT, padding: "4px 6px", fontSize: 12, fontFamily: FONT, outline: "none" }}
                         />
                       </td>
                     )
@@ -956,7 +956,7 @@ export default function InlineEditableTable({
                           value={newRowData.jobTitle || ""}
                           onChange={e => setNewRowData(p => ({ ...p, jobTitle: e.target.value }))}
                           onKeyDown={e => { if (e.key === "Enter") saveNewRow(); if (e.key === "Escape") setAddingRow(false) }}
-                          style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 4, color: TEXT, padding: "4px 6px", fontSize: 12, fontFamily: FONT, outline: "none" }}
+                          style={{ width: "100%", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 4, color: TEXT, padding: "4px 6px", fontSize: 12, fontFamily: FONT, outline: "none" }}
                         />
                       </td>
                     )

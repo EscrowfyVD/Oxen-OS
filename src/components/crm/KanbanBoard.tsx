@@ -198,7 +198,7 @@ export default function KanbanBoard({ contacts, loading, onStageChange, onContac
                 display: "flex",
                 flexDirection: "column",
                 borderRadius: 12,
-                background: isOver ? "rgba(192,139,136,0.06)" : "rgba(255,255,255,0.02)",
+                background: isOver ? "rgba(192,139,136,0.06)" : "var(--surface-subtle)",
                 border: `1px solid ${isOver ? `${ROSE}40` : CARD_BORDER}`,
                 transition: "background 0.2s, border-color 0.2s",
               }}
@@ -208,7 +208,7 @@ export default function KanbanBoard({ contacts, loading, onStageChange, onContac
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: col.color }} />
                   <span style={{ fontSize: 12, fontWeight: 600, color: TEXT, fontFamily: "'DM Sans', sans-serif" }}>{col.label}</span>
-                  <span style={{ fontSize: 11, color: TEXT3, fontFamily: "'DM Sans', sans-serif", background: "rgba(255,255,255,0.06)", padding: "1px 7px", borderRadius: 10 }}>{items.length}</span>
+                  <span style={{ fontSize: 11, color: TEXT3, fontFamily: "'DM Sans', sans-serif", background: "var(--surface-input)", padding: "1px 7px", borderRadius: 10 }}>{items.length}</span>
                 </div>
               </div>
 

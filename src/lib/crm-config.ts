@@ -262,23 +262,23 @@ export const OWNER_COLORS: Record<string, string> = {
   Vernon: "#34D399",
 }
 
-// ─── UI Color tokens ───
+// ─── UI Color tokens (CSS-variable-backed for light/dark theme support) ───
 export const CRM_COLORS = {
-  card_bg: "rgba(15,17,24,0.6)",
-  card_border: "rgba(255,255,255,0.06)",
-  text_primary: "#F0F0F2",
-  text_secondary: "rgba(240,240,242,0.55)",
-  text_tertiary: "rgba(240,240,242,0.3)",
-  rose_gold: "#C08B88",
-  green: "#34D399",
-  amber: "#FBBF24",
-  indigo: "#818CF8",
-  red: "#F87171",
+  card_bg: "var(--card-bg)",
+  card_border: "var(--card-border)",
+  text_primary: "var(--text-primary)",
+  text_secondary: "var(--text-secondary)",
+  text_tertiary: "var(--text-tertiary)",
+  rose_gold: "#C08B88",           // Rose gold stays constant in both themes
+  green: "var(--green)",
+  amber: "var(--amber)",
+  indigo: "var(--indigo)",
+  red: "var(--red)",
   cyan: "#22D3EE",
   teal: "#2DD4BF",
   purple: "#A78BFA",
-  glass_blur: "blur(20px)",
-  glass_shadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03)",
+  glass_blur: "blur(var(--glass-blur))",
+  glass_shadow: "var(--glass-shadow)",
 } as const
 
 // ─── Helper: format currency ───

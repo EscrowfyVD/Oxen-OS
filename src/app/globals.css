@@ -64,12 +64,91 @@
   --glass-highlight: rgba(255,255,255,0.05);
   --glass-hover-border: rgba(192,139,136,0.18);
   --glass-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03);
+
+  /* ── Sidebar ── */
+  --sidebar-bg: linear-gradient(180deg, #0D0F14 0%, #080A0E 50%, #060709 100%);
+  --sidebar-border: rgba(255,255,255,0.04);
+
+  /* ── Surfaces ── */
+  --surface-input: rgba(255,255,255,0.06);
+  --surface-hover: rgba(255,255,255,0.03);
+  --surface-subtle: rgba(255,255,255,0.02);
+  --surface-elevated: rgba(255,255,255,0.04);
+  --header-bg: rgba(6,7,9,0.88);
+  --modal-bg: linear-gradient(135deg, #0C0E13 0%, #0A0B0F 100%);
+}
+
+/* ═══════════════════════════════════════════════
+   LIGHT MODE — Warm, refined Oxen-branded
+   ═══════════════════════════════════════════════ */
+html.light {
+  color-scheme: light;
+
+  /* ── Core palette ── */
+  --void: #F8F6F3;
+  --subtle-dark: #F0EDE8;
+  --card-bg: rgba(255,255,255,0.8);
+  --card-bg-solid: #FFFFFF;
+  --card-border: rgba(26,26,46,0.08);
+  --text-primary: #1A1A2E;
+  --text-secondary: rgba(26,26,46,0.65);
+  --text-tertiary: rgba(26,26,46,0.4);
+  --rose-gold: #C08B88;
+  --green: #059669;
+  --amber: #D97706;
+  --indigo: #6366F1;
+  --red: #DC2626;
+  --logo-gradient: linear-gradient(135deg, #C08B88 0%, #1A1A2E 50%, #C08B88 100%);
+
+  /* ── Aliases ── */
+  --bg: var(--void);
+  --bg-elevated: var(--subtle-dark);
+  --bg-card: var(--card-bg);
+  --bg-card-hover: rgba(255,255,255,0.95);
+  --bg-input: rgba(26,26,46,0.03);
+  --rose: var(--rose-gold);
+  --rose-light: #B07E7B;
+  --rose-dim: rgba(192,139,136,0.15);
+  --rose-glow: rgba(192,139,136,0.08);
+  --text: var(--text-primary);
+  --text-mid: var(--text-secondary);
+  --text-dim: var(--text-tertiary);
+  --border: var(--card-border);
+  --border-active: rgba(26,26,46,0.15);
+  --yellow: var(--amber);
+  --blue: var(--indigo);
+  --purple: #7C3AED;
+  --orange: #C2733E;
+  --teal: #0D9488;
+
+  /* ── Glass ── */
+  --glass-blur: 20px;
+  --glass-bg: rgba(255,255,255,0.7);
+  --glass-border: rgba(26,26,46,0.08);
+  --glass-highlight: rgba(26,26,46,0.04);
+  --glass-hover-border: rgba(192,139,136,0.25);
+  --glass-shadow: 0 1px 3px rgba(26,26,46,0.06), 0 0 0 1px rgba(26,26,46,0.04);
+
+  /* ── Sidebar ── */
+  --sidebar-bg: linear-gradient(180deg, #F0EDE8 0%, #EBE7E2 50%, #F8F6F3 100%);
+  --sidebar-border: rgba(26,26,46,0.08);
+
+  /* ── Surfaces ── */
+  --surface-input: rgba(26,26,46,0.04);
+  --surface-hover: rgba(26,26,46,0.03);
+  --surface-subtle: rgba(26,26,46,0.02);
+  --surface-elevated: rgba(26,26,46,0.04);
+  --header-bg: rgba(248,246,243,0.92);
+  --modal-bg: linear-gradient(135deg, #FFFFFF 0%, #F8F6F3 100%);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html {
   color-scheme: dark;
+}
+html.light {
+  color-scheme: light;
 }
 
 body {
@@ -900,4 +979,156 @@ table {
   border-color: var(--rose-gold);
   transform: translateY(-2px);
   box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 30px rgba(192,139,136,0.06);
+}
+
+/* ═══════════════════════════════════════════════
+   LIGHT MODE — Element-specific overrides
+   ═══════════════════════════════════════════════ */
+
+/* Background silk wave — softer for light */
+html.light body::before {
+  background:
+    radial-gradient(ellipse at 15% 80%, rgba(192,139,136,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 20%, rgba(192,139,136,0.03) 0%, transparent 50%);
+}
+html.light body::after { opacity: 0; }
+
+/* Form elements */
+html.light select, html.light option {
+  background: #FFFFFF;
+  color: var(--text-primary);
+}
+html.light select option {
+  background: #FFFFFF;
+  color: #1A1A2E;
+}
+html.light input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
+/* Scrollbar */
+html.light ::-webkit-scrollbar-thumb { background: rgba(192,139,136,0.2); }
+html.light ::-webkit-scrollbar-thumb:hover { background: rgba(192,139,136,0.35); }
+
+/* Buttons */
+html.light .btn-primary { color: #FFFFFF; }
+html.light .btn-secondary {
+  background: rgba(26,26,46,0.02);
+  border-color: rgba(192,139,136,0.18);
+}
+html.light .btn-secondary:hover {
+  background: rgba(192,139,136,0.08);
+  border-color: rgba(192,139,136,0.3);
+}
+
+/* Cards */
+html.light .card::after {
+  background: linear-gradient(90deg, transparent 10%, rgba(26,26,46,0.04) 50%, transparent 90%);
+}
+html.light .card:hover {
+  box-shadow: 0 4px 16px rgba(26,26,46,0.08), 0 0 0 1px rgba(192,139,136,0.06);
+}
+
+/* KPI cards */
+html.light .kpi-card {
+  background: linear-gradient(135deg, rgba(192,139,136,0.04) 0%, rgba(255,255,255,0.9) 100%);
+}
+html.light .kpi-card:hover {
+  box-shadow: 0 4px 20px rgba(26,26,46,0.08), 0 0 20px rgba(192,139,136,0.04);
+}
+
+/* Sticky header */
+html.light .sticky-header {
+  background: var(--header-bg);
+}
+html.light .sticky-header::after {
+  background: linear-gradient(90deg, transparent 5%, rgba(192,139,136,0.25) 50%, transparent 95%);
+}
+
+/* Navigation */
+html.light .nav-item:hover {
+  background: rgba(26,26,46,0.04);
+}
+html.light .nav-item.active {
+  background: rgba(192,139,136,0.1);
+  color: #1A1A2E;
+  box-shadow: 0 0 12px rgba(192,139,136,0.06);
+}
+
+/* Modals */
+html.light .modal-content {
+  background: var(--modal-bg);
+  border-color: rgba(26,26,46,0.1);
+  box-shadow: 0 24px 80px rgba(26,26,46,0.12), 0 0 40px rgba(192,139,136,0.04);
+}
+html.light .modal-content::before {
+  background: linear-gradient(90deg, transparent 10%, rgba(192,139,136,0.15) 50%, transparent 90%);
+}
+html.light .modal-overlay {
+  background: rgba(26,26,46,0.3);
+}
+
+/* Toast */
+html.light .toast {
+  background: rgba(255,255,255,0.95);
+  box-shadow: 0 8px 32px rgba(26,26,46,0.1), 0 0 24px rgba(192,139,136,0.04);
+}
+
+/* Finance */
+html.light .finance-card {
+  background: rgba(255,255,255,0.7);
+}
+html.light .finance-card::after {
+  background: linear-gradient(90deg, transparent 10%, rgba(26,26,46,0.04) 50%, transparent 90%);
+}
+html.light .account-card {
+  background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 100%);
+}
+html.light .account-card::before {
+  background: linear-gradient(90deg, transparent, rgba(26,26,46,0.06), transparent);
+}
+html.light .account-card:hover {
+  box-shadow: 0 4px 20px rgba(26,26,46,0.08), 0 0 20px rgba(192,139,136,0.04);
+}
+
+/* Progress bar */
+html.light .progress-bar { background: rgba(26,26,46,0.06); }
+
+/* Net profit — stronger colors for light bg */
+html.light .net-positive { color: #059669; text-shadow: none; }
+html.light .net-negative { color: #DC2626; text-shadow: none; }
+
+/* Interactive cards */
+html.light .interactive-card:hover {
+  border-color: rgba(192,139,136,0.2);
+  box-shadow: 0 4px 20px rgba(26,26,46,0.08);
+}
+
+/* Tabs */
+html.light .tab-btn.active {
+  text-shadow: none;
+}
+
+/* Toggle group */
+html.light .toggle-group {
+  background: rgba(26,26,46,0.02);
+}
+html.light .toggle-btn.active {
+  background: rgba(192,139,136,0.12);
+}
+
+/* Highlight box */
+html.light .highlight-box {
+  background: linear-gradient(135deg, rgba(192,139,136,0.06), transparent);
+}
+
+/* Sidebar bottom gradient line */
+html.light .sidebar::after {
+  background: linear-gradient(180deg, rgba(192,139,136,0.12) 0%, transparent 30%, transparent 70%, rgba(192,139,136,0.06) 100%);
+}
+
+/* AI shimmer in light mode */
+html.light .ai-shimmer {
+  background: linear-gradient(90deg, rgba(192,139,136,0.04) 25%, rgba(192,139,136,0.12) 50%, rgba(192,139,136,0.04) 75%);
+  background-size: 200% 100%;
 }

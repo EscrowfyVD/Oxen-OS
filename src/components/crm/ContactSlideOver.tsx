@@ -49,7 +49,7 @@ function avatarColor(name: string): string {
    ══════════════════════════════════════════════════════════════ */
 
 const lbl: React.CSSProperties = { fontSize: 10, color: TEXT3, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 3, fontFamily: "'DM Sans', sans-serif" }
-const inputS: React.CSSProperties = { width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${ROSE}40`, borderRadius: 6, color: TEXT, padding: "5px 7px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", outline: "none" }
+const inputS: React.CSSProperties = { width: "100%", background: "var(--surface-input)", border: `1px solid ${ROSE}40`, borderRadius: 6, color: TEXT, padding: "5px 7px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", outline: "none" }
 
 function EText({ label, value, onSave, isUrl, isLink }: { label: string; value: string; onSave: (v: string) => Promise<void>; isUrl?: boolean; isLink?: "mailto" | "tel" }) {
   const [editing, setEditing] = useState(false)
@@ -102,7 +102,7 @@ function ESelect({ label, value, options, onSave, placeholder }: { label: string
   return (
     <div style={{ marginBottom: 10, transition: "background 0.3s", background: flash ? "rgba(52,211,153,0.08)" : "transparent", borderRadius: 4, padding: "2px 4px", margin: "0 -4px 10px" }}>
       <div style={lbl}>{label} {saving && <span style={{ color: ROSE, fontSize: 8 }}>saving...</span>}</div>
-      <select value={value} onChange={(e) => handleChange(e.target.value)} style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: value ? TEXT : TEXT3, padding: "5px 7px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>
+      <select value={value} onChange={(e) => handleChange(e.target.value)} style={{ width: "100%", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: value ? TEXT : TEXT3, padding: "5px 7px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>
         <option value="">{placeholder || "Select an option"}</option>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -134,7 +134,7 @@ function EMultiPills({ label, values, options, onSave, color }: { label: string;
         )) : <span style={{ fontSize: 11, color: TEXT3 }}>Add a value</span>}
       </div>
       {open && (
-        <div style={{ marginTop: 6, maxHeight: 150, overflowY: "auto", background: "rgba(255,255,255,0.03)", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, padding: 4 }}>
+        <div style={{ marginTop: 6, maxHeight: 150, overflowY: "auto", background: "var(--surface-hover)", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, padding: 4 }}>
           {options.map((o) => (
             <label key={o} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 5px", cursor: "pointer", fontSize: 11, color: values.includes(o) ? TEXT : TEXT2, fontFamily: "'DM Sans', sans-serif" }}>
               <input type="checkbox" checked={values.includes(o)} onChange={() => toggle(o)} style={{ accentColor: color, width: 13, height: 13 }} />
@@ -298,7 +298,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
   if (loading && !contact) {
     return (
       <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", justifyContent: "flex-end", background: "rgba(0,0,0,0.3)", transition: "opacity 0.3s" }} onClick={handleOverlayClick}>
-        <div ref={panelRef} style={{ width: 450, maxWidth: "90vw", height: "100vh", background: "rgba(15,17,24,0.95)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT2, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>
+        <div ref={panelRef} style={{ width: 450, maxWidth: "90vw", height: "100vh", background: "var(--card-bg-solid)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT2, fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>
           Loading...
         </div>
       </div>
@@ -339,7 +339,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
         ref={panelRef}
         style={{
           width: 450, maxWidth: "90vw", height: "100vh",
-          background: "rgba(15,17,24,0.95)",
+          background: "var(--card-bg-solid)",
           backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
           borderLeft: `1px solid ${CARD_BORDER}`,
           boxShadow: "-8px 0 40px rgba(0,0,0,0.4)",
@@ -386,22 +386,22 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
           {/* Quick actions */}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
             {contact.email && (
-              <a href={`mailto:${contact.email}`} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.04)", color: TEXT2, fontSize: 11, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
+              <a href={`mailto:${contact.email}`} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-elevated)", color: TEXT2, fontSize: 11, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ fontSize: 13 }}>✉</span> Email
               </a>
             )}
             {contact.whatsapp && (
-              <a href={`https://wa.me/${contact.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.04)", color: TEXT2, fontSize: 11, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
+              <a href={`https://wa.me/${contact.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-elevated)", color: TEXT2, fontSize: 11, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ fontSize: 13 }}>📱</span> WhatsApp
               </a>
             )}
             {contact.phone && (
-              <a href={`tel:${contact.phone}`} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.04)", color: TEXT2, fontSize: 11, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
+              <a href={`tel:${contact.phone}`} style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-elevated)", color: TEXT2, fontSize: 11, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ fontSize: 13 }}>📞</span> Call
               </a>
             )}
             {contact.linkedinUrl && (
-              <a href={contact.linkedinUrl.startsWith("http") ? contact.linkedinUrl : `https://${contact.linkedinUrl}`} target="_blank" rel="noopener noreferrer" style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.04)", color: TEXT2, fontSize: 11, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
+              <a href={contact.linkedinUrl.startsWith("http") ? contact.linkedinUrl : `https://${contact.linkedinUrl}`} target="_blank" rel="noopener noreferrer" style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-elevated)", color: TEXT2, fontSize: 11, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ fontWeight: 700, fontSize: 11 }}>in</span> LinkedIn
               </a>
             )}
@@ -415,8 +415,8 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
                 Add to Sequence
               </button>
               {showSeq && (
-                <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, background: "rgba(15,17,24,0.98)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: 12, width: 260, zIndex: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
-                  <select value={selCampaign} onChange={(e) => setSelCampaign(e.target.value)} style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT, padding: "6px 8px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", marginBottom: 8 }}>
+                <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, padding: 12, width: 260, zIndex: 300, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
+                  <select value={selCampaign} onChange={(e) => setSelCampaign(e.target.value)} style={{ width: "100%", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT, padding: "6px 8px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", marginBottom: 8 }}>
                     <option value="">Choose campaign...</option>
                     {campaigns.map((c: { id: string; name: string }) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
@@ -455,7 +455,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
                     </button>
                   </div>
                   {editingNote ? (
-                    <textarea value={noteVal} onChange={(e) => setNoteVal(e.target.value)} rows={3} style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${ROSE}30`, borderRadius: 6, color: TEXT, padding: "6px 8px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", resize: "vertical", outline: "none" }} />
+                    <textarea value={noteVal} onChange={(e) => setNoteVal(e.target.value)} rows={3} style={{ width: "100%", background: "var(--surface-elevated)", border: `1px solid ${ROSE}30`, borderRadius: 6, color: TEXT, padding: "6px 8px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", resize: "vertical", outline: "none" }} />
                   ) : (
                     <p style={{ fontSize: 12, color: TEXT, lineHeight: 1.5, margin: 0, fontFamily: "'DM Sans', sans-serif", whiteSpace: "pre-wrap" }}>{contact.pinnedNote}</p>
                   )}
@@ -580,7 +580,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
                   onChange={(e) => setNoteText(e.target.value)}
                   rows={2}
                   placeholder="Write a note..."
-                  style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", resize: "vertical", outline: "none", marginBottom: 8 }}
+                  style={{ width: "100%", background: "var(--surface-elevated)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", resize: "vertical", outline: "none", marginBottom: 8 }}
                 />
                 <button onClick={handleAddNote} disabled={addingNote || !noteText.trim()} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: `linear-gradient(135deg, ${ROSE}, #A07070)`, color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: addingNote || !noteText.trim() ? 0.5 : 1 }}>
                   {addingNote ? "Adding..." : "+ Add Note"}

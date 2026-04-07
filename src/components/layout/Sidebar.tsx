@@ -26,8 +26,10 @@ import {
   ChevronRight,
   type LucideIcon,
 } from "lucide-react"
+import { Sun, Moon, Monitor } from "lucide-react"
 import { ROLE_COLORS, ROLE_LABELS, canAccess, canAccessPage, type RoleLevel } from "@/lib/permissions"
 import { getAvatarGradient } from "@/lib/avatar"
+import { useTheme } from "@/lib/theme"
 
 type NavItem = {
   label: string
@@ -72,6 +74,7 @@ const NAV_ITEMS: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
+  const { theme, resolvedTheme, setTheme } = useTheme()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [wikiCount, setWikiCount] = useState<number | null>(null)
   const [userRole, setUserRole] = useState<RoleLevel>("member")
@@ -171,9 +174,9 @@ export default function Sidebar() {
         }`}
         style={{
           width: 220,
-          background: "linear-gradient(180deg, #0D0F14 0%, #080A0E 50%, #060709 100%)",
-          borderRight: "1px solid rgba(255,255,255,0.04)",
-          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+          background: "var(--sidebar-bg)",
+          borderRight: "1px solid var(--sidebar-border)",
+          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1), background 0.3s ease",
           padding: "28px 0",
         }}
       >
@@ -291,9 +294,9 @@ export default function Sidebar() {
                             padding: "6px 16px 6px 48px",
                             fontSize: 11,
                             fontFamily: "'DM Sans', sans-serif",
-                            color: subActive ? "#F0F0F2" : "rgba(240,240,242,0.45)",
+                            color: subActive ? "var(--text-primary)" : "var(--text-secondary)",
                             textDecoration: "none",
-                            borderLeft: subActive ? "2px solid #C08B88" : "2px solid transparent",
+                            borderLeft: subActive ? "2px solid var(--rose-gold)" : "2px solid transparent",
                             transition: "color 0.15s, border-color 0.15s",
                             fontWeight: subActive ? 500 : 400,
                           }}
@@ -403,28 +406,57 @@ export default function Sidebar() {
               </div>
             </div>
 
-            {/* Sign out */}
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              onMouseEnter={() => setSignOutHover(true)}
-              onMouseLeave={() => setSignOutHover(false)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginTop: 12,
-                padding: 0,
-                border: "none",
-                background: "none",
-                cursor: "pointer",
-                fontSize: 11,
-                color: signOutHover ? "#C08B88" : "var(--text-tertiary)",
-                transition: "color 0.2s ease",
-              }}
-            >
-              <LogOut size={13} strokeWidth={1.8} />
-              Sign out
-            </button>
+            {/* Theme toggle + Sign out */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+              <div style={{ display: "flex", gap: 2, background: "var(--surface-subtle)", borderRadius: 8, padding: 2, border: "1px solid var(--card-border)" }}>
+                {([
+                  { value: "light" as const, Icon: Sun, label: "Light" },
+                  { value: "dark" as const, Icon: Moon, label: "Dark" },
+                  { value: "system" as const, Icon: Monitor, label: "System" },
+                ] as const).map(({ value, Icon, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setTheme(value)}
+                    title={label}
+                    style={{
+                      padding: "4px 6px",
+                      borderRadius: 6,
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "all 0.2s ease",
+                      background: theme === value ? "var(--rose-dim)" : "transparent",
+                      color: theme === value ? "var(--rose-gold)" : "var(--text-tertiary)",
+                    }}
+                  >
+                    <Icon size={12} strokeWidth={1.8} />
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                onMouseEnter={() => setSignOutHover(true)}
+                onMouseLeave={() => setSignOutHover(false)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: 0,
+                  border: "none",
+                  background: "none",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  color: signOutHover ? "var(--rose-gold)" : "var(--text-tertiary)",
+                  transition: "color 0.2s ease",
+                }}
+              >
+                <LogOut size={13} strokeWidth={1.8} />
+                Sign out
+              </button>
+            </div>
           </div>
         )}
       </aside>
