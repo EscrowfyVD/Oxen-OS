@@ -92,6 +92,7 @@ interface KanbanBoardProps {
   contacts: KanbanContact[]
   loading: boolean
   onStageChange: (contactId: string, newStage: string) => Promise<void>
+  onContactClick?: (id: string) => void
 }
 
 /* ── Assign contact to kanban column ── */
@@ -113,7 +114,7 @@ function getColumnForContact(c: KanbanContact): string {
 /* ════════════════════════════════════════════════════════════════
    KANBAN BOARD COMPONENT
    ════════════════════════════════════════════════════════════════ */
-export default function KanbanBoard({ contacts, loading, onStageChange }: KanbanBoardProps) {
+export default function KanbanBoard({ contacts, loading, onStageChange, onContactClick }: KanbanBoardProps) {
   const router = useRouter()
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
@@ -232,7 +233,7 @@ export default function KanbanBoard({ contacts, loading, onStageChange }: Kanban
                         draggable
                         onDragStart={() => handleDragStart(c.id)}
                         onDragEnd={handleDragEnd}
-                        onClick={() => router.push(`/crm/contacts/${c.id}`)}
+                        onClick={() => onContactClick ? onContactClick(c.id) : router.push(`/crm/contacts/${c.id}`)}
                         style={{
                           background: CARD_BG,
                           border: `1px solid ${CARD_BORDER}`,

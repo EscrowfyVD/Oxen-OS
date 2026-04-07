@@ -11,6 +11,7 @@ import {
 import CsvImportWizard from "@/components/crm/CsvImportWizard"
 import KanbanBoard from "@/components/crm/KanbanBoard"
 import type { KanbanContact } from "@/components/crm/KanbanBoard"
+import ContactSlideOver from "@/components/crm/ContactSlideOver"
 
 /* ── Design Tokens ── */
 const BG = "#060709"
@@ -87,6 +88,7 @@ export default function ContactListPage() {
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 1 })
   const [loading, setLoading] = useState(true)
   const [showImportWizard, setShowImportWizard] = useState(false)
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
 
   // View mode (persisted in localStorage)
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -373,7 +375,7 @@ export default function ContactListPage() {
                       return (
                         <tr
                           key={c.id}
-                          onClick={() => router.push(`/crm/contacts/${c.id}`)}
+                          onClick={() => setSelectedContactId(c.id)}
                           style={{ cursor: "pointer", transition: "background 0.15s" }}
                           onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
                           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -446,6 +448,7 @@ export default function ContactListPage() {
           contacts={kanbanContacts}
           loading={kanbanLoading}
           onStageChange={handleKanbanStageChange}
+          onContactClick={(id) => setSelectedContactId(id)}
         />
       )}
 
@@ -456,6 +459,16 @@ export default function ContactListPage() {
           onComplete={() => fetchContacts(1)}
         />
       )}
+
+      {/* Contact Slide-Over Panel */}
+      <ContactSlideOver
+        contactId={selectedContactId}
+        onClose={() => setSelectedContactId(null)}
+        onContactUpdated={() => {
+          if (viewMode === "list") fetchContacts(pagination.page)
+          else fetchKanbanContacts()
+        }}
+      />
     </div>
   )
 }
