@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { getOwnerForGeo } from "@/lib/crm-config"
+import { enrollLead, getLemlistCampaigns, isLemlistConfigured } from "@/lib/lemlist"
 
 // GET /api/crm/contacts — paginated list with filters
 export async function GET(request: Request) {
@@ -171,6 +172,49 @@ export async function POST(request: Request) {
         performedBy: userId,
       },
     })
+
+    // Auto-push to Lemlist: if outreachGroup is set and dealOwner is Andy or Paul Louis
+    if (
+      outreachGroup &&
+      dealOwner &&
+      ["Andy", "Paul Louis"].includes(dealOwner) &&
+      !doNotContact &&
+      isLemlistConfigured()
+    ) {
+      // Best-effort: find first matching campaign and enroll
+      getLemlistCampaigns()
+        .then(async (campaigns) => {
+          if (campaigns.length > 0) {
+            // Use the first available campaign
+            const campaign = campaigns[0]
+            const result = await enrollLead(campaign._id, {
+              email,
+              firstName,
+              lastName,
+              companyName: contact.company?.name ?? "",
+            })
+            if (result.ok) {
+              await prisma.$transaction([
+                prisma.activity.create({
+                  data: {
+                    type: "clay_sequence_event",
+                    description: `Auto-enrolled in Lemlist sequence: ${campaign.name}`,
+                    contactId: contact.id,
+                    performedBy: "system",
+                  },
+                }),
+                prisma.crmContact.update({
+                  where: { id: contact.id },
+                  data: { lifecycleStage: "sequence_active" },
+                }),
+              ])
+            }
+          }
+        })
+        .catch((err) =>
+          console.error("[CRM POST] Lemlist auto-push error:", err),
+        )
+    }
 
     return NextResponse.json({ contact }, { status: 201 })
   } catch (err) {

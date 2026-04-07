@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess, requireAdmin } from "@/lib/admin"
+import { removeLeadFromAll, isLemlistConfigured } from "@/lib/lemlist"
 
 // GET /api/crm/contacts/[id] — full detail with relations
 export async function GET(
@@ -130,6 +131,13 @@ export async function PATCH(
           performedBy: userId,
         })),
       })
+    }
+
+    // Auto-remove from Lemlist when doNotContact is toggled ON
+    if (data.doNotContact === true && isLemlistConfigured()) {
+      removeLeadFromAll(existing.email).catch((err) =>
+        console.error("[CRM PATCH] Lemlist removeLeadFromAll error:", err),
+      )
     }
 
     return NextResponse.json({ contact: updated })

@@ -176,6 +176,13 @@ export default function ContactDetailPage() {
   const [editingNote, setEditingNote] = useState(false)
   const [noteVal, setNoteVal] = useState("")
 
+  // Lemlist state
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [lemlistCampaigns, setLemlistCampaigns] = useState<any[]>([])
+  const [selectedCampaign, setSelectedCampaign] = useState("")
+  const [enrolling, setEnrolling] = useState(false)
+  const [showSequenceDropdown, setShowSequenceDropdown] = useState(false)
+
   /* ── Fetchers ── */
   const fetchContact = useCallback(async () => {
     try {
@@ -227,7 +234,15 @@ export default function ContactDetailPage() {
     } catch { /* ignore */ }
   }, [id])
 
-  useEffect(() => { fetchContact() }, [fetchContact])
+  const fetchLemlistCampaigns = useCallback(async () => {
+    try {
+      const res = await fetch("/api/lemlist/campaigns")
+      const data = await res.json()
+      setLemlistCampaigns(data.campaigns ?? [])
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => { fetchContact(); fetchLemlistCampaigns() }, [fetchContact, fetchLemlistCampaigns])
 
   useEffect(() => {
     if (activeTab === "activity") fetchActivities()
@@ -257,6 +272,51 @@ export default function ContactDetailPage() {
       await fetch(`/api/crm/contacts/${id}`, { method: "DELETE" })
       router.push("/crm/contacts")
     } catch { /* ignore */ }
+  }
+
+  /* ── Lemlist enroll ── */
+  const handleEnroll = async () => {
+    if (!selectedCampaign || enrolling) return
+    setEnrolling(true)
+    try {
+      const res = await fetch("/api/lemlist/enroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactId: id, campaignId: selectedCampaign }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setShowSequenceDropdown(false)
+        setSelectedCampaign("")
+        fetchActivities()
+        fetchContact()
+      } else {
+        alert(data.error || "Failed to enroll")
+      }
+    } catch { alert("Network error") }
+    setEnrolling(false)
+  }
+
+  const handleRemoveFromLemlist = async (campaignId?: string) => {
+    try {
+      const res = await fetch("/api/lemlist/remove", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactId: id, campaignId }),
+      })
+      const data = await res.json()
+      if (data.ok) { fetchActivities(); fetchContact() }
+    } catch { /* ignore */ }
+  }
+
+  /* ── Do Not Contact with Lemlist removal ── */
+  const handleDoNotContactToggle = async () => {
+    const newVal = !contact.doNotContact
+    patchContact({ doNotContact: newVal })
+    if (newVal) {
+      // Remove from all Lemlist sequences when marking Do Not Contact
+      handleRemoveFromLemlist()
+    }
   }
 
   /* ── Loading / Not Found ── */
@@ -336,6 +396,41 @@ export default function ContactDetailPage() {
           {/* Right actions */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
             <div style={{ display: "flex", gap: 8 }}>
+              {/* Add to Sequence */}
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => { if (!contact.doNotContact) setShowSequenceDropdown(!showSequenceDropdown) }}
+                  disabled={contact.doNotContact}
+                  style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${ROSE}40`, background: `${ROSE}12`, color: contact.doNotContact ? TEXT3 : ROSE, fontSize: 12, cursor: contact.doNotContact ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 500, opacity: contact.doNotContact ? 0.4 : 1 }}
+                >
+                  Add to Sequence
+                </button>
+                {showSequenceDropdown && (
+                  <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, ...GLASS, padding: 14, width: 280, zIndex: 200 }}>
+                    <div style={{ fontSize: 11, color: TEXT3, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Select Campaign</div>
+                    {lemlistCampaigns.length === 0 ? (
+                      <div style={{ fontSize: 12, color: TEXT3, fontFamily: "'DM Sans', sans-serif", padding: "8px 0" }}>No campaigns available</div>
+                    ) : (
+                      <>
+                        <select
+                          value={selectedCampaign}
+                          onChange={(e) => setSelectedCampaign(e.target.value)}
+                          style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "8px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}
+                        >
+                          <option value="">Choose a campaign...</option>
+                          {lemlistCampaigns.map((c: { id: string; name: string }) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          <button onClick={() => { setShowSequenceDropdown(false); setSelectedCampaign("") }} style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${CARD_BORDER}`, background: "transparent", color: TEXT2, fontSize: 11, cursor: "pointer" }}>Cancel</button>
+                          <button onClick={handleEnroll} disabled={!selectedCampaign || enrolling} style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: `linear-gradient(135deg, ${ROSE}, #A07070)`, color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", opacity: !selectedCampaign || enrolling ? 0.5 : 1 }}>{enrolling ? "Enrolling..." : "Enroll"}</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
               <button onClick={() => router.push(`/crm/contacts/${id}/edit`)} style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "rgba(255,255,255,0.04)", color: TEXT, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
                 Edit
               </button>
@@ -347,7 +442,7 @@ export default function ContactDetailPage() {
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <span style={{ fontSize: 11, color: contact.doNotContact ? "#F87171" : TEXT3, fontFamily: "'DM Sans', sans-serif" }}>Do Not Contact</span>
               <div
-                onClick={() => patchContact({ doNotContact: !contact.doNotContact })}
+                onClick={handleDoNotContactToggle}
                 style={{
                   width: 36, height: 20, borderRadius: 10, position: "relative", cursor: "pointer", transition: "background 0.2s",
                   background: contact.doNotContact ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.1)",
@@ -563,6 +658,26 @@ export default function ContactDetailPage() {
             <InlineField label="Company" value={companyName} onSave={() => {}} />
             <InlineField label="Job Title" value={contact.jobTitle || ""} onSave={(v) => patchContact({ jobTitle: v })} />
           </GlassCard>
+
+          {/* ── Lemlist Sequence Status Card ── */}
+          {contact.lifecycleStage === "sequence_active" && (
+            <GlassCard>
+              <h4 style={{ fontSize: 12, color: ROSE, textTransform: "uppercase", letterSpacing: 0.8, margin: "0 0 14px", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Sequence Status</h4>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34D399", animation: "pulse 2s infinite" }} />
+                <span style={{ fontSize: 13, color: "#34D399", fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>Active in Lemlist</span>
+              </div>
+              <div style={{ fontSize: 12, color: TEXT2, fontFamily: "'DM Sans', sans-serif", marginBottom: 12 }}>
+                Contact is enrolled in a Lemlist outreach sequence.
+              </div>
+              <button
+                onClick={() => handleRemoveFromLemlist()}
+                style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid rgba(248,113,113,0.3)", background: "rgba(248,113,113,0.08)", color: "#F87171", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+              >
+                Remove from All Sequences
+              </button>
+            </GlassCard>
+          )}
 
           {/* ── Classification Card ── */}
           <GlassCard>
