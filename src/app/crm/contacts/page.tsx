@@ -14,6 +14,7 @@ import type { KanbanContact } from "@/components/crm/KanbanBoard"
 import ContactSlideOver from "@/components/crm/ContactSlideOver"
 import InlineEditableTable from "@/components/crm/InlineEditableTable"
 import type { TableContact } from "@/components/crm/InlineEditableTable"
+import PushToLemlistModal from "@/components/crm/PushToLemlistModal"
 
 /* ── Design Tokens ── */
 const BG = "var(--void)"
@@ -77,6 +78,8 @@ export default function ContactListPage() {
   const [loading, setLoading] = useState(true)
   const [showImportWizard, setShowImportWizard] = useState(false)
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
+  const [lemlistContacts, setLemlistContacts] = useState<TableContact[] | null>(null)
+  const [lemlistMode, setLemlistMode] = useState<"selected" | "all">("selected")
 
   // View mode (persisted in localStorage)
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -297,7 +300,17 @@ export default function ContactListPage() {
               style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-input)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Import CSV
+              Import
+            </button>
+            <button
+              onClick={() => {
+                setLemlistContacts(contacts as unknown as TableContact[])
+                setLemlistMode("all")
+              }}
+              style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-input)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              Push to Lemlist
             </button>
             <button onClick={() => router.push("/crm?tab=clients")} style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${ROSE}, #A07070)`, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
               + New Contact
@@ -358,6 +371,10 @@ export default function ContactListPage() {
               onDeleteContacts={handleDeleteContacts}
               onBulkUpdate={handleBulkUpdate}
               onContactClick={(id) => setSelectedContactId(id)}
+              onPushToLemlist={(selected) => {
+                setLemlistContacts(selected)
+                setLemlistMode("selected")
+              }}
             />
           </div>
         </div>
@@ -375,6 +392,17 @@ export default function ContactListPage() {
         <CsvImportWizard
           onClose={() => setShowImportWizard(false)}
           onComplete={() => fetchContacts(1)}
+        />
+      )}
+
+      {/* Push to Lemlist Modal */}
+      {lemlistContacts && (
+        <PushToLemlistModal
+          contacts={lemlistContacts}
+          mode={lemlistMode}
+          totalFilteredCount={lemlistMode === "all" ? pagination.total : undefined}
+          onClose={() => setLemlistContacts(null)}
+          onComplete={() => fetchContacts(pagination.page)}
         />
       )}
 

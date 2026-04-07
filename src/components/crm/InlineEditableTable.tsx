@@ -83,6 +83,7 @@ export interface InlineEditableTableProps {
   onDeleteContacts: (ids: string[]) => Promise<boolean>
   onBulkUpdate: (ids: string[], data: Record<string, unknown>) => Promise<boolean>
   onContactClick: (id: string) => void
+  onPushToLemlist?: (contacts: TableContact[]) => void
 }
 
 /* ══════════════════════════════════════════════
@@ -196,7 +197,7 @@ function isValidEmail(s: string): boolean {
 export default function InlineEditableTable({
   contacts, loading, pagination, sortBy, sortDir,
   onSort, onPageChange, onCellSave, onCreateContact,
-  onDeleteContacts, onBulkUpdate, onContactClick,
+  onDeleteContacts, onBulkUpdate, onContactClick, onPushToLemlist,
 }: InlineEditableTableProps) {
 
   /* ── Column state ── */
@@ -763,6 +764,17 @@ export default function InlineEditableTable({
             </div>
           )}
         </div>
+
+        {/* Push to Lemlist */}
+        {onPushToLemlist && (
+          <button
+            onClick={() => {
+              const selected = contacts.filter(c => selectedIds.has(c.id))
+              onPushToLemlist(selected)
+            }}
+            style={{ background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 6, color: TEXT2, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: FONT }}
+          >Push to Lemlist</button>
+        )}
 
         {/* Export */}
         <button
