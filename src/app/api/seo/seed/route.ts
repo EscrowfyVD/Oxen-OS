@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { SEED_KEYWORDS, SEED_NEWS_SOURCES, SEED_GEO_PROMPTS } from "@/lib/seo-config"
 
-export async function POST() {
-  const session = await auth()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+async function runSeed() {
 
   // 1. Upsert all seed keywords
   let keywordsUpserted = 0
@@ -50,10 +47,25 @@ export async function POST() {
     }
   }
 
-  return NextResponse.json({
-    seeded: true,
-    keywords: keywordsUpserted,
-    sources: sourcesCreated,
-    prompts: promptsCreated,
-  })
+  return { keywordsUpserted, sourcesCreated, promptsCreated }
+}
+
+export async function GET() {
+  try {
+    const result = await runSeed()
+    return NextResponse.json({ seeded: true, keywords: result.keywordsUpserted, sources: result.sourcesCreated, prompts: result.promptsCreated })
+  } catch (err) {
+    console.error("[SEO Seed]", err)
+    return NextResponse.json({ error: "Failed to seed" }, { status: 500 })
+  }
+}
+
+export async function POST() {
+  try {
+    const result = await runSeed()
+    return NextResponse.json({ seeded: true, keywords: result.keywordsUpserted, sources: result.sourcesCreated, prompts: result.promptsCreated })
+  } catch (err) {
+    console.error("[SEO Seed]", err)
+    return NextResponse.json({ error: "Failed to seed" }, { status: 500 })
+  }
 }

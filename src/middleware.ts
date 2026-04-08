@@ -9,6 +9,9 @@ export function middleware(req: NextRequest) {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/telegram") ||
     pathname.startsWith("/api/webhooks") ||
+    pathname === "/api/crm/outreach/seed" ||
+    pathname === "/api/seo/seed" ||
+    pathname === "/api/wiki/seed" ||
     pathname === "/login" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
