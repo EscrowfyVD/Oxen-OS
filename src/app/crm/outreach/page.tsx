@@ -43,6 +43,7 @@ interface OutreachDomain {
 interface OutreachCampaign {
   id: string
   name: string
+  lemlistCampaignId: string | null
   vertical: string | null
   owner: string
   domainId: string | null
@@ -162,6 +163,7 @@ export default function OutreachPage() {
   const [alerts, setAlerts] = useState<OutreachAlert[]>([])
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
+  const [syncingLemlist, setSyncingLemlist] = useState(false)
 
   // Suppression
   const [suppressionSearch, setSuppressionSearch] = useState("")
@@ -238,6 +240,21 @@ export default function OutreachPage() {
     setSyncing(false)
   }
 
+  const handleSyncLemlist = async () => {
+    setSyncingLemlist(true)
+    try {
+      const res = await fetch("/api/lemlist/sync", { method: "POST" })
+      if (res.ok) {
+        const data = await res.json()
+        showToast(`Synced ${data.outreachCampaignsSynced ?? data.campaigns} campaigns from Lemlist. ${data.synced} contacts matched.`)
+        fetchCampaigns()
+      } else {
+        showToast("Lemlist sync failed")
+      }
+    } catch { showToast("Lemlist sync failed") }
+    setSyncingLemlist(false)
+  }
+
   const handleResolveAlert = async (alertId: string) => {
     try {
       const res = await fetch(`/api/crm/outreach/alerts/${alertId}`, {
@@ -293,6 +310,10 @@ export default function OutreachPage() {
             <button onClick={handleSyncMetrics} disabled={syncing} style={{ ...btnSecondary, opacity: syncing ? 0.6 : 1, display: "flex", alignItems: "center", gap: 6 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={syncing ? { animation: "spin 1s linear infinite" } : undefined}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
               {syncing ? "Checking..." : "Sync Metrics"}
+            </button>
+            <button onClick={handleSyncLemlist} disabled={syncingLemlist} style={{ ...btnSecondary, opacity: syncingLemlist ? 0.6 : 1, display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={syncingLemlist ? { animation: "spin 1s linear infinite" } : undefined}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              {syncingLemlist ? "Syncing..." : "Sync Lemlist"}
             </button>
           </div>
         </div>
@@ -429,7 +450,10 @@ export default function OutreachPage() {
                       const replyRateNum = c.totalSent > 0 ? (c.totalReplied / c.totalSent) * 100 : 0
                       return (
                         <tr key={c.id} onClick={() => setSelectedCampaign(c)} style={{ borderBottom: `1px solid ${CARD_BORDER}`, cursor: "pointer", transition: "background 0.15s" }} onMouseEnter={(e) => (e.currentTarget.style.background = `${ROSE}08`)} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                          <td style={{ padding: "10px 12px", fontSize: 13, color: TEXT, fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>{c.name}</td>
+                          <td style={{ padding: "10px 12px", fontSize: 13, color: TEXT, fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>
+                            {c.name}
+                            {c.lemlistCampaignId && <span style={{ marginLeft: 6, display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 700, background: "rgba(96,165,250,0.15)", color: "#60A5FA", verticalAlign: "middle" }}>lemlist</span>}
+                          </td>
                           <td style={{ padding: "10px 12px", fontSize: 12, color: TEXT2, fontFamily: "'DM Sans', sans-serif" }}>{c.vertical ?? "—"}</td>
                           <td style={{ padding: "10px 12px", fontSize: 12, color: TEXT2, fontFamily: "'DM Sans', sans-serif" }}>{c.owner}</td>
                           <td style={{ padding: "10px 12px", fontSize: 12, color: TEXT2, fontFamily: "'DM Sans', sans-serif" }}>{c.domain?.domain ?? "—"}</td>

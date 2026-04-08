@@ -1339,6 +1339,7 @@ model OutreachDomain {
 model OutreachCampaign {
   id                   String   @id @default(cuid())
   name                 String
+  lemlistCampaignId    String?  @unique
   vertical             String?
   owner                String
   domainId             String?

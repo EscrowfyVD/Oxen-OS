@@ -228,6 +228,48 @@ export async function POST(request: Request) {
         campaignSynced++
       }
 
+      // Step 5: Upsert OutreachCampaign and calculate metrics from resolved leads
+      const stateCounts = { sent: 0, replied: 0, bounced: 0, unsubscribed: 0, interested: 0, notInterested: 0 }
+      for (const lead of resolved) {
+        const s = lead.state
+        if (s !== "scanned") stateCounts.sent++
+        if (s === "interested" || s === "replied") { stateCounts.replied++; stateCounts.interested++ }
+        if (s === "notInterested") stateCounts.notInterested++
+        if (s === "bounced") stateCounts.bounced++
+        if (s === "unsubscribed") stateCounts.unsubscribed++
+      }
+
+      try {
+        await prisma.outreachCampaign.upsert({
+          where: { lemlistCampaignId: campaign._id },
+          update: {
+            name: campaign.name,
+            status: "active",
+            totalSent: stateCounts.sent,
+            totalReplied: stateCounts.replied,
+            totalBounced: stateCounts.bounced,
+            totalUnsubscribed: stateCounts.unsubscribed,
+            repliesInterested: stateCounts.interested,
+            repliesNotInterested: stateCounts.notInterested,
+          },
+          create: {
+            lemlistCampaignId: campaign._id,
+            name: campaign.name,
+            owner: "Unknown",
+            platform: "lemlist",
+            status: "active",
+            totalSent: stateCounts.sent,
+            totalReplied: stateCounts.replied,
+            totalBounced: stateCounts.bounced,
+            totalUnsubscribed: stateCounts.unsubscribed,
+            repliesInterested: stateCounts.interested,
+            repliesNotInterested: stateCounts.notInterested,
+          },
+        })
+      } catch (err) {
+        console.error(`[Lemlist Sync] OutreachCampaign upsert error for ${campaign.name}:`, err)
+      }
+
       debugLog.push({
         campaignId: campaign._id,
         campaignName: campaign.name,
@@ -237,12 +279,33 @@ export async function POST(request: Request) {
         matched: crmContacts.length,
         synced: campaignSynced,
         notFound: campaignNotFound,
+        outreachMetrics: stateCounts,
       })
+    }
+
+    // Also upsert OutreachCampaigns for campaigns with 0 leads (so they still show up)
+    for (const campaign of campaigns) {
+      const alreadyInLog = debugLog.some(d => d.campaignId === campaign._id && d.resolved && (d.resolved as number) > 0)
+      if (!alreadyInLog) {
+        try {
+          await prisma.outreachCampaign.upsert({
+            where: { lemlistCampaignId: campaign._id },
+            update: { name: campaign.name },
+            create: {
+              lemlistCampaignId: campaign._id,
+              name: campaign.name,
+              owner: "Unknown",
+              platform: "lemlist",
+              status: "active",
+            },
+          })
+        } catch { /* ignore duplicates */ }
+      }
     }
 
     console.log(`[Lemlist Sync] Done: synced=${synced}, notFound=${notFound}, noEmail=${noEmail}, campaigns=${campaigns.length}`)
 
-    return NextResponse.json({ synced, notFound, noEmail, campaigns: campaigns.length, debug: debugLog })
+    return NextResponse.json({ synced, notFound, noEmail, campaigns: campaigns.length, outreachCampaignsSynced: campaigns.length, debug: debugLog })
   } catch (err) {
     console.error("[Lemlist Sync] Error:", err)
     return NextResponse.json({ error: "Lemlist sync failed" }, { status: 500 })

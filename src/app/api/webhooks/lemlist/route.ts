@@ -105,10 +105,10 @@ export async function POST(request: Request) {
 
   try {
     const body = JSON.parse(rawBody)
-    const { email, event, campaignName } = body
+    const { email, event, campaignName, campaignId: lemlistCampaignId } = body
 
     console.log(
-      `[Lemlist Webhook] event=${event} email=${email ?? "n/a"} campaign=${campaignName ?? "n/a"} auth=${method}`,
+      `[Lemlist Webhook] event=${event} email=${email ?? "n/a"} campaign=${campaignName ?? "n/a"} campaignId=${lemlistCampaignId ?? "n/a"} auth=${method}`,
     )
 
     if (!email) return NextResponse.json({ ok: true })
@@ -184,16 +184,20 @@ export async function POST(request: Request) {
     })
 
     // ── Sync to OutreachCampaign ──
-    if (campaignName) {
+    if (campaignName || lemlistCampaignId) {
       try {
-        // Find or create the outreach campaign
-        let outreachCampaign = await prisma.outreachCampaign.findFirst({
-          where: { name: campaignName },
-        })
+        // Find by lemlistCampaignId first, then by name
+        let outreachCampaign = lemlistCampaignId
+          ? await prisma.outreachCampaign.findUnique({ where: { lemlistCampaignId } })
+          : null
+        if (!outreachCampaign && campaignName) {
+          outreachCampaign = await prisma.outreachCampaign.findFirst({ where: { name: campaignName } })
+        }
         if (!outreachCampaign) {
           outreachCampaign = await prisma.outreachCampaign.create({
             data: {
-              name: campaignName,
+              name: campaignName ?? "Unknown Campaign",
+              lemlistCampaignId: lemlistCampaignId ?? null,
               owner: contact.dealOwner ?? "Unknown",
               platform: "lemlist",
               status: "active",
