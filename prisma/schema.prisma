@@ -1303,6 +1303,98 @@ model SeoAlert {
   createdAt    DateTime  @default(now())
 }
 
+// ─── Outreach Command Center ───
+
+model OutreachDomain {
+  id              String   @id @default(cuid())
+  domain          String   @unique
+  owner           String
+  mailbox         String
+  provider        String   @default("google_workspace")
+  status          String   @default("warmup")
+  warmupStartDate DateTime?
+  activeDate      DateTime?
+  spfValid        Boolean  @default(false)
+  dkimValid       Boolean  @default(false)
+  dmarcValid      Boolean  @default(false)
+  trackingDomain  String?
+  trackingValid   Boolean  @default(false)
+  openRate        Float?
+  replyRate       Float?
+  bounceRate      Float?
+  spamRate        Float?
+  inboxPlacement  Float?
+  isBlacklisted   Boolean  @default(false)
+  blacklistDetails String?
+  lastHealthCheck DateTime?
+  notes           String?
+  campaigns       OutreachCampaign[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([owner])
+  @@index([status])
+}
+
+model OutreachCampaign {
+  id                   String   @id @default(cuid())
+  name                 String
+  vertical             String?
+  owner                String
+  domainId             String?
+  domain               OutreachDomain? @relation(fields: [domainId], references: [id])
+  status               String   @default("active")
+  platform             String   @default("lemlist")
+  totalSent            Int      @default(0)
+  totalOpened          Int      @default(0)
+  totalClicked         Int      @default(0)
+  totalReplied         Int      @default(0)
+  totalBounced         Int      @default(0)
+  totalUnsubscribed    Int      @default(0)
+  repliesInterested    Int      @default(0)
+  repliesNotInterested Int      @default(0)
+  repliesOoo           Int      @default(0)
+  meetingsBooked       Int      @default(0)
+  startDate            DateTime?
+  endDate              DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([owner])
+  @@index([status])
+  @@index([domainId])
+}
+
+model SuppressionEntry {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  reason    String
+  source    String?
+  addedBy   String?
+  contactId String?
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([reason])
+}
+
+model OutreachAlert {
+  id         String    @id @default(cuid())
+  type       String
+  severity   String
+  domainId   String?
+  campaignId String?
+  title      String
+  detail     String    @db.Text
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime?
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
+
+  @@index([resolved, severity])
+  @@index([domainId])
+}
+
 model Job {
   id          String    @id @default(cuid())
   type        String    // e.g. "ai:score-lead", "ai:generate-article", "sync:email"

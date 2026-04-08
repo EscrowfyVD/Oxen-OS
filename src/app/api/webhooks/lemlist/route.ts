@@ -183,6 +183,49 @@ export async function POST(request: Request) {
       },
     })
 
+    // ── Sync to OutreachCampaign ──
+    if (campaignName) {
+      try {
+        // Find or create the outreach campaign
+        let outreachCampaign = await prisma.outreachCampaign.findFirst({
+          where: { name: campaignName },
+        })
+        if (!outreachCampaign) {
+          outreachCampaign = await prisma.outreachCampaign.create({
+            data: {
+              name: campaignName,
+              owner: contact.dealOwner ?? "Unknown",
+              platform: "lemlist",
+              status: "active",
+            },
+          })
+        }
+
+        // Increment the appropriate metric
+        const incrementField: Record<string, string> = {
+          emailsSent: "totalSent",
+          emailsOpened: "totalOpened",
+          emailsClicked: "totalClicked",
+          emailsReplied: "totalReplied",
+          emailsBounced: "totalBounced",
+          emailsUnsubscribed: "totalUnsubscribed",
+          contacted: "totalSent",
+          interested: "repliesInterested",
+          notInterested: "repliesNotInterested",
+        }
+
+        const field = incrementField[event]
+        if (field) {
+          await prisma.outreachCampaign.update({
+            where: { id: outreachCampaign.id },
+            data: { [field]: { increment: 1 } },
+          })
+        }
+      } catch (err) {
+        console.error("[Lemlist Webhook] OutreachCampaign sync error:", err)
+      }
+    }
+
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error("[Lemlist Webhook] Processing error:", error)

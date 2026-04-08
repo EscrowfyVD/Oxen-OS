@@ -33,7 +33,7 @@ const ROSE_GOLD = "#C08B88"
 const GREEN = "#34D399"
 
 type ViewMode = "kanban" | "table" | "cards"
-type SubNav = "dashboard" | "pipeline" | "contacts" | "companies" | "reports"
+type SubNav = "dashboard" | "pipeline" | "contacts" | "companies" | "outreach" | "reports"
 
 /* ── Filter state shape ── */
 interface Filters {
@@ -393,6 +393,7 @@ export default function CrmPage() {
                   { id: "pipeline", label: "Pipeline" },
                   { id: "contacts", label: "Contacts" },
                   { id: "companies", label: "Companies" },
+                  { id: "outreach", label: "Outreach" },
                   { id: "reports", label: "Reports" },
                 ] as { id: SubNav; label: string }[]
               ).map((tab) => (
@@ -401,6 +402,10 @@ export default function CrmPage() {
                   onClick={() => {
                     if (tab.id === "contacts") {
                       router.push("/crm/contacts")
+                      return
+                    }
+                    if (tab.id === "outreach") {
+                      router.push("/crm/outreach")
                       return
                     }
                     setSubNav(tab.id)
