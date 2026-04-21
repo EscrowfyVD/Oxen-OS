@@ -51,6 +51,14 @@ async function runSeed() {
 }
 
 export async function GET() {
+  // Guard: never run in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Seed routes are disabled in production" },
+      { status: 403 }
+    )
+  }
+
   try {
     const result = await runSeed()
     return NextResponse.json({ seeded: true, keywords: result.keywordsUpserted, sources: result.sourcesCreated, prompts: result.promptsCreated })
@@ -61,6 +69,14 @@ export async function GET() {
 }
 
 export async function POST() {
+  // Guard: never run in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Seed routes are disabled in production" },
+      { status: 403 }
+    )
+  }
+
   try {
     const result = await runSeed()
     return NextResponse.json({ seeded: true, keywords: result.keywordsUpserted, sources: result.sourcesCreated, prompts: result.promptsCreated })

@@ -82,6 +82,15 @@ function verifySignature(
 
 // ── POST /api/webhooks/lemlist ──
 export async function POST(request: Request) {
+  // Fail-closed: refuse to process if secret is not configured
+  if (!process.env.LEMLIST_WEBHOOK_SECRET) {
+    console.error("[webhooks/lemlist] LEMLIST_WEBHOOK_SECRET is not defined. Webhook cannot be verified.")
+    return NextResponse.json(
+      { error: "Webhook secret not configured" },
+      { status: 500 },
+    )
+  }
+
   // Read raw body first (needed for HMAC verification before parsing)
   const rawBody = await request.text()
 

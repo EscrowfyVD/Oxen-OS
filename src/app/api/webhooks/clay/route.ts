@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { requireWebhookSecret } from "@/lib/webhook-auth"
 
 export async function POST(request: Request) {
-  const secret = request.headers.get("x-webhook-secret")
-  if (process.env.CLAY_WEBHOOK_SECRET && secret !== process.env.CLAY_WEBHOOK_SECRET) {
-    return NextResponse.json({ ok: true })
-  }
+  const authFail = requireWebhookSecret(request, { envVarName: "CLAY_WEBHOOK_SECRET" })
+  if (authFail) return authFail
 
   try {
     const body = await request.json()

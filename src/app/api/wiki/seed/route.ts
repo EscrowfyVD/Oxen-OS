@@ -162,6 +162,14 @@ const SEED_PAGES = [
 ]
 
 export async function POST() {
+  // Guard: never run in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Seed routes are disabled in production" },
+      { status: 403 }
+    )
+  }
+
   const session = await auth()
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

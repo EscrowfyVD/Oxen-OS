@@ -41,6 +41,14 @@ async function seed() {
 
 // GET + POST /api/crm/outreach/seed — seed initial domains (idempotent)
 export async function GET() {
+  // Guard: never run in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Seed routes are disabled in production" },
+      { status: 403 }
+    )
+  }
+
   try {
     const seeded = await seed()
     return NextResponse.json({ seeded })
@@ -51,6 +59,14 @@ export async function GET() {
 }
 
 export async function POST() {
+  // Guard: never run in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Seed routes are disabled in production" },
+      { status: 403 }
+    )
+  }
+
   try {
     const seeded = await seed()
     return NextResponse.json({ seeded })
