@@ -9,7 +9,6 @@ import {
   VERTICALS,
   STAGE_PROBABILITY,
   STAGE_LABELS,
-  CRM_COLORS,
   fmtCurrencyFull,
 } from "@/lib/crm-config"
 
@@ -56,29 +55,30 @@ const overlayStyle: React.CSSProperties = {
 }
 
 const modalStyle: React.CSSProperties = {
-  background: "linear-gradient(180deg, #0D0F14 0%, #0A0B0F 100%)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  borderTop: `2px solid ${CRM_COLORS.rose_gold}`,
+  background: "var(--modal-bg)",
+  border: "1px solid var(--border)",
+  borderTop: "2px solid var(--rose-gold)",
   borderRadius: 16, padding: 28, width: 580,
   maxHeight: "88vh", overflowY: "auto",
+  color: "var(--text-primary)",
 }
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8,
-  padding: "8px 12px", color: CRM_COLORS.text_primary, fontSize: 12,
+  width: "100%", background: "var(--surface-elevated)",
+  border: "1px solid var(--border)", borderRadius: 8,
+  padding: "8px 12px", color: "var(--text-primary)", fontSize: 12,
   fontFamily: "'DM Sans', sans-serif", outline: "none",
 }
 
 const labelStyle: React.CSSProperties = {
   display: "block", fontSize: 10, textTransform: "uppercase",
-  letterSpacing: 1, color: CRM_COLORS.text_tertiary,
+  letterSpacing: 1, color: "var(--text-tertiary)",
   fontFamily: "'DM Sans', sans-serif", marginBottom: 4,
 }
 
 const sectionTitle: React.CSSProperties = {
   fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 600,
-  color: CRM_COLORS.rose_gold, textTransform: "uppercase", letterSpacing: 1.5,
+  color: "var(--rose-gold)", textTransform: "uppercase", letterSpacing: 1.5,
   marginBottom: 10, marginTop: 18,
 }
 
@@ -169,7 +169,7 @@ export default function DealModal({ mode, deal, contacts, onSave, onClose }: Dea
     <div style={overlayStyle} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="animate-slideUp" style={modalStyle}>
         {/* Header */}
-        <div style={{ fontFamily: "'Bellfair', serif", fontSize: 20, color: CRM_COLORS.text_primary, marginBottom: 20 }}>
+        <div style={{ fontFamily: "'Bellfair', serif", fontSize: 20, color: "var(--text-primary)", marginBottom: 20 }}>
           {mode === "edit" ? "Edit Deal" : "New Deal"}
         </div>
 
@@ -188,7 +188,7 @@ export default function DealModal({ mode, deal, contacts, onSave, onClose }: Dea
           {contactSearch && filteredContacts.length > 0 && (
             <div style={{
               position: "absolute", top: "100%", left: 0, right: 0, zIndex: 20,
-              background: "#0D0F14", border: "1px solid rgba(255,255,255,0.08)",
+              background: "var(--card-bg-solid)", border: "1px solid var(--border-active)",
               borderRadius: 8, marginTop: 4, maxHeight: 180, overflowY: "auto",
             }}>
               {filteredContacts.map((c) => {
@@ -200,13 +200,13 @@ export default function DealModal({ mode, deal, contacts, onSave, onClose }: Dea
                       setContactSearch(name)
                     }}
                     style={{
-                      padding: "8px 12px", fontSize: 12, color: CRM_COLORS.text_primary,
+                      padding: "8px 12px", fontSize: 12, color: "var(--text-primary)",
                       fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-input)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
-                    {name}{c.company ? <span style={{ color: CRM_COLORS.text_tertiary, marginLeft: 8 }}>{c.company}</span> : null}
+                    {name}{c.company ? <span style={{ color: "var(--text-tertiary)", marginLeft: 8 }}>{c.company}</span> : null}
                   </div>
                 )
               })}
@@ -221,7 +221,7 @@ export default function DealModal({ mode, deal, contacts, onSave, onClose }: Dea
             onChange={(e) => set("dealName", e.target.value)}
             placeholder={autoName || "Auto-generated from contact + company"} />
           {!form.dealName && autoName && (
-            <div style={{ fontSize: 10, color: CRM_COLORS.text_tertiary, marginTop: 3, fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 3, fontFamily: "'DM Sans', sans-serif" }}>
               Will be saved as: {autoName}
             </div>
           )}
@@ -263,13 +263,13 @@ export default function DealModal({ mode, deal, contacts, onSave, onClose }: Dea
                 placeholder="0.00" />
               <span style={{
                 position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-                fontSize: 10, color: CRM_COLORS.text_tertiary, fontFamily: "'DM Sans', sans-serif",
+                fontSize: 10, color: "var(--text-tertiary)", fontFamily: "'DM Sans', sans-serif",
               }}>
                 {(numericProb * 100).toFixed(0)}%
               </span>
             </div>
             {form.stage && STAGE_LABELS[form.stage] && (
-              <div style={{ fontSize: 9, color: CRM_COLORS.text_tertiary, marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
+              <div style={{ fontSize: 9, color: "var(--text-tertiary)", marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>
                 Stage default: {((STAGE_PROBABILITY[form.stage] || 0) * 100).toFixed(0)}%
               </div>
             )}
@@ -277,8 +277,8 @@ export default function DealModal({ mode, deal, contacts, onSave, onClose }: Dea
           <div>
             <label style={labelStyle}>Weighted Value</label>
             <div style={{
-              ...inputStyle, background: "rgba(255,255,255,0.02)", cursor: "default",
-              fontFamily: "'Bellfair', serif", fontSize: 14, color: CRM_COLORS.green,
+              ...inputStyle, background: "var(--surface-subtle)", cursor: "default",
+              fontFamily: "'Bellfair', serif", fontSize: 14, color: "var(--green)",
             }}>
               {fmtCurrencyFull(weightedValue)}
             </div>
@@ -326,9 +326,9 @@ export default function DealModal({ mode, deal, contacts, onSave, onClose }: Dea
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
                 fontFamily: "'DM Sans', sans-serif",
-                background: form.verticals.includes(v) ? "rgba(192,139,136,0.15)" : "rgba(255,255,255,0.03)",
-                border: `1px solid ${form.verticals.includes(v) ? "rgba(192,139,136,0.4)" : "rgba(255,255,255,0.06)"}`,
-                color: form.verticals.includes(v) ? CRM_COLORS.rose_gold : CRM_COLORS.text_secondary,
+                background: form.verticals.includes(v) ? "var(--rose-gold)" : "var(--surface-input)",
+                border: form.verticals.includes(v) ? "1px solid transparent" : "1px solid var(--border)",
+                color: form.verticals.includes(v) ? "#fff" : "var(--text-secondary)",
               }}>
                 <input type="checkbox" checked={form.verticals.includes(v)} onChange={() => toggleVertical(v)}
                   style={{ display: "none" }} />
@@ -352,8 +352,8 @@ export default function DealModal({ mode, deal, contacts, onSave, onClose }: Dea
           <button onClick={onClose}
             style={{
               padding: "8px 16px", borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.06)", background: "transparent",
-              color: CRM_COLORS.text_secondary, fontSize: 11,
+              border: "1px solid var(--border)", background: "transparent",
+              color: "var(--text-secondary)", fontSize: 11,
               fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
             }}>
             Cancel

@@ -3,14 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X } from "lucide-react"
-import { CRM_COLORS } from "@/lib/crm-config"
 
 const CARD_BG = "var(--card-bg-solid)"
-const CARD_BORDER = CRM_COLORS.card_border
-const TEXT_PRIMARY = CRM_COLORS.text_primary
-const TEXT_SECONDARY = CRM_COLORS.text_secondary
-const TEXT_TERTIARY = CRM_COLORS.text_tertiary
-const ROSE_GOLD = CRM_COLORS.rose_gold
+const CARD_BORDER = "var(--card-border)"
+const TEXT_PRIMARY = "var(--text-primary)"
+const TEXT_SECONDARY = "var(--text-secondary)"
+const TEXT_TERTIARY = "var(--text-tertiary)"
+const ROSE_GOLD = "var(--rose-gold)"
 
 interface SearchResult {
   id: string
@@ -159,9 +158,9 @@ export default function CommandPaletteProvider({
   const typeBadge = (type: SearchResult["type"]) => {
     const colors: Record<string, string> = {
       page: TEXT_TERTIARY,
-      contact: CRM_COLORS.indigo,
-      company: CRM_COLORS.green,
-      deal: CRM_COLORS.amber,
+      contact: "var(--indigo)",
+      company: "var(--green)",
+      deal: "var(--amber)",
     }
     return (
       <span
@@ -212,6 +211,7 @@ export default function CommandPaletteProvider({
               borderRadius: 16,
               boxShadow: "0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px var(--surface-elevated)",
               overflow: "hidden",
+              color: "var(--text-primary)",
             }}
           >
             {/* Search input */}

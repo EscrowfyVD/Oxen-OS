@@ -1,15 +1,13 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { CRM_COLORS } from "@/lib/crm-config"
-
-const CARD_BORDER = CRM_COLORS.card_border
-const TEXT = CRM_COLORS.text_primary
-const TEXT2 = CRM_COLORS.text_secondary
-const TEXT3 = CRM_COLORS.text_tertiary
-const ROSE = CRM_COLORS.rose_gold
-const GREEN = CRM_COLORS.green
-const RED = CRM_COLORS.red
+const CARD_BORDER = "var(--border)"
+const TEXT = "var(--text-primary)"
+const TEXT2 = "var(--text-secondary)"
+const TEXT3 = "var(--text-tertiary)"
+const ROSE = "var(--rose-gold)"
+const GREEN = "var(--green)"
+const RED = "var(--red)"
 const FONT = "'DM Sans', sans-serif"
 
 interface Campaign {
@@ -145,7 +143,7 @@ export default function PushToLemlistModal({
     background: "var(--card-bg-solid)", border: `1px solid ${CARD_BORDER}`,
     borderRadius: 16, width: "min(94vw, 520px)", maxHeight: "85vh",
     display: "flex", flexDirection: "column", overflow: "hidden",
-    boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
+    boxShadow: "0 24px 80px rgba(0,0,0,0.5)", color: "var(--text-primary)",
   }
 
   const btnPrimary: React.CSSProperties = {

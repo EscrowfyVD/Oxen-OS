@@ -10,10 +10,10 @@ const CARD_BORDER = "var(--card-border)"
 const TEXT = "var(--text-primary)"
 const TEXT2 = "var(--text-secondary)"
 const TEXT3 = "var(--text-tertiary)"
-const ROSE = "#C08B88"
-const GREEN = "#34D399"
-const AMBER = "#FBBF24"
-const RED = "#F87171"
+const ROSE = "var(--rose-gold)"
+const GREEN = "var(--green)"
+const AMBER = "var(--amber)"
+const RED = "var(--red)"
 const GLASS: React.CSSProperties = {
   background: CARD_BG,
   border: `1px solid ${CARD_BORDER}`,
@@ -476,6 +476,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
+    color: "var(--text-primary)",
   }
 
   const headerStyle: React.CSSProperties = {
@@ -619,7 +620,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
           borderRadius: 20,
           padding: "80px 48px",
           textAlign: "center",
-          background: dragOver ? "rgba(192,139,136,0.06)" : "var(--surface-subtle)",
+          background: dragOver ? "var(--rose-glow)" : "var(--surface-subtle)",
           transition: "all 0.2s",
           cursor: "pointer",
         }}
@@ -1052,7 +1053,7 @@ export default function CsvImportWizard({ onClose, onComplete }: CsvImportWizard
                               fontSize: 10,
                               fontWeight: 500,
                               borderRadius: 16,
-                              background: "rgba(192,139,136,0.12)",
+                              background: "var(--rose-dim)",
                               color: ROSE,
                             }}
                           >

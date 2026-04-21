@@ -6,16 +6,16 @@ import {
   STAGE_COLORS, STAGE_LABELS, ACTIVITY_ICONS, ACTIVITY_TYPES,
   ICP_FITS, OWNER_COLORS, KYC_STATUSES,
   VERTICALS, SUB_VERTICALS, GEO_ZONES, DEAL_OWNERS,
-  ACQUISITION_SOURCES, CRM_COLORS, fmtCurrency,
+  ACQUISITION_SOURCES, fmtCurrency,
   OUTREACH_GROUPS, LIFECYCLE_STAGES,
 } from "@/lib/crm-config"
 
 /* ── Design Tokens ── */
-const CARD_BORDER = CRM_COLORS.card_border
-const TEXT = CRM_COLORS.text_primary
-const TEXT2 = CRM_COLORS.text_secondary
-const TEXT3 = CRM_COLORS.text_tertiary
-const ROSE = CRM_COLORS.rose_gold
+const CARD_BORDER = "var(--border)"
+const TEXT = "var(--text-primary)"
+const TEXT2 = "var(--text-secondary)"
+const TEXT3 = "var(--text-tertiary)"
+const ROSE = "var(--rose-gold)"
 
 /* ── Helpers ── */
 function fmtDate(d: string | null | undefined): string {
@@ -336,7 +336,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
   const initials = `${contact.firstName?.[0] || ""}${contact.lastName?.[0] || ""}`.toUpperCase()
   const avColor = avatarColor(fullName)
   const companyName = contact.company?.name || ""
-  const stageColor = STAGE_COLORS[contact.lifecycleStage] || "#9CA3AF"
+  const stageColor = STAGE_COLORS[contact.lifecycleStage] || "var(--text-secondary)"
   const stageLabel = STAGE_LABELS[contact.lifecycleStage] || contact.lifecycleStage || "—"
 
   const tabs: { id: PanelTab; label: string }[] = [
@@ -364,7 +364,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
         ref={panelRef}
         style={{
           width: 450, maxWidth: "90vw", height: "100vh",
-          background: "var(--card-bg-solid)",
+          background: "var(--card-bg-solid)", color: "var(--text-primary)",
           backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
           borderLeft: `1px solid ${CARD_BORDER}`,
           boxShadow: "-8px 0 40px rgba(0,0,0,0.4)",
@@ -396,7 +396,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
               {initials}
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 20, fontWeight: 400, color: "#fff", fontFamily: "'Bellfair', serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fullName || "Unnamed"}</div>
+              <div style={{ fontSize: 20, fontWeight: 400, color: "var(--text-primary)", fontFamily: "'Bellfair', serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fullName || "Unnamed"}</div>
               {companyName && (
                 <div
                   onClick={() => contact.company?.id && router.push(`/crm/companies/${contact.company.id}`)}
@@ -501,7 +501,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
               <ESelect label="ICP Fit" value={contact.icpFit || ""} options={ICP_FITS.map((f) => ({ value: f.id, label: f.label }))} onSave={(v) => patch({ icpFit: v || null })} placeholder="Not scored" />
 
               <EMultiPills label="Verticals" values={contact.vertical || []} options={VERTICALS} onSave={(v) => patch({ vertical: v })} color={ROSE} />
-              <EMultiPills label="Sub-Verticals" values={contact.subVertical || []} options={SUB_VERTICALS} onSave={(v) => patch({ subVertical: v })} color="#818CF8" />
+              <EMultiPills label="Sub-Verticals" values={contact.subVertical || []} options={SUB_VERTICALS} onSave={(v) => patch({ subVertical: v })} color="var(--indigo)" />
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <ESelect label="Geo Zone" value={contact.geoZone || ""} options={GEO_ZONES.map((g) => ({ value: g, label: g }))} onSave={(v) => patch({ geoZone: v || null })} placeholder="Select..." />
@@ -526,8 +526,8 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
               {contact.lifecycleStage === "sequence_active" && (
                 <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(52,211,153,0.06)", borderRadius: 6, border: "1px solid rgba(52,211,153,0.15)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34D399" }} />
-                    <span style={{ fontSize: 11, color: "#34D399", fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>Active in Lemlist</span>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)" }} />
+                    <span style={{ fontSize: 11, color: "var(--green)", fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>Active in Lemlist</span>
                   </div>
                 </div>
               )}
@@ -550,10 +550,10 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
                       <Badge
                         label={contact.lemlistStatus}
                         color={
-                          contact.lemlistStatus === "active" ? "#34D399"
-                          : contact.lemlistStatus === "completed" ? "#9CA3AF"
+                          contact.lemlistStatus === "active" ? "var(--green)"
+                          : contact.lemlistStatus === "completed" ? "var(--text-secondary)"
                           : contact.lemlistStatus === "replied" ? ROSE
-                          : contact.lemlistStatus === "bounced" ? "#F87171"
+                          : contact.lemlistStatus === "bounced" ? "var(--red)"
                           : TEXT2
                         }
                       />
@@ -583,7 +583,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
                       borderRadius: 6,
                       border: "1px solid rgba(248,113,113,0.3)",
                       background: "rgba(248,113,113,0.08)",
-                      color: "#F87171",
+                      color: "var(--red)",
                       fontSize: 11,
                       fontWeight: 500,
                       cursor: removingFromSeq ? "not-allowed" : "pointer",
@@ -638,7 +638,7 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
                 <div style={{ padding: "32px 0", textAlign: "center", color: TEXT3, fontSize: 12 }}>No deals found</div>
               ) : (
                 deals.map((d: { id: string; dealName: string; stage: string; dealValue: number | null; dealOwner: string | null; kycStatus?: string }, i: number) => {
-                  const dColor = STAGE_COLORS[d.stage] || "#9CA3AF"
+                  const dColor = STAGE_COLORS[d.stage] || "var(--text-secondary)"
                   const dLabel = STAGE_LABELS[d.stage] || d.stage
                   const kycObj = KYC_STATUSES.find((k) => k.id === d.kycStatus)
                   return (

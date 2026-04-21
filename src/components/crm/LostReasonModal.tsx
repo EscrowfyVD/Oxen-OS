@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { LOST_REASONS, CRM_COLORS } from "@/lib/crm-config"
+import { LOST_REASONS } from "@/lib/crm-config"
 
 /* ── Types ── */
 
@@ -26,22 +26,23 @@ const overlayStyle: React.CSSProperties = {
 }
 
 const modalStyle: React.CSSProperties = {
-  background: "linear-gradient(180deg, #0D0F14 0%, #0A0B0F 100%)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  borderTop: `2px solid ${CRM_COLORS.red}`,
+  background: "var(--modal-bg)",
+  border: "1px solid var(--border)",
+  borderTop: "2px solid var(--red)",
   borderRadius: 16, padding: 28, width: 480,
+  color: "var(--text-primary)",
 }
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8,
-  padding: "8px 12px", color: CRM_COLORS.text_primary, fontSize: 12,
+  width: "100%", background: "var(--surface-elevated)",
+  border: "1px solid var(--border)", borderRadius: 8,
+  padding: "8px 12px", color: "var(--text-primary)", fontSize: 12,
   fontFamily: "'DM Sans', sans-serif", outline: "none",
 }
 
 const labelStyle: React.CSSProperties = {
   display: "block", fontSize: 10, textTransform: "uppercase",
-  letterSpacing: 1, color: CRM_COLORS.text_tertiary,
+  letterSpacing: 1, color: "var(--text-tertiary)",
   fontFamily: "'DM Sans', sans-serif", marginBottom: 4,
 }
 
@@ -66,16 +67,16 @@ export default function LostReasonModal({ deal, onConfirm, onCancel }: LostReaso
             fontSize: 20,
           }}>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M10 2L18 17H2L10 2Z" stroke={CRM_COLORS.red} strokeWidth="1.5" fill="none" />
-              <path d="M10 8V12" stroke={CRM_COLORS.red} strokeWidth="1.5" strokeLinecap="round" />
-              <circle cx="10" cy="14.5" r="0.75" fill={CRM_COLORS.red} />
+              <path d="M10 2L18 17H2L10 2Z" stroke="var(--red)" strokeWidth="1.5" fill="none" />
+              <path d="M10 8V12" stroke="var(--red)" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="10" cy="14.5" r="0.75" fill="var(--red)" />
             </svg>
           </div>
           <div>
-            <div style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: CRM_COLORS.text_primary }}>
+            <div style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: "var(--text-primary)" }}>
               Mark as Lost
             </div>
-            <div style={{ fontSize: 11, color: CRM_COLORS.text_secondary, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: "var(--text-secondary)", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>
               {dealName}
             </div>
           </div>
@@ -86,7 +87,7 @@ export default function LostReasonModal({ deal, onConfirm, onCancel }: LostReaso
           padding: "10px 14px", borderRadius: 8,
           background: "rgba(248,113,113,0.06)",
           border: "1px solid rgba(248,113,113,0.15)",
-          fontSize: 11, color: CRM_COLORS.text_secondary,
+          fontSize: 11, color: "var(--text-secondary)",
           fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5,
           marginBottom: 18,
         }}>
@@ -99,7 +100,7 @@ export default function LostReasonModal({ deal, onConfirm, onCancel }: LostReaso
           <select
             style={{
               ...inputStyle,
-              borderColor: !lostReason ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.06)",
+              borderColor: !lostReason ? "rgba(248,113,113,0.3)" : "var(--border)",
             }}
             value={lostReason}
             onChange={(e) => setLostReason(e.target.value)}
@@ -117,7 +118,7 @@ export default function LostReasonModal({ deal, onConfirm, onCancel }: LostReaso
           <textarea
             style={{
               ...inputStyle, minHeight: 90, resize: "vertical",
-              borderColor: !lostNotes.trim() ? "rgba(248,113,113,0.3)" : "rgba(255,255,255,0.06)",
+              borderColor: !lostNotes.trim() ? "rgba(248,113,113,0.3)" : "var(--border)",
             }}
             value={lostNotes}
             onChange={(e) => setLostNotes(e.target.value)}
@@ -130,8 +131,8 @@ export default function LostReasonModal({ deal, onConfirm, onCancel }: LostReaso
           <button onClick={onCancel}
             style={{
               padding: "8px 16px", borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.06)", background: "transparent",
-              color: CRM_COLORS.text_secondary, fontSize: 11,
+              border: "1px solid var(--border)", background: "transparent",
+              color: "var(--text-secondary)", fontSize: 11,
               fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
             }}>
             Cancel
@@ -143,8 +144,8 @@ export default function LostReasonModal({ deal, onConfirm, onCancel }: LostReaso
               padding: "8px 20px", borderRadius: 8, fontSize: 11,
               fontFamily: "'DM Sans', sans-serif",
               background: canConfirm ? "rgba(248,113,113,0.2)" : "rgba(248,113,113,0.06)",
-              border: `1px solid ${canConfirm ? CRM_COLORS.red : "rgba(248,113,113,0.15)"}`,
-              color: canConfirm ? CRM_COLORS.red : "rgba(248,113,113,0.4)",
+              border: `1px solid ${canConfirm ? "var(--red)" : "rgba(248,113,113,0.15)"}`,
+              color: canConfirm ? "var(--red)" : "rgba(248,113,113,0.4)",
               cursor: canConfirm ? "pointer" : "not-allowed",
               transition: "all 0.2s ease",
             }}>

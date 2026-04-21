@@ -63,7 +63,7 @@ function SearchIcon() {
 /* ── Helpers ── */
 
 const typeConfig: Record<string, { label: string; icon: React.ReactNode; color: string; route: string }> = {
-  contact: { label: "Contacts", icon: <PersonIcon />, color: CRM_COLORS.rose_gold, route: "/crm/contacts" },
+  contact: { label: "Contacts", icon: <PersonIcon />, color: "var(--rose-gold)", route: "/crm/contacts" },
   company: { label: "Companies", icon: <BuildingIcon />, color: CRM_COLORS.indigo, route: "/crm/companies" },
   deal: { label: "Deals", icon: <HandshakeIcon />, color: CRM_COLORS.green, route: "/crm/deals" },
 }
@@ -178,20 +178,21 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "linear-gradient(180deg, #0D0F14 0%, #0A0B0F 100%)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--modal-bg)",
+          border: "1px solid var(--border-active)",
           borderRadius: 16, width: "100%", maxWidth: 600,
           boxShadow: CRM_COLORS.glass_shadow,
           overflow: "hidden",
+          color: "var(--text-primary)",
         }}
       >
         {/* Search input */}
         <div style={{
           display: "flex", alignItems: "center", gap: 12,
           padding: "16px 20px",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          borderBottom: "1px solid var(--border)",
         }}>
-          <span style={{ color: CRM_COLORS.text_tertiary, display: "flex" }}>
+          <span style={{ color: "var(--text-tertiary)", display: "flex" }}>
             <SearchIcon />
           </span>
           <input
@@ -202,14 +203,14 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
             placeholder="Search contacts, companies, deals..."
             style={{
               flex: 1, background: "transparent", border: "none", outline: "none",
-              color: CRM_COLORS.text_primary, fontSize: 14,
+              color: "var(--text-primary)", fontSize: 14,
               fontFamily: "'DM Sans', sans-serif",
             }}
           />
           <kbd style={{
             padding: "2px 6px", borderRadius: 4, fontSize: 10,
-            background: "rgba(255,255,255,0.06)", color: CRM_COLORS.text_tertiary,
-            fontFamily: "'DM Sans', sans-serif", border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--surface-input)", color: "var(--text-tertiary)",
+            fontFamily: "'DM Sans', sans-serif", border: "1px solid var(--border-active)",
           }}>
             ESC
           </kbd>
@@ -220,7 +221,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
           {loading && (
             <div style={{
               padding: "20px 0", textAlign: "center",
-              fontSize: 12, color: CRM_COLORS.text_tertiary,
+              fontSize: 12, color: "var(--text-tertiary)",
               fontFamily: "'DM Sans', sans-serif",
             }}>
               Searching...
@@ -230,7 +231,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
           {!loading && query.trim() && results.length === 0 && (
             <div style={{
               padding: "24px 0", textAlign: "center",
-              fontSize: 12, color: CRM_COLORS.text_tertiary,
+              fontSize: 12, color: "var(--text-tertiary)",
               fontFamily: "'DM Sans', sans-serif",
             }}>
               No results found for &quot;{query}&quot;
@@ -246,7 +247,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                 <div style={{
                   padding: "8px 20px 4px",
                   fontSize: 9, textTransform: "uppercase", letterSpacing: 1.5,
-                  color: CRM_COLORS.text_tertiary, fontFamily: "'DM Sans', sans-serif",
+                  color: "var(--text-tertiary)", fontFamily: "'DM Sans', sans-serif",
                   fontWeight: 600,
                 }}>
                   {cfg.label}
@@ -265,7 +266,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                       style={{
                         display: "flex", alignItems: "center", gap: 12,
                         padding: "10px 20px", cursor: "pointer",
-                        background: isSelected ? "rgba(255,255,255,0.04)" : "transparent",
+                        background: isSelected ? "var(--surface-elevated)" : "transparent",
                         transition: "background 0.1s ease",
                       }}
                     >
@@ -274,7 +275,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontSize: 13, color: CRM_COLORS.text_primary,
+                          fontSize: 13, color: "var(--text-primary)",
                           fontFamily: "'DM Sans', sans-serif",
                           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                         }}>
@@ -282,7 +283,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                         </div>
                         {result.secondary && (
                           <div style={{
-                            fontSize: 11, color: CRM_COLORS.text_tertiary,
+                            fontSize: 11, color: "var(--text-tertiary)",
                             fontFamily: "'DM Sans', sans-serif", marginTop: 1,
                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                           }}>
@@ -294,7 +295,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                       </div>
                       {isSelected && (
                         <span style={{
-                          fontSize: 10, color: CRM_COLORS.text_tertiary,
+                          fontSize: 10, color: "var(--text-tertiary)",
                           fontFamily: "'DM Sans', sans-serif",
                         }}>
                           Enter
@@ -311,17 +312,17 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
         {/* Footer hint */}
         {!query.trim() && (
           <div style={{
-            padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.04)",
+            padding: "12px 20px", borderTop: "1px solid var(--border)",
             display: "flex", gap: 16, justifyContent: "center",
           }}>
             {[
-              { icon: <PersonIcon />, label: "Contacts", color: CRM_COLORS.rose_gold },
+              { icon: <PersonIcon />, label: "Contacts", color: "var(--rose-gold)" },
               { icon: <BuildingIcon />, label: "Companies", color: CRM_COLORS.indigo },
               { icon: <HandshakeIcon />, label: "Deals", color: CRM_COLORS.green },
             ].map((h) => (
               <span key={h.label} style={{
                 display: "flex", alignItems: "center", gap: 5,
-                fontSize: 10, color: CRM_COLORS.text_tertiary,
+                fontSize: 10, color: "var(--text-tertiary)",
                 fontFamily: "'DM Sans', sans-serif",
               }}>
                 <span style={{ color: h.color, display: "flex" }}>{h.icon}</span>

@@ -9,7 +9,6 @@ import {
   CONTACT_TYPES,
   DEAL_OWNERS,
   getOwnerForGeo,
-  CRM_COLORS,
   OUTREACH_GROUPS,
 } from "@/lib/crm-config"
 
@@ -48,7 +47,7 @@ interface ContactModalProps {
   onClose: () => void
 }
 
-/* ── Shared styles ── */
+/* ── Shared styles (theme-aware via CSS variables) ── */
 
 const overlayStyle: React.CSSProperties = {
   position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
@@ -57,29 +56,30 @@ const overlayStyle: React.CSSProperties = {
 }
 
 const modalStyle: React.CSSProperties = {
-  background: "linear-gradient(180deg, #0D0F14 0%, #0A0B0F 100%)",
-  border: `1px solid rgba(255,255,255,0.06)`,
-  borderTop: `2px solid ${CRM_COLORS.rose_gold}`,
+  background: "var(--modal-bg)",
+  border: "1px solid var(--border)",
+  borderTop: "2px solid var(--rose-gold)",
   borderRadius: 16, padding: 28, width: 620,
   maxHeight: "88vh", overflowY: "auto",
+  color: "var(--text-primary)",
 }
 
 const inputStyle: React.CSSProperties = {
-  width: "100%", background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8,
-  padding: "8px 12px", color: CRM_COLORS.text_primary, fontSize: 12,
+  width: "100%", background: "var(--bg-input)",
+  border: "1px solid var(--border)", borderRadius: 8,
+  padding: "8px 12px", color: "var(--text-primary)", fontSize: 12,
   fontFamily: "'DM Sans', sans-serif", outline: "none",
 }
 
 const labelStyle: React.CSSProperties = {
   display: "block", fontSize: 10, textTransform: "uppercase",
-  letterSpacing: 1, color: CRM_COLORS.text_tertiary,
+  letterSpacing: 1, color: "var(--text-tertiary)",
   fontFamily: "'DM Sans', sans-serif", marginBottom: 4,
 }
 
 const sectionTitle: React.CSSProperties = {
   fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 600,
-  color: CRM_COLORS.rose_gold, textTransform: "uppercase", letterSpacing: 1.5,
+  color: "var(--rose-gold)", textTransform: "uppercase", letterSpacing: 1.5,
   marginBottom: 10, marginTop: 18,
 }
 
@@ -165,7 +165,7 @@ export default function ContactModal({ mode, contact, onSave, onClose }: Contact
     <div style={overlayStyle} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="animate-slideUp" style={modalStyle}>
         {/* Header */}
-        <div style={{ fontFamily: "'Bellfair', serif", fontSize: 20, color: CRM_COLORS.text_primary, marginBottom: 20 }}>
+        <div style={{ fontFamily: "'Bellfair', serif", fontSize: 20, color: "var(--text-primary)", marginBottom: 20 }}>
           {mode === "edit" ? "Edit Contact" : "New Contact"}
         </div>
 
@@ -217,16 +217,16 @@ export default function ContactModal({ mode, contact, onSave, onClose }: Contact
           {showCompanyDropdown && companySuggestions.length > 0 && (
             <div style={{
               position: "absolute", top: "100%", left: 0, right: 0, zIndex: 20,
-              background: "#0D0F14", border: "1px solid rgba(255,255,255,0.08)",
+              background: "var(--card-bg-solid)", border: "1px solid var(--border-active)",
               borderRadius: 8, marginTop: 4, maxHeight: 160, overflowY: "auto",
             }}>
               {companySuggestions.map((c) => (
                 <div key={c} onClick={() => { setCompanySearch(c); set("company", c); setShowCompanyDropdown(false) }}
                   style={{
-                    padding: "8px 12px", fontSize: 12, color: CRM_COLORS.text_primary,
+                    padding: "8px 12px", fontSize: 12, color: "var(--text-primary)",
                     fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-hover)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   {c}
@@ -257,9 +257,9 @@ export default function ContactModal({ mode, contact, onSave, onClose }: Contact
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer",
                 fontFamily: "'DM Sans', sans-serif",
-                background: form.verticals.includes(v) ? "rgba(192,139,136,0.15)" : "rgba(255,255,255,0.03)",
-                border: `1px solid ${form.verticals.includes(v) ? "rgba(192,139,136,0.4)" : "rgba(255,255,255,0.06)"}`,
-                color: form.verticals.includes(v) ? CRM_COLORS.rose_gold : CRM_COLORS.text_secondary,
+                background: form.verticals.includes(v) ? "var(--rose-gold)" : "var(--surface-input)",
+                border: form.verticals.includes(v) ? "1px solid transparent" : "1px solid var(--border)",
+                color: form.verticals.includes(v) ? "#fff" : "var(--text-secondary)",
               }}>
                 <input type="checkbox" checked={form.verticals.includes(v)} onChange={() => toggleMulti("verticals", v)}
                   style={{ display: "none" }} />
@@ -276,16 +276,16 @@ export default function ContactModal({ mode, contact, onSave, onClose }: Contact
           <div style={{
             display: "flex", flexWrap: "wrap", gap: 4,
             maxHeight: 120, overflowY: "auto", padding: 4,
-            background: "rgba(255,255,255,0.02)", borderRadius: 8,
+            background: "var(--surface-subtle)", borderRadius: 8,
           }}>
             {SUB_VERTICALS.map((sv) => (
               <label key={sv} style={{
                 display: "flex", alignItems: "center", gap: 4,
                 padding: "3px 8px", borderRadius: 5, fontSize: 10, cursor: "pointer",
                 fontFamily: "'DM Sans', sans-serif",
-                background: form.subVerticals.includes(sv) ? "rgba(129,140,248,0.12)" : "transparent",
-                border: `1px solid ${form.subVerticals.includes(sv) ? "rgba(129,140,248,0.3)" : "rgba(255,255,255,0.04)"}`,
-                color: form.subVerticals.includes(sv) ? CRM_COLORS.indigo : CRM_COLORS.text_tertiary,
+                background: form.subVerticals.includes(sv) ? "var(--rose-gold)" : "var(--surface-input)",
+                border: form.subVerticals.includes(sv) ? "1px solid transparent" : "1px solid var(--border)",
+                color: form.subVerticals.includes(sv) ? "#fff" : "var(--text-tertiary)",
               }}>
                 <input type="checkbox" checked={form.subVerticals.includes(sv)} onChange={() => toggleMulti("subVerticals", sv)}
                   style={{ display: "none" }} />
@@ -339,9 +339,9 @@ export default function ContactModal({ mode, contact, onSave, onClose }: Contact
                 display: "flex", alignItems: "center", gap: 5,
                 padding: "6px 14px", borderRadius: 8, fontSize: 11, cursor: "pointer",
                 fontFamily: "'DM Sans', sans-serif", textTransform: "capitalize",
-                background: form.contactType === ct ? "rgba(192,139,136,0.12)" : "rgba(255,255,255,0.03)",
-                border: `1px solid ${form.contactType === ct ? CRM_COLORS.rose_gold : "rgba(255,255,255,0.06)"}`,
-                color: form.contactType === ct ? CRM_COLORS.rose_gold : CRM_COLORS.text_secondary,
+                background: form.contactType === ct ? "var(--rose-dim)" : "var(--surface-input)",
+                border: form.contactType === ct ? "1px solid var(--rose-gold)" : "1px solid var(--border)",
+                color: form.contactType === ct ? "var(--rose-gold)" : "var(--text-secondary)",
               }}>
                 <input type="radio" name="contactType" value={ct} checked={form.contactType === ct}
                   onChange={() => set("contactType", ct)} style={{ display: "none" }} />
@@ -396,18 +396,18 @@ export default function ContactModal({ mode, contact, onSave, onClose }: Contact
             <div onClick={() => set("doNotContact", !form.doNotContact)}
               style={{
                 width: 38, height: 20, borderRadius: 10, position: "relative",
-                background: form.doNotContact ? "rgba(248,113,113,0.4)" : "rgba(255,255,255,0.08)",
-                border: `1px solid ${form.doNotContact ? CRM_COLORS.red : "rgba(255,255,255,0.1)"}`,
+                background: form.doNotContact ? "rgba(248,113,113,0.4)" : "var(--surface-input)",
+                border: form.doNotContact ? "1px solid var(--red)" : "1px solid var(--border)",
                 transition: "all 0.2s ease", cursor: "pointer",
               }}>
               <div style={{
                 width: 14, height: 14, borderRadius: "50%",
-                background: form.doNotContact ? CRM_COLORS.red : "rgba(255,255,255,0.3)",
+                background: form.doNotContact ? "var(--red)" : "var(--text-tertiary)",
                 position: "absolute", top: 2, left: form.doNotContact ? 20 : 2,
                 transition: "all 0.2s ease",
               }} />
             </div>
-            <span style={{ color: form.doNotContact ? CRM_COLORS.red : CRM_COLORS.text_secondary }}>
+            <span style={{ color: form.doNotContact ? "var(--red)" : "var(--text-secondary)" }}>
               Do Not Contact
             </span>
           </label>
@@ -418,8 +418,8 @@ export default function ContactModal({ mode, contact, onSave, onClose }: Contact
           <button onClick={onClose}
             style={{
               padding: "8px 16px", borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.06)", background: "transparent",
-              color: CRM_COLORS.text_secondary, fontSize: 11,
+              border: "1px solid var(--border)", background: "transparent",
+              color: "var(--text-secondary)", fontSize: 11,
               fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
             }}>
             Cancel
