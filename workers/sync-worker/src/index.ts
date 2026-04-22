@@ -4,9 +4,7 @@
  * Handles: sync:email, sync:calendar
  */
 
-import { PrismaClient } from "@prisma/client"
-
-const prisma = new PrismaClient()
+import { prisma } from "./lib/prisma"
 
 const WORKER_ID = `sync-worker-${process.pid}`
 const POLL_INTERVAL = parseInt(process.env.SYNC_POLL_INTERVAL_MS || "10000", 10)

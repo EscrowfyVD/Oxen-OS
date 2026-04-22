@@ -12,7 +12,11 @@
     "postinstall": "npx prisma generate",
     "worker:ai": "cd workers/ai-worker && npm start",
     "worker:sync": "cd workers/sync-worker && npm start",
-    "worker:sync-schema": "cp prisma/schema.prisma workers/ai-worker/prisma/schema.prisma && cp prisma/schema.prisma workers/sync-worker/prisma/schema.prisma"
+    "worker:sync-schema": "cp prisma/schema.prisma workers/ai-worker/prisma/schema.prisma && cp prisma/schema.prisma workers/sync-worker/prisma/schema.prisma",
+    "worker:sync-libs": "mkdir -p workers/sync-worker/src/lib && cp src/lib/token-encryption.ts workers/sync-worker/src/lib/token-encryption.ts && cp src/lib/prisma.ts workers/sync-worker/src/lib/prisma.ts && echo 'Synced token-encryption.ts and prisma.ts to sync-worker'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "encrypt-tokens": "tsx scripts/encrypt-oauth-tokens.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -61,6 +65,7 @@
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.5"
   }
 }
