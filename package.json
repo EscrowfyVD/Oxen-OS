@@ -16,7 +16,11 @@
     "worker:sync-libs": "mkdir -p workers/sync-worker/src/lib && cp src/lib/token-encryption.ts workers/sync-worker/src/lib/token-encryption.ts && cp src/lib/prisma.ts workers/sync-worker/src/lib/prisma.ts && echo 'Synced token-encryption.ts and prisma.ts to sync-worker'",
     "test": "vitest run",
     "test:watch": "vitest",
-    "encrypt-tokens": "tsx scripts/encrypt-oauth-tokens.ts"
+    "encrypt-tokens": "tsx scripts/encrypt-oauth-tokens.ts",
+    "ci:typecheck": "tsc --noEmit",
+    "ci:test": "vitest run",
+    "ci:lint": "eslint .",
+    "ci:all": "npm run ci:typecheck && npm run ci:lint && npm run ci:test && npm run build"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

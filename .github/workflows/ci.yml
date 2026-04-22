@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pin to Railway's Node version (v22.11.0) so local dev / CI / prod stay aligned.
+  NODE_VERSION: "22"
+
+jobs:
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Prisma generate
+        run: npx prisma generate
+      - name: TypeScript check (monolith)
+        run: npx tsc --noEmit
+      - name: TypeScript check (sync-worker)
+        # Worker resolves @prisma/client upward from root node_modules — no separate install needed.
+        run: cd workers/sync-worker && npx tsc --noEmit
+      # TODO(baseline 2026-04-22): ai-worker has 1 pre-existing TS error
+      # (workers/ai-worker/src/index.ts:56 — Record<string, unknown> vs Prisma JSON field).
+      # Skipped until dedicated cleanup sprint. Re-enable once fixed.
+      # - name: TypeScript check (ai-worker)
+      #   run: cd workers/ai-worker && npx tsc --noEmit
+
+  lint:
+    name: Lint (non-blocking)
+    runs-on: ubuntu-latest
+    # TODO(baseline 2026-04-22): 79 errors + 157 warnings in pre-existing code.
+    # Job is non-blocking (continue-on-error at job level) until a dedicated lint
+    # cleanup sprint brings the baseline to 0. The job tile will show red in the
+    # Actions UI if eslint fails — keeping visibility high while unblocking merges.
+    # To make blocking: remove `continue-on-error: true` and add this job to the
+    # required status checks in branch protection.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: ESLint
+        run: npx eslint .
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Prisma generate
+        run: npx prisma generate
+      - name: Vitest
+        run: npx vitest run
+        env:
+          # Placeholder key for tests. The token-encryption tests override this
+          # in a `beforeAll` hook with a fresh random key; this value is only
+          # a safety net so the module-level fail-fast doesn't abort before
+          # the hook runs.
+          TOKEN_ENCRYPTION_KEY_V1: "dGVzdC1rZXktbm90LXJlYWwtdXNlLXJhbmRvbS1pbi1wcm9kLQo="
+
+  build:
+    name: Next.js build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Prisma generate
+        run: npx prisma generate
+      - name: Build (Next.js)
+        run: npm run build
+        env:
+          # These env vars MUST be defined for `next build` to pre-render the
+          # static pages. Placeholder values — only used at build time, never
+          # at runtime in CI. Real values live on Railway.
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/db"
+          NEXTAUTH_SECRET: "ci-build-secret-not-real"
+          NEXTAUTH_URL: "http://localhost:3000"
+          GOOGLE_CLIENT_ID: "ci-placeholder"
+          GOOGLE_CLIENT_SECRET: "ci-placeholder"
+          TOKEN_ENCRYPTION_KEY_V1: "dGVzdC1rZXktbm90LXJlYWwtdXNlLXJhbmRvbS1pbi1wcm9kLQo="
+          TELEGRAM_BOT_TOKEN: "ci-placeholder"
+          TELEGRAM_WEBHOOK_SECRET: "ci-placeholder"
+          LEMLIST_API_KEY: "ci-placeholder"
+          LEMLIST_WEBHOOK_SECRET: "ci-placeholder"
+          CLAY_WEBHOOK_SECRET: "ci-placeholder"
+          TRIGIFY_WEBHOOK_SECRET: "ci-placeholder"
+          N8N_WEBHOOK_SECRET: "ci-placeholder"
+          ANTHROPIC_API_KEY: "ci-placeholder"
+          CRON_SECRET: "ci-placeholder"
+          WEBSITE_WEBHOOK_SECRET: "ci-placeholder"
+          SUPPORT_WEBHOOK_SECRET: "ci-placeholder"
