@@ -1,23 +1,16 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody } from "@/lib/validate"
+import { bulkTransactionsEnvelope } from "../../_schemas"
 
 export async function POST(request: Request) {
   const { error, session } = await requirePageAccess("finance")
   if (error) return error
 
-  const body = await request.json()
-  const { entries } = body as {
-    entries: Array<{
-      type: string; category: string; description?: string; amount: number
-      currency?: string; date: string; entity?: string; paymentSource?: string
-      reference?: string; notes?: string
-    }>
-  }
-
-  if (!Array.isArray(entries) || entries.length === 0) {
-    return NextResponse.json({ error: "No entries provided" }, { status: 400 })
-  }
+  const v = await validateBody(request, bulkTransactionsEnvelope)
+  if ("error" in v) return v.error
+  const { entries } = v.data
 
   const userId = session.user?.id ?? session.user?.email ?? "unknown"
   const results = { success: 0, failed: 0, errors: [] as string[] }

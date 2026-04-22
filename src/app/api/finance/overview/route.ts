@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateSearchParams } from "@/lib/validate"
+import { overviewQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const month = searchParams.get("month")
-  const entity = searchParams.get("entity")
+  const vq = validateSearchParams(searchParams, overviewQuery)
+  if ("error" in vq) return vq.error
+  const { month, entity } = vq.data
 
   const now = new Date()
   const targetMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`

@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { replaceBudgetsSchema, budgetQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const month = searchParams.get("month") // "YYYY-MM"
-  const entity = searchParams.get("entity")
-
-  if (!month) return NextResponse.json({ error: "month parameter required" }, { status: 400 })
+  const vq = validateSearchParams(searchParams, budgetQuery)
+  if ("error" in vq) return vq.error
+  const { month, entity } = vq.data
 
   const [year, mon] = month.split("-").map(Number)
   const monthStart = new Date(year, mon - 1, 1)
@@ -34,16 +35,9 @@ export async function POST(request: Request) {
   const { error, session } = await requirePageAccess("finance")
   if (error) return error
 
-  const body = await request.json()
-  const { month, entity, items } = body as {
-    month: string
-    entity?: string
-    items: Array<{ category: string; amount: number }>
-  }
-
-  if (!month || !items || !Array.isArray(items)) {
-    return NextResponse.json({ error: "month and items are required" }, { status: 400 })
-  }
+  const v = await validateBody(request, replaceBudgetsSchema)
+  if ("error" in v) return v.error
+  const { month, entity, items } = v.data
 
   const userId = session.user?.id ?? session.user?.email ?? "unknown"
   const [year, mon] = month.split("-").map(Number)

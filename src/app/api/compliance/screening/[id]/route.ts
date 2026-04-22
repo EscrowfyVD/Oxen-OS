@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
+import { validateBody } from "@/lib/validate"
+import { updateScreeningSchema } from "../../_schemas"
 
 export async function PATCH(
   request: Request,
@@ -12,8 +14,9 @@ export async function PATCH(
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const body = await request.json()
-    const { result, matchDetails, riskLevel, notes, reviewedBy, nextScreeningDate } = body
+    const v = await validateBody(request, updateScreeningSchema)
+    if ("error" in v) return v.error
+    const { result, matchDetails, riskLevel, notes, reviewedBy, nextScreeningDate } = v.data
 
     const existing = await prisma.screeningRecord.findUnique({ where: { id } })
     if (!existing) return NextResponse.json({ error: "Screening record not found" }, { status: 404 })
@@ -31,7 +34,7 @@ export async function PATCH(
       where: { id },
       data: {
         ...(result !== undefined && { result }),
-        ...(matchDetails !== undefined && { matchDetails }),
+        ...(matchDetails !== undefined && { matchDetails: matchDetails as object }),
         ...(riskLevel !== undefined && { riskLevel: riskLevel || null }),
         ...(notes !== undefined && { notes: notes || null }),
         ...(nextScreeningDate !== undefined && { nextScreeningDate: nextScreeningDate ? new Date(nextScreeningDate) : null }),

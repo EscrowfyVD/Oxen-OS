@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createBankAccountSchema, listBankAccountsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const entity = searchParams.get("entity")
-  const active = searchParams.get("active")
+  const v = validateSearchParams(searchParams, listBankAccountsQuery)
+  if ("error" in v) return v.error
+  const { entity, active } = v.data
 
   const where: Record<string, unknown> = {}
   if (entity && entity !== "all") where.entity = entity
@@ -28,12 +31,9 @@ export async function POST(request: Request) {
   const { error, session } = await requirePageAccess("finance")
   if (error) return error
 
-  const body = await request.json()
-  const { name, bankName, currency, iban, accountType, entity, currentBalance, notes } = body
-
-  if (!name || !bankName) {
-    return NextResponse.json({ error: "name and bankName are required" }, { status: 400 })
-  }
+  const v = await validateBody(request, createBankAccountSchema)
+  if ("error" in v) return v.error
+  const { name, bankName, currency, iban, accountType, entity, currentBalance, notes } = v.data
 
   const userId = session.user?.id ?? session.user?.email ?? "unknown"
 
@@ -41,11 +41,11 @@ export async function POST(request: Request) {
     data: {
       name,
       bankName,
-      currency: currency || "EUR",
+      currency,
       iban: iban || null,
-      accountType: accountType || "operating",
-      entity: entity || "oxen",
-      currentBalance: currentBalance ? parseFloat(currentBalance) : 0,
+      accountType,
+      entity,
+      currentBalance: currentBalance ?? 0,
       notes: notes || null,
       createdBy: userId,
     },

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody } from "@/lib/validate"
+import { updateFinanceTransactionSchema } from "../../_schemas"
 
 export async function GET(
   request: Request,
@@ -30,20 +32,22 @@ export async function PATCH(
   if (error) return error
 
   const { id } = await params
-  const body = await request.json()
+  const v = await validateBody(request, updateFinanceTransactionSchema)
+  if ("error" in v) return v.error
+  const body = v.data
 
   const data: Record<string, unknown> = {}
   const fields = [
     "type", "category", "description", "currency", "entity",
     "recurringPeriod", "paymentSource", "bankAccountName", "reference",
     "status", "reimbursedTo", "contactId", "notes", "attachmentUrl", "attachmentName",
-  ]
+  ] as const
   for (const f of fields) {
     if (body[f] !== undefined) data[f] = body[f] || null
   }
   if (body.amount !== undefined) {
-    data.amount = parseFloat(body.amount)
-    const rate = body.exchangeRate ? parseFloat(body.exchangeRate) : 1
+    data.amount = body.amount
+    const rate = body.exchangeRate ?? 1
     data.exchangeRate = rate
     const cur = body.currency || "EUR"
     data.amountEur = cur === "EUR" ? data.amount : (data.amount as number) * rate

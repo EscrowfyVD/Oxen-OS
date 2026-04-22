@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { validateBody } from "@/lib/validate"
+import { createPolicyVersionSchema } from "../../../_schemas"
 
 export async function GET(
   _request: Request,
@@ -36,12 +38,9 @@ export async function POST(
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const body = await request.json()
-    const { content, changelog } = body
-
-    if (!content) {
-      return NextResponse.json({ error: "content is required" }, { status: 400 })
-    }
+    const v = await validateBody(request, createPolicyVersionSchema)
+    if ("error" in v) return v.error
+    const { content, changelog } = v.data
 
     const policy = await prisma.policy.findUnique({ where: { id } })
     if (!policy) return NextResponse.json({ error: "Policy not found" }, { status: 404 })

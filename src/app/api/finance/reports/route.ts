@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateSearchParams } from "@/lib/validate"
+import { reportsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const reportType = searchParams.get("type") || "pnl" // pnl, cashflow, entity_comparison
-  const entity = searchParams.get("entity")
-  const dateFrom = searchParams.get("dateFrom")
-  const dateTo = searchParams.get("dateTo")
+  const vq = validateSearchParams(searchParams, reportsQuery)
+  if ("error" in vq) return vq.error
+  const { type: reportType, entity, dateFrom, dateTo } = vq.data
 
   const now = new Date()
   const startDate = dateFrom ? new Date(dateFrom) : new Date(now.getFullYear(), 0, 1)

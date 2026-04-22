@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createIncidentSchema, listIncidentsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   try {
@@ -9,10 +11,9 @@ export async function GET(request: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
-    const type = searchParams.get("type")
-    const severity = searchParams.get("severity")
-    const status = searchParams.get("status")
-    const entityId = searchParams.get("entityId")
+    const vq = validateSearchParams(searchParams, listIncidentsQuery)
+    if ("error" in vq) return vq.error
+    const { type, severity, status, entityId } = vq.data
 
     const where: Record<string, unknown> = {}
     if (type && type !== "all") where.type = type
@@ -40,12 +41,9 @@ export async function POST(request: Request) {
     const session = await auth()
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = await request.json()
-    const { title, type, severity, status, description, rootCause, remediation, entityId, reportedBy, assignedTo, reportedToRegulator, regulatorRef, reportedAt, financialImpact, currency, tags } = body
-
-    if (!title || !type) {
-      return NextResponse.json({ error: "title and type are required" }, { status: 400 })
-    }
+    const v = await validateBody(request, createIncidentSchema)
+    if ("error" in v) return v.error
+    const { title, type, severity, status, description, rootCause, remediation, entityId, reportedBy, assignedTo, reportedToRegulator, regulatorRef, reportedAt, financialImpact, currency, tags } = v.data
 
     const userId = session.user?.id ?? session.user?.email ?? "unknown"
 

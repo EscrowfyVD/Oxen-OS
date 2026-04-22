@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createPolicySchema, listPoliciesQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   try {
@@ -9,10 +11,9 @@ export async function GET(request: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
-    const category = searchParams.get("category")
-    const status = searchParams.get("status")
-    const entityId = searchParams.get("entityId")
-    const search = searchParams.get("search")
+    const vq = validateSearchParams(searchParams, listPoliciesQuery)
+    if ("error" in vq) return vq.error
+    const { category, status, entityId, search } = vq.data
 
     const where: Record<string, unknown> = {}
     if (category && category !== "all") where.category = category
@@ -47,12 +48,9 @@ export async function POST(request: Request) {
     const session = await auth()
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = await request.json()
-    const { title, category, status, priority, description, content, entityId, ownerId, reviewerId, effectiveDate, expiryDate, reviewDate, tags } = body
-
-    if (!title || !category) {
-      return NextResponse.json({ error: "title and category are required" }, { status: 400 })
-    }
+    const v = await validateBody(request, createPolicySchema)
+    if ("error" in v) return v.error
+    const { title, category, status, priority, description, content, entityId, ownerId, reviewerId, effectiveDate, expiryDate, reviewDate, tags } = v.data
 
     const userId = session.user?.id ?? session.user?.email ?? "unknown"
 

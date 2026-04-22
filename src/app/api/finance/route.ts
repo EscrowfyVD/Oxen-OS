@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createFinanceEntrySchema, listFinanceEntriesQuery } from "./_schemas"
 
 export async function GET(request: Request) {
-  const { error, session } = await requirePageAccess("finance")
+  const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const type = searchParams.get("type")
-  const category = searchParams.get("category")
-  const entity = searchParams.get("entity")
-  const dateFrom = searchParams.get("dateFrom")
-  const dateTo = searchParams.get("dateTo")
-  const search = searchParams.get("search")
-  const sortBy = searchParams.get("sortBy") || "date"
-  const sortDir = (searchParams.get("sortDir") || "desc") as "asc" | "desc"
+  const v = validateSearchParams(searchParams, listFinanceEntriesQuery)
+  if ("error" in v) return v.error
+  const { type, category, entity, dateFrom, dateTo, search } = v.data
+  const sortBy = v.data.sortBy || "date"
+  const sortDir = v.data.sortDir || "desc"
 
   const where: Record<string, unknown> = {}
   if (type) where.type = type
@@ -48,12 +47,9 @@ export async function POST(request: Request) {
   const { error, session } = await requirePageAccess("finance")
   if (error) return error
 
-  const body = await request.json()
-  const { type, category, description, amount, currency, date, entity, recurring, notes } = body
-
-  if (!type || !category || amount == null || !date) {
-    return NextResponse.json({ error: "type, category, amount, and date are required" }, { status: 400 })
-  }
+  const v = await validateBody(request, createFinanceEntrySchema)
+  if ("error" in v) return v.error
+  const { type, category, description, amount, currency, date, entity, recurring, notes } = v.data
 
   const userId = session.user?.id ?? session.user?.email ?? "unknown"
 
@@ -62,10 +58,10 @@ export async function POST(request: Request) {
       type,
       category,
       description: description || null,
-      amount: parseFloat(amount),
-      currency: currency || "EUR",
+      amount,
+      currency,
       date: new Date(date),
-      entity: entity || "oxen",
+      entity,
       recurring: recurring ?? false,
       notes: notes || null,
       createdBy: userId,

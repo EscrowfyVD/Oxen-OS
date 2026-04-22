@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
+import { validateBody } from "@/lib/validate"
+import { updateLicenseSchema } from "../../_schemas"
 
 export async function GET(
   _request: Request,
@@ -38,8 +40,9 @@ export async function PATCH(
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const body = await request.json()
-    const { name, code, regulator, entityId, entityName, type, status, grantedDate, expiryDate, renewalDate, conditions, notes, documentUrl } = body
+    const v = await validateBody(request, updateLicenseSchema)
+    if ("error" in v) return v.error
+    const { name, code, regulator, entityId, entityName, type, status, grantedDate, expiryDate, renewalDate, conditions, notes, documentUrl } = v.data
 
     const existing = await prisma.regulatoryLicense.findUnique({ where: { id } })
     if (!existing) return NextResponse.json({ error: "License not found" }, { status: 404 })

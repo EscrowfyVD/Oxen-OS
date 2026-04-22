@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
+import { validateBody } from "@/lib/validate"
+import { updatePolicySchema } from "../../_schemas"
 
 export async function GET(
   _request: Request,
@@ -39,8 +41,9 @@ export async function PATCH(
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const body = await request.json()
-    const { title, category, status, priority, description, content, entityId, ownerId, reviewerId, effectiveDate, expiryDate, reviewDate, tags } = body
+    const v = await validateBody(request, updatePolicySchema)
+    if ("error" in v) return v.error
+    const { title, category, status, priority, description, content, entityId, ownerId, reviewerId, effectiveDate, expiryDate, reviewDate, tags } = v.data
 
     const existing = await prisma.policy.findUnique({ where: { id } })
     if (!existing) return NextResponse.json({ error: "Policy not found" }, { status: 404 })

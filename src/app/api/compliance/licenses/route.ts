@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createLicenseSchema, listLicensesQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   try {
@@ -9,7 +11,9 @@ export async function GET(request: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
-    const entityId = searchParams.get("entityId")
+    const vq = validateSearchParams(searchParams, listLicensesQuery)
+    if ("error" in vq) return vq.error
+    const { entityId } = vq.data
 
     const where: Record<string, unknown> = {}
     if (entityId && entityId !== "all") where.entityId = entityId
@@ -34,12 +38,9 @@ export async function POST(request: Request) {
     const session = await auth()
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = await request.json()
-    const { name, code, regulator, entityId, entityName, type, status, grantedDate, expiryDate, renewalDate, conditions, notes, documentUrl } = body
-
-    if (!name || !regulator) {
-      return NextResponse.json({ error: "name and regulator are required" }, { status: 400 })
-    }
+    const v = await validateBody(request, createLicenseSchema)
+    if ("error" in v) return v.error
+    const { name, code, regulator, entityId, entityName, type, status, grantedDate, expiryDate, renewalDate, conditions, notes, documentUrl } = v.data
 
     const userId = session.user?.id ?? session.user?.email ?? "unknown"
 

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createScreeningSchema, listScreeningsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   try {
@@ -9,9 +11,9 @@ export async function GET(request: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
-    const result = searchParams.get("result")
-    const screeningType = searchParams.get("screeningType")
-    const subjectType = searchParams.get("subjectType")
+    const vq = validateSearchParams(searchParams, listScreeningsQuery)
+    if ("error" in vq) return vq.error
+    const { result, screeningType, subjectType } = vq.data
 
     const where: Record<string, unknown> = {}
     if (result && result !== "all") where.result = result
@@ -35,12 +37,9 @@ export async function POST(request: Request) {
     const session = await auth()
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = await request.json()
-    const { subjectName, subjectType, screeningType, result, provider, matchDetails, contactId, riskLevel, notes, nextScreeningDate } = body
-
-    if (!subjectName || !subjectType || !screeningType) {
-      return NextResponse.json({ error: "subjectName, subjectType, and screeningType are required" }, { status: 400 })
-    }
+    const v = await validateBody(request, createScreeningSchema)
+    if ("error" in v) return v.error
+    const { subjectName, subjectType, screeningType, result, provider, matchDetails, contactId, riskLevel, notes, nextScreeningDate } = v.data
 
     const userId = session.user?.id ?? session.user?.email ?? "unknown"
 
@@ -51,7 +50,7 @@ export async function POST(request: Request) {
         screeningType,
         result: result || "clear",
         provider: provider || null,
-        matchDetails: matchDetails || null,
+        matchDetails: (matchDetails as object) || undefined,
         contactId: contactId || null,
         riskLevel: riskLevel || null,
         notes: notes || null,

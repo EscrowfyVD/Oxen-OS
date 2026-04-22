@@ -54,7 +54,8 @@
     "prisma": "^5.22.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "recharts": "^3.8.0"
+    "recharts": "^3.8.0",
+    "zod": "^3.25.76"
   },
   "engines": {
     "node": ">=20"

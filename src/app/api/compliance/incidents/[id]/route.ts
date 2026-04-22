@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
+import { validateBody } from "@/lib/validate"
+import { updateIncidentSchema } from "../../_schemas"
 
 export async function GET(
   _request: Request,
@@ -38,8 +40,9 @@ export async function PATCH(
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const body = await request.json()
-    const { title, type, severity, status, description, rootCause, remediation, entityId, assignedTo, reportedToRegulator, regulatorRef, reportedAt, financialImpact, currency, tags } = body
+    const v = await validateBody(request, updateIncidentSchema)
+    if ("error" in v) return v.error
+    const { title, type, severity, status, description, rootCause, remediation, entityId, assignedTo, reportedToRegulator, regulatorRef, reportedAt, financialImpact, currency, tags } = v.data
 
     const existing = await prisma.complianceIncident.findUnique({ where: { id } })
     if (!existing) return NextResponse.json({ error: "Incident not found" }, { status: 404 })

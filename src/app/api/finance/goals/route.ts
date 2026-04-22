@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createFinanceGoalSchema, listGoalsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const period = searchParams.get("period")
-  const entity = searchParams.get("entity")
+  const vq = validateSearchParams(searchParams, listGoalsQuery)
+  if ("error" in vq) return vq.error
+  const { period, entity } = vq.data
 
   const where: Record<string, unknown> = {}
   if (period) where.period = period
@@ -26,12 +29,9 @@ export async function POST(request: Request) {
   const { error, session } = await requirePageAccess("finance")
   if (error) return error
 
-  const body = await request.json()
-  const { metric, target, entity, period } = body
-
-  if (!metric || target == null || !period) {
-    return NextResponse.json({ error: "metric, target, and period are required" }, { status: 400 })
-  }
+  const v = await validateBody(request, createFinanceGoalSchema)
+  if ("error" in v) return v.error
+  const { metric, target, entity, period } = v.data
 
   const userId = session.user?.id ?? session.user?.email ?? "unknown"
   const ent = entity || "oxen"
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   const goal = await prisma.financeGoal.create({
     data: {
       metric,
-      target: parseFloat(target),
+      target,
       entity: ent,
       period,
       createdBy: userId,

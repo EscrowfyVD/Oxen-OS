@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateSearchParams } from "@/lib/validate"
+import { exportTransactionsQuery } from "../../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const entity = searchParams.get("entity")
-  const dateFrom = searchParams.get("dateFrom")
-  const dateTo = searchParams.get("dateTo")
-  const type = searchParams.get("type")
+  const vq = validateSearchParams(searchParams, exportTransactionsQuery)
+  if ("error" in vq) return vq.error
+  const { entity, dateFrom, dateTo, type } = vq.data
 
   const where: Record<string, unknown> = {}
   if (entity && entity !== "all") where.entity = entity

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { validateBody } from "@/lib/validate"
+import { upsertTrainingCompletionSchema } from "../../../_schemas"
 
 export async function GET(
   _request: Request,
@@ -41,12 +43,9 @@ export async function POST(
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const body = await request.json()
-    const { employeeId, completedAt, expiresAt, score, certificateUrl, status, notes } = body
-
-    if (!employeeId) {
-      return NextResponse.json({ error: "employeeId is required" }, { status: 400 })
-    }
+    const v = await validateBody(request, upsertTrainingCompletionSchema)
+    if ("error" in v) return v.error
+    const { employeeId, completedAt, expiresAt, score, certificateUrl, status, notes } = v.data
 
     const training = await prisma.training.findUnique({ where: { id } })
     if (!training) return NextResponse.json({ error: "Training not found" }, { status: 404 })

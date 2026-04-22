@@ -1,24 +1,19 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createFinanceTransactionSchema, listFinanceTransactionsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("finance")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const type = searchParams.get("type")
-  const category = searchParams.get("category")
-  const entity = searchParams.get("entity")
-  const dateFrom = searchParams.get("dateFrom")
-  const dateTo = searchParams.get("dateTo")
-  const search = searchParams.get("search")
-  const status = searchParams.get("status")
-  const paymentSource = searchParams.get("paymentSource")
-  const sortBy = searchParams.get("sortBy") || "date"
-  const sortDir = (searchParams.get("sortDir") || "desc") as "asc" | "desc"
-  const page = parseInt(searchParams.get("page") || "1")
-  const limit = parseInt(searchParams.get("limit") || "50")
+  const v = validateSearchParams(searchParams, listFinanceTransactionsQuery)
+  if ("error" in v) return v.error
+  const { type, category, entity, dateFrom, dateTo, search, status, paymentSource, page, limit } = v.data
+  const sortBy = v.data.sortBy || "date"
+  const sortDir = v.data.sortDir || "desc"
 
   const where: Record<string, unknown> = {}
   if (type) where.type = type
@@ -61,40 +56,36 @@ export async function POST(request: Request) {
   const { error, session } = await requirePageAccess("finance")
   if (error) return error
 
-  const body = await request.json()
+  const v = await validateBody(request, createFinanceTransactionSchema)
+  if ("error" in v) return v.error
   const {
     type, category, description, amount, currency, exchangeRate,
     date, entity, recurring, recurringPeriod, paymentSource,
     bankAccountName, reference, status, reimbursable, reimbursedTo,
     contactId, notes,
-  } = body
-
-  if (!type || !category || amount == null || !date) {
-    return NextResponse.json({ error: "type, category, amount, and date are required" }, { status: 400 })
-  }
+  } = v.data
 
   const userId = session.user?.id ?? session.user?.email ?? "unknown"
-  const parsedAmount = parseFloat(amount)
-  const rate = exchangeRate ? parseFloat(exchangeRate) : 1
-  const amountEur = currency === "EUR" ? parsedAmount : parsedAmount * rate
+  const rate = exchangeRate ?? 1
+  const amountEur = currency === "EUR" ? amount : amount * rate
 
   const transaction = await prisma.financeTransaction.create({
     data: {
       type,
       category,
       description: description || null,
-      amount: parsedAmount,
-      currency: currency || "EUR",
+      amount,
+      currency,
       exchangeRate: rate,
       amountEur,
       date: new Date(date),
-      entity: entity || "oxen",
+      entity,
       recurring: recurring ?? false,
       recurringPeriod: recurringPeriod || null,
       paymentSource: paymentSource || null,
       bankAccountName: bankAccountName || null,
       reference: reference || null,
-      status: status || "confirmed",
+      status,
       reimbursable: reimbursable ?? false,
       reimbursedTo: reimbursedTo || null,
       contactId: contactId || null,

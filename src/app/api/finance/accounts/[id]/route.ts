@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody } from "@/lib/validate"
+import { updateBankAccountSchema } from "../../_schemas"
 
 export async function PATCH(
   request: Request,
@@ -10,7 +12,9 @@ export async function PATCH(
   if (error) return error
 
   const { id } = await params
-  const body = await request.json()
+  const v = await validateBody(request, updateBankAccountSchema)
+  if ("error" in v) return v.error
+  const body = v.data
 
   const data: Record<string, unknown> = {}
   if (body.name !== undefined) data.name = body.name
@@ -20,7 +24,7 @@ export async function PATCH(
   if (body.accountType !== undefined) data.accountType = body.accountType
   if (body.entity !== undefined) data.entity = body.entity
   if (body.currentBalance !== undefined) {
-    data.currentBalance = parseFloat(body.currentBalance)
+    data.currentBalance = body.currentBalance
     data.lastUpdated = new Date()
   }
   if (body.isActive !== undefined) data.isActive = body.isActive

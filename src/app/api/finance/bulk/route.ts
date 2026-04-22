@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody } from "@/lib/validate"
+import { bulkFinanceEntriesEnvelope } from "../_schemas"
 
 const VALID_TYPES = ["revenue", "expense", "budget"]
 
@@ -8,12 +10,9 @@ export async function POST(request: Request) {
   const { error, session } = await requirePageAccess("finance")
   if (error) return error
 
-  const body = await request.json()
-  const { rows } = body as { rows: Array<Record<string, string>> }
-
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return NextResponse.json({ error: "rows array is required" }, { status: 400 })
-  }
+  const v = await validateBody(request, bulkFinanceEntriesEnvelope)
+  if ("error" in v) return v.error
+  const { rows } = v.data
 
   const userId = session.user?.id ?? session.user?.email ?? "unknown"
   const errors: Array<{ row: number; error: string }> = []
