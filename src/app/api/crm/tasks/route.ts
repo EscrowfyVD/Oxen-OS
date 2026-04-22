@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createTaskSchema, listTasksQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("crm")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const assignee = searchParams.get("assignee")
-  const status = searchParams.get("status")
-  const type = searchParams.get("type")
-  const contactId = searchParams.get("contactId")
-  const dealId = searchParams.get("dealId")
+  const vq = validateSearchParams(searchParams, listTasksQuery)
+  if ("error" in vq) return vq.error
+  const { assignee, status, type, contactId, dealId } = vq.data
 
   const where: Record<string, unknown> = {}
   if (assignee) where.assignee = assignee
@@ -40,15 +40,9 @@ export async function POST(request: Request) {
   const { error: pageErr, session } = await requirePageAccess("crm")
   if (pageErr) return pageErr
 
-  const body = await request.json()
-  const { title, type, priority, dueDate, assignee, contactId, dealId, outcomeNote } = body
-
-  if (!title || !type || !dueDate || !assignee) {
-    return NextResponse.json(
-      { error: "Missing required fields: title, type, dueDate, assignee" },
-      { status: 400 }
-    )
-  }
+  const v = await validateBody(request, createTaskSchema)
+  if ("error" in v) return v.error
+  const { title, type, priority, dueDate, assignee, contactId, dealId, outcomeNote } = v.data
 
   const task = await prisma.crmTask.create({
     data: {

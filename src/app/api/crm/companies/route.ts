@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createCompanySchema, listCompaniesQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("crm")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const search = searchParams.get("search")
-  const vertical = searchParams.get("vertical")
-  const geoZone = searchParams.get("geoZone")
-  const industry = searchParams.get("industry")
-  const revenueRange = searchParams.get("revenueRange")
-  const sortBy = searchParams.get("sortBy") || "createdAt"
-  const sortDir = (searchParams.get("sortDir") || "desc") as "asc" | "desc"
+  const vq = validateSearchParams(searchParams, listCompaniesQuery)
+  if ("error" in vq) return vq.error
+  const { search, vertical, geoZone, industry, revenueRange } = vq.data
+  const sortBy = vq.data.sortBy || "createdAt"
+  const sortDir = vq.data.sortDir || "desc"
 
   const where: Record<string, unknown> = {}
 
@@ -71,20 +71,14 @@ export async function POST(request: Request) {
   const { error: pageErr, session } = await requirePageAccess("crm")
   if (pageErr) return pageErr
 
-  const body = await request.json()
+  const v = await validateBody(request, createCompanySchema)
+  if ("error" in v) return v.error
   const {
     name, website, industry, description,
     hqCountry, hqCity, vertical, subVertical, geoZone,
     employeeCount, revenueRange, fundingTotal, techStack,
     linkedinUrl, socialProfiles,
-  } = body
-
-  if (!name) {
-    return NextResponse.json(
-      { error: "Missing required field: name" },
-      { status: 400 }
-    )
-  }
+  } = v.data
 
   // Auto-extract domain from website
   const domain = website ? extractDomain(website) : null
@@ -114,7 +108,7 @@ export async function POST(request: Request) {
       vertical: vertical ?? [],
       subVertical: subVertical ?? [],
       geoZone: geoZone ?? null,
-      employeeCount: employeeCount ? parseInt(employeeCount) : null,
+      employeeCount: employeeCount ?? null,
       revenueRange: revenueRange ?? null,
       fundingTotal: fundingTotal ?? null,
       techStack: techStack ?? [],

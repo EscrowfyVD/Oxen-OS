@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createActivitySchema, listActivitiesQuery } from "../../../_schemas"
 
 // GET /api/crm/contacts/[id]/activities — paginated list
 export async function GET(
@@ -12,8 +14,9 @@ export async function GET(
 
   const { id } = await params
   const { searchParams } = new URL(request.url)
-  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10))
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "25", 10)))
+  const vq = validateSearchParams(searchParams, listActivitiesQuery)
+  if ("error" in vq) return vq.error
+  const { page, limit } = vq.data
   const skip = (page - 1) * limit
 
   try {
@@ -65,12 +68,9 @@ export async function POST(
       return NextResponse.json({ error: "Contact not found" }, { status: 404 })
     }
 
-    const body = await request.json()
-    const { type, description, dealId, metadata, isPrivate } = body
-
-    if (!type) {
-      return NextResponse.json({ error: "Missing required field: type" }, { status: 400 })
-    }
+    const v = await validateBody(request, createActivitySchema)
+    if ("error" in v) return v.error
+    const { type, description, dealId, metadata, isPrivate } = v.data
 
     const userId = session.user?.email ?? "unknown"
 

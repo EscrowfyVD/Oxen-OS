@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody } from "@/lib/validate"
+import { checkDuplicatesSchema } from "../../_schemas"
 
 /**
  * POST /api/crm/contacts/check-duplicates
@@ -12,10 +14,11 @@ export async function POST(request: Request) {
   if (error) return error
 
   try {
-    const body = await request.json()
-    const { emails } = body as { emails: string[] }
+    const v = await validateBody(request, checkDuplicatesSchema)
+    if ("error" in v) return v.error
+    const { emails } = v.data
 
-    if (!Array.isArray(emails) || emails.length === 0) {
+    if (emails.length === 0) {
       return NextResponse.json({ existing: [] })
     }
 

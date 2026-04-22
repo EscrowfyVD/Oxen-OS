@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { getOwnerForGeo } from "@/lib/crm-config"
 import { enrollLead, getLemlistCampaigns, isLemlistConfigured } from "@/lib/lemlist"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createContactSchema, listContactsQuery } from "../_schemas"
 
 // GET /api/crm/contacts — paginated list with filters
 export async function GET(request: Request) {
@@ -10,20 +12,12 @@ export async function GET(request: Request) {
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10))
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)))
+  const vq = validateSearchParams(searchParams, listContactsQuery)
+  if ("error" in vq) return vq.error
+  const { page, limit, lifecycleStage, vertical, geoZone, dealOwner, contactType, outreachGroup, lemlistCampaign, q } = vq.data
   const skip = (page - 1) * limit
-
-  const lifecycleStage = searchParams.get("lifecycleStage")
-  const vertical = searchParams.get("vertical")
-  const geoZone = searchParams.get("geoZone")
-  const dealOwner = searchParams.get("dealOwner")
-  const contactType = searchParams.get("contactType")
-  const outreachGroup = searchParams.get("outreachGroup")
-  const lemlistCampaign = searchParams.get("lemlistCampaign")
-  const q = searchParams.get("q")
-  const sortBy = searchParams.get("sortBy") || "createdAt"
-  const sortDir = (searchParams.get("sortDir") || "desc") as "asc" | "desc"
+  const sortBy = vq.data.sortBy || "createdAt"
+  const sortDir = vq.data.sortDir || "desc"
 
   const where: Record<string, unknown> = {}
 
@@ -99,7 +93,8 @@ export async function POST(request: Request) {
   if (pageErr) return pageErr
 
   try {
-    const body = await request.json()
+    const v = await validateBody(request, createContactSchema)
+    if ("error" in v) return v.error
     const {
       firstName, lastName, email, phone, linkedinUrl, jobTitle,
       companyId, vertical, subVertical, geoZone,
@@ -110,14 +105,7 @@ export async function POST(request: Request) {
       telegram, whatsapp, website, introducerId,
       introducerVertical, introducerGeo,
       outreachGroup,
-    } = body
-
-    if (!firstName || !lastName || !email) {
-      return NextResponse.json(
-        { error: "Missing required fields: firstName, lastName, email" },
-        { status: 400 },
-      )
-    }
+    } = v.data
 
     // Duplicate detection on email
     const existing = await prisma.crmContact.findUnique({ where: { email } })

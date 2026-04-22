@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateSearchParams } from "@/lib/validate"
+import { searchContactsQuery } from "../../_schemas"
 
 // GET /api/crm/contacts/search?q=... — fuzzy search across name, email, company
 export async function GET(request: Request) {
@@ -8,8 +10,9 @@ export async function GET(request: Request) {
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const q = searchParams.get("q")
-  const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)))
+  const vq = validateSearchParams(searchParams, searchContactsQuery)
+  if ("error" in vq) return vq.error
+  const { q, limit } = vq.data
 
   if (!q || q.trim().length === 0) {
     return NextResponse.json({ contacts: [] })

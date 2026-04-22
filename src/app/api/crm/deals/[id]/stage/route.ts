@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { STAGE_PROBABILITY, STAGE_LABELS, getOwnerForGeo } from "@/lib/crm-config"
 import { PLAYBOOK_TEMPLATES } from "@/lib/playbook-templates"
+import { validateBody } from "@/lib/validate"
+import { updateDealStageSchema } from "../../../_schemas"
 
 export async function PATCH(
   request: Request,
@@ -12,15 +14,9 @@ export async function PATCH(
   if (pageErr) return pageErr
 
   const { id } = await params
-  const body = await request.json()
-  const { stage: newStage, lostReason, lostNotes } = body
-
-  if (!newStage) {
-    return NextResponse.json(
-      { error: "Missing required field: stage" },
-      { status: 400 }
-    )
-  }
+  const v = await validateBody(request, updateDealStageSchema)
+  if ("error" in v) return v.error
+  const { stage: newStage, lostReason, lostNotes } = v.data
 
   const deal = await prisma.deal.findUnique({
     where: { id },

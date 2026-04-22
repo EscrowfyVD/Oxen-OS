@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
+import { validateBody } from "@/lib/validate"
+import { trigifyWebhookSchema } from "../_schemas"
 
 export async function POST(request: Request) {
   const authFail = requireWebhookSecret(request, { envVarName: "TRIGIFY_WEBHOOK_SECRET" })
   if (authFail) return authFail
 
+  const v = await validateBody(request, trigifyWebhookSchema, { publicErrors: false })
+  if ("error" in v) return v.error
+  const { email, signal_type, title, detail, score, name, company } = v.data
+
   try {
-    const body = await request.json()
-    const { email, signal_type, title, detail, score, name, company } = body
+    const body = v.data
 
     if (!email) return NextResponse.json({ ok: true })
 

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody } from "@/lib/validate"
+import { updateDealSchema } from "../../_schemas"
 
 export async function GET(
   _request: Request,
@@ -71,15 +73,18 @@ export async function PATCH(
     return NextResponse.json({ error: "Deal not found" }, { status: 404 })
   }
 
-  const body = await request.json()
+  const v = await validateBody(request, updateDealSchema)
+  if ("error" in v) return v.error
+  const body = v.data as Record<string, unknown>
   const userId = session.user?.email ?? "unknown"
 
-  // If dealValue or winProbability changes, recalculate weightedValue
+  // Zod already coerced dealValue to number|null and validated other fields.
+  // Recalculate weightedValue if either dealValue or winProbability changed.
   const newDealValue = body.dealValue !== undefined
-    ? (body.dealValue != null ? parseFloat(body.dealValue) : null)
+    ? (body.dealValue as number | null)
     : existing.dealValue
   const newWinProbability = body.winProbability !== undefined
-    ? body.winProbability
+    ? (body.winProbability as number)
     : existing.winProbability
 
   if (body.dealValue !== undefined || body.winProbability !== undefined) {
@@ -89,12 +94,8 @@ export async function PATCH(
         : null
   }
 
-  // Parse numeric fields
-  if (body.dealValue !== undefined && body.dealValue != null) {
-    body.dealValue = parseFloat(body.dealValue)
-  }
   if (body.expectedCloseDate !== undefined && body.expectedCloseDate != null) {
-    body.expectedCloseDate = new Date(body.expectedCloseDate)
+    body.expectedCloseDate = new Date(body.expectedCloseDate as string)
   }
 
   const deal = await prisma.deal.update({

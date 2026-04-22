@@ -2,20 +2,19 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { STAGE_PROBABILITY, getOwnerForGeo } from "@/lib/crm-config"
+import { validateBody, validateSearchParams } from "@/lib/validate"
+import { createDealSchema, listDealsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("crm")
   if (error) return error
 
   const { searchParams } = new URL(request.url)
-  const stage = searchParams.get("stage")
-  const dealOwner = searchParams.get("dealOwner")
-  const vertical = searchParams.get("vertical")
-  const companyId = searchParams.get("companyId")
-  const contactId = searchParams.get("contactId")
-  const search = searchParams.get("search")
-  const sortBy = searchParams.get("sortBy") || "createdAt"
-  const sortDir = (searchParams.get("sortDir") || "desc") as "asc" | "desc"
+  const vq = validateSearchParams(searchParams, listDealsQuery)
+  if ("error" in vq) return vq.error
+  const { stage, dealOwner, vertical, companyId, contactId, search } = vq.data
+  const sortBy = vq.data.sortBy || "createdAt"
+  const sortDir = vq.data.sortDir || "desc"
 
   const where: Record<string, unknown> = {}
 
@@ -68,20 +67,14 @@ export async function POST(request: Request) {
   const { error: pageErr, session } = await requirePageAccess("crm")
   if (pageErr) return pageErr
 
-  const body = await request.json()
+  const v = await validateBody(request, createDealSchema)
+  if ("error" in v) return v.error
   const {
     dealName, contactId, companyId, stage: rawStage,
     dealValue, dealOwner, acquisitionSource, acquisitionSourceDetail,
     vertical, expectedCloseDate, kycStatus,
     introducerId, conferenceName, notes,
-  } = body
-
-  if (!dealName || !contactId) {
-    return NextResponse.json(
-      { error: "Missing required fields: dealName, contactId" },
-      { status: 400 }
-    )
-  }
+  } = v.data
 
   // Verify contact exists
   const contact = await prisma.crmContact.findUnique({ where: { id: contactId } })
@@ -95,8 +88,8 @@ export async function POST(request: Request) {
   // Auto-set winProbability from stage
   const winProbability = STAGE_PROBABILITY[stage] ?? 0.05
 
-  // Compute weightedValue
-  const numericValue = dealValue ? parseFloat(dealValue) : null
+  // Compute weightedValue — Zod already coerced dealValue to number (or null)
+  const numericValue = dealValue ?? null
   const weightedValue = numericValue != null ? numericValue * winProbability : null
 
   // Auto-assign owner from geoZone if not provided

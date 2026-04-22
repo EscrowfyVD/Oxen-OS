@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getOwnerForGeo, STAGE_PROBABILITY } from "@/lib/crm-config"
+import { requireWebhookSecret } from "@/lib/webhook-auth"
+import { validateBody } from "@/lib/validate"
+import { inboundLeadSchema } from "../../_schemas"
 
 // ── Country → GeoZone mapping ──
 const COUNTRY_GEO_MAP: Record<string, string> = {
@@ -46,14 +49,16 @@ function detectGeoZone(country: string | null | undefined): string {
 }
 
 export async function POST(request: Request) {
-  // ── Auth ──
-  const secret = request.headers.get("x-webhook-secret")
-  if (!secret || secret !== process.env.WEBSITE_WEBHOOK_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  // ── Auth (Sprint 2.3b : upgrade from custom check to requireWebhookSecret) ──
+  // Uses timingSafeEqual + fail-closed on missing env var, aligned with
+  // Clay/Trigify/N8N/Telegram webhooks (Sprint 0).
+  const authFail = requireWebhookSecret(request, { envVarName: "WEBSITE_WEBHOOK_SECRET" })
+  if (authFail) return authFail
+
+  const v = await validateBody(request, inboundLeadSchema, { publicErrors: false })
+  if ("error" in v) return v.error
 
   try {
-    const body = await request.json()
     const {
       firstName,
       lastName,
@@ -64,14 +69,7 @@ export async function POST(request: Request) {
       message,
       source,
       pageUrl,
-    } = body
-
-    if (!firstName || !lastName || !email) {
-      return NextResponse.json(
-        { error: "Missing required fields: firstName, lastName, email" },
-        { status: 400 },
-      )
-    }
+    } = v.data
 
     const performedBy = "webhook:website"
 

@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
+import { validateBody } from "@/lib/validate"
+import { n8nWebhookSchema } from "../_schemas"
 
 export async function POST(request: Request) {
   const authFail = requireWebhookSecret(request, { envVarName: "N8N_WEBHOOK_SECRET" })
   if (authFail) return authFail
 
-  try {
-    const body = await request.json()
-    const { action, contactEmail, data } = body
+  const v = await validateBody(request, n8nWebhookSchema, { publicErrors: false })
+  if ("error" in v) return v.error
+  const { action, contactEmail, data } = v.data
 
-    if (!action || !contactEmail) return NextResponse.json({ ok: true })
+  try {
+    const body = v.data
 
     const contact = await prisma.crmContact.findFirst({
       where: { email: { equals: contactEmail, mode: "insensitive" } },
@@ -40,9 +43,12 @@ export async function POST(request: Request) {
         const allowed = [
           "firstName", "lastName", "company", "vertical", "lifecycleStage", "source", "country",
           "outreachStatus", "leadSource", "clientType", "dealOwner", "introducerId",
-        ]
+        ] as const
+        // Cast to indexable record — Zod narrows `data` to the discriminated
+        // update_contact shape, which TypeScript rejects for generic string indexing.
+        const d = data as Record<string, unknown> | undefined
         for (const key of allowed) {
-          if (data?.[key] !== undefined) updateData[key] = data[key]
+          if (d?.[key] !== undefined) updateData[key] = d[key]
         }
         if (Object.keys(updateData).length > 0) {
           await prisma.crmContact.update({ where: { id: contact.id }, data: updateData })

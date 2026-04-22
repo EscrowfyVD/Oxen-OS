@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateSearchParams } from "@/lib/validate"
+import { exportContactsQuery } from "../../_schemas"
 
 const MAX_EXPORT = 5000
 
@@ -42,13 +44,9 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url)
-
-    const lifecycleStage = searchParams.get("lifecycleStage")
-    const vertical = searchParams.get("vertical")
-    const geoZone = searchParams.get("geoZone")
-    const dealOwner = searchParams.get("dealOwner")
-    const outreachGroup = searchParams.get("outreachGroup")
-    const q = searchParams.get("q")
+    const vq = validateSearchParams(searchParams, exportContactsQuery)
+    if ("error" in vq) return vq.error
+    const { lifecycleStage, vertical, geoZone, dealOwner, outreachGroup, contactType, q } = vq.data
 
     const where: Record<string, unknown> = {}
 
@@ -76,8 +74,8 @@ export async function GET(request: Request) {
       ]
     }
 
-    if (searchParams.get("contactType") && searchParams.get("contactType") !== "all") {
-      where.contactType = searchParams.get("contactType")
+    if (contactType && contactType !== "all") {
+      where.contactType = contactType
     }
 
     const contacts = await prisma.crmContact.findMany({

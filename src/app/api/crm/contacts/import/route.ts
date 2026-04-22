@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { getOwnerForGeo } from "@/lib/crm-config"
+import { validateBody } from "@/lib/validate"
+import { importContactsSchema } from "../../_schemas"
 
 interface MappedContact {
   firstName: string
@@ -40,24 +42,11 @@ export async function POST(request: Request) {
   if (pageErr) return pageErr
 
   try {
-    const body = await request.json()
-    const { contacts, duplicateAction } = body as {
+    const v = await validateBody(request, importContactsSchema)
+    if ("error" in v) return v.error
+    const { contacts, duplicateAction } = v.data as {
       contacts: MappedContact[]
       duplicateAction: "skip" | "update"
-    }
-
-    if (!Array.isArray(contacts) || contacts.length === 0) {
-      return NextResponse.json(
-        { error: "contacts array is required and must not be empty" },
-        { status: 400 },
-      )
-    }
-
-    if (duplicateAction !== "skip" && duplicateAction !== "update") {
-      return NextResponse.json(
-        { error: 'duplicateAction must be "skip" or "update"' },
-        { status: 400 },
-      )
     }
 
     const userId = session.user?.email ?? "unknown"

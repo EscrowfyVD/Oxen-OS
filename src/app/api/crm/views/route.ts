@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody } from "@/lib/validate"
+import { createViewSchema } from "../_schemas"
 
 export async function GET() {
   const { error, session } = await requirePageAccess("crm")
@@ -25,15 +27,9 @@ export async function POST(request: Request) {
   const { error: pageErr, session } = await requirePageAccess("crm")
   if (pageErr) return pageErr
 
-  const body = await request.json()
-  const { name, filters, filterLogic, isShared } = body
-
-  if (!name || !filters) {
-    return NextResponse.json(
-      { error: "Missing required fields: name, filters" },
-      { status: 400 }
-    )
-  }
+  const v = await validateBody(request, createViewSchema)
+  if ("error" in v) return v.error
+  const { name, filters, filterLogic, isShared } = v.data
 
   const view = await prisma.smartView.create({
     data: {

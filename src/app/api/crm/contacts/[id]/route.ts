@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess, requireAdmin } from "@/lib/admin"
 import { removeLeadFromAll, isLemlistConfigured } from "@/lib/lemlist"
+import { validateBody } from "@/lib/validate"
+import { updateContactSchema } from "../../_schemas"
 
 // GET /api/crm/contacts/[id] — full detail with relations
 export async function GET(
@@ -64,7 +66,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Contact not found" }, { status: 404 })
     }
 
-    const body = await request.json()
+    const v = await validateBody(request, updateContactSchema)
+    if ("error" in v) return v.error
+    const body = v.data
     const userId = session.user?.email ?? "unknown"
 
     // Build update data from only the fields provided

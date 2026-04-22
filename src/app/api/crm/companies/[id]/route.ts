@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody } from "@/lib/validate"
+import { updateCompanySchema } from "../../_schemas"
 
 export async function GET(
   _request: Request,
@@ -90,7 +92,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Company not found" }, { status: 404 })
   }
 
-  const body = await request.json()
+  const v = await validateBody(request, updateCompanySchema)
+  if ("error" in v) return v.error
+  const body = v.data as Record<string, unknown> & { website?: string | null; domain?: string | null }
   const userId = session.user?.email ?? "unknown"
 
   // If website is changing, re-extract domain

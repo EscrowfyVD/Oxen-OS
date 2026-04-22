@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { validateBody } from "@/lib/validate"
+import { updateTaskSchema } from "../../_schemas"
 
 export async function PATCH(
   request: Request,
@@ -10,8 +12,9 @@ export async function PATCH(
   if (pageErr) return pageErr
 
   const { id } = await params
-  const body = await request.json()
-  const { title, type, priority, dueDate, assignee, status, outcomeNote, contactId, dealId } = body
+  const v = await validateBody(request, updateTaskSchema)
+  if ("error" in v) return v.error
+  const { title, type, priority, dueDate, assignee, status, outcomeNote, contactId, dealId } = v.data
 
   const existing = await prisma.crmTask.findUnique({ where: { id } })
   if (!existing) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
+import { lemlistWebhookSchema } from "../_schemas"
 
 const LEMLIST_SECRET = process.env.LEMLIST_WEBHOOK_SECRET ?? ""
 
@@ -113,7 +114,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = JSON.parse(rawBody)
+    // Validation Zod en inline (safeParse) plutôt que via validateBody() :
+    // le body a déjà été consommé via req.text() pour la vérification HMAC.
+    let parsedBody: unknown
+    try {
+      parsedBody = JSON.parse(rawBody)
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
+    }
+    const parsed = lemlistWebhookSchema.safeParse(parsedBody)
+    if (!parsed.success) {
+      // publicErrors: false équivalent — on ne leak pas la structure au sender
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 })
+    }
+    const body = parsed.data
     const { email, event, campaignName, campaignId: lemlistCampaignId } = body
 
     console.log(

@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
+import { validateBody } from "@/lib/validate"
+import { clayWebhookSchema } from "../_schemas"
 
 export async function POST(request: Request) {
   const authFail = requireWebhookSecret(request, { envVarName: "CLAY_WEBHOOK_SECRET" })
   if (authFail) return authFail
 
+  const v = await validateBody(request, clayWebhookSchema, { publicErrors: false })
+  if ("error" in v) return v.error
+  const { email, enrichment_type, data, title, score } = v.data
+
   try {
-    const body = await request.json()
-    const { email, enrichment_type, data, title, score } = body
+    const body = v.data
 
     if (!email) return NextResponse.json({ ok: true })
 
