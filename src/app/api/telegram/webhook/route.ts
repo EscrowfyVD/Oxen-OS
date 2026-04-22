@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
+import { requireWebhookSecret } from "@/lib/webhook-auth"
 import Anthropic from "@anthropic-ai/sdk"
 
 const anthropic = new Anthropic()
@@ -41,6 +42,12 @@ function esc(text: string): string {
 // ═══════════════════════════════════════════════════════
 
 export async function POST(request: Request) {
+  const authError = requireWebhookSecret(request, {
+    envVarName: "TELEGRAM_WEBHOOK_SECRET",
+    headerName: "x-telegram-bot-api-secret-token",
+  })
+  if (authError) return authError
+
   try {
     const update: TelegramUpdate = await request.json()
 

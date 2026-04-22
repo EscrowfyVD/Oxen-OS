@@ -221,11 +221,11 @@ function escHtml(text: string): string {
 
 // ─── Set webhook URL ────────────────────────────────────
 
-export async function setWebhook(url: string) {
+export async function setWebhook(url: string, secretToken: string) {
   const res = await fetch(`${TELEGRAM_API}/setWebhook`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ url, secret_token: secretToken }),
   })
   return res.json()
 }
