@@ -7,11 +7,13 @@
 
 import { PrismaClient } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
+import { logger, serializeError } from "./lib/logger"
 
 const prisma = new PrismaClient()
 const anthropic = new Anthropic()
 
 const WORKER_ID = `ai-worker-${process.pid}`
+const log = logger.child({ workerId: WORKER_ID })
 const POLL_INTERVAL = parseInt(process.env.AI_POLL_INTERVAL_MS || "5000", 10)
 const STALE_TIMEOUT = parseInt(process.env.STALE_JOB_TIMEOUT_MS || "300000", 10)
 
@@ -502,7 +504,7 @@ async function resetStaleJobs() {
     data: { status: "pending", processedBy: null, startedAt: null },
   })
   if (result.count > 0) {
-    console.log(`[${WORKER_ID}] Reset ${result.count} stale jobs`)
+    log.info({ count: result.count }, "reset stale jobs")
   }
 }
 
@@ -516,19 +518,19 @@ async function poll() {
 
       const job = await claimNextJob()
       if (job) {
-        console.log(`[${WORKER_ID}] Processing job ${job.id} (${job.type}) attempt ${job.attempts}`)
+        log.info({ jobId: job.id, jobType: job.type, attempt: job.attempts }, "processing job")
         try {
           const result = await processJob(job)
           await completeJob(job.id, result || {})
-          console.log(`[${WORKER_ID}] Completed job ${job.id}`)
+          log.info({ jobId: job.id }, "completed job")
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err)
-          console.error(`[${WORKER_ID}] Failed job ${job.id}: ${errorMessage}`)
+          log.error({ jobId: job.id, errorMessage }, "failed job")
           await failJob(job.id, errorMessage)
         }
       }
     } catch (err) {
-      console.error(`[${WORKER_ID}] Poll error:`, err)
+      log.error({ err: serializeError(err) }, "poll error")
     }
 
     // Wait before next poll
@@ -538,16 +540,16 @@ async function poll() {
 
 // Graceful shutdown
 process.on("SIGINT", () => {
-  console.log(`[${WORKER_ID}] Shutting down...`)
+  log.info("shutting down")
   running = false
 })
 process.on("SIGTERM", () => {
-  console.log(`[${WORKER_ID}] Shutting down...`)
+  log.info("shutting down")
   running = false
 })
 
-console.log(`[${WORKER_ID}] Starting AI Worker (poll every ${POLL_INTERVAL}ms)`)
+log.info({ pollInterval: POLL_INTERVAL }, "starting ai worker")
 poll().then(() => {
-  console.log(`[${WORKER_ID}] Worker stopped`)
+  log.info("worker stopped")
   prisma.$disconnect()
 })

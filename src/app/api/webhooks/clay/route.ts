@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
 import { validateBody } from "@/lib/validate"
+import { childLoggerFromRequest, serializeError } from "@/lib/logger"
 import { clayWebhookSchema } from "../_schemas"
 
 export async function POST(request: Request) {
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   const v = await validateBody(request, clayWebhookSchema, { publicErrors: false })
   if ("error" in v) return v.error
   const { email, enrichment_type, data, title, score } = v.data
+
+  const log = childLoggerFromRequest(request).child({ webhook: "clay" })
 
   try {
     const body = v.data
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
       },
     })
   } catch (error) {
-    console.error("Clay webhook error:", error)
+    log.error({ err: serializeError(error) }, "clay webhook processing failed")
   }
 
   return NextResponse.json({ ok: true })

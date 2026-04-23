@@ -2,6 +2,9 @@ import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "./prisma"
+import { logger, serializeError } from "./logger"
+
+const authLog = logger.child({ component: "nextauth" })
 
 // Only require secure cookies when served over HTTPS (production / Railway)
 // On http://localhost, secure:true causes browsers to reject the cookies → auth fails
@@ -69,22 +72,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ account, profile }) {
-      console.log("[AUTH] signIn callback - email:", profile?.email)
+      authLog.info({ email: profile?.email ?? null }, "signIn callback")
       if (!profile?.email) {
-        console.log("[AUTH] No email in profile, rejecting")
+        authLog.warn("signIn rejected: no email in profile")
         return false
       }
       const allowed = profile.email.endsWith("@oxen.finance")
-      console.log("[AUTH] Domain check:", allowed ? "ALLOWED" : "REJECTED")
+      authLog.info(
+        { email: profile.email, allowed },
+        allowed ? "signIn domain check: allowed" : "signIn domain check: rejected"
+      )
       if (!allowed) return false
 
       // Force-update the stored account with fresh tokens & scopes from Google.
       // PrismaAdapter does NOT update existing accounts on re-login,
       // so without this, old scopes (missing drive.readonly) persist forever.
       if (account && profile.email) {
-        console.log("[AUTH] Account from Google - scope:", account.scope)
-        console.log("[AUTH] Account from Google - has access_token:", !!account.access_token)
-        console.log("[AUTH] Account from Google - has refresh_token:", !!account.refresh_token)
+        authLog.debug(
+          {
+            scope: account.scope,
+            hasAccessToken: !!account.access_token,
+            hasRefreshToken: !!account.refresh_token,
+          },
+          "signIn: account received from Google"
+        )
         try {
           const existingAccount = await prisma.account.findFirst({
             where: {
@@ -94,7 +105,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             select: { id: true, scope: true },
           })
           if (existingAccount) {
-            console.log("[AUTH] Found existing account:", existingAccount.id, "Old scope:", existingAccount.scope)
+            authLog.info(
+              { accountId: existingAccount.id, oldScope: existingAccount.scope },
+              "signIn: existing account found"
+            )
             const updateData: Record<string, unknown> = {
               access_token: account.access_token,
               expires_at: account.expires_at,
@@ -110,12 +124,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               where: { id: existingAccount.id },
               data: updateData,
             })
-            console.log("[AUTH] Account tokens updated successfully. New scope:", account.scope)
+            authLog.info(
+              { accountId: existingAccount.id, newScope: account.scope },
+              "signIn: account tokens updated"
+            )
           } else {
-            console.log("[AUTH] No existing account found for providerAccountId:", account.providerAccountId)
+            authLog.info(
+              { providerAccountId: account.providerAccountId },
+              "signIn: no existing account found for providerAccountId"
+            )
           }
         } catch (e) {
-          console.error("[AUTH] Failed to update account tokens:", e)
+          authLog.error(
+            { err: serializeError(e) },
+            "signIn: failed to update account tokens"
+          )
         }
       }
 

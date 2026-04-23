@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma"
+import { logger, serializeError } from "@/lib/logger"
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ""
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`
+
+const log = logger.child({ component: "telegram-lib" })
 
 // ─── Low-level send ─────────────────────────────────────
 
@@ -24,10 +27,10 @@ export async function sendTelegramMessage(
     const result = await res.json()
 
     if (!result.ok) {
-      console.error("[Telegram] sendMessage failed:", result.description, "chatId:", chatId)
+      log.error({ description: result.description, chatId }, "sendMessage failed")
       // If parse mode fails, retry without formatting
       if (parseMode && result.description?.includes("parse")) {
-        console.log("[Telegram] Retrying without parse mode...")
+        log.info("retrying sendMessage without parse mode")
         const retryRes = await fetch(`${TELEGRAM_API}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -39,7 +42,7 @@ export async function sendTelegramMessage(
 
     return result
   } catch (error) {
-    console.error("[Telegram] sendMessage error:", error)
+    log.error({ err: serializeError(error) }, "sendMessage error")
     return { ok: false, description: String(error) }
   }
 }
@@ -60,7 +63,7 @@ export async function sendTelegramNotification(
     const result = await sendTelegramMessage(employee.telegramChatId, message)
     return result.ok === true
   } catch (error) {
-    console.error("[Telegram] notification error:", error)
+    log.error({ err: serializeError(error) }, "notification error")
     return false
   }
 }

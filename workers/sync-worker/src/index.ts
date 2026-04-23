@@ -5,8 +5,10 @@
  */
 
 import { prisma } from "./lib/prisma"
+import { logger, serializeError } from "./lib/logger"
 
 const WORKER_ID = `sync-worker-${process.pid}`
+const log = logger.child({ workerId: WORKER_ID })
 const POLL_INTERVAL = parseInt(process.env.SYNC_POLL_INTERVAL_MS || "10000", 10)
 const STALE_TIMEOUT = parseInt(process.env.STALE_JOB_TIMEOUT_MS || "300000", 10)
 
@@ -271,7 +273,7 @@ async function handleEmailSync(payload: Record<string, unknown>) {
 // ─── Calendar Sync Handler (placeholder) ───
 
 async function handleCalendarSync(payload: Record<string, unknown>) {
-  console.log(`[${WORKER_ID}] Calendar sync job received`, payload)
+  log.info({ payload }, "calendar sync job received")
   return { status: "not_implemented_yet" }
 }
 
@@ -297,7 +299,7 @@ async function resetStaleJobs() {
     data: { status: "pending", processedBy: null, startedAt: null },
   })
   if (result.count > 0) {
-    console.log(`[${WORKER_ID}] Reset ${result.count} stale jobs`)
+    log.info({ count: result.count }, "reset stale jobs")
   }
 }
 
@@ -314,12 +316,12 @@ async function runScheduledTasks() {
   if (now.getTime() - lastCheckUpcoming >= 15 * 60 * 1000) {
     lastCheckUpcoming = now.getTime()
     try {
-      console.log(`[${WORKER_ID}] Running check-upcoming...`)
+      log.info("running check-upcoming")
       const res = await fetch(`${APP_URL}/api/telegram/check-upcoming`, { method: "POST" })
       const data = await res.json()
-      console.log(`[${WORKER_ID}] check-upcoming result:`, JSON.stringify(data))
+      log.info({ data }, "check-upcoming result")
     } catch (err) {
-      console.error(`[${WORKER_ID}] check-upcoming failed:`, err)
+      log.error({ err: serializeError(err) }, "check-upcoming failed")
     }
   }
 
@@ -327,16 +329,16 @@ async function runScheduledTasks() {
   if (day === 1 && hour === 8 && minute < 15 && lastMondayDigest !== dateKey) {
     lastMondayDigest = dateKey
     try {
-      console.log(`[${WORKER_ID}] Sending Monday digest...`)
+      log.info("sending monday digest")
       const res = await fetch(`${APP_URL}/api/telegram/weekly-digest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "monday" }),
       })
       const data = await res.json()
-      console.log(`[${WORKER_ID}] Monday digest result:`, JSON.stringify(data))
+      log.info({ data }, "monday digest result")
     } catch (err) {
-      console.error(`[${WORKER_ID}] Monday digest failed:`, err)
+      log.error({ err: serializeError(err) }, "monday digest failed")
     }
   }
 
@@ -344,16 +346,16 @@ async function runScheduledTasks() {
   if (day === 5 && hour === 17 && minute < 15 && lastFridayDigest !== dateKey) {
     lastFridayDigest = dateKey
     try {
-      console.log(`[${WORKER_ID}] Sending Friday digest...`)
+      log.info("sending friday digest")
       const res = await fetch(`${APP_URL}/api/telegram/weekly-digest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "friday" }),
       })
       const data = await res.json()
-      console.log(`[${WORKER_ID}] Friday digest result:`, JSON.stringify(data))
+      log.info({ data }, "friday digest result")
     } catch (err) {
-      console.error(`[${WORKER_ID}] Friday digest failed:`, err)
+      log.error({ err: serializeError(err) }, "friday digest failed")
     }
   }
 
@@ -361,7 +363,7 @@ async function runScheduledTasks() {
   if (hour === 7 && minute < 15 && lastLemlistSync !== dateKey) {
     lastLemlistSync = dateKey
     try {
-      console.log(`[${WORKER_ID}] Running daily Lemlist sync...`)
+      log.info("running daily lemlist sync")
       const cronSecret = process.env.CRON_SECRET || ""
       const res = await fetch(`${APP_URL}/api/lemlist/sync`, {
         method: "POST",
@@ -371,9 +373,9 @@ async function runScheduledTasks() {
         },
       })
       const data = await res.json()
-      console.log(`[${WORKER_ID}] Lemlist sync result:`, JSON.stringify(data))
+      log.info({ data }, "lemlist sync result")
     } catch (err) {
-      console.error(`[${WORKER_ID}] Lemlist sync failed:`, err)
+      log.error({ err: serializeError(err) }, "lemlist sync failed")
     }
   }
 }
@@ -390,30 +392,41 @@ async function poll() {
 
       const job = await claimNextJob()
       if (job) {
-        console.log(`[${WORKER_ID}] Processing job ${job.id} (${job.type}) attempt ${job.attempts}`)
+        log.info({ jobId: job.id, jobType: job.type, attempt: job.attempts }, "processing job")
         try {
           const result = await processJob(job)
           await completeJob(job.id, result || {})
-          console.log(`[${WORKER_ID}] Completed job ${job.id}`)
+          log.info({ jobId: job.id }, "completed job")
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err)
-          console.error(`[${WORKER_ID}] Failed job ${job.id}: ${errorMessage}`)
+          log.error({ jobId: job.id, errorMessage }, "failed job")
           await failJob(job.id, errorMessage)
         }
       }
     } catch (err) {
-      console.error(`[${WORKER_ID}] Poll error:`, err)
+      log.error({ err: serializeError(err) }, "poll error")
     }
 
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL))
   }
 }
 
-process.on("SIGINT", () => { console.log(`[${WORKER_ID}] Shutting down...`); running = false })
-process.on("SIGTERM", () => { console.log(`[${WORKER_ID}] Shutting down...`); running = false })
+process.on("SIGINT", () => { log.info("shutting down (SIGINT)"); running = false })
+process.on("SIGTERM", () => { log.info("shutting down (SIGTERM)"); running = false })
 
-console.log(`[${WORKER_ID}] Starting Sync Worker (poll every ${POLL_INTERVAL}ms, cron: check-upcoming/15min, monday-digest/Mon-8am, friday-digest/Fri-5pm, lemlist-sync/daily-7am)`)
+log.info(
+  {
+    pollInterval: POLL_INTERVAL,
+    cron: {
+      checkUpcoming: "15min",
+      mondayDigest: "Mon-8am",
+      fridayDigest: "Fri-5pm",
+      lemlistSync: "daily-7am",
+    },
+  },
+  "starting sync worker"
+)
 poll().then(() => {
-  console.log(`[${WORKER_ID}] Worker stopped`)
+  log.info("worker stopped")
   prisma.$disconnect()
 })

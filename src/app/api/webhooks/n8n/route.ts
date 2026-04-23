@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
 import { validateBody } from "@/lib/validate"
+import { childLoggerFromRequest, serializeError } from "@/lib/logger"
 import { n8nWebhookSchema } from "../_schemas"
 
 export async function POST(request: Request) {
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   const v = await validateBody(request, n8nWebhookSchema, { publicErrors: false })
   if ("error" in v) return v.error
   const { action, contactEmail, data } = v.data
+
+  const log = childLoggerFromRequest(request).child({ webhook: "n8n", action })
 
   try {
     const body = v.data
@@ -72,7 +75,7 @@ export async function POST(request: Request) {
         break
     }
   } catch (error) {
-    console.error("n8n webhook error:", error)
+    log.error({ err: serializeError(error) }, "n8n webhook processing failed")
   }
 
   return NextResponse.json({ ok: true })

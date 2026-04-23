@@ -19,6 +19,7 @@ const PAIRS: ReadonlyArray<readonly [string, string]> = [
     "workers/sync-worker/src/lib/token-encryption.ts",
   ],
   ["src/lib/prisma.ts", "workers/sync-worker/src/lib/prisma.ts"],
+  ["src/lib/logger.ts", "workers/sync-worker/src/lib/logger.ts"],
 ]
 
 function sha256(path: string): string {

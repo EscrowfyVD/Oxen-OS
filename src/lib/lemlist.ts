@@ -1,7 +1,11 @@
 // ─── Lemlist API Helper ────────────────────────────────
 
+import { logger, serializeError } from "./logger"
+
 const LEMLIST_API_KEY = process.env.LEMLIST_API_KEY || ""
 const BASE_URL = "https://api.lemlist.com/api"
+
+const log = logger.child({ component: "lemlist" })
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -30,7 +34,7 @@ const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 
 export async function getLemlistCampaigns(): Promise<LemlistCampaign[]> {
   if (!isLemlistConfigured()) {
-    console.error("[Lemlist] API key not configured")
+    log.error("API key not configured")
     return []
   }
 
@@ -46,7 +50,7 @@ export async function getLemlistCampaigns(): Promise<LemlistCampaign[]> {
     })
 
     if (!res.ok) {
-      console.error("[Lemlist] Failed to fetch campaigns:", res.status, res.statusText)
+      log.error({ status: res.status, statusText: res.statusText }, "failed to fetch campaigns")
       return cachedCampaigns // return stale cache on error
     }
 
@@ -55,7 +59,7 @@ export async function getLemlistCampaigns(): Promise<LemlistCampaign[]> {
     cacheTimestamp = now
     return data
   } catch (error) {
-    console.error("[Lemlist] Network error fetching campaigns:", error)
+    log.error({ err: serializeError(error) }, "network error fetching campaigns")
     return cachedCampaigns // return stale cache on network failure
   }
 }
@@ -96,14 +100,14 @@ export async function enrollLead(
 
     if (!res.ok) {
       const body = await res.text()
-      console.error("[Lemlist] enrollLead failed:", res.status, body)
+      log.error({ status: res.status, body }, "enrollLead failed")
       return { ok: false, error: `${res.status} ${body}` }
     }
 
     const data = await res.json()
     return { ok: true, leadId: data._id }
   } catch (error) {
-    console.error("[Lemlist] Network error enrolling lead:", error)
+    log.error({ err: serializeError(error) }, "network error enrolling lead")
     return { ok: false, error: String(error) }
   }
 }
@@ -115,7 +119,7 @@ export async function removeLead(
   email: string,
 ): Promise<{ ok: boolean }> {
   if (!isLemlistConfigured()) {
-    console.error("[Lemlist] API key not configured")
+    log.error("API key not configured")
     return { ok: false }
   }
 
@@ -129,13 +133,13 @@ export async function removeLead(
     )
 
     if (!res.ok) {
-      console.error("[Lemlist] removeLead failed:", res.status, res.statusText)
+      log.error({ status: res.status, statusText: res.statusText }, "removeLead failed")
       return { ok: false }
     }
 
     return { ok: true }
   } catch (error) {
-    console.error("[Lemlist] Network error removing lead:", error)
+    log.error({ err: serializeError(error) }, "network error removing lead")
     return { ok: false }
   }
 }
@@ -146,7 +150,7 @@ export async function removeLeadFromAll(
   email: string,
 ): Promise<{ ok: boolean }> {
   if (!isLemlistConfigured()) {
-    console.error("[Lemlist] API key not configured")
+    log.error("API key not configured")
     return { ok: false }
   }
 
@@ -160,13 +164,13 @@ export async function removeLeadFromAll(
     )
 
     if (!res.ok) {
-      console.error("[Lemlist] removeLeadFromAll failed:", res.status, res.statusText)
+      log.error({ status: res.status, statusText: res.statusText }, "removeLeadFromAll failed")
       return { ok: false }
     }
 
     return { ok: true }
   } catch (error) {
-    console.error("[Lemlist] Network error removing lead from all:", error)
+    log.error({ err: serializeError(error) }, "network error removing lead from all")
     return { ok: false }
   }
 }

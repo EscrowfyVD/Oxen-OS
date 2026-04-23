@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
 import { validateBody } from "@/lib/validate"
+import { childLoggerFromRequest, serializeError } from "@/lib/logger"
 import { trigifyWebhookSchema } from "../_schemas"
 
 export async function POST(request: Request) {
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
   const v = await validateBody(request, trigifyWebhookSchema, { publicErrors: false })
   if ("error" in v) return v.error
   const { email, signal_type, title, detail, score, name, company } = v.data
+
+  const log = childLoggerFromRequest(request).child({ webhook: "trigify" })
 
   try {
     const body = v.data
@@ -67,7 +70,7 @@ export async function POST(request: Request) {
       data: { relationshipScore: Math.min(totalScore, 100) },
     })
   } catch (error) {
-    console.error("Trigify webhook error:", error)
+    log.error({ err: serializeError(error) }, "trigify webhook processing failed")
   }
 
   return NextResponse.json({ ok: true })

@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/prisma"
+import { logger, serializeError } from "@/lib/logger"
+
+const log = logger.child({ component: "google-calendar" })
 
 export async function refreshAccessToken(refreshToken: string): Promise<string | null> {
   try {
@@ -14,14 +17,14 @@ export async function refreshAccessToken(refreshToken: string): Promise<string |
     })
 
     if (!response.ok) {
-      console.error("Token refresh failed:", response.status, await response.text())
+      log.error({ status: response.status, body: await response.text() }, "token refresh failed")
       return null
     }
 
     const data = await response.json()
     return data.access_token ?? null
   } catch (error) {
-    console.error("Token refresh error:", error)
+    log.error({ err: serializeError(error) }, "token refresh error")
     return null
   }
 }
@@ -60,7 +63,7 @@ export async function getAccessTokenForUser(userEmail: string): Promise<string |
         },
       })
     } catch (e) {
-      console.error("[Auth] Failed to persist refreshed token:", e)
+      log.error({ err: serializeError(e) }, "failed to persist refreshed token")
     }
   }
 
@@ -109,14 +112,14 @@ export async function createGoogleCalendarEvent(
     )
 
     if (!res.ok) {
-      console.error("[GoogleCal] Create failed:", res.status, await res.text())
+      log.error({ status: res.status, body: await res.text() }, "create event failed")
       return null
     }
 
     const data = await res.json()
     return data.id ?? null
   } catch (err) {
-    console.error("[GoogleCal] Create error:", err)
+    log.error({ err: serializeError(err) }, "create event error")
     return null
   }
 }
@@ -154,13 +157,13 @@ export async function updateGoogleCalendarEvent(
     )
 
     if (!res.ok) {
-      console.error("[GoogleCal] Update failed:", res.status, await res.text())
+      log.error({ status: res.status, body: await res.text() }, "update event failed")
       return false
     }
 
     return true
   } catch (err) {
-    console.error("[GoogleCal] Update error:", err)
+    log.error({ err: serializeError(err) }, "update event error")
     return false
   }
 }
@@ -182,13 +185,13 @@ export async function deleteGoogleCalendarEvent(
     )
 
     if (!res.ok && res.status !== 410) {
-      console.error("[GoogleCal] Delete failed:", res.status, await res.text())
+      log.error({ status: res.status, body: await res.text() }, "delete event failed")
       return false
     }
 
     return true
   } catch (err) {
-    console.error("[GoogleCal] Delete error:", err)
+    log.error({ err: serializeError(err) }, "delete event error")
     return false
   }
 }

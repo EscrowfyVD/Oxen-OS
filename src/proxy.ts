@@ -2,6 +2,11 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function proxy(req: NextRequest) {
+  // Generate request ID early — propagated via response header for correlation
+  // with pino logger child (Sprint 2.4a). Reuses incoming id if client/proxy
+  // already set one (e.g. Cloudflare).
+  const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID()
+
   const { pathname } = req.nextUrl
 
   // Allow auth API routes, webhooks, login page, and static assets
@@ -13,7 +18,9 @@ export function proxy(req: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {
-    return NextResponse.next()
+    const res = NextResponse.next()
+    res.headers.set("x-request-id", requestId)
+    return res
   }
 
   // Check for NextAuth session cookie (works in Edge Runtime without Prisma)
@@ -26,10 +33,14 @@ export function proxy(req: NextRequest) {
   if (!hasSession) {
     const loginUrl = new URL("/login", req.url)
     loginUrl.searchParams.set("callbackUrl", pathname)
-    return NextResponse.redirect(loginUrl)
+    const redir = NextResponse.redirect(loginUrl)
+    redir.headers.set("x-request-id", requestId)
+    return redir
   }
 
-  return NextResponse.next()
+  const res = NextResponse.next()
+  res.headers.set("x-request-id", requestId)
+  return res
 }
 
 export const config = {

@@ -1,5 +1,6 @@
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient, type Prisma } from "@prisma/client"
 import { encryptNullable, decryptNullable } from "./token-encryption"
+import { logger, serializeError } from "./logger"
 
 /**
  * Prisma client singleton with transparent Account-token encryption.
@@ -8,11 +9,20 @@ import { encryptNullable, decryptNullable } from "./token-encryption"
  * `id_token` on every write, and decrypts them on every read. Application
  * code continues to read/write plaintext — encryption is invisible.
  *
+ * Sprint 2.4a : slow-query logging wired via pino. Queries exceeding
+ * `SLOW_QUERY_THRESHOLD_MS` (default 500ms) are logged at warn level with
+ * the query text and params. Errors and warnings from Prisma are routed
+ * through the structured logger as well.
+ *
  * ⚠️ WORKER SYNC — This file is the canonical source and is mirrored to
  * `workers/sync-worker/src/lib/prisma.ts` via `npm run worker:sync-libs`.
  * DO NOT edit the worker copy directly. A SHA-256 hash test in
  * `src/lib/__tests__/worker-sync.test.ts` enforces identical content.
  */
+
+const SLOW_QUERY_THRESHOLD_MS = Number(
+  process.env.SLOW_QUERY_THRESHOLD_MS ?? 500
+)
 
 // Champs du modèle Account à chiffrer de façon transparente.
 // ⚠️ Si vous ajoutez un champ ici, TOUT le code existant reste compatible,
@@ -47,9 +57,9 @@ function decryptAccountRecord<T extends Record<string, unknown> | null>(
         // Fallback : si le déchiffrement échoue, on log mais on ne plante pas.
         // Cela peut arriver pendant la migration one-shot ou si un token
         // legacy non chiffré a échappé au script.
-        console.error(
-          `[prisma] Failed to decrypt Account.${field}, returning raw value`,
-          err instanceof Error ? err.message : err
+        logger.error(
+          { err: serializeError(err), field },
+          `prisma: failed to decrypt Account.${field}, returning raw value`
         )
       }
     }
@@ -58,7 +68,38 @@ function decryptAccountRecord<T extends Record<string, unknown> | null>(
 }
 
 function makePrisma() {
-  const base = new PrismaClient()
+  // Emit 'query' events to compute duration — only slow ones are logged.
+  // 'error' and 'warn' events are routed through the structured logger.
+  const base = new PrismaClient({
+    log: [
+      { level: "query", emit: "event" },
+      { level: "error", emit: "event" },
+      { level: "warn", emit: "event" },
+    ],
+  })
+
+  base.$on("query" as never, (e: Prisma.QueryEvent) => {
+    if (e.duration >= SLOW_QUERY_THRESHOLD_MS) {
+      logger.warn(
+        {
+          prisma: {
+            duration: e.duration,
+            query: e.query,
+            params: e.params,
+          },
+        },
+        `slow query (${e.duration}ms)`
+      )
+    }
+  })
+
+  base.$on("error" as never, (e: Prisma.LogEvent) => {
+    logger.error({ prisma: e }, "prisma error")
+  })
+
+  base.$on("warn" as never, (e: Prisma.LogEvent) => {
+    logger.warn({ prisma: e }, "prisma warn")
+  })
 
   return base.$extends({
     name: "account-token-encryption",

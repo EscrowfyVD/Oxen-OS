@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
+import { childLoggerFromRequest, serializeError } from "@/lib/logger"
 import { lemlistWebhookSchema } from "../_schemas"
 
 const LEMLIST_SECRET = process.env.LEMLIST_WEBHOOK_SECRET ?? ""
@@ -83,9 +84,11 @@ function verifySignature(
 
 // ── POST /api/webhooks/lemlist ──
 export async function POST(request: Request) {
+  const log = childLoggerFromRequest(request).child({ webhook: "lemlist" })
+
   // Fail-closed: refuse to process if secret is not configured
   if (!process.env.LEMLIST_WEBHOOK_SECRET) {
-    console.error("[webhooks/lemlist] LEMLIST_WEBHOOK_SECRET is not defined. Webhook cannot be verified.")
+    log.error("LEMLIST_WEBHOOK_SECRET is not defined; webhook cannot be verified")
     return NextResponse.json(
       { error: "Webhook secret not configured" },
       { status: 500 },
@@ -98,15 +101,12 @@ export async function POST(request: Request) {
   const { ok: verified, method } = verifySignature(request.headers, rawBody)
 
   if (!verified) {
-    console.error(
-      "[Lemlist Webhook] 401 — signature verification failed.",
-      "Headers received:",
-      Object.fromEntries(
-        [...request.headers.entries()].filter(
-          ([k]) => k.startsWith("x-") || k === "content-type",
-        ),
+    const xHeaders = Object.fromEntries(
+      [...request.headers.entries()].filter(
+        ([k]) => k.startsWith("x-") || k === "content-type",
       ),
     )
+    log.warn({ xHeaders }, "lemlist webhook 401: signature verification failed")
     return NextResponse.json(
       { error: "Unauthorized — invalid webhook signature" },
       { status: 401 },
@@ -130,8 +130,15 @@ export async function POST(request: Request) {
     const body = parsed.data
     const { email, event, campaignName, campaignId: lemlistCampaignId } = body
 
-    console.log(
-      `[Lemlist Webhook] event=${event} email=${email ?? "n/a"} campaign=${campaignName ?? "n/a"} campaignId=${lemlistCampaignId ?? "n/a"} auth=${method}`,
+    log.info(
+      {
+        event,
+        email: email ?? null,
+        campaignName: campaignName ?? null,
+        lemlistCampaignId: lemlistCampaignId ?? null,
+        authMethod: method,
+      },
+      "lemlist webhook event received",
     )
 
     if (!email) return NextResponse.json({ ok: true })
@@ -141,7 +148,7 @@ export async function POST(request: Request) {
     })
 
     if (!contact) {
-      console.log(`[Lemlist Webhook] No CRM contact found for ${email}`)
+      log.info({ email }, "lemlist webhook: no CRM contact found")
       return NextResponse.json({ ok: true })
     }
 
@@ -249,13 +256,13 @@ export async function POST(request: Request) {
           })
         }
       } catch (err) {
-        console.error("[Lemlist Webhook] OutreachCampaign sync error:", err)
+        log.error({ err: serializeError(err) }, "lemlist webhook: OutreachCampaign sync failed")
       }
     }
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("[Lemlist Webhook] Processing error:", error)
+    log.error({ err: serializeError(error) }, "lemlist webhook processing failed")
     return NextResponse.json(
       { error: "Webhook processing failed" },
       { status: 500 },

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getOwnerForGeo, STAGE_PROBABILITY } from "@/lib/crm-config"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
 import { validateBody } from "@/lib/validate"
+import { childLoggerFromRequest, serializeError } from "@/lib/logger"
 import { inboundLeadSchema } from "../../_schemas"
 
 // ── Country → GeoZone mapping ──
@@ -57,6 +58,8 @@ export async function POST(request: Request) {
 
   const v = await validateBody(request, inboundLeadSchema, { publicErrors: false })
   if ("error" in v) return v.error
+
+  const log = childLoggerFromRequest(request).child({ webhook: "inbound-lead" })
 
   try {
     const {
@@ -238,7 +241,7 @@ export async function POST(request: Request) {
         )
       }
     } catch (tgErr) {
-      console.error("[Inbound Lead] Telegram notification failed:", tgErr)
+      log.error({ err: serializeError(tgErr) }, "inbound-lead: telegram notification failed")
     }
 
     // ── 9. Return success ──
@@ -249,7 +252,7 @@ export async function POST(request: Request) {
       assignedTo: dealOwner,
     })
   } catch (err) {
-    console.error("[Inbound Lead Webhook] Error:", err)
+    log.error({ err: serializeError(err) }, "inbound-lead webhook processing failed")
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

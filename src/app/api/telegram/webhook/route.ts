@@ -2,9 +2,11 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
+import { logger, serializeError } from "@/lib/logger"
 import Anthropic from "@anthropic-ai/sdk"
 
 const anthropic = new Anthropic()
+const tgLog = logger.child({ component: "telegram-webhook" })
 
 // ─── Telegram types ────────────────────────────────────
 
@@ -56,11 +58,11 @@ export async function POST(request: Request) {
     const cbq = update.callback_query
 
     if (msg) {
-      console.log(`[Telegram IN] message from ${msg.from.first_name} (@${msg.from.username || "?"}) chatId=${msg.chat.id}: "${msg.text || "(no text)"}"`)
+      tgLog.info({ fromName: msg.from.first_name, username: msg.from.username ?? null, chatId: msg.chat.id, text: msg.text ?? null }, "telegram IN: message")
     } else if (cbq) {
-      console.log(`[Telegram IN] callback_query from ${cbq.from.first_name} data="${cbq.data}"`)
+      tgLog.info({ fromName: cbq.from.first_name, data: cbq.data ?? null }, "telegram IN: callback_query")
     } else {
-      console.log(`[Telegram IN] update with no message or callback_query:`, JSON.stringify(update).slice(0, 200))
+      tgLog.info({ update: JSON.stringify(update).slice(0, 200) }, "telegram IN: update with no message or callback_query")
       return NextResponse.json({ ok: true })
     }
 
@@ -111,7 +113,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("[Telegram webhook] Error:", error)
+    tgLog.error({ err: serializeError(error) }, "telegram webhook: handler error")
     return NextResponse.json({ ok: true }) // Always 200 so Telegram doesn't retry
   }
 }
@@ -291,7 +293,7 @@ async function handleBrief(chatId: number) {
       `<i>Could not generate a full brief. Check the CRM for context.</i>`,
     )
   } catch (error) {
-    console.error("[Telegram /brief]", error)
+    tgLog.error({ err: serializeError(error), command: "/brief" }, "telegram command failed")
     await sendTelegramMessage(chatId, "❌ Failed to fetch meeting brief. Try again later.")
   }
 }
@@ -407,7 +409,7 @@ Keep it under 2000 characters. Be concise and actionable.`
       `🏛 <b>Daily Digest — Oxen OS</b>\n\n${esc(digest)}`,
     )
   } catch (error) {
-    console.error("[Telegram /digest]", error)
+    tgLog.error({ err: serializeError(error), command: "/digest" }, "telegram command failed")
     await sendTelegramMessage(chatId, "❌ Failed to generate digest. Try again later.")
   }
 }
@@ -454,7 +456,7 @@ async function handleSupport(chatId: number, text: string, fromName: string) {
       `Our team will follow up shortly.`,
     )
   } catch (error) {
-    console.error("[Telegram /support]", error)
+    tgLog.error({ err: serializeError(error), command: "/support" }, "telegram command failed")
     await sendTelegramMessage(chatId, "❌ Failed to create support ticket. Try again later.")
   }
 }
@@ -551,7 +553,7 @@ async function handlePipeline(chatId: number) {
 
     await sendTelegramMessage(chatId, reply)
   } catch (error) {
-    console.error("[Telegram /pipeline]", error)
+    tgLog.error({ err: serializeError(error), command: "/pipeline" }, "telegram command failed")
     await sendTelegramMessage(chatId, "❌ Failed to fetch pipeline. Try again later.")
   }
 }
@@ -624,7 +626,7 @@ async function handleTasks(chatId: number) {
 
     await sendTelegramMessage(chatId, reply)
   } catch (error) {
-    console.error("[Telegram /tasks]", error)
+    tgLog.error({ err: serializeError(error), command: "/tasks" }, "telegram command failed")
     await sendTelegramMessage(chatId, "❌ Failed to fetch tasks. Try again later.")
   }
 }
@@ -661,7 +663,7 @@ async function handleRegularMessage(chatId: number, text: string, fromName: stri
         `✅ Your message has been forwarded to our support team.\n\nReference: #${ticketRef}\n\nWe'll respond shortly.`,
       )
     } catch (error) {
-      console.error("[Telegram] Auto-ticket error:", error)
+      tgLog.error({ err: serializeError(error) }, "telegram auto-ticket failed")
       await sendTelegramMessage(
         chatId,
         "Thank you for your message. To get help, use /support followed by your question.\n\nTo link your Oxen account, send /start",
@@ -774,7 +776,7 @@ Be specific and extract all actionable items.`
 
     await sendTelegramMessage(chatId, reply)
   } catch (error) {
-    console.error("[Telegram] Meeting note error:", error)
+    tgLog.error({ err: serializeError(error) }, "telegram meeting note failed")
     await sendTelegramMessage(chatId, "❌ Failed to process note. Try again.")
   }
 }
@@ -860,7 +862,7 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
       `📝 Interaction saved\n📋 ${tasksCreated} task${tasksCreated !== 1 ? "s" : ""} created`,
     )
   } catch (error) {
-    console.error("[Telegram] Note linking error:", error)
+    tgLog.error({ err: serializeError(error) }, "telegram note linking failed")
     pendingNotes.delete(chatId)
     await sendTelegramMessage(chatId, "❌ Failed to link note. Try again.")
   }
@@ -872,7 +874,7 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
 
 async function handleEmailLinking(chatId: number, email: string) {
   const cleaned = email.trim().toLowerCase()
-  console.log(`[Telegram] Email linking attempt: chatId=${chatId} email=${cleaned}`)
+  tgLog.info({ chatId, email: cleaned }, "telegram email linking attempt")
 
   const employee = await prisma.employee.findFirst({
     where: { email: { equals: cleaned, mode: "insensitive" } },
@@ -891,7 +893,7 @@ async function handleEmailLinking(chatId: number, email: string) {
     data: { telegramChatId: String(chatId) },
   })
 
-  console.log(`[Telegram] Linked chatId=${chatId} to employee=${employee.name} (${employee.email})`)
+  tgLog.info({ chatId, employeeName: employee.name, employeeEmail: employee.email }, "telegram chat linked to employee")
 
   await sendTelegramMessage(
     chatId,
@@ -911,7 +913,7 @@ async function handleEmailLinking(chatId: number, email: string) {
 // ═══════════════════════════════════════════════════════
 
 async function handleCallbackQuery(chatId: number, data: string, queryId: string) {
-  console.log(`[Telegram] Callback query: chatId=${chatId} data=${data}`)
+  tgLog.info({ chatId, data }, "telegram callback query")
 
   // Answer the callback to stop loading spinner
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || ""
