@@ -33,6 +33,9 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // NextAuth session cleanup: DELETE WHERE expires < NOW() — runs periodically
+  @@index([expires])
 }
 
 model User {
@@ -112,6 +115,9 @@ model Task {
   createdBy        String
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+
+  // Kanban filter: column ∈ {todo, inprogress, done} — ubiquitous `{ not: "done" }`
+  @@index([column])
 }
 
 // ─── Organigramme (Legal Structure) ───
@@ -188,6 +194,8 @@ model CalendarEvent {
   updatedAt     DateTime  @updatedAt
 
   @@unique([googleEventId, calendarOwner])
+  // Range queries on startTime (dashboards, digest, upcoming) — ubiquitous
+  @@index([startTime])
 }
 
 // ─── Internal Events (user-created meetings) ───
@@ -365,6 +373,11 @@ model CrmContact {
   kanbanTasks     Task[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // FK: company detail pages + per-company aggregations
+  @@index([companyId])
+  // Dashboard filter: lifecycleStage = "customer" (crm/overview, crm/health)
+  @@index([lifecycleStage])
 }
 
 model Deal {
@@ -408,6 +421,23 @@ model Deal {
   tasks           CrmTask[]
   playbookSteps   PlaybookStep[]
   aiFollowUps     AIFollowUp[]
+
+  // FK: ROI route, followups, stage transitions
+  @@index([contactId])
+  // FK: company aggregations on closed_won
+  @@index([companyId])
+  // Pipeline Kanban — most frequent filter (stage = X / in / notIn)
+  @@index([stage])
+  // Dashboard filter: "my deals"
+  @@index([dealOwner])
+  // Composite: pipeline by owner (telegram webhook, dashboard, leftmost prefix on [stage])
+  @@index([stage, dealOwner])
+  // Weekly/monthly won-lost stats (telegram weekly-digest)
+  @@index([closedAt])
+  // Forecast route: expectedCloseDate BETWEEN X AND Y
+  @@index([expectedCloseDate])
+  // At-risk dashboard filter (crm/overview, crm/dashboard)
+  @@index([aiDealHealth])
 }
 
 model PlaybookStep {
@@ -423,6 +453,9 @@ model PlaybookStep {
   isBlocking  Boolean   @default(false)
   order       Int       @default(0)
   createdAt   DateTime  @default(now())
+
+  // FK: playbook init + step listing by deal (and by deal+stage)
+  @@index([dealId])
 }
 
 model AIFollowUp {
@@ -438,6 +471,11 @@ model AIFollowUp {
   assignee        String     // deal owner
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
+
+  // FK: contact detail + dashboard pending followups
+  @@index([contactId])
+  // FK: deal followups (often composed with status = "pending" at query time)
+  @@index([dealId])
 }
 
 model Activity {
@@ -452,6 +490,15 @@ model Activity {
   performedBy     String?
   isPrivate       Boolean  @default(false)
   createdAt       DateTime @default(now())
+
+  // FK: contact timeline (findMany + count, ubiquitous)
+  @@index([contactId])
+  // FK: deal timeline + followups
+  @@index([dealId])
+  // orderBy createdAt desc on every Activity query (feeds + timelines)
+  @@index([createdAt])
+  // Composite: type filter (meetings, emails) + chronological (dashboard counters)
+  @@index([type, createdAt])
 }
 
 model CrmTask {
@@ -472,6 +519,15 @@ model CrmTask {
   createdBy       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // FK: contact tasks listing
+  @@index([contactId])
+  // FK: deal tasks listing
+  @@index([dealId])
+  // Dashboard: pending/completed filter
+  @@index([status])
+  // Range queries: today/upcoming/overdue tasks (dashboard)
+  @@index([dueDate])
 }
 
 model AuditLog {
@@ -484,6 +540,9 @@ model AuditLog {
   newValue    String?
   performedBy String
   createdAt   DateTime @default(now())
+
+  // Composite: entity history lookup (WHERE entityType = X AND entityId = Y)
+  @@index([entityType, entityId])
 }
 
 model SmartView {
@@ -513,6 +572,13 @@ model FinanceEntry {
   createdBy   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  // Range queries on date (summary, reports, overview)
+  @@index([date])
+  // revenue/expense/budget filter
+  @@index([type])
+  // Multi-entity filter (oxen/escrowfy/galaktika/lapki)
+  @@index([entity])
 }
 
 model FinanceTransaction {
@@ -546,6 +612,13 @@ model FinanceTransaction {
   createdBy       String
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  // Range queries on date (overview, reports, summary)
+  @@index([date])
+  // revenue/expense filter
+  @@index([type])
+  // Multi-entity filter
+  @@index([entity])
 }
 
 model FinanceBudget {
@@ -577,6 +650,9 @@ model BankAccount {
   createdBy     String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  // Composite: active accounts per entity (most common list pattern)
+  @@index([entity, isActive])
 }
 
 model FinanceGoal {
@@ -758,6 +834,11 @@ model AIInsight {
   linkedTaskId String?
   source       String?  // "auto_analysis", "deal_stage_change", "system"
   createdAt    DateTime @default(now())
+
+  // Ubiquitous filter: dismissed = false (all ai/* routes)
+  @@index([dismissed])
+  // FK: contact detail page insights
+  @@index([contactId])
 }
 
 model AIConversation {
@@ -848,6 +929,11 @@ model Email {
   direction     String   @default("inbound")
   syncedBy      String
   createdAt     DateTime @default(now())
+
+  // FK: contact email timeline (orderBy date desc)
+  @@index([contactId])
+  // Composite: outbound/inbound stats per period (weekly-digest)
+  @@index([direction, date])
 }
 
 // ─── Agent model removed — introducers are now CrmContact with contactType="introducer" ───
@@ -962,6 +1048,9 @@ model ConferenceAttendee {
   otherCost       Decimal?   @default(0) @db.Decimal(19, 4)
   budgetNotes     String?
   createdAt       DateTime   @default(now())
+
+  // FK: attendees of a conference (ROI route, conference detail)
+  @@index([conferenceId])
 }
 
 model ConferenceContact {
@@ -1147,6 +1236,11 @@ model ComplianceIncident {
   createdBy       String
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  // Dashboard: open/investigating/reported/resolved filter
+  @@index([status])
+  // Filter by incident type (sar/breach/complaint)
+  @@index([type])
 }
 
 model ScreeningRecord {
