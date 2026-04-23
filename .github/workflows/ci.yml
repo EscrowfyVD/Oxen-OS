@@ -118,3 +118,7 @@ jobs:
           CRON_SECRET: "ci-placeholder"
           WEBSITE_WEBHOOK_SECRET: "ci-placeholder"
           SUPPORT_WEBHOOK_SECRET: "ci-placeholder"
+          # Sentry (Sprint 2.4b) — empty DSN disables Sentry entirely,
+          # exercising the `if (process.env.SENTRY_DSN)` guard path.
+          SENTRY_DSN: ""
+          NEXT_PUBLIC_SENTRY_DSN: ""

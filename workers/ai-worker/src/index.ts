@@ -5,9 +5,24 @@
  *          ai:keyword-discover, ai:geo-test
  */
 
+import * as Sentry from "@sentry/node"
 import { PrismaClient } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 import { logger, serializeError } from "./lib/logger"
+import { sentryBeforeSend } from "./lib/sentry"
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV ?? "unknown",
+    tracesSampleRate: 0,
+    sendDefaultPii: false,
+    beforeSend: sentryBeforeSend,
+    integrations: (defaults) =>
+      defaults.filter((i) => i.name !== "Console" && i.name !== "Http"),
+    maxBreadcrumbs: 30,
+  })
+}
 
 const prisma = new PrismaClient()
 const anthropic = new Anthropic()

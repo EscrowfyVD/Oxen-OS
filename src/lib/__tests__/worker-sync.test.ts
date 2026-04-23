@@ -20,6 +20,7 @@ const PAIRS: ReadonlyArray<readonly [string, string]> = [
   ],
   ["src/lib/prisma.ts", "workers/sync-worker/src/lib/prisma.ts"],
   ["src/lib/logger.ts", "workers/sync-worker/src/lib/logger.ts"],
+  ["src/lib/sentry.ts", "workers/sync-worker/src/lib/sentry.ts"],
 ]
 
 function sha256(path: string): string {
