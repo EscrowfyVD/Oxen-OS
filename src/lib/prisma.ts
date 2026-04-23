@@ -1,6 +1,6 @@
 import { PrismaClient, type Prisma } from "@prisma/client"
 import { encryptNullable, decryptNullable } from "./token-encryption"
-import { logger, serializeError } from "./logger"
+import { logger } from "./logger"
 
 /**
  * Prisma client singleton with transparent Account-token encryption.
@@ -51,17 +51,11 @@ function decryptAccountRecord<T extends Record<string, unknown> | null>(
   const out: Record<string, unknown> = { ...record }
   for (const field of ACCOUNT_ENCRYPTED_FIELDS) {
     if (field in out && typeof out[field] === "string") {
-      try {
-        out[field] = decryptNullable(out[field] as string)
-      } catch (err) {
-        // Fallback : si le déchiffrement échoue, on log mais on ne plante pas.
-        // Cela peut arriver pendant la migration one-shot ou si un token
-        // legacy non chiffré a échappé au script.
-        logger.error(
-          { err: serializeError(err), field },
-          `prisma: failed to decrypt Account.${field}, returning raw value`
-        )
-      }
+      // Sprint 1.3bis: removed try/catch fallback. Decrypt failures now
+      // throw and propagate to Sentry (Sprint 2.4b) so real regressions
+      // are detected immediately rather than silently returning corrupted
+      // tokens to Google APIs. Migration one-shot completed 2026-04-22.
+      out[field] = decryptNullable(out[field] as string)
     }
   }
   return out as T
