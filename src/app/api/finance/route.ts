@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateBody, validateSearchParams } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { createFinanceEntrySchema, listFinanceEntriesQuery } from "./_schemas"
 
 export async function GET(request: Request) {
@@ -40,7 +41,11 @@ export async function GET(request: Request) {
 
   const total = await prisma.financeEntry.count({ where })
 
-  return NextResponse.json({ entries, total })
+  // Sprint 3.2 — serialize Decimal amount for JSON.
+  return NextResponse.json({
+    entries: entries.map((e) => ({ ...e, amount: serializeMoney(e.amount) ?? 0 })),
+    total,
+  })
 }
 
 export async function POST(request: Request) {
@@ -68,5 +73,8 @@ export async function POST(request: Request) {
     },
   })
 
-  return NextResponse.json({ entry }, { status: 201 })
+  return NextResponse.json(
+    { entry: { ...entry, amount: serializeMoney(entry.amount) ?? 0 } },
+    { status: 201 },
+  )
 }

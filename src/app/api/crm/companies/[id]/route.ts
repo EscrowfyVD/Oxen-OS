@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateBody } from "@/lib/validate"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 import { updateCompanySchema } from "../../_schemas"
 
 export async function GET(
@@ -55,17 +56,28 @@ export async function GET(
     return NextResponse.json({ error: "Company not found" }, { status: 404 })
   }
 
-  // Compute aggregates
+  // Compute aggregates (Sprint 3.2: sum in Decimal precision, serialize at the boundary).
   const activeDeals = company.deals.filter(
     (d) => d.stage !== "closed_won" && d.stage !== "closed_lost"
   )
   const wonDeals = company.deals.filter((d) => d.stage === "closed_won")
-  const totalDealValue = company.deals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-  const totalWeightedValue = activeDeals.reduce((s, d) => s + (d.weightedValue ?? 0), 0)
-  const wonRevenue = wonDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
+  const totalDealValue = serializeMoney(sumDecimals(company.deals.map((d) => d.dealValue))) ?? 0
+  const totalWeightedValue = serializeMoney(sumDecimals(activeDeals.map((d) => d.weightedValue))) ?? 0
+  const wonRevenue = serializeMoney(sumDecimals(wonDeals.map((d) => d.dealValue))) ?? 0
+
+  // Sprint 3.2 — serialize Decimal fields on the company + nested deals for JSON.
+  const serializedCompany = {
+    ...company,
+    totalRevenue: serializeMoney(company.totalRevenue) ?? 0,
+    deals: company.deals.map((d) => ({
+      ...d,
+      dealValue: serializeMoney(d.dealValue),
+      weightedValue: serializeMoney(d.weightedValue),
+    })),
+  }
 
   return NextResponse.json({
-    company,
+    company: serializedCompany,
     aggregates: {
       totalContacts: company.contacts.length,
       activeDealsCount: activeDeals.length,
@@ -130,5 +142,8 @@ export async function PATCH(
     },
   })
 
-  return NextResponse.json({ company })
+  // Sprint 3.2 — serialize totalRevenue (Decimal) for JSON.
+  return NextResponse.json({
+    company: { ...company, totalRevenue: serializeMoney(company.totalRevenue) ?? 0 },
+  })
 }

@@ -275,7 +275,7 @@ model Company {
   // Computed
   contactsCount   Int      @default(0)
   activeDealsCount Int     @default(0)
-  totalRevenue    Float    @default(0)
+  totalRevenue    Decimal  @default(0) @db.Decimal(19, 4)
   // Relations
   contacts        CrmContact[]
   deals           Deal[]
@@ -375,14 +375,14 @@ model Deal {
   companyId       String?
   company         Company? @relation(fields: [companyId], references: [id])
   stage           String   @default("new_lead") // 9 stages
-  dealValue       Float?   // estimated monthly revenue
+  dealValue       Decimal? @db.Decimal(19, 4) // estimated monthly revenue
   dealOwner       String   // "Andy", "Paul Louis", "Vernon"
   acquisitionSource       String?
   acquisitionSourceDetail String?
   vertical        String[]
   expectedCloseDate DateTime?
   winProbability  Float?   // auto-set from stage, manually adjustable
-  weightedValue   Float?   // dealValue × winProbability
+  weightedValue   Decimal? @db.Decimal(19, 4) // dealValue × winProbability
   // Lost tracking
   lostReason      String?  // REQUIRED when closed_lost
   lostNotes       String?  @db.Text
@@ -504,7 +504,7 @@ model FinanceEntry {
   type        String   // "revenue", "expense", "budget"
   category    String
   description String?
-  amount      Float
+  amount      Decimal  @db.Decimal(19, 4)
   currency    String   @default("EUR")
   date        DateTime
   entity      String   @default("oxen")
@@ -520,10 +520,10 @@ model FinanceTransaction {
   type            String    // "revenue", "expense"
   category        String
   description     String?
-  amount          Float
+  amount          Decimal   @db.Decimal(19, 4)
   currency        String    @default("EUR")
-  exchangeRate    Float?    @default(1)
-  amountEur       Float?    // Normalized EUR amount
+  exchangeRate    Decimal?  @default(1) @db.Decimal(19, 8)
+  amountEur       Decimal?  @db.Decimal(19, 4) // Normalized EUR amount
   date            DateTime
   entity          String    @default("oxen")
   recurring       Boolean   @default(false)
@@ -551,7 +551,7 @@ model FinanceTransaction {
 model FinanceBudget {
   id        String   @id @default(cuid())
   category  String
-  amount    Float
+  amount    Decimal  @db.Decimal(19, 4)
   month     String   // "YYYY-MM"
   entityId  String   @default("oxen")
   notes     String?
@@ -570,7 +570,7 @@ model BankAccount {
   iban          String?
   accountType   String   @default("operating") // "operating", "savings", "escrow", "card"
   entity        String   @default("oxen")
-  currentBalance Float   @default(0)
+  currentBalance Decimal @default(0) @db.Decimal(19, 4)
   lastUpdated   DateTime @default(now())
   isActive      Boolean  @default(true)
   notes         String?
@@ -954,12 +954,12 @@ model ConferenceAttendee {
   role            String?
   confirmed       Boolean    @default(true)
   reportSubmitted Boolean    @default(false)
-  ticketCost      Float?     @default(0)
-  hotelCost       Float?     @default(0)
-  flightCost      Float?     @default(0)
-  taxiCost        Float?     @default(0)
-  mealsCost       Float?     @default(0)
-  otherCost       Float?     @default(0)
+  ticketCost      Decimal?   @default(0) @db.Decimal(19, 4)
+  hotelCost       Decimal?   @default(0) @db.Decimal(19, 4)
+  flightCost      Decimal?   @default(0) @db.Decimal(19, 4)
+  taxiCost        Decimal?   @default(0) @db.Decimal(19, 4)
+  mealsCost       Decimal?   @default(0) @db.Decimal(19, 4)
+  otherCost       Decimal?   @default(0) @db.Decimal(19, 4)
   budgetNotes     String?
   createdAt       DateTime   @default(now())
 }
@@ -1141,7 +1141,7 @@ model ComplianceIncident {
   regulatorRef    String?   // regulator reference number
   reportedAt      DateTime?
   resolvedAt      DateTime?
-  financialImpact Float?
+  financialImpact Decimal? @db.Decimal(19, 4)
   currency        String    @default("EUR")
   tags            String[]
   createdBy       String

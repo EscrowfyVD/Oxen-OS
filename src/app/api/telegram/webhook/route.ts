@@ -372,11 +372,13 @@ async function handleDigest(chatId: number) {
     })
     if (deals.length > 0) {
       contextParts.push("\n## Your Active Pipeline")
+      // Sprint 3.2 — d.dealValue is Prisma.Decimal; convert once per row.
       let totalValue = 0
       for (const d of deals) {
-        totalValue += d.dealValue || 0
+        const dv = d.dealValue ? d.dealValue.toNumber() : 0
+        totalValue += dv
         const company = d.contact?.company?.name || `${d.contact?.firstName || ""} ${d.contact?.lastName || ""}`.trim() || "?"
-        contextParts.push(`- ${d.dealName} (${company}) — ${d.stage} — €${d.dealValue?.toLocaleString() || "?"}`)
+        contextParts.push(`- ${d.dealName} (${company}) — ${d.stage} — €${dv.toLocaleString() || "?"}`)
       }
       contextParts.push(`Total pipeline: €${totalValue.toLocaleString()}`)
     }
@@ -507,11 +509,13 @@ async function handlePipeline(chatId: number) {
     const stageCounts: Record<string, { count: number; value: number }> = {}
     let totalValue = 0
 
+    // Sprint 3.2 — deal.dealValue is Prisma.Decimal; convert once per row.
     for (const deal of deals) {
+      const dv = deal.dealValue ? deal.dealValue.toNumber() : 0
       if (!stageCounts[deal.stage]) stageCounts[deal.stage] = { count: 0, value: 0 }
       stageCounts[deal.stage].count++
-      stageCounts[deal.stage].value += deal.dealValue || 0
-      totalValue += deal.dealValue || 0
+      stageCounts[deal.stage].value += dv
+      totalValue += dv
     }
 
     let reply = `📊 <b>Your Pipeline</b>\n\n`

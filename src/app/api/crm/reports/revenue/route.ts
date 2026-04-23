@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 
 export async function GET() {
   const { error } = await requirePageAccess("crm")
@@ -27,23 +28,26 @@ export async function GET() {
     },
   })
 
+  // Sprint 3.2 — dealValue is Decimal; convert each to number once, then aggregate.
   // Revenue by acquisition source
   const bySource: Record<string, { count: number; totalValue: number }> = {}
   for (const deal of wonDeals) {
     const source = deal.acquisitionSource ?? "Unknown"
+    const dv = serializeMoney(deal.dealValue) ?? 0
     if (!bySource[source]) bySource[source] = { count: 0, totalValue: 0 }
     bySource[source].count++
-    bySource[source].totalValue += deal.dealValue ?? 0
+    bySource[source].totalValue += dv
   }
 
   // Revenue by vertical
   const byVertical: Record<string, { count: number; totalValue: number }> = {}
   for (const deal of wonDeals) {
     const verticals = deal.vertical.length > 0 ? deal.vertical : ["Uncategorized"]
+    const dv = serializeMoney(deal.dealValue) ?? 0
     for (const v of verticals) {
       if (!byVertical[v]) byVertical[v] = { count: 0, totalValue: 0 }
       byVertical[v].count++
-      byVertical[v].totalValue += deal.dealValue ?? 0
+      byVertical[v].totalValue += dv
     }
   }
 
@@ -51,12 +55,13 @@ export async function GET() {
   const byGeoZone: Record<string, { count: number; totalValue: number }> = {}
   for (const deal of wonDeals) {
     const geo = deal.company?.geoZone ?? deal.contact?.geoZone ?? "Unknown"
+    const dv = serializeMoney(deal.dealValue) ?? 0
     if (!byGeoZone[geo]) byGeoZone[geo] = { count: 0, totalValue: 0 }
     byGeoZone[geo].count++
-    byGeoZone[geo].totalValue += deal.dealValue ?? 0
+    byGeoZone[geo].totalValue += dv
   }
 
-  const totalRevenue = wonDeals.reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
+  const totalRevenue = serializeMoney(sumDecimals(wonDeals.map((d) => d.dealValue))) ?? 0
 
   return NextResponse.json({
     revenue: {

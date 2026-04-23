@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 
 const anthropic = new Anthropic()
@@ -14,7 +15,8 @@ async function checkDealHealth(deal: {
   id: string
   dealName: string
   stage: string
-  dealValue: number | null
+  // Sprint 3.2: dealValue is Prisma.Decimal (stringified only in the prompt, no arithmetic here).
+  dealValue: Prisma.Decimal | null
   dealOwner: string
   daysInCurrentStage: number
   daysSinceLastActivity: number

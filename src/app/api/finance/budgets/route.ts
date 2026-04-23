@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateBody, validateSearchParams } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { upsertBudgetsSchema, budgetsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
@@ -42,14 +43,22 @@ export async function GET(request: Request) {
 
   const actualMap: Record<string, number> = {}
   for (const a of actuals) {
-    actualMap[a.category] = a._sum.amountEur ?? a._sum.amount ?? 0
+    actualMap[a.category] = serializeMoney(a._sum.amountEur ?? a._sum.amount) ?? 0
   }
 
-  const budgetsWithActual = budgets.map((b) => ({
-    ...b,
-    actual: actualMap[b.category] || 0,
-    variance: b.amount - (actualMap[b.category] || 0),
-  }))
+  // Sprint 3.2 — serialize Decimal fields for the JSON response
+  // (default JSON serializer turns Decimal into a string, which would break
+  // frontend reducers that use sum + v.amount).
+  const budgetsWithActual = budgets.map((b) => {
+    const amount = serializeMoney(b.amount) ?? 0
+    const actual = actualMap[b.category] || 0
+    return {
+      ...b,
+      amount,
+      actual,
+      variance: amount - actual,
+    }
+  })
 
   return NextResponse.json({ budgets: budgetsWithActual })
 }

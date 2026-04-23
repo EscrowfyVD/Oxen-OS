@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { STAGE_PROBABILITY, getOwnerForGeo } from "@/lib/crm-config"
 import { validateBody, validateSearchParams } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { createDealSchema, listDealsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
@@ -60,7 +61,14 @@ export async function GET(request: Request) {
     orderBy: { [sortBy]: sortDir },
   })
 
-  return NextResponse.json({ deals })
+  // Sprint 3.2 — serialize Decimal fields for JSON (frontend reducers expect number).
+  return NextResponse.json({
+    deals: deals.map((d) => ({
+      ...d,
+      dealValue: serializeMoney(d.dealValue),
+      weightedValue: serializeMoney(d.weightedValue),
+    })),
+  })
 }
 
 export async function POST(request: Request) {
@@ -161,5 +169,15 @@ export async function POST(request: Request) {
     },
   })
 
-  return NextResponse.json({ deal }, { status: 201 })
+  // Sprint 3.2 — serialize Decimal fields on the returned deal.
+  return NextResponse.json(
+    {
+      deal: {
+        ...deal,
+        dealValue: serializeMoney(deal.dealValue),
+        weightedValue: serializeMoney(deal.weightedValue),
+      },
+    },
+    { status: 201 },
+  )
 }

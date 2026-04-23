@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateSearchParams } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { summaryQuery } from "../_schemas"
 
 export async function GET(request: Request) {
@@ -50,8 +51,9 @@ export async function GET(request: Request) {
   for (const e of allEntries) {
     const key = `${e.date.getFullYear()}-${String(e.date.getMonth() + 1).padStart(2, "0")}`
     if (!monthlyTotals[key]) monthlyTotals[key] = { revenue: 0, expense: 0 }
-    if (e.type === "revenue") monthlyTotals[key].revenue += e.amount
-    else monthlyTotals[key].expense += e.amount
+    const amt = serializeMoney(e.amount) ?? 0
+    if (e.type === "revenue") monthlyTotals[key].revenue += amt
+    else monthlyTotals[key].expense += amt
   }
 
   const monthlyTrend = Object.entries(monthlyTotals)
@@ -64,7 +66,7 @@ export async function GET(request: Request) {
     where: { ...baseWhere, type: "expense", date: { gte: threeMonthsAgo, lte: monthEnd } },
     _sum: { amount: true },
   })
-  const burnRate = (recentExpenses._sum.amount || 0) / 3
+  const burnRate = (serializeMoney(recentExpenses._sum.amount) ?? 0) / 3
 
   // Expense breakdown by category (current month)
   const expensesByCategory = await prisma.financeEntry.groupBy({
@@ -88,20 +90,20 @@ export async function GET(request: Request) {
     select: { category: true, amount: true },
   })
 
-  // Build P&L: budget vs actual by category
+  // Build P&L: budget vs actual by category (Sprint 3.2: serialize Decimals at the boundary).
   const budgetMap: Record<string, number> = {}
   for (const b of budgets) {
-    budgetMap[b.category] = (budgetMap[b.category] || 0) + b.amount
+    budgetMap[b.category] = (budgetMap[b.category] || 0) + (serializeMoney(b.amount) ?? 0)
   }
 
   const expenseMap: Record<string, number> = {}
   for (const e of expensesByCategory) {
-    expenseMap[e.category] = e._sum.amount || 0
+    expenseMap[e.category] = serializeMoney(e._sum.amount) ?? 0
   }
 
   const revenueMap: Record<string, number> = {}
   for (const r of revenueByCategory) {
-    revenueMap[r.category] = r._sum.amount || 0
+    revenueMap[r.category] = serializeMoney(r._sum.amount) ?? 0
   }
 
   // All categories that appear in either budget or actual
@@ -113,20 +115,22 @@ export async function GET(request: Request) {
     variance: (budgetMap[cat] || 0) - (expenseMap[cat] || 0),
   }))
 
+  const revenueTotal = serializeMoney(monthlyRevenue._sum.amount) ?? 0
+  const expenseTotal = serializeMoney(monthlyExpenses._sum.amount) ?? 0
   const summary = {
     month: targetMonth,
-    revenue: monthlyRevenue._sum.amount || 0,
-    expenses: monthlyExpenses._sum.amount || 0,
-    netProfit: (monthlyRevenue._sum.amount || 0) - (monthlyExpenses._sum.amount || 0),
+    revenue: revenueTotal,
+    expenses: expenseTotal,
+    netProfit: revenueTotal - expenseTotal,
     burnRate,
     monthlyTrend,
     expensesByCategory: expensesByCategory.map((e) => ({
       category: e.category,
-      amount: e._sum.amount || 0,
+      amount: serializeMoney(e._sum.amount) ?? 0,
     })),
     revenueByCategory: revenueByCategory.map((r) => ({
       category: r.category,
-      amount: r._sum.amount || 0,
+      amount: serializeMoney(r._sum.amount) ?? 0,
     })),
     budgetVsActual,
   }

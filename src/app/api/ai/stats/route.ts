@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { serializeMoney } from "@/lib/decimal"
 
 export async function GET() {
   const session = await auth()
@@ -58,7 +59,8 @@ export async function GET() {
       },
       _sum: { dealValue: true },
     })
-    revenueAtRisk = atRiskDeals._sum.dealValue ?? 0
+    // Sprint 3.2 — _sum.dealValue is Prisma.Decimal | null; serialize for JSON.
+    revenueAtRisk = serializeMoney(atRiskDeals._sum.dealValue) ?? 0
   }
 
   return NextResponse.json({

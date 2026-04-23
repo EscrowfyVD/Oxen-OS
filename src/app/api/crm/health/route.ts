@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 
 export async function GET() {
   const { error } = await requirePageAccess("crm")
@@ -35,6 +36,10 @@ export async function GET() {
     orderBy: { relationshipScore: "desc" },
   })
 
+  // Sprint 3.2 — Decimal-precision aggregation, serialize once per bucket.
+  const customerDealTotal = (c: (typeof customers)[number]): import("@prisma/client").Prisma.Decimal =>
+    sumDecimals(c.deals.map((d) => d.dealValue))
+
   // Relationship strength distribution
   const strengthValues = ["strong", "warm", "cold", "no_relationship"]
   const distribution = strengthValues.map((strength) => {
@@ -42,10 +47,7 @@ export async function GET() {
     return {
       status: strength,
       count: filtered.length,
-      totalDealValue: filtered.reduce(
-        (s, c) => s + c.deals.reduce((ds, d) => ds + (d.dealValue ?? 0), 0),
-        0
-      ),
+      totalDealValue: serializeMoney(sumDecimals(filtered.map(customerDealTotal))) ?? 0,
     }
   })
 
@@ -60,10 +62,7 @@ export async function GET() {
   const byVertical = Array.from(verticalMap.entries()).map(([vertical, vCustomers]) => ({
     vertical,
     count: vCustomers.length,
-    totalDealValue: vCustomers.reduce(
-      (s, c) => s + c.deals.reduce((ds, d) => ds + (d.dealValue ?? 0), 0),
-      0
-    ),
+    totalDealValue: serializeMoney(sumDecimals(vCustomers.map(customerDealTotal))) ?? 0,
     avgRelationshipScore:
       vCustomers.length > 0
         ? Math.round(
@@ -74,8 +73,10 @@ export async function GET() {
 
   return NextResponse.json({
     health: {
+      // Sprint 3.2 — serialize nested Decimal deals for JSON.
       customers: customers.map((c) => ({
         ...c,
+        deals: c.deals.map((d) => ({ ...d, dealValue: serializeMoney(d.dealValue) })),
         name: `${c.firstName} ${c.lastName}`,
         company: c.company?.name ?? null,
       })),

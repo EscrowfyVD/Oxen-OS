@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateSearchParams } from "@/lib/validate"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 import { overviewQuery } from "../_schemas"
 
 export async function GET(request: Request) {
@@ -35,8 +36,9 @@ export async function GET(request: Request) {
     }),
   ])
 
-  const revenue = monthRevenue._sum.amountEur ?? monthRevenue._sum.amount ?? 0
-  const expenses = monthExpenses._sum.amountEur ?? monthExpenses._sum.amount ?? 0
+  // Sprint 3.2 — convert Decimal aggregates to number at the route boundary.
+  const revenue = serializeMoney(monthRevenue._sum.amountEur ?? monthRevenue._sum.amount) ?? 0
+  const expenses = serializeMoney(monthExpenses._sum.amountEur ?? monthExpenses._sum.amount) ?? 0
   const netProfit = revenue - expenses
 
   // Last 12 months trend
@@ -54,7 +56,7 @@ export async function GET(request: Request) {
   for (const t of allTx) {
     const key = `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, "0")}`
     if (!monthlyTotals[key]) monthlyTotals[key] = { revenue: 0, expense: 0 }
-    const amt = t.amountEur ?? t.amount
+    const amt = serializeMoney(t.amountEur ?? t.amount) ?? 0
     if (t.type === "revenue") monthlyTotals[key].revenue += amt
     else monthlyTotals[key].expense += amt
   }
@@ -69,7 +71,7 @@ export async function GET(request: Request) {
     where: { ...entityWhere, type: "expense", date: { gte: threeMonthsAgo, lte: monthEnd } },
     _sum: { amountEur: true, amount: true },
   })
-  const burnRate = (recentExp._sum.amountEur ?? recentExp._sum.amount ?? 0) / 3
+  const burnRate = (serializeMoney(recentExp._sum.amountEur ?? recentExp._sum.amount) ?? 0) / 3
 
   // Category breakdowns
   const [expensesByCat, revenueByCat] = await Promise.all([
@@ -92,10 +94,10 @@ export async function GET(request: Request) {
   if (entity && entity !== "all") budgetWhere.entityId = entity
   const budgets = await prisma.financeBudget.findMany({ where: budgetWhere })
   const budgetMap: Record<string, number> = {}
-  for (const b of budgets) budgetMap[b.category] = (budgetMap[b.category] || 0) + b.amount
+  for (const b of budgets) budgetMap[b.category] = (budgetMap[b.category] || 0) + (serializeMoney(b.amount) ?? 0)
 
   const expenseMap: Record<string, number> = {}
-  for (const e of expensesByCat) expenseMap[e.category] = e._sum.amountEur ?? e._sum.amount ?? 0
+  for (const e of expensesByCat) expenseMap[e.category] = serializeMoney(e._sum.amountEur ?? e._sum.amount) ?? 0
 
   const allCats = new Set([...Object.keys(budgetMap), ...Object.keys(expenseMap)])
   const budgetVsActual = Array.from(allCats).map((cat) => ({
@@ -109,7 +111,8 @@ export async function GET(request: Request) {
   const accounts = await prisma.bankAccount.findMany({
     where: { isActive: true, ...(entity && entity !== "all" ? { entity } : {}) },
   })
-  const totalBalance = accounts.reduce((sum, a) => sum + a.currentBalance, 0)
+  // Sprint 3.2 — aggregate in Decimal precision, then convert once at the boundary.
+  const totalBalance = serializeMoney(sumDecimals(accounts.map((a) => a.currentBalance))) ?? 0
 
   return NextResponse.json({
     summary: {
@@ -121,11 +124,11 @@ export async function GET(request: Request) {
       monthlyTrend,
       expensesByCategory: expensesByCat.map((e) => ({
         category: e.category,
-        amount: e._sum.amountEur ?? e._sum.amount ?? 0,
+        amount: serializeMoney(e._sum.amountEur ?? e._sum.amount) ?? 0,
       })),
       revenueByCategory: revenueByCat.map((r) => ({
         category: r.category,
-        amount: r._sum.amountEur ?? r._sum.amount ?? 0,
+        amount: serializeMoney(r._sum.amountEur ?? r._sum.amount) ?? 0,
       })),
       budgetVsActual,
       totalAccounts: accounts.length,

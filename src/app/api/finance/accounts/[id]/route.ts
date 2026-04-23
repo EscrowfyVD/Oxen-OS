@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateBody } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { updateBankAccountSchema } from "../../_schemas"
 
 export async function PATCH(
@@ -35,7 +36,10 @@ export async function PATCH(
     data,
   })
 
-  return NextResponse.json({ account })
+  // Sprint 3.2 — serialize Decimal currentBalance for JSON.
+  return NextResponse.json({
+    account: { ...account, currentBalance: serializeMoney(account.currentBalance) ?? 0 },
+  })
 }
 
 export async function DELETE(

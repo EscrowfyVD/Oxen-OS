@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 import { VERTICALS, GEO_ZONES } from "@/lib/crm-config"
 
@@ -28,7 +29,8 @@ async function scoreContact(contact: {
   lastInteraction: Date | null
   company: { name: string; industry: string | null; employeeCount: number | null; vertical: string[]; geoZone: string | null } | null
   activities: { type: string; description: string | null; createdAt: Date }[]
-  deals: { dealName: string; stage: string; dealValue: number | null }[]
+  // Sprint 3.2: dealValue is Prisma.Decimal (stringified only in the prompt, no arithmetic here).
+  deals: { dealName: string; stage: string; dealValue: Prisma.Decimal | null }[]
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const prompt = `You are an ICP scoring engine for a B2B payment services company. Target verticals: ${VERTICALS.join(", ")}. Geo zones: ${GEO_ZONES.join(", ")}.

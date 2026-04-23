@@ -1,6 +1,20 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
+import { serializeMoney, toDecimal } from "@/lib/decimal"
+
+// Sprint 3.2 — Pattern C: non-throwing wrapper for monetary user inputs.
+// Preserves exact decimal precision (avoids float drift on fractional values)
+// while keeping the previous graceful-failure semantics of parseFloat || 0.
+function safeMoney(v: unknown): Prisma.Decimal | null {
+  if (v === null || v === undefined || v === "") return null
+  try {
+    return toDecimal(v as string | number)
+  } catch {
+    return null
+  }
+}
 
 export async function GET(
   request: Request,
@@ -26,7 +40,14 @@ export async function GET(
     return NextResponse.json({ error: "Deal not found" }, { status: 404 })
   }
 
-  return NextResponse.json({ deal })
+  // Sprint 3.2 — serialize Decimal fields for JSON.
+  return NextResponse.json({
+    deal: {
+      ...deal,
+      dealValue: serializeMoney(deal.dealValue),
+      weightedValue: serializeMoney(deal.weightedValue),
+    },
+  })
 }
 
 export async function PATCH(
@@ -56,7 +77,8 @@ export async function PATCH(
       ...(dealName !== undefined && { dealName }),
       ...(stage !== undefined && { stage }),
       ...(dealValue !== undefined && {
-        dealValue: dealValue !== null ? parseFloat(dealValue) : null,
+        // Sprint 3.2 — Pattern C: toDecimal preserves exact user-entered precision.
+        dealValue: safeMoney(dealValue),
       }),
       ...(winProbability !== undefined && { winProbability: parseFloat(winProbability) }),
       ...(closeDate !== undefined && {
@@ -81,19 +103,23 @@ export async function PATCH(
 
       let insightType = "buying_signal"
       let severity = "low"
+      // Sprint 3.2 — convert Decimal to number for .toLocaleString() (which on
+      // Decimal returns bare digits with no thousand separators).
+      const dvNum = serializeMoney(deal.dealValue)
+      const dvFmt = dvNum != null ? dvNum.toLocaleString() : "?"
       let title = `Deal "${deal.dealName}" moved to ${stageLabel}`
-      let summary = `Deal "${deal.dealName}" for ${companyName} moved from ${prevLabel} to ${stageLabel}. Expected revenue: EUR${deal.dealValue?.toLocaleString() || "?"}. Probability: ${deal.winProbability || "?"}%.`
+      let summary = `Deal "${deal.dealName}" for ${companyName} moved from ${prevLabel} to ${stageLabel}. Expected revenue: EUR${dvFmt}. Probability: ${deal.winProbability || "?"}%.`
 
       if (stage === "closed_won" || stage === "commit" || stage === "volume_ramp") {
         insightType = "opportunity"
         severity = "medium"
         title = `Deal won: "${deal.dealName}"`
-        summary = `Deal "${deal.dealName}" for ${companyName} has reached ${stageLabel}. Expected revenue: EUR${deal.dealValue?.toLocaleString() || "?"}. Time to celebrate and plan onboarding.`
+        summary = `Deal "${deal.dealName}" for ${companyName} has reached ${stageLabel}. Expected revenue: EUR${dvFmt}. Time to celebrate and plan onboarding.`
       } else if (stage === "closed_lost") {
         insightType = "risk"
         severity = "high"
         title = `Deal lost: "${deal.dealName}"`
-        summary = `Deal "${deal.dealName}" for ${companyName} was marked as lost. Expected revenue was EUR${deal.dealValue?.toLocaleString() || "?"}. Review what happened and document lessons learned.`
+        summary = `Deal "${deal.dealName}" for ${companyName} was marked as lost. Expected revenue was EUR${dvFmt}. Review what happened and document lessons learned.`
       }
 
       await prisma.aIInsight.create({
@@ -111,7 +137,14 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ deal })
+  // Sprint 3.2 — serialize Decimal fields for JSON.
+  return NextResponse.json({
+    deal: {
+      ...deal,
+      dealValue: serializeMoney(deal.dealValue),
+      weightedValue: serializeMoney(deal.weightedValue),
+    },
+  })
 }
 
 export async function DELETE(

@@ -4,6 +4,7 @@ import { requirePageAccess } from "@/lib/admin"
 import { STAGE_PROBABILITY, STAGE_LABELS, getOwnerForGeo } from "@/lib/crm-config"
 import { PLAYBOOK_TEMPLATES } from "@/lib/playbook-templates"
 import { validateBody } from "@/lib/validate"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 import { updateDealStageSchema } from "../../../_schemas"
 
 export async function PATCH(
@@ -49,9 +50,12 @@ export async function PATCH(
   }
 
   // Auto-update winProbability from stage
+  // Sprint 3.2 — deal.dealValue is Prisma.Decimal, convert to number for the
+  // multiplication; Prisma accepts number when writing back to Decimal column.
   const winProbability = STAGE_PROBABILITY[newStage] ?? 0
+  const dealValueNum = serializeMoney(deal.dealValue)
   const weightedValue =
-    deal.dealValue != null ? deal.dealValue * winProbability : null
+    dealValueNum != null ? dealValueNum * winProbability : null
 
   const now = new Date()
 
@@ -143,9 +147,12 @@ export async function PATCH(
       const companyDeals = await prisma.deal.findMany({
         where: { companyId: deal.companyId },
       })
-      const totalRevenue = companyDeals
-        .filter((d) => d.stage === "closed_won")
-        .reduce((s, d) => s + (d.dealValue ?? 0), 0)
+      // Sprint 3.2 — aggregate in Decimal precision, Prisma accepts Decimal directly.
+      const totalRevenue = sumDecimals(
+        companyDeals
+          .filter((d) => d.stage === "closed_won")
+          .map((d) => d.dealValue),
+      )
       const activeCount = companyDeals.filter(
         (d) => d.stage !== "closed_won" && d.stage !== "closed_lost"
       ).length
@@ -213,5 +220,12 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ deal: updatedDeal })
+  // Sprint 3.2 — serialize Decimal fields on the returned deal.
+  return NextResponse.json({
+    deal: {
+      ...updatedDeal,
+      dealValue: serializeMoney(updatedDeal.dealValue),
+      weightedValue: serializeMoney(updatedDeal.weightedValue),
+    },
+  })
 }

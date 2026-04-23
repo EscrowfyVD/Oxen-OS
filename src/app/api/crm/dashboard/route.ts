@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { PIPELINE_STAGES } from "@/lib/crm-config"
+import { serializeMoney } from "@/lib/decimal"
 
 // ─── Date helpers ───
 
@@ -124,7 +125,8 @@ export async function GET(request: Request) {
 
   const kpis = {
     activeDeals,
-    pipelineValue: pipelineAgg._sum.weightedValue ?? 0,
+    // Sprint 3.2 — serialize Decimal aggregate for JSON.
+    pipelineValue: serializeMoney(pipelineAgg._sum.weightedValue) ?? 0,
     meetingsThisWeek,
     overdueTasks,
   }
@@ -138,10 +140,11 @@ export async function GET(request: Request) {
     where: dealOwnerFilter,
   })
 
+  // Sprint 3.2 — serialize Decimal aggregates once per stage.
   const funnelMap = new Map(
     funnelData.map((f) => [
       f.stage,
-      { count: f._count.id, value: f._sum.dealValue ?? 0 },
+      { count: f._count.id, value: serializeMoney(f._sum.dealValue) ?? 0 },
     ])
   )
 
@@ -349,7 +352,8 @@ export async function GET(request: Request) {
       proposalsSent,
       dealsWon,
       dealsLost,
-      revenue: revenueAgg._sum.dealValue ?? 0,
+      // Sprint 3.2 — serialize Decimal aggregate for JSON.
+      revenue: serializeMoney(revenueAgg._sum.dealValue) ?? 0,
     }
   }
 
@@ -360,17 +364,18 @@ export async function GET(request: Request) {
 
   const performance = { thisMonth, lastMonth }
 
+  // Sprint 3.2 — serialize Decimal fields on nested deal objects for JSON.
   return NextResponse.json({
     kpis,
     funnel,
     tasksToday,
     recentActivity,
-    staleDeals,
+    staleDeals: staleDeals.map((d) => ({ ...d, dealValue: serializeMoney(d.dealValue) })),
     followUpCount,
     atRiskDeals: atRiskDeals.map((d) => ({
       id: d.id,
       dealName: d.dealName,
-      dealValue: d.dealValue,
+      dealValue: serializeMoney(d.dealValue),
       aiDealHealth: d.aiDealHealth,
       aiDealHealthReason: d.aiDealHealthReason,
       contactName: d.contact

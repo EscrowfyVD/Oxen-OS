@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateBody } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { updateDealSchema } from "../../_schemas"
 
 export async function GET(
@@ -56,7 +57,14 @@ export async function GET(
     return NextResponse.json({ error: "Deal not found" }, { status: 404 })
   }
 
-  return NextResponse.json({ deal })
+  // Sprint 3.2 — serialize Decimal fields (dealValue, weightedValue) for JSON.
+  return NextResponse.json({
+    deal: {
+      ...deal,
+      dealValue: serializeMoney(deal.dealValue),
+      weightedValue: serializeMoney(deal.weightedValue),
+    },
+  })
 }
 
 export async function PATCH(
@@ -79,10 +87,12 @@ export async function PATCH(
   const userId = session.user?.email ?? "unknown"
 
   // Zod already coerced dealValue to number|null and validated other fields.
-  // Recalculate weightedValue if either dealValue or winProbability changed.
-  const newDealValue = body.dealValue !== undefined
-    ? (body.dealValue as number | null)
-    : existing.dealValue
+  // Sprint 3.2 — existing.dealValue is Prisma.Decimal; convert to number for
+  // the arithmetic, Prisma accepts number when writing back to Decimal column.
+  const newDealValue: number | null =
+    body.dealValue !== undefined
+      ? (body.dealValue as number | null)
+      : serializeMoney(existing.dealValue)
   const newWinProbability = body.winProbability !== undefined
     ? (body.winProbability as number)
     : existing.winProbability
@@ -121,5 +131,12 @@ export async function PATCH(
     },
   })
 
-  return NextResponse.json({ deal })
+  // Sprint 3.2 — serialize Decimal fields for the JSON response.
+  return NextResponse.json({
+    deal: {
+      ...deal,
+      dealValue: serializeMoney(deal.dealValue),
+      weightedValue: serializeMoney(deal.weightedValue),
+    },
+  })
 }

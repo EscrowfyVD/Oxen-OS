@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateBody, validateSearchParams } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { createCompanySchema, listCompaniesQuery } from "../_schemas"
 
 export async function GET(request: Request) {
@@ -53,7 +54,18 @@ export async function GET(request: Request) {
     orderBy: { [sortBy]: sortDir },
   })
 
-  return NextResponse.json({ companies })
+  // Sprint 3.2 — serialize Decimal fields on company.totalRevenue + nested deals.
+  return NextResponse.json({
+    companies: companies.map((c) => ({
+      ...c,
+      totalRevenue: serializeMoney(c.totalRevenue) ?? 0,
+      deals: c.deals.map((d) => ({
+        ...d,
+        dealValue: serializeMoney(d.dealValue),
+        weightedValue: serializeMoney(d.weightedValue),
+      })),
+    })),
+  })
 }
 
 function extractDomain(website: string): string | null {
@@ -127,5 +139,9 @@ export async function POST(request: Request) {
     },
   })
 
-  return NextResponse.json({ company }, { status: 201 })
+  // Sprint 3.2 — serialize totalRevenue (Decimal) for JSON.
+  return NextResponse.json(
+    { company: { ...company, totalRevenue: serializeMoney(company.totalRevenue) ?? 0 } },
+    { status: 201 },
+  )
 }

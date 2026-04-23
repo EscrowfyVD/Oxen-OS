@@ -2,7 +2,24 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateBody } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { updateFinanceTransactionSchema } from "../../_schemas"
+
+// Sprint 3.2 — serialize Decimal fields on a FinanceTransaction for JSON.
+function serializeTx<
+  T extends {
+    amount: import("@prisma/client").Prisma.Decimal
+    amountEur: import("@prisma/client").Prisma.Decimal | null
+    exchangeRate: import("@prisma/client").Prisma.Decimal | null
+  },
+>(t: T) {
+  return {
+    ...t,
+    amount: serializeMoney(t.amount) ?? 0,
+    amountEur: serializeMoney(t.amountEur),
+    exchangeRate: serializeMoney(t.exchangeRate),
+  }
+}
 
 export async function GET(
   request: Request,
@@ -21,7 +38,7 @@ export async function GET(
     return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
   }
 
-  return NextResponse.json({ transaction })
+  return NextResponse.json({ transaction: serializeTx(transaction) })
 }
 
 export async function PATCH(
@@ -63,7 +80,7 @@ export async function PATCH(
     include: { contact: { select: { id: true, firstName: true, lastName: true, company: { select: { id: true, name: true } } } } },
   })
 
-  return NextResponse.json({ transaction })
+  return NextResponse.json({ transaction: serializeTx(transaction) })
 }
 
 export async function DELETE(

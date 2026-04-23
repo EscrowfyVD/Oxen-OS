@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
 import { validateBody, validateSearchParams } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { createIncidentSchema, listIncidentsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
@@ -29,7 +30,13 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" },
     })
 
-    return NextResponse.json({ incidents })
+    // Sprint 3.2 — serialize Decimal financialImpact for JSON.
+    return NextResponse.json({
+      incidents: incidents.map((i) => ({
+        ...i,
+        financialImpact: serializeMoney(i.financialImpact),
+      })),
+    })
   } catch (error) {
     console.error("[Compliance Incidents GET] Error:", error)
     return NextResponse.json({ error: "Failed to fetch incidents" }, { status: 500 })
@@ -92,7 +99,11 @@ export async function POST(request: Request) {
       logActivity("sar_filed", `SAR filed: ${code} - ${title}`, userId, entityId || undefined, `/compliance/incidents`)
     }
 
-    return NextResponse.json({ incident }, { status: 201 })
+    // Sprint 3.2 — serialize Decimal financialImpact for JSON.
+    return NextResponse.json(
+      { incident: { ...incident, financialImpact: serializeMoney(incident.financialImpact) } },
+      { status: 201 },
+    )
   } catch (error) {
     console.error("[Compliance Incidents POST] Error:", error)
     return NextResponse.json({ error: "Failed to create incident" }, { status: 500 })

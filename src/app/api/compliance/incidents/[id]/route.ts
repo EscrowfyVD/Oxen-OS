@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { logActivity } from "@/lib/activity"
 import { validateBody } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { updateIncidentSchema } from "../../_schemas"
 
 export async function GET(
@@ -24,7 +25,10 @@ export async function GET(
 
     if (!incident) return NextResponse.json({ error: "Incident not found" }, { status: 404 })
 
-    return NextResponse.json({ incident })
+    // Sprint 3.2 — serialize Decimal financialImpact for JSON.
+    return NextResponse.json({
+      incident: { ...incident, financialImpact: serializeMoney(incident.financialImpact) },
+    })
   } catch (error) {
     console.error("[Compliance Incident GET] Error:", error)
     return NextResponse.json({ error: "Failed to fetch incident" }, { status: 500 })
@@ -86,7 +90,10 @@ export async function PATCH(
 
     logActivity("incident_updated", `Updated incident ${existing.code}: ${incident.title}`, userId, existing.entityId || undefined, `/compliance/incidents`)
 
-    return NextResponse.json({ incident })
+    // Sprint 3.2 — serialize Decimal financialImpact for JSON.
+    return NextResponse.json({
+      incident: { ...incident, financialImpact: serializeMoney(incident.financialImpact) },
+    })
   } catch (error) {
     console.error("[Compliance Incident PATCH] Error:", error)
     return NextResponse.json({ error: "Failed to update incident" }, { status: 500 })

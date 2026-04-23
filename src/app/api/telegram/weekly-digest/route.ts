@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramMessage } from "@/lib/telegram"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 
 // No auth required — called by sync worker cron
 export async function POST(request: Request) {
@@ -108,10 +109,11 @@ async function buildMondayPersonalDigest(ownerName: string): Promise<string> {
     select: { dealValue: true, winProbability: true, stage: true },
   })
 
+  // Sprint 3.2 — d.dealValue is Prisma.Decimal; convert once per row for arithmetic.
   const totalActive = activeDeals.length
-  const totalPipeline = activeDeals.reduce((sum, d) => sum + (d.dealValue || 0), 0)
+  const totalPipeline = serializeMoney(sumDecimals(activeDeals.map((d) => d.dealValue))) ?? 0
   const weightedPipeline = activeDeals.reduce(
-    (sum, d) => sum + (d.dealValue || 0) * (d.winProbability || 0),
+    (sum, d) => sum + (d.dealValue ? d.dealValue.toNumber() : 0) * (d.winProbability || 0),
     0,
   )
 
@@ -161,7 +163,7 @@ async function buildMondayPersonalDigest(ownerName: string): Promise<string> {
       stageChangedAt: { gte: lastWeekStart, lt: weekStart },
     },
   })
-  const wonValue = dealsWonLastWeek.reduce((s, d) => s + (d.dealValue || 0), 0)
+  const wonValue = serializeMoney(sumDecimals(dealsWonLastWeek.map((d) => d.dealValue))) ?? 0
 
   // Needs attention
   const staleDeals = await prisma.deal.count({
@@ -268,7 +270,7 @@ async function buildMondayTeamDigest(): Promise<string> {
     select: { dealValue: true, dealOwner: true, stage: true },
   })
   const totalDeals = allActiveDeals.length
-  const totalValue = allActiveDeals.reduce((s, d) => s + (d.dealValue || 0), 0)
+  const totalValue = serializeMoney(sumDecimals(allActiveDeals.map((d) => d.dealValue))) ?? 0
 
   // New leads
   const newLeads = await prisma.crmContact.count({
@@ -283,7 +285,7 @@ async function buildMondayTeamDigest(): Promise<string> {
   const lostDeals = await prisma.deal.count({
     where: { stage: "closed_lost", closedAt: { gte: lastWeekStart, lt: weekStart } },
   })
-  const wonValue = wonDeals.reduce((s, d) => s + (d.dealValue || 0), 0)
+  const wonValue = serializeMoney(sumDecimals(wonDeals.map((d) => d.dealValue))) ?? 0
 
   // Per rep
   const DEAL_OWNERS = ["Andy", "Paul Louis", "Vernon"]
@@ -303,7 +305,7 @@ async function buildMondayTeamDigest(): Promise<string> {
     repStats.push({
       name: owner,
       active: repDeals.length,
-      pipeline: repDeals.reduce((s, d) => s + (d.dealValue || 0), 0),
+      pipeline: serializeMoney(sumDecimals(repDeals.map((d) => d.dealValue))) ?? 0,
       meetings: Math.round(meetings / DEAL_OWNERS.length), // rough split
     })
   }
@@ -330,7 +332,7 @@ async function buildMondayTeamDigest(): Promise<string> {
     },
     _sum: { dealValue: true },
   })
-  const pipelineDelta = totalValue - (lastWeekValue._sum.dealValue || 0)
+  const pipelineDelta = totalValue - (serializeMoney(lastWeekValue._sum.dealValue) ?? 0)
 
   // Win rate this month
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)

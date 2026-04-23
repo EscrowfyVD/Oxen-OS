@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { SLA_TIMES, getNextAgent, detectPriority } from "@/lib/support-config"
 import { sendTelegramMessage } from "@/lib/telegram"
+import { serializeMoney } from "@/lib/decimal"
 
 interface AutoTicketInput {
   subject: string
@@ -30,7 +31,9 @@ export async function createAutoTicket(input: AutoTicketInput): Promise<AutoTick
     })
     if (contact) {
       contactId = contact.id
-      dealValue = contact.deals[0]?.dealValue ?? null
+      // Sprint 3.2: dealValue is now Prisma.Decimal | null — convert to number
+      // for detectPriority(), which compares against a numeric threshold.
+      dealValue = serializeMoney(contact.deals[0]?.dealValue ?? null)
     }
   }
 

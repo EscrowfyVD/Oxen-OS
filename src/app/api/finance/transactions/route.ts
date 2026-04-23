@@ -2,7 +2,24 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateBody, validateSearchParams } from "@/lib/validate"
+import { serializeMoney } from "@/lib/decimal"
 import { createFinanceTransactionSchema, listFinanceTransactionsQuery } from "../_schemas"
+
+// Sprint 3.2 — centralize transaction Decimal serialization for JSON responses.
+function serializeTx<
+  T extends {
+    amount: import("@prisma/client").Prisma.Decimal
+    amountEur: import("@prisma/client").Prisma.Decimal | null
+    exchangeRate: import("@prisma/client").Prisma.Decimal | null
+  },
+>(t: T) {
+  return {
+    ...t,
+    amount: serializeMoney(t.amount) ?? 0,
+    amountEur: serializeMoney(t.amountEur),
+    exchangeRate: serializeMoney(t.exchangeRate),
+  }
+}
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("finance")
@@ -49,7 +66,12 @@ export async function GET(request: Request) {
     prisma.financeTransaction.count({ where }),
   ])
 
-  return NextResponse.json({ transactions, total, page, limit })
+  return NextResponse.json({
+    transactions: transactions.map(serializeTx),
+    total,
+    page,
+    limit,
+  })
 }
 
 export async function POST(request: Request) {
@@ -97,5 +119,5 @@ export async function POST(request: Request) {
     },
   })
 
-  return NextResponse.json({ transaction }, { status: 201 })
+  return NextResponse.json({ transaction: serializeTx(transaction) }, { status: 201 })
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { serializeMoney } from "@/lib/decimal"
 
 export async function GET() {
   const { error } = await requirePageAccess("crm")
@@ -19,15 +20,16 @@ export async function GET() {
     where: { stage: { notIn: ["closed_won", "closed_lost"] } },
     _sum: { dealValue: true, weightedValue: true },
   })
-  const pipelineValue = pipelineAgg._sum.dealValue ?? 0
-  const pipelineWeightedValue = pipelineAgg._sum.weightedValue ?? 0
+  // Sprint 3.2 — serialize Decimal aggregates to number at the route boundary.
+  const pipelineValue = serializeMoney(pipelineAgg._sum.dealValue) ?? 0
+  const pipelineWeightedValue = serializeMoney(pipelineAgg._sum.weightedValue) ?? 0
 
   // Total deal value for won deals (monthly revenue proxy)
   const wonDealsAgg = await prisma.deal.aggregate({
     where: { stage: "closed_won" },
     _sum: { dealValue: true },
   })
-  const monthlyRevenue = wonDealsAgg._sum.dealValue ?? 0
+  const monthlyRevenue = serializeMoney(wonDealsAgg._sum.dealValue) ?? 0
 
   // Revenue run rate (monthly * 12)
   const revenueRunRate = monthlyRevenue * 12
@@ -64,7 +66,8 @@ export async function GET() {
     id: d.contact.id,
     name: `${d.contact.firstName} ${d.contact.lastName}`,
     company: d.company?.name ?? null,
-    dealValue: d.dealValue,
+    // Sprint 3.2 — serialize Decimal for the JSON response.
+    dealValue: serializeMoney(d.dealValue),
     dealOwner: d.dealOwner,
     vertical: d.vertical,
     relationshipStrength: d.contact.relationshipStrength,
@@ -122,7 +125,8 @@ export async function GET() {
     contactName: `${d.contact.firstName} ${d.contact.lastName}`,
     company: d.company?.name ?? null,
     aiDealHealth: d.aiDealHealth,
-    dealValue: d.dealValue,
+    // Sprint 3.2 — serialize Decimal for the JSON response.
+    dealValue: serializeMoney(d.dealValue),
     stage: d.stage,
     dealOwner: d.dealOwner,
   }))

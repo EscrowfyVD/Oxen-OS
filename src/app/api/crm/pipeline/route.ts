@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 
 export async function GET() {
   const { error } = await requirePageAccess("crm")
@@ -28,12 +29,10 @@ export async function GET() {
   })
 
   // Pipeline KPIs
+  // Sprint 3.2 — dealValue/weightedValue are Decimal, winProbability stays Float.
   const totalDeals = deals.length
-  const totalDealValue = deals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-  const totalWeightedValue = deals.reduce(
-    (s, d) => s + (d.weightedValue ?? 0),
-    0
-  )
+  const totalDealValue = serializeMoney(sumDecimals(deals.map((d) => d.dealValue))) ?? 0
+  const totalWeightedValue = serializeMoney(sumDecimals(deals.map((d) => d.weightedValue))) ?? 0
   const avgProbability =
     totalDeals > 0
       ? Math.round(
@@ -59,11 +58,9 @@ export async function GET() {
     return {
       stage,
       count: stageDeals.length,
-      dealValue: stageDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0),
-      weightedValue: stageDeals.reduce(
-        (s, d) => s + (d.weightedValue ?? 0),
-        0
-      ),
+      // Sprint 3.2 — Decimal-precision sum, serialize once for JSON.
+      dealValue: serializeMoney(sumDecimals(stageDeals.map((d) => d.dealValue))) ?? 0,
+      weightedValue: serializeMoney(sumDecimals(stageDeals.map((d) => d.weightedValue))) ?? 0,
     }
   })
 
@@ -92,6 +89,9 @@ export async function GET() {
       byStage,
       deals: deals.map((d) => ({
         ...d,
+        // Sprint 3.2 — serialize Decimal for the JSON response.
+        dealValue: serializeMoney(d.dealValue),
+        weightedValue: serializeMoney(d.weightedValue),
         contactName: `${d.contact.firstName} ${d.contact.lastName}`,
         companyName: d.company?.name ?? null,
       })),

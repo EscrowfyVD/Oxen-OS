@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { serializeMoney } from "@/lib/decimal"
 
 export async function GET(request: Request) {
   const { error } = await requirePageAccess("crm")
@@ -72,11 +73,12 @@ export async function GET(request: Request) {
     }),
   ])
 
+  // Sprint 3.2 — serialize Decimal dealValue on search-result deals for JSON.
   return NextResponse.json({
     results: {
       contacts,
       companies,
-      deals,
+      deals: deals.map((d) => ({ ...d, dealValue: serializeMoney(d.dealValue) })),
     },
     total: contacts.length + companies.length + deals.length,
   })

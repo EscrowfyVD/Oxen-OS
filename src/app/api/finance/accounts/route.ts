@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateBody, validateSearchParams } from "@/lib/validate"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 import { createBankAccountSchema, listBankAccountsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
@@ -22,9 +23,15 @@ export async function GET(request: Request) {
     orderBy: [{ entity: "asc" }, { name: "asc" }],
   })
 
-  const totalBalance = accounts.reduce((sum, a) => sum + a.currentBalance, 0)
+  // Sprint 3.2 — aggregate in Decimal precision, then serialize balances
+  // for the JSON response (frontend reducers expect number).
+  const totalBalance = serializeMoney(sumDecimals(accounts.map((a) => a.currentBalance))) ?? 0
+  const serializedAccounts = accounts.map((a) => ({
+    ...a,
+    currentBalance: serializeMoney(a.currentBalance) ?? 0,
+  }))
 
-  return NextResponse.json({ accounts, totalBalance })
+  return NextResponse.json({ accounts: serializedAccounts, totalBalance })
 }
 
 export async function POST(request: Request) {
@@ -51,5 +58,9 @@ export async function POST(request: Request) {
     },
   })
 
-  return NextResponse.json({ account }, { status: 201 })
+  // Sprint 3.2 — serialize Decimal for the JSON response.
+  return NextResponse.json(
+    { account: { ...account, currentBalance: serializeMoney(account.currentBalance) ?? 0 } },
+    { status: 201 },
+  )
 }

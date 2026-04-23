@@ -75,11 +75,13 @@ export async function POST() {
 
     if (deals.length > 0) {
       contextParts.push("\n## Active Pipeline")
+      // Sprint 3.2 — d.dealValue is Prisma.Decimal; convert to number for running
+      // total and use .toFixed(0) for prompt-side display.
       let totalValue = 0
       for (const d of deals) {
-        totalValue += d.dealValue || 0
+        totalValue += d.dealValue ? d.dealValue.toNumber() : 0
         const contactLabel = d.contact?.company?.name || `${d.contact?.firstName} ${d.contact?.lastName}` || "?"
-        contextParts.push(`- ${d.dealName} (${contactLabel}) — ${d.stage} — €${d.dealValue?.toLocaleString() || "?"}`)
+        contextParts.push(`- ${d.dealName} (${contactLabel}) — ${d.stage} — €${d.dealValue?.toFixed(0) || "?"}`)
       }
       contextParts.push(`Total pipeline: €${totalValue.toLocaleString()}`)
     }

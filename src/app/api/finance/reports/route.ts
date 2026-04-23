@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateSearchParams } from "@/lib/validate"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 import { reportsQuery } from "../_schemas"
 
 export async function GET(request: Request) {
@@ -47,7 +48,8 @@ async function buildPnLReport(startDate: Date, endDate: Date, entityWhere: Recor
   for (const tx of transactions) {
     const key = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, "0")}`
     if (!months[key]) months[key] = { revenue: {}, expenses: {} }
-    const amt = tx.amountEur ?? tx.amount
+    // Sprint 3.2 — serialize Decimal to number at the aggregation boundary.
+    const amt = serializeMoney(tx.amountEur ?? tx.amount) ?? 0
     if (tx.type === "revenue") {
       months[key].revenue[tx.category] = (months[key].revenue[tx.category] || 0) + amt
     } else {
@@ -114,7 +116,8 @@ async function buildCashFlowReport(startDate: Date, endDate: Date, entityWhere: 
   for (const tx of transactions) {
     const key = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, "0")}`
     if (!months[key]) months[key] = { inflow: 0, outflow: 0, bySource: {} }
-    const amt = tx.amountEur ?? tx.amount
+    // Sprint 3.2 — serialize Decimal to number at the aggregation boundary.
+    const amt = serializeMoney(tx.amountEur ?? tx.amount) ?? 0
     if (tx.type === "revenue") months[key].inflow += amt
     else months[key].outflow += amt
     const src = tx.paymentSource || "other"
@@ -124,7 +127,8 @@ async function buildCashFlowReport(startDate: Date, endDate: Date, entityWhere: 
   const accounts = await prisma.bankAccount.findMany({
     where: { isActive: true, ...(Object.keys(entityWhere).length ? entityWhere : {}) },
   })
-  const currentCash = accounts.reduce((s, a) => s + a.currentBalance, 0)
+  // Sprint 3.2 — aggregate in Decimal precision, then convert once at the boundary.
+  const currentCash = serializeMoney(sumDecimals(accounts.map((a) => a.currentBalance))) ?? 0
 
   const monthKeys = Object.keys(months).sort()
   let runningBalance = currentCash
@@ -163,13 +167,14 @@ async function buildEntityComparison(startDate: Date, endDate: Date) {
         }),
       ])
 
-      const revenue = rev._sum.amountEur ?? rev._sum.amount ?? 0
-      const expenses = exp._sum.amountEur ?? exp._sum.amount ?? 0
+      // Sprint 3.2 — serialize Decimals at the entity boundary.
+      const revenue = serializeMoney(rev._sum.amountEur ?? rev._sum.amount) ?? 0
+      const expenses = serializeMoney(exp._sum.amountEur ?? exp._sum.amount) ?? 0
 
       const accounts = await prisma.bankAccount.findMany({
         where: { entity, isActive: true },
       })
-      const cashBalance = accounts.reduce((s, a) => s + a.currentBalance, 0)
+      const cashBalance = serializeMoney(sumDecimals(accounts.map((a) => a.currentBalance))) ?? 0
 
       return {
         entity,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 import {
   PIPELINE_STAGES,
   STAGE_LABELS,
@@ -81,12 +82,14 @@ export async function GET(req: NextRequest) {
     })
 
     // Group by stage
+    // Sprint 3.2 — dealValue/weightedValue are Decimal. Aggregate in Decimal precision
+    // then convert to number once at the boundary for the JSON response and arithmetic.
     const byStage = PIPELINE_STAGES
       .filter((s) => s.id !== "closed_lost")
       .map((stage) => {
         const stageDeals = monthDeals.filter((d) => d.stage === stage.id)
-        const totalValue = stageDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-        const weightedValue = stageDeals.reduce((s, d) => s + (d.weightedValue ?? 0), 0)
+        const totalValue = serializeMoney(sumDecimals(stageDeals.map((d) => d.dealValue))) ?? 0
+        const weightedValue = serializeMoney(sumDecimals(stageDeals.map((d) => d.weightedValue))) ?? 0
 
         return {
           stageId: stage.id,
@@ -100,8 +103,8 @@ export async function GET(req: NextRequest) {
               ? `${d.contact.firstName} ${d.contact.lastName}`
               : "Unknown",
             companyName: d.company?.name ?? null,
-            dealValue: d.dealValue,
-            weightedValue: d.weightedValue,
+            dealValue: serializeMoney(d.dealValue),
+            weightedValue: serializeMoney(d.weightedValue),
             winProbability: d.winProbability,
             stage: d.stage,
             aiDealHealth: d.aiDealHealth ?? null,
@@ -112,8 +115,8 @@ export async function GET(req: NextRequest) {
       })
       .filter((s) => s.deals.length > 0)
 
-    const totalValue = monthDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-    const totalWeightedValue = monthDeals.reduce((s, d) => s + (d.weightedValue ?? 0), 0)
+    const totalValue = serializeMoney(sumDecimals(monthDeals.map((d) => d.dealValue))) ?? 0
+    const totalWeightedValue = serializeMoney(sumDecimals(monthDeals.map((d) => d.weightedValue))) ?? 0
     const dealCount = monthDeals.length
 
     return {
@@ -134,11 +137,16 @@ export async function GET(req: NextRequest) {
     return close >= globalStart && close <= globalEnd
   })
 
-  const bestCase = allMonthDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-  const expected = allMonthDeals.reduce((s, d) => s + (d.weightedValue ?? 0), 0)
-  const worstCase = allMonthDeals
-    .filter((d) => d.stage === "closed_won" || d.stage === "negotiation")
-    .reduce((s, d) => s + (d.dealValue ?? 0), 0)
+  // Sprint 3.2 — Decimal-precision aggregation, serialize once at JSON boundary.
+  const bestCase = serializeMoney(sumDecimals(allMonthDeals.map((d) => d.dealValue))) ?? 0
+  const expected = serializeMoney(sumDecimals(allMonthDeals.map((d) => d.weightedValue))) ?? 0
+  const worstCase = serializeMoney(
+    sumDecimals(
+      allMonthDeals
+        .filter((d) => d.stage === "closed_won" || d.stage === "negotiation")
+        .map((d) => d.dealValue),
+    ),
+  ) ?? 0
 
   return NextResponse.json({
     months: monthsResult,

@@ -57,9 +57,11 @@ export async function POST() {
       }
 
       // High-value deals in negotiation
+      // Sprint 3.2 — d.dealValue is Prisma.Decimal; compare via .greaterThan()
+      // and format via .toFixed() / .toString() to avoid float coercion.
       for (const d of c.deals) {
-        if (d.stage === "negotiation" && d.dealValue && d.dealValue > 10000) {
-          analysisPoints.push(`BUYING_SIGNAL: High-value deal "${d.dealName}" (€${d.dealValue.toLocaleString()}) in negotiation with ${companyName || fullName}. Probability: ${d.winProbability || "?"}%`)
+        if (d.stage === "negotiation" && d.dealValue && d.dealValue.greaterThan(10000)) {
+          analysisPoints.push(`BUYING_SIGNAL: High-value deal "${d.dealName}" (€${d.dealValue.toFixed(0)}) in negotiation with ${companyName || fullName}. Probability: ${d.winProbability || "?"}%`)
         }
       }
     }

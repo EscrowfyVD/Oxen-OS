@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { serializeMoney, sumDecimals } from "@/lib/decimal"
 
 export async function GET(
   _request: Request,
@@ -39,9 +40,20 @@ export async function GET(
       return NextResponse.json({ error: "Conference not found" }, { status: 404 })
     }
 
-    // Calculate total cost from all attendee budgets
-    const totalCost = conference.attendees.reduce((sum, a) =>
-      sum + (a.ticketCost ?? 0) + (a.hotelCost ?? 0) + (a.flightCost ?? 0) + (a.taxiCost ?? 0) + (a.mealsCost ?? 0) + (a.otherCost ?? 0), 0)
+    // Sprint 3.2 — all *Cost fields + dealValue are Decimal; aggregate in Decimal
+    // precision then convert once at the JSON boundary.
+    const totalCost = serializeMoney(
+      sumDecimals(
+        conference.attendees.flatMap((a) => [
+          a.ticketCost,
+          a.hotelCost,
+          a.flightCost,
+          a.taxiCost,
+          a.mealsCost,
+          a.otherCost,
+        ]),
+      ),
+    ) ?? 0
 
     const contactsCollected = conference.collectedContacts.length
     const crmLeads = conference.collectedContacts.filter((c) => c.addedToCrm).length
@@ -67,10 +79,14 @@ export async function GET(
       })
 
       dealsCount = deals.length
-      pipelineValue = deals.reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
-      wonRevenue = deals
-        .filter((d) => d.stage === "won" || d.stage === "closed_won")
-        .reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
+      pipelineValue = serializeMoney(sumDecimals(deals.map((d) => d.dealValue))) ?? 0
+      wonRevenue = serializeMoney(
+        sumDecimals(
+          deals
+            .filter((d) => d.stage === "won" || d.stage === "closed_won")
+            .map((d) => d.dealValue),
+        ),
+      ) ?? 0
     }
 
     const roi = totalCost > 0 ? ((wonRevenue - totalCost) / totalCost) * 100 : 0
