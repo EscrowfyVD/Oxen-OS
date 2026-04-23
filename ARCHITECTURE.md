@@ -191,7 +191,11 @@ Cross-cutting tables are unprefixed: `User`, `Account`, `Session`, `Verification
 
 ### Migrations
 
-Railway build command currently runs `npx prisma db push --accept-data-loss`. This is fast but does not produce migration artifacts. Moving to `prisma migrate deploy` with proper migration files is tracked as known technical debt for a dedicated DB sprint.
+Railway build command runs `npx prisma generate && npx prisma migrate deploy && npm run build`. Each schema change goes through a versioned migration in `prisma/migrations/` — reviewable in PRs, applied atomically in prod, and reversible via DB backup restore + `git revert`.
+
+The baseline migration `prisma/migrations/0_baseline/` was generated at Sprint 3.1 from the existing schema and marked as applied via `prisma migrate resolve --applied` — no SQL executed against prod tables, just `_prisma_migrations` table bootstrap.
+
+**Workflow for contributors** : see [`MIGRATIONS.md`](./MIGRATIONS.md) for the full guide (creating migrations, reviewing SQL, rollback procedure, multi-step patterns for risky changes like `Float → Decimal`).
 
 ### Prisma Client extensions
 
