@@ -21,6 +21,13 @@ import {
 } from "vitest"
 
 // ─── Mocks before module-under-test imports ────────────────────────
+//
+// Mock at the Prisma level only. We do NOT mock @/lib/clay-enrichment
+// because the upsert helpers and assignRandomBD live in the same module
+// — vi.mock cannot intercept same-module function calls (vitest gotcha).
+// Instead, we control behavior via Prisma mocks: assignRandomBD reads
+// env + calls prisma.employee.findMany, so configuring that mock fully
+// determines the BD-assignment outcome.
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     company: {
@@ -40,22 +47,8 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 
-// Keep real classifyPersona + extractClayTableSegment (cf. their unit tests),
-// only mock assignRandomBD which depends on DB.
-vi.mock("@/lib/clay-enrichment", async () => {
-  const actual =
-    await vi.importActual<typeof import("@/lib/clay-enrichment")>(
-      "@/lib/clay-enrichment",
-    )
-  return {
-    ...actual,
-    assignRandomBD: vi.fn(),
-  }
-})
-
 import { POST } from "./route"
 import { prisma } from "@/lib/prisma"
-import { assignRandomBD } from "@/lib/clay-enrichment"
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 const SECRET = "test-clay-secret-32-bytes-deadbeef-cafe"
@@ -119,9 +112,14 @@ const PEOPLE_PAYLOAD_VALID = {
 // ─── Setup ────────────────────────────────────────────────────────────
 describe("POST /api/webhooks/clay-enrichment", () => {
   const ORIGINAL_SECRET = process.env.CLAY_WEBHOOK_SECRET
+  const ORIGINAL_BD_EMAILS = process.env.CRM_BD_EMAILS
 
   beforeAll(() => {
     process.env.CLAY_WEBHOOK_SECRET = SECRET
+    // Set CRM_BD_EMAILS so assignRandomBD has a non-empty input — actual
+    // BD selection is controlled per-test via prisma.employee.findMany mock.
+    process.env.CRM_BD_EMAILS =
+      "andy@oxen.finance,paullouis@oxen.finance"
   })
 
   afterAll(() => {
@@ -130,10 +128,18 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     } else {
       process.env.CLAY_WEBHOOK_SECRET = ORIGINAL_SECRET
     }
+    if (ORIGINAL_BD_EMAILS === undefined) {
+      delete process.env.CRM_BD_EMAILS
+    } else {
+      process.env.CRM_BD_EMAILS = ORIGINAL_BD_EMAILS
+    }
   })
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: no BD found (assignRandomBD returns null → dealOwner=null).
+    // Tests that exercise the BD-assignment path override this.
+    vi.mocked(prisma.employee.findMany).mockResolvedValue([] as never)
   })
 
   // ─── Auth ────────────────────────────────────────────────────────────
@@ -223,7 +229,11 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     vi.mocked(prisma.crmContact.create).mockResolvedValue({
       id: "ct-new-1",
     } as never)
-    vi.mocked(assignRandomBD).mockResolvedValue("emp-andy-id")
+    // assignRandomBD path: findMany returns 1 BD → deterministic pick;
+    // findUnique returns the BD's name.
+    vi.mocked(prisma.employee.findMany).mockResolvedValue([
+      { id: "emp-andy-id" },
+    ] as never)
     vi.mocked(prisma.employee.findUnique).mockResolvedValue({
       name: "Andy",
     } as never)
@@ -252,7 +262,7 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     vi.mocked(prisma.crmContact.create).mockResolvedValue({
       id: "ct-new-2",
     } as never)
-    vi.mocked(assignRandomBD).mockResolvedValue(null)
+    // findMany default ([]) → assignRandomBD returns null → dealOwner=null
 
     const res = await POST(makeReq(noCompanyPayload))
     const body = await res.json()
@@ -287,7 +297,8 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     expect(body.action).toBe("updated")
     expect(body.contactId).toBe("ct-existing-1")
     expect(prisma.crmContact.create).not.toHaveBeenCalled()
-    expect(assignRandomBD).not.toHaveBeenCalled()
+    // assignRandomBD path NOT triggered → no Employee findMany call
+    expect(prisma.employee.findMany).not.toHaveBeenCalled()
     const updateArgs = vi.mocked(prisma.crmContact.update).mock.calls[0][0]
     // dealOwner is NOT in update data — preserved
     expect("dealOwner" in updateArgs.data).toBe(false)
@@ -302,7 +313,10 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     vi.mocked(prisma.crmContact.create).mockResolvedValue({
       id: "ct-new-10",
     } as never)
-    vi.mocked(assignRandomBD).mockResolvedValue("emp-paullouis-id")
+    // 1-element findMany → deterministic pick (idx=0).
+    vi.mocked(prisma.employee.findMany).mockResolvedValue([
+      { id: "emp-paullouis-id" },
+    ] as never)
     vi.mocked(prisma.employee.findUnique).mockResolvedValue({
       name: "Paul Louis",
     } as never)
@@ -310,7 +324,9 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     const res = await POST(makeReq(PEOPLE_PAYLOAD_VALID))
 
     expect(res.status).toBe(200)
-    expect(assignRandomBD).toHaveBeenCalledTimes(1)
+    // BD-assignment path triggered: findMany called with the BD email list
+    expect(prisma.employee.findMany).toHaveBeenCalledTimes(1)
+    expect(prisma.employee.findUnique).toHaveBeenCalledTimes(1)
     const createArgs = vi.mocked(prisma.crmContact.create).mock.calls[0][0]
     expect(createArgs.data.dealOwner).toBe("Paul Louis")
     expect(createArgs.data.email).toBe("jpc@inter-serv.com") // lowercased
@@ -326,7 +342,7 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     vi.mocked(prisma.crmContact.create).mockResolvedValue({
       id: "ct-11",
     } as never)
-    vi.mocked(assignRandomBD).mockResolvedValue(null)
+    // findMany default ([]) — assignRandomBD returns null, dealOwner null.
 
     // PEOPLE_PAYLOAD_VALID already has jobTitle="CEO"
     await POST(makeReq(PEOPLE_PAYLOAD_VALID))
@@ -351,7 +367,6 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     vi.mocked(prisma.crmContact.create).mockResolvedValue({
       id: "ct-12",
     } as never)
-    vi.mocked(assignRandomBD).mockResolvedValue(null)
 
     await POST(makeReq(opPayload))
 

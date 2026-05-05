@@ -203,3 +203,34 @@ export const clayEnrichmentSchema = z
   )
 
 export type ClayEnrichmentPayload = z.infer<typeof clayEnrichmentSchema>
+
+// ─────────────────────────────────────────────────────────────
+// Clay batch CSV import — /api/crm/contacts/import-clay
+//
+// Wraps a list of clayEnrichmentSchema rows (all sharing the same
+// source_table / scope / group / pain_tier — the 4 axes are auto-detected
+// in the wizard from the source_table dropdown). Each row in `rows` is
+// the company OR person sub-payload (without the wrapping metadata).
+// ─────────────────────────────────────────────────────────────
+
+const clayBatchCompanyRow = clayCompanyPayload
+const clayBatchPersonRow = clayPersonPayload
+
+export const clayBatchImportSchema = z
+  .object({
+    source_table: z.string().min(1).max(200),
+    scope: z.enum(["company", "people"]),
+    group: crmGroup,
+    pain_tier: crmPainTier,
+    rows: z
+      .array(z.union([clayBatchCompanyRow, clayBatchPersonRow]))
+      .min(1)
+      .max(5000),
+  })
+  // The wizard provides homogeneous rows (all-Company or all-People per
+  // source_table). We don't enforce row-level shape via Zod here because
+  // each row is a partial payload — the route assembles the full
+  // ClayEnrichmentPayload before calling the upsert helpers, which
+  // perform the final validation.
+
+export type ClayBatchImportPayload = z.infer<typeof clayBatchImportSchema>

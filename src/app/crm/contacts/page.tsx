@@ -9,6 +9,7 @@ import {
   OUTREACH_GROUPS,
 } from "@/lib/crm-config"
 import CsvImportWizard from "@/components/crm/CsvImportWizard"
+import ClayImportWizard from "@/components/crm/ClayImportWizard"
 import KanbanBoard from "@/components/crm/KanbanBoard"
 import type { KanbanContact } from "@/components/crm/KanbanBoard"
 import ContactSlideOver from "@/components/crm/ContactSlideOver"
@@ -83,6 +84,7 @@ export default function ContactListPage() {
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 1 })
   const [loading, setLoading] = useState(true)
   const [showImportWizard, setShowImportWizard] = useState(false)
+  const [showClayImportWizard, setShowClayImportWizard] = useState(false)
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
   const [lemlistContacts, setLemlistContacts] = useState<TableContact[] | null>(null)
   const [lemlistMode, setLemlistMode] = useState<"selected" | "all">("selected")
@@ -346,6 +348,14 @@ export default function ContactListPage() {
               Import
             </button>
             <button
+              onClick={() => setShowClayImportWizard(true)}
+              style={{ padding: "8px 18px", borderRadius: 8, border: `1px solid ${CARD_BORDER}`, background: "var(--surface-input)", color: TEXT2, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+              title="Import enriched data from Clay tables (Sprint S0 PRD-001)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+              Import (Clay)
+            </button>
+            <button
               onClick={() => {
                 setLemlistContacts(contacts as unknown as TableContact[])
                 setLemlistMode("all")
@@ -448,6 +458,14 @@ export default function ContactListPage() {
       {showImportWizard && (
         <CsvImportWizard
           onClose={() => setShowImportWizard(false)}
+          onComplete={() => fetchContacts(1)}
+        />
+      )}
+
+      {/* Clay Enrichment Import Wizard Modal (Sprint S0 batch 4) */}
+      {showClayImportWizard && (
+        <ClayImportWizard
+          onClose={() => setShowClayImportWizard(false)}
           onComplete={() => fetchContacts(1)}
         />
       )}

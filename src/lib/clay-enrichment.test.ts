@@ -14,6 +14,7 @@ import {
   classifyPersona,
   extractClayTableSegment,
   assignRandomBD,
+  parseClayTableName,
 } from "./clay-enrichment"
 import { prisma } from "@/lib/prisma"
 
@@ -74,6 +75,53 @@ describe("extractClayTableSegment", () => {
   })
   it("returns null when table name does not match the pattern", () => {
     expect(extractClayTableSegment("invalid_table_name")).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+describe("parseClayTableName", () => {
+  it("parses a Company table name into all 4 fields", () => {
+    expect(
+      parseClayTableName("vDC_G1_Tier 1_Company_Active Business Loss"),
+    ).toEqual({
+      scope: "company",
+      group: "G1",
+      painTier: "T1",
+      segment: "Active Business Loss",
+    })
+  })
+
+  it("parses a People table name with G7B + T2", () => {
+    expect(
+      parseClayTableName("vDC_G7B_Tier 2_People_Crypto Funds Series A"),
+    ).toEqual({
+      scope: "people",
+      group: "G7B",
+      painTier: "T2",
+      segment: "Crypto Funds Series A",
+    })
+  })
+
+  it("returns nulls for malformed table name", () => {
+    expect(parseClayTableName("garbage_table_name")).toEqual({
+      scope: null,
+      group: null,
+      painTier: null,
+      segment: null,
+    })
+  })
+
+  it("partial parse: missing tier", () => {
+    const r = parseClayTableName("vDC_G3_Company_Some Segment")
+    expect(r.scope).toBe("company")
+    expect(r.group).toBe("G3")
+    expect(r.painTier).toBeNull()
+    expect(r.segment).toBe("Some Segment")
+  })
+
+  it("rejects invalid group token (G99 not in enum)", () => {
+    const r = parseClayTableName("vDC_G99_Tier 1_Company_X")
+    expect(r.group).toBeNull()
   })
 })
 
