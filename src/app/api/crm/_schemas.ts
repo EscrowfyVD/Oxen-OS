@@ -260,7 +260,7 @@ export const createCompanySchema = z.object({
   website: urlString.nullish(),
   industry: z.string().max(100).nullish(),
   description: z.string().max(5000).nullish(),
-  hqCountry: z.string().max(100).nullish(),
+  country: z.string().max(100).nullish(),
   hqCity: z.string().max(100).nullish(),
   vertical: z.array(z.string().max(100)).max(20).optional(),
   subVertical: z.array(z.string().max(100)).max(30).optional(),

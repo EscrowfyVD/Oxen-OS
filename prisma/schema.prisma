@@ -7,6 +7,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── PRD-001 Scoring Engine — Enums ───
+
+enum CrmGroup {
+  G1
+  G2
+  G3
+  G4
+  G5
+  G6
+  G7A
+  G7B
+}
+
+enum CrmPainTier {
+  T1
+  T2
+  T3
+}
+
+enum CrmPersona {
+  DM
+  OP
+}
+
+enum EnrichmentSource {
+  clay
+  trigify
+  manual
+  csv_import
+  inbound_form
+}
+
 // ─── NextAuth Models ───
 
 model Account {
@@ -268,18 +300,29 @@ model Company {
   domain          String?  @unique
   industry        String?
   description     String?  @db.Text
-  hqCountry       String?
+  country         String?  // renamed from hqCountry (Sprint S0 Clay enrichment alignment)
   hqCity          String?
+  location        String?  // Clay raw location, ex: "Abu Dhabi, Maryah Island"
   vertical        String[] // multi-select: primary verticals
   subVertical     String[] // multi-select: sub-verticals
   geoZone         String?  // "Malta", "Cyprus", "Luxembourg", "UK", "UAE", "Europe", "Asia", "South America", "Other"
   // Clay enrichment
   employeeCount   Int?
+  companySize     String?  // Clay bucket: "11-50 employees", "51-200 employees", etc.
+  companyType     String?  // Clay: "Privately Held", "Public Company", etc.
   revenueRange    String?  // "<100K", "100K-500K", "500K-1M", "1M-5M", "5M-20M", "20M+", "Unknown"
   fundingTotal    String?
   techStack       String[]
   linkedinUrl     String?
   socialProfiles  Json?
+  // Clay segment tag (D3 — extracted from source_table name)
+  clayTableSegment String? // ex: "Active Business Loss"
+  // PRD-001 scoring
+  group           CrmGroup?
+  painTier        CrmPainTier?
+  // Tracking
+  enrichmentSource EnrichmentSource?
+  enrichedAt      DateTime?
   // Computed
   contactsCount   Int      @default(0)
   activeDealsCount Int     @default(0)
@@ -289,6 +332,10 @@ model Company {
   deals           Deal[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // Indexes for PRD-001 scoring queries
+  @@index([group])
+  @@index([painTier])
 }
 
 model CrmContact {
@@ -322,6 +369,14 @@ model CrmContact {
   annualRevenueRange String?
   country         String?
   city            String?
+  location        String?  // Clay raw location, ex: "Abu Dhabi, Maryah Island"
+  // PRD-001 scoring
+  group           CrmGroup?
+  painTier        CrmPainTier?
+  persona         CrmPersona?
+  // Enrichment tracking
+  enrichmentSource EnrichmentSource?
+  enrichedAt      DateTime?
   // Smart fields (auto-computed)
   lastInteraction DateTime?
   daysSinceLastContact Int?
@@ -378,6 +433,10 @@ model CrmContact {
   @@index([companyId])
   // Dashboard filter: lifecycleStage = "customer" (crm/overview, crm/health)
   @@index([lifecycleStage])
+  // Indexes for PRD-001 scoring queries
+  @@index([group])
+  @@index([painTier])
+  @@index([persona])
 }
 
 model Deal {

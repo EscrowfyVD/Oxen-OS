@@ -87,7 +87,7 @@ export async function POST(request: Request) {
   if ("error" in v) return v.error
   const {
     name, website, industry, description,
-    hqCountry, hqCity, vertical, subVertical, geoZone,
+    country, hqCity, vertical, subVertical, geoZone,
     employeeCount, revenueRange, fundingTotal, techStack,
     linkedinUrl, socialProfiles,
   } = v.data
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
       domain: domain ?? null,
       industry: industry ?? null,
       description: description ?? null,
-      hqCountry: hqCountry ?? null,
+      country: country ?? null,
       hqCity: hqCity ?? null,
       vertical: vertical ?? [],
       subVertical: subVertical ?? [],

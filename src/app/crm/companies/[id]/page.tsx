@@ -71,7 +71,7 @@ interface Company {
   domain: string | null
   industry: string | null
   description: string | null
-  hqCountry: string | null
+  country: string | null
   hqCity: string | null
   vertical: string[]
   subVertical: string[]
@@ -260,10 +260,10 @@ export default function CompanyDetailPage() {
                 {company.industry}
               </span>
             )}
-            {(company.hqCity || company.hqCountry) && (
+            {(company.hqCity || company.country) && (
               <span className="flex items-center gap-1" style={{ fontSize: 12, color: TEXT_SECONDARY, fontFamily: "'DM Sans', sans-serif" }}>
                 <MapPin size={11} strokeWidth={1.8} />
-                {[company.hqCity, company.hqCountry].filter(Boolean).join(", ")}
+                {[company.hqCity, company.country].filter(Boolean).join(", ")}
               </span>
             )}
           </div>
@@ -366,7 +366,7 @@ export default function CompanyDetailPage() {
             {[
               { label: "Name", value: company.name },
               { label: "Industry", value: company.industry },
-              { label: "HQ", value: [company.hqCity, company.hqCountry].filter(Boolean).join(", ") || null },
+              { label: "HQ", value: [company.hqCity, company.country].filter(Boolean).join(", ") || null },
               { label: "Geo Zone", value: company.geoZone },
               { label: "Website", value: company.website },
               { label: "Domain", value: company.domain },

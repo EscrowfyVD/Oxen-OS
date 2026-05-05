@@ -36,7 +36,7 @@ interface CompanyCard {
   id: string
   name: string
   industry: string | null
-  hqCountry: string | null
+  country: string | null
   hqCity: string | null
   vertical: string[]
   geoZone: string | null
@@ -275,9 +275,9 @@ export default function CompaniesListPage() {
                 </div>
 
                 {/* HQ Location */}
-                {(company.hqCity || company.hqCountry) && (
+                {(company.hqCity || company.country) && (
                   <p style={{ fontSize: 11, color: TEXT_TERTIARY, marginBottom: 12, fontFamily: "'DM Sans', sans-serif" }}>
-                    {[company.hqCity, company.hqCountry].filter(Boolean).join(", ")}
+                    {[company.hqCity, company.country].filter(Boolean).join(", ")}
                   </p>
                 )}
 

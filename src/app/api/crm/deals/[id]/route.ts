@@ -38,7 +38,7 @@ export async function GET(
           name: true,
           domain: true,
           industry: true,
-          hqCountry: true,
+          country: true,
           geoZone: true,
         },
       },

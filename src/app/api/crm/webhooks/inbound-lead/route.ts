@@ -128,7 +128,7 @@ export async function POST(request: Request) {
           name: company,
           domain,
           geoZone,
-          hqCountry: country ?? null,
+          country: country ?? null,
         },
       })
       companyId = upserted.id
