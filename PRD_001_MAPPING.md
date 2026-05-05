@@ -1,7 +1,7 @@
-# PRD-001 v3 — Intent Scoring Engine
+# PRD-001 v3.1 — Intent Scoring Engine
 # Document de mapping vers le CRM Oxen OS existant
 
-> Document v3 — généré le 2026-05-01, révisé 2026-05-05 (réponses Andy).
+> Document v3.1 — généré le 2026-05-01, révisé 2026-05-05 (réponses Andy + sub-questions closes).
 > Référence PRD : Andy / Oxen Finance — `CRM_scoring_brief.docx` — April 29, 2026
 > Statut : Draft pour validation Vernon avant décomposition en sprints
 > Aucun code modifié, aucune migration, aucune implémentation — audit + mapping uniquement.
@@ -9,6 +9,7 @@
 > **Changelog** :
 > - **v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
 > - **v2 → v3** : intégration des décisions Andy reçues 2026-05-05 (mapping vertical→group finalisé, FinTech/Crypto IN scope intermediaries only, iGaming + Import/Export OUT, auto-assignment Random 50/50, Pain Tier T2 default, Market Signal workflow, 5/7 Open Questions résolues).
+> - **v3 → v3.1** : closure des 3 sub-questions Andy (crypto = intermédiaires UNIQUEMENT confirmé, override 30j validated, Market Signal UX = Oxen OS validated). 6 décisions structurelles confirmées. Pending uniquement : Lemlist API verification + Clay mapping rules en S0.
 
 ---
 
@@ -20,11 +21,11 @@ Le PRD décrit un **Intent Scoring Engine** ambitieux (3 nouveaux models, 22 cha
 
 Le **désalignement structurel le plus lourd** : (1) le PRD propose `Account` + `Contact` (1-to-N) mais le CRM a `CrmContact` (qui mélange les deux concepts) + `Company` séparée — décision schéma à trancher. (2) `vertical` actuel (7 valeurs string[]) ne mappe pas 1-to-1 avec les 8 `group` du PRD (G1-G7B). (3) `dealOwner` est string hardcodée, pas FK Employee, ce qui bloque l'`assigned_bd` UUID FK du PRD. (4) **Lemlist library actuelle ne supporte que enroll + remove — pas de pause, pas d'advance, pas de step manipulation** : Open Question #1 du PRD est répondue NÉGATIVEMENT par le code (à vérifier côté API Lemlist mais aucune trace dans le code).
 
-**Verdict effort** : **8 semaines** pour Vernon + Johnny (1 dev externe) + Claude Code, en assumant les 5 décisions structurelles tranchées en S0. Estimation revue à la baisse (vs 9-10 v1) compte tenu du risque migration minimal confirmé.
+**Verdict effort** : **8 semaines** pour Vernon + Johnny (1 dev externe) + Claude Code, en assumant les 6 décisions structurelles confirmées en S0. Estimation revue à la baisse (vs 9-10 v1) compte tenu du risque migration minimal confirmé.
 
 **Risque principal** : la cohabitation `IntentSignal` (existant) vs `Signal` (PRD) — à trancher avant tout dev. **Migration data en pratique inexistante** (0 IntentSignal en prod).
 
-**Décisions Andy reçues 2026-05-05** : Andy a confirmé 4 décisions structurelles le 2026-05-05 : iGaming et Import/Export OUT of scope outbound, FinTech/Crypto IN avec mapping G1/G5, auto-assignment Random 50/50 Andy/Paul Louis, Pain Tier T2 par défaut. Score override 30j auto-expire (à valider Andy). Market Signals auto-create Lemlist draft + validation BD manuelle. Lemlist API pause/advance à vérifier par Vernon cette semaine.
+**Décisions Andy reçues 2026-05-05** : Andy a confirmé **6 décisions structurelles** le 2026-05-05 : (1) iGaming et Import/Export **OUT of scope** outbound (B2C, pas intermédiaires), (2) **FinTech/Crypto IN scope = intermédiaires UNIQUEMENT** (CSP crypto → G1/T1, compta crypto → G5/T1, avocats crypto) — **PAS** exchanges, wallets, ou protocols, (3) auto-assignment Random 50/50 Andy/Paul Louis, (4) Pain Tier T2 par défaut, (5) Score override 30j auto-expire (validated), (6) Market Signals auto-create Lemlist draft + validation depuis Oxen OS (validated). Reste pending : Lemlist API pause/advance à vérifier par Vernon cette semaine, et Clay mapping rules à formaliser en Sprint S0.
 
 **Bloquants techniques (à résoudre AVANT dev)** :
 - B1 : Open Q #1 Lemlist API pause/advance — code actuel ne l'implémente pas
@@ -589,16 +590,16 @@ company (optional)
 
 ## 8. Open Questions du PRD — réponses
 
-État au 2026-05-05 : **5/7 résolues**, 2 pending.
+État au 2026-05-05 : **5/7 résolues**, **2 pending** (Q1 Lemlist + Q6 Clay rules).
 
 | # | Question PRD | Statut | Réponse |
 |---|---|---|---|
 | 1 | Lemlist API supports pause + step advancement ? | **PENDING** | Pending Vernon vérification (cette semaine). Code Oxen OS actuel ne l'implémente pas (`src/lib/lemlist.ts` : enroll + remove only). À vérifier côté docs Lemlist officielles. |
 | 2 | Existing CRM accounts tagged with industry, size, jurisdiction ? | **RESOLVED** | DB check 2026-05-01 (`scripts/db/check-counts.ts`) : 9 contacts test seed, 5/9 sans vertical (55.6%), 0 IntentSignal. Pre-launch state — pas un blocker. |
 | 3 | Signal API: auth per source ? | **RESOLVED** | OUI ; chaque webhook a son env var dédié (`CLAY_WEBHOOK_SECRET`, `TRIGIFY_WEBHOOK_SECRET`, `N8N_WEBHOOK_SECRET`, `WEBSITE_WEBHOOK_SECRET`, `LEMLIST_WEBHOOK_SECRET` HMAC). Sprint 0 hardening déjà en place. Pour `/api/signals` unifié : maintenir le pattern par source via `requireWebhookSecret()`. |
-| 4 | Should score_override expire ? | **PENDING (Andy validation)** | Vernon proposes 30 jours auto-expire + ping Telegram BD 3 jours avant (cf. section 5b.2). À valider par Andy. |
-| 5 | Market campaigns auto-create Lemlist ? | **RESOLVED** | OUI — auto-create draft + BD validate manual (cf. section 5b.3). Implication code : nouvelle fonction `createCampaign(name, draft=true)` dans `src/lib/lemlist.ts` (vérifier API Lemlist supporte création programmatique). |
-| 6 | Clay mapping rules pour group + pain tier ? | **PENDING — to define in Sprint S0** | Mapping de base défini (cf. section 3.2) via sub-verticals → group + Pain Tier T1/T2 par sub-vertical. Règles fines (heuristiques companySize / country / fundingStage → group/tier) à formaliser admin-configurable en Sprint S0. |
+| 4 | Should score_override expire ? | **RESOLVED (Andy 2026-05-05)** | OUI — 30 jours auto-expire + ping Telegram BD 3 jours avant expiration. Champ `score_override_expires_at` TIMESTAMP NOT NULL. Daily Decay Job gère expiration + notifications. Audit log obligatoire. Cf. section 5b.2. |
+| 5 | Market campaigns auto-create Lemlist ? | **RESOLVED (Andy 2026-05-05)** | OUI — auto-create draft + **validation BD depuis Oxen OS** (avec preview structuré, pas Lemlist UI). Implication code : nouvelle fonction `createCampaign(name, draft=true)` dans `src/lib/lemlist.ts` (vérifier API Lemlist supporte création programmatique). Cf. section 5b.3. |
+| 6 | Clay mapping rules pour group + pain tier ? | **PENDING — to define in Sprint S0** | Mapping de base défini (cf. section 3.2) via sub-verticals → group + Pain Tier T1/T2 par sub-vertical. Règles fines (heuristiques companySize / country / fundingStage → group/tier) à formaliser admin-configurable en Sprint S0 (Vernon + Andy, ~30 min). |
 | 7 | Auto-assignment BD : geo-based (existing) vs random 50/50 (PRD) ? | **RESOLVED (Andy 2026-05-05)** | Random 50/50 Andy/Paul Louis pour scoring engine. Geo-based (`getOwnerForGeo`) reste pour autres flux (inbound forms). Vernon (UAE) exclu. Cf. section 5b.1. |
 
 ---
@@ -740,20 +741,19 @@ Semaine 2 :
 
 ### 11.1 À décider AVANT lancement (Sprint S0 obligatoire)
 
-**5 décisions tranchées** par Andy 2026-05-05 (cf. sections 3.2, 5b) :
+**6 décisions tranchées** par Andy 2026-05-05 (cf. sections 3.2, 5b) :
 - ✅ Mapping `vertical` → `group` : Option B Coexister + table finale (Family Office=G4, CSP=G1, Luxury/Yacht=G6, FinTech-CSP=G1/T1, FinTech-compta=G5/T1, iGaming + Import/Export OUT)
+- ✅ FinTech/Crypto scope précisé : intermédiaires UNIQUEMENT (CSPs, accountants, lawyers) — **PAS** exchanges/wallets/protocols
 - ✅ Architecture `Signal` : EXTEND IntentSignal (Vernon proposed v1, retained)
 - ✅ Pain Tier default value : T2 (T1 pour FinTech/Crypto sub-verticals)
 - ✅ Auto-assignment : Random 50/50 Andy/Paul Louis pour scoring engine, geo-based reste pour inbound flows
-- ✅ Market campaigns auto-create Lemlist : auto-draft + BD validate manual
+- ✅ Score override expiration : 30 jours auto-expire + Telegram 3 jours avant (Andy validated)
+- ✅ Market campaigns auto-create Lemlist : auto-draft + validation BD depuis **Oxen OS** (Andy validated)
 
-**2 décisions encore en attente** :
+**2 items encore en attente** :
 
-1. **Lemlist API capabilities** : Vernon vérifie cette semaine (Open Q #1) — pause/advance API support. Si NON, fallback alertes manuelles (cf. section 7.1).
-2. **Validation finale Andy** :
-   - Sub-question : "FinTech/Crypto IN scope = intermédiaires (CSP crypto, compta crypto, avocats crypto), pas exchanges/wallets/protocols ?" (cf. section 3.2)
-   - Sub-question : Override 30 jours auto-expire + Telegram 3 jours avant (cf. section 5b.2) — accepted ?
-   - Sub-question : UX Market Signal validation depuis Oxen OS vs Lemlist UI (cf. section 5b.3) — préférence ?
+1. **Lemlist API pause/advance verification** (Vernon, cette semaine) — Open Q #1. Si NON supporté côté API, fallback alertes manuelles via Telegram (cf. section 7.1).
+2. **Clay mapping rules** sub-vertical → Group + Pain Tier (Vernon + Andy, ~30 min) — Open Q #6. Mapping de base existe (cf. section 3.2), règles fines (heuristiques companySize / country / fundingStage) à formaliser en début de Sprint S0.
 
 ### 11.2 À discuter avec le PM lundi
 
