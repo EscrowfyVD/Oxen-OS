@@ -1,7 +1,7 @@
-# PRD-001 v3.1 — Intent Scoring Engine
+# PRD-001 v3.2 — Intent Scoring Engine
 # Document de mapping vers le CRM Oxen OS existant
 
-> Document v3.1 — généré le 2026-05-01, révisé 2026-05-05 (réponses Andy + sub-questions closes).
+> Document v3.2 — généré le 2026-05-01, révisé 2026-05-05 (Lemlist API verification close).
 > Référence PRD : Andy / Oxen Finance — `CRM_scoring_brief.docx` — April 29, 2026
 > Statut : Draft pour validation Vernon avant décomposition en sprints
 > Aucun code modifié, aucune migration, aucune implémentation — audit + mapping uniquement.
@@ -9,7 +9,8 @@
 > **Changelog** :
 > - **v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
 > - **v2 → v3** : intégration des décisions Andy reçues 2026-05-05 (mapping vertical→group finalisé, FinTech/Crypto IN scope intermediaries only, iGaming + Import/Export OUT, auto-assignment Random 50/50, Pain Tier T2 default, Market Signal workflow, 5/7 Open Questions résolues).
-> - **v3 → v3.1** : closure des 3 sub-questions Andy (crypto = intermédiaires UNIQUEMENT confirmé, override 30j validated, Market Signal UX = Oxen OS validated). 6 décisions structurelles confirmées. Pending uniquement : Lemlist API verification + Clay mapping rules en S0.
+> - **v3 → v3.1** : closure des 3 sub-questions Andy (crypto = intermédiaires UNIQUEMENT confirmé, override 30j validated, Market Signal UX = Oxen OS validated). 6 décisions structurelles confirmées.
+> - **v3.1 → v3.2** : Lemlist API verification complétée par Vernon 2026-05-05. Pause/Resume/Status disponibles ; advance/skip step non exposé → workaround pause + update `{{signal_context}}` variable + resume. Aucune réduction scope PRD section 6.7 nécessaire. Open Q #1 RESOLVED. **6/7 questions résolues, 1 pending (Clay mapping rules en S0)**.
 
 ---
 
@@ -25,10 +26,10 @@ Le **désalignement structurel le plus lourd** : (1) le PRD propose `Account` + 
 
 **Risque principal** : la cohabitation `IntentSignal` (existant) vs `Signal` (PRD) — à trancher avant tout dev. **Migration data en pratique inexistante** (0 IntentSignal en prod).
 
-**Décisions Andy reçues 2026-05-05** : Andy a confirmé **6 décisions structurelles** le 2026-05-05 : (1) iGaming et Import/Export **OUT of scope** outbound (B2C, pas intermédiaires), (2) **FinTech/Crypto IN scope = intermédiaires UNIQUEMENT** (CSP crypto → G1/T1, compta crypto → G5/T1, avocats crypto) — **PAS** exchanges, wallets, ou protocols, (3) auto-assignment Random 50/50 Andy/Paul Louis, (4) Pain Tier T2 par défaut, (5) Score override 30j auto-expire (validated), (6) Market Signals auto-create Lemlist draft + validation depuis Oxen OS (validated). Reste pending : Lemlist API pause/advance à vérifier par Vernon cette semaine, et Clay mapping rules à formaliser en Sprint S0.
+**Décisions Andy reçues 2026-05-05** : Andy a confirmé **6 décisions structurelles** le 2026-05-05 : (1) iGaming et Import/Export **OUT of scope** outbound (B2C, pas intermédiaires), (2) **FinTech/Crypto IN scope = intermédiaires UNIQUEMENT** (CSP crypto → G1/T1, compta crypto → G5/T1, avocats crypto) — **PAS** exchanges, wallets, ou protocols, (3) auto-assignment Random 50/50 Andy/Paul Louis, (4) Pain Tier T2 par défaut, (5) Score override 30j auto-expire (validated), (6) Market Signals auto-create Lemlist draft + validation depuis Oxen OS (validated). Lemlist API verified par Vernon 2026-05-05 : pause/resume/status ✅, advance/skip step ❌ non exposé mais workaround simple via pause + update variables + resume. Reste pending : **Clay mapping rules** à formaliser en début de Sprint S0 (~30 min Vernon + Andy).
 
 **Bloquants techniques (à résoudre AVANT dev)** :
-- B1 : Open Q #1 Lemlist API pause/advance — code actuel ne l'implémente pas
+- ~~B1 : Open Q #1 Lemlist API pause/advance — code actuel ne l'implémente pas~~ → **RESOLVED 2026-05-05** (cf. section 7.1 — pause/resume API ✅, advance via workaround Option A)
 - B2 : Mapping `vertical` → `group` (7 verticals → 8 groups, pas 1-to-1)
 - B3 : Architecture `Signal` vs `IntentSignal`
 - B4 : `dealOwner` string → FK Employee (déjà dans backlog `FEATURES.md`)
@@ -470,53 +471,66 @@ Cette section documente les décisions opérationnelles tranchées par Andy le 2
 
 ## 7. Intégrations externes
 
-### 7.1 Lemlist API — Open Question #1 du PRD (CRITIQUE)
+### 7.1 Lemlist API — Open Question #1 du PRD (RESOLVED 2026-05-05)
 
 **Question PRD** : Lemlist API supporte-t-il pause + step advancement programmatiques ?
 
-#### État actuel du code Oxen OS
+**Statut** : ✅ **RESOLVED** — vérification Vernon 2026-05-05.
 
-Lecture exhaustive de `src/lib/lemlist.ts` (177 lignes) :
+#### Capabilities Lemlist API — vérifiées
 
-| Fonction | Endpoint Lemlist appelé | Action |
+| Capability | Endpoint Lemlist | Statut |
+|---|---|---|
+| ✅ **Pause lead** | `POST /api/leads/pause/{leadId}` | Disponible |
+| ✅ **Resume lead** | `POST /api/leads/start/{leadId}` | Disponible |
+| ✅ **Get lead status** | `GET /api/leads/{email}?version=v2` | Disponible (state, currentStep, paused, etc.) |
+| ❌ **Advance / skip step** (direct) | — | **NON exposé** par l'API |
+
+**Refs officielles** :
+- https://developer.lemlist.com/api-reference/endpoints/leads/pause-lead
+- https://developer.lemlist.com/api-reference/endpoints/leads/resume-paused-lead
+- https://developer.lemlist.com/api-reference/endpoints/leads/get-lead-by-email
+
+#### Workaround pour "advance step" (non exposé)
+
+Pas d'endpoint direct pour avancer le step d'un lead. **Workaround Option A retenu** :
+
+1. **Pause** le lead (POST pause)
+2. **Update lead variables** custom (ex: `{{signal_context}}`) via API ou via re-enroll avec nouveaux variables
+3. **Resume** le lead (POST start)
+
+Le step suivant utilise alors les nouvelles variables → contextualisation auto du prochain message.
+
+**Convention pour Andy** : ajouter la variable `{{signal_context}}` dans les templates Lemlist côté UI → permet l'auto-injection du contexte signal au prochain touch.
+
+#### Code Oxen OS actuel (`src/lib/lemlist.ts`, 177 lignes)
+
+| Fonction existante | Endpoint Lemlist appelé | Action |
 |---|---|---|
 | `getLemlistCampaigns()` | `GET /api/campaigns` | Liste toutes les campagnes (cache 1h) |
 | `enrollLead()` | `POST /api/campaigns/{id}/leads/{email}` | Enrolle un lead dans une campagne |
 | `removeLead()` | `DELETE /api/campaigns/{id}/leads/{email}` | Retire un lead d'une campagne spécifique |
 | `removeLeadFromAll()` | `DELETE /api/leads/{email}` | Retire de toutes campagnes (unsubscribe) |
-| `lemlistAuth()` | - | Helper Basic auth |
-| `isLemlistConfigured()` | - | Vérification env var |
 
-**Aucune fonction pause** dans le code.
-**Aucune fonction step advancement** dans le code.
-**Aucun appel à un endpoint type `/api/campaigns/{id}/leads/{email}/pause`** ou `/advance` ou `/step`.
+**Helpers à ajouter en Sprint S5** :
+- `pauseLemlistLead(leadId)` → `POST /api/leads/pause/{leadId}`
+- `resumeLemlistLead(leadId)` → `POST /api/leads/start/{leadId}`
+- `getLemlistLeadStatus(email)` → `GET /api/leads/{email}?version=v2`
+- (Optionnel) `updateLemlistLeadVariables(leadId, vars)` — si exposé par API, à vérifier au moment du dev. Sinon : re-enroll cycle.
 
-#### Réponse à Open Question #1
+#### Impact sur le PRD section 6.7
 
-**INCONNU côté code Oxen OS** mais **NON IMPLÉMENTÉ ACTUELLEMENT**.
+**Section 6.7 Immediate Action (8 triggers, 2h SLA) — pauses sequence** :
+- ✅ **Fully implementable** via `POST /api/leads/pause/{leadId}` après détection signal
+- Les 8 triggers (BD profile visit, pricing visit, email opens 3+, link click, comment Oxen, banking frustration post, call connected, etc.) déclenchent tous : Telegram alert → pause auto → BD a 2h pour agir → resume manuel après action
+- Pas besoin de fallback "alertes manuelles uniquement"
 
-À VÉRIFIER côté Lemlist API docs (https://developer.lemlist.com) :
-- Si l'API expose `POST /campaigns/{id}/leads/{email}/pause` ou équivalent → faisable
-- Si l'API n'expose que enroll/remove (cf. ce qui est dans le code) → **NON faisable** sans contournement
+**Section 6.7 Rapid Action (4 triggers, 24h SLA) — advances next touch** :
+- Pas d'advance/skip direct → **Workaround Option A retenu** : pause + update variables + resume
+- Les 4 triggers (competitor post like/comment, job change CFO/COO, funding round, geographic expansion) → contextualise le prochain touch via `{{signal_context}}` injecté
+- Andy doit s'assurer que les templates Lemlist utilisent `{{signal_context}}` pour bénéficier de l'auto-contextualisation
 
-#### Si NON : impact sur le PRD
-
-Triggers PRD section 6.7 "Immediate Action (2h SLA) — pauses sequence" :
-- Devient **alertes manuelles** : Telegram → BD pause manuellement dans Lemlist UI
-- Section 6.7 du PRD à reviser
-- Impact sur 8 triggers Immediate :
-  1. BD LinkedIn profile visit after email (+10)
-  2. Oxen pricing/demo page visit (+12)
-  3. Email opened 3+ times in 24h (+8)
-  4. Click on link in email (+10)
-  5. Comment on Oxen post (+10)
-  6. Public banking frustration post (+12)
-  7. Lemlist call connected, conversation >2 min (+10)
-- **Workaround** : remove + re-enroll cycle (`removeLead` + plus tard `enrollLead`) pour simuler pause+resume — fonctionnel mais perd le "step" exact
-
-#### Recommandation
-
-Vérifier officiellement les capabilities Lemlist API **avant Sprint S5** (Sequence Routing). Si NON, scope du PRD section 6.7 à reduire (alertes manuelles uniquement, pas de pause auto).
+**Conclusion** : aucune réduction de scope nécessaire dans le PRD. Toutes les triggers section 6.7 sont implémentables.
 
 ### 7.2 Clay — Pattern Match (Open Question PRD section 6.2)
 
@@ -590,11 +604,11 @@ company (optional)
 
 ## 8. Open Questions du PRD — réponses
 
-État au 2026-05-05 : **5/7 résolues**, **2 pending** (Q1 Lemlist + Q6 Clay rules).
+État au 2026-05-05 : **6/7 résolues**, **1 pending** (Q6 Clay rules).
 
 | # | Question PRD | Statut | Réponse |
 |---|---|---|---|
-| 1 | Lemlist API supports pause + step advancement ? | **PENDING** | Pending Vernon vérification (cette semaine). Code Oxen OS actuel ne l'implémente pas (`src/lib/lemlist.ts` : enroll + remove only). À vérifier côté docs Lemlist officielles. |
+| 1 | Lemlist API supports pause + step advancement ? | **RESOLVED (Vernon 2026-05-05)** | Pause/Resume/Status : ✅ disponibles (`POST /api/leads/pause/{leadId}`, `POST /api/leads/start/{leadId}`, `GET /api/leads/{email}?version=v2`). Advance/skip step direct : ❌ non exposé — workaround Option A : pause + update variables (`{{signal_context}}`) + resume. Aucune réduction de scope PRD section 6.7 nécessaire. Cf. section 7.1. |
 | 2 | Existing CRM accounts tagged with industry, size, jurisdiction ? | **RESOLVED** | DB check 2026-05-01 (`scripts/db/check-counts.ts`) : 9 contacts test seed, 5/9 sans vertical (55.6%), 0 IntentSignal. Pre-launch state — pas un blocker. |
 | 3 | Signal API: auth per source ? | **RESOLVED** | OUI ; chaque webhook a son env var dédié (`CLAY_WEBHOOK_SECRET`, `TRIGIFY_WEBHOOK_SECRET`, `N8N_WEBHOOK_SECRET`, `WEBSITE_WEBHOOK_SECRET`, `LEMLIST_WEBHOOK_SECRET` HMAC). Sprint 0 hardening déjà en place. Pour `/api/signals` unifié : maintenir le pattern par source via `requireWebhookSecret()`. |
 | 4 | Should score_override expire ? | **RESOLVED (Andy 2026-05-05)** | OUI — 30 jours auto-expire + ping Telegram BD 3 jours avant expiration. Champ `score_override_expires_at` TIMESTAMP NOT NULL. Daily Decay Job gère expiration + notifications. Audit log obligatoire. Cf. section 5b.2. |
@@ -610,7 +624,7 @@ company (optional)
 
 | # | Bloquant | Impact | Action |
 |---|---|---|---|
-| **B1** | Open Q #1 Lemlist API pause/advance | Si NON, section 6.7 du PRD à reviser, triggers Immediate deviennent manuels | Vérifier docs Lemlist officielles + tester avec API key. **Avant Sprint S5.** |
+| ~~**B1**~~ | ~~Open Q #1 Lemlist API pause/advance~~ | **RESOLVED 2026-05-05** | Pause/resume disponibles. Advance via workaround pause + `{{signal_context}}` + resume. Cf. section 7.1. Helpers à ajouter en Sprint S5. |
 | **B2** | Mapping `vertical` → `group` (7 → 8, pas 1-to-1) | Migration data complexe ; Option A/B/C à trancher | Décision Vernon/Andy : Coexister recommandé. **Avant Sprint S1.** |
 | **B3** | Architecture `Signal` vs `IntentSignal` | Refactor (EXTEND IntentSignal) vs coexistence vs nouveau model `Signal` | Décision technique : EXTEND IntentSignal recommandé. **Avant Sprint S1.** |
 | **B4** | `dealOwner` string → FK Employee | Bloque `assigned_bd UUID FK` du PRD ; refactor cross-module | Sprint S0 dédié AVANT scoring (déjà dans backlog `FEATURES.md`) |
@@ -750,10 +764,11 @@ Semaine 2 :
 - ✅ Score override expiration : 30 jours auto-expire + Telegram 3 jours avant (Andy validated)
 - ✅ Market campaigns auto-create Lemlist : auto-draft + validation BD depuis **Oxen OS** (Andy validated)
 
-**2 items encore en attente** :
+**1 item encore en attente** :
 
-1. **Lemlist API pause/advance verification** (Vernon, cette semaine) — Open Q #1. Si NON supporté côté API, fallback alertes manuelles via Telegram (cf. section 7.1).
-2. **Clay mapping rules** sub-vertical → Group + Pain Tier (Vernon + Andy, ~30 min) — Open Q #6. Mapping de base existe (cf. section 3.2), règles fines (heuristiques companySize / country / fundingStage) à formaliser en début de Sprint S0.
+1. **Clay mapping rules** sub-vertical → Group + Pain Tier (Vernon + Andy, ~30 min) — Open Q #6. Mapping de base existe (cf. section 3.2), règles fines (heuristiques companySize / country / fundingStage) à formaliser en début de Sprint S0.
+
+**Lemlist API verification** (Vernon, 2026-05-05) : ✅ RESOLVED — pause/resume/status disponibles, advance/skip via workaround pause + update variables `{{signal_context}}` + resume. Helpers à ajouter en Sprint S5 : `pauseLemlistLead`, `resumeLemlistLead`, `getLemlistLeadStatus`. Convention Andy : utiliser `{{signal_context}}` dans templates Lemlist. Cf. section 7.1.
 
 ### 11.2 À discuter avec le PM lundi
 
