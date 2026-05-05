@@ -1,12 +1,14 @@
-# PRD-001 v2 — Intent Scoring Engine
+# PRD-001 v3 — Intent Scoring Engine
 # Document de mapping vers le CRM Oxen OS existant
 
-> Document v2 — généré le 2026-05-01, révisé 2026-05-05.
+> Document v3 — généré le 2026-05-01, révisé 2026-05-05 (réponses Andy).
 > Référence PRD : Andy / Oxen Finance — `CRM_scoring_brief.docx` — April 29, 2026
 > Statut : Draft pour validation Vernon avant décomposition en sprints
 > Aucun code modifié, aucune migration, aucune implémentation — audit + mapping uniquement.
 >
-> **Changelog v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
+> **Changelog** :
+> - **v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
+> - **v2 → v3** : intégration des décisions Andy reçues 2026-05-05 (mapping vertical→group finalisé, FinTech/Crypto IN scope intermediaries only, iGaming + Import/Export OUT, auto-assignment Random 50/50, Pain Tier T2 default, Market Signal workflow, 5/7 Open Questions résolues).
 
 ---
 
@@ -21,6 +23,8 @@ Le **désalignement structurel le plus lourd** : (1) le PRD propose `Account` + 
 **Verdict effort** : **8 semaines** pour Vernon + Johnny (1 dev externe) + Claude Code, en assumant les 5 décisions structurelles tranchées en S0. Estimation revue à la baisse (vs 9-10 v1) compte tenu du risque migration minimal confirmé.
 
 **Risque principal** : la cohabitation `IntentSignal` (existant) vs `Signal` (PRD) — à trancher avant tout dev. **Migration data en pratique inexistante** (0 IntentSignal en prod).
+
+**Décisions Andy reçues 2026-05-05** : Andy a confirmé 4 décisions structurelles le 2026-05-05 : iGaming et Import/Export OUT of scope outbound, FinTech/Crypto IN avec mapping G1/G5, auto-assignment Random 50/50 Andy/Paul Louis, Pain Tier T2 par défaut. Score override 30j auto-expire (à valider Andy). Market Signals auto-create Lemlist draft + validation BD manuelle. Lemlist API pause/advance à vérifier par Vernon cette semaine.
 
 **Bloquants techniques (à résoudre AVANT dev)** :
 - B1 : Open Q #1 Lemlist API pause/advance — code actuel ne l'implémente pas
@@ -197,19 +201,22 @@ Aucun équivalent existant. Confirmé par grep.
 | Cardinalité | Single value per Account (required) | Multi-select per CrmContact (array) |
 | Sub-verticals | Pas mentionnés | 28 sub-verticals existants (`crm-config.ts:15-44`) |
 
-#### Mapping vertical → group (À VALIDER avec Vernon/Andy)
+#### Mapping vertical → group — version finale (Andy 2026-05-05)
 
-| Vertical actuel | Group PRD | Notes |
-|---|---|---|
-| `FinTech / Crypto` | **AUCUN** match évident | PRD ne définit pas un groupe FinTech ; les "crypto profiles" sont intégrés comme T1 high-intensity dans groupes existants (G1, G5, etc.) — section 6.9 in fine. **Vertical disparait dans le PRD ou se mappe par sub-vertical** |
-| `Family Office` | **G4** Wealth Intermediaries | Match probable (multi-family offices, wealth managers per PRD) |
-| `CSP / Fiduciaries` | **G1** Structural Architects | Match évident (CSPs, fiduciaries per PRD) |
-| `Luxury Assets` | **G6** High-Ticket Settlement | Match probable (yacht/jet/art/luxury real estate per PRD) |
-| `iGaming` | **AUCUN** match | PRD n'a pas de groupe iGaming. Probable T1 dans G1 ou G5 ? À TRANCHER |
-| `Yacht Brokers` | **G6** High-Ticket Settlement | Same as Luxury Assets — sub-vertical |
-| `Import / Export` | **AUCUN** match | PRD n'a pas Import/Export comme groupe |
+| Vertical actuel | Group | Pain Tier default | Status |
+|---|---|---|---|
+| Family Office | **G4** | T2 | IN scope |
+| CSP/Fiduciaries | **G1** | T2 | IN scope |
+| Luxury Assets | **G6** | T2 | IN scope |
+| Yacht Brokers | **G6** | T2 | IN scope |
+| FinTech/Crypto (CSP crypto) | **G1** | **T1** | IN scope (intermediaries only) |
+| FinTech/Crypto (compta crypto) | **G5** | **T1** | IN scope (intermediaries only) |
+| iGaming | NULL | NULL | **OUT of scope** (clients finaux) |
+| Import/Export | NULL | NULL | **OUT of scope** (clients finaux) |
 
-**Sub-verticals actuels qui matchent les groupes PRD** :
+**Note — sub-question Andy en suspens** : "Confirme que FinTech/Crypto = intermédiaires (CSP crypto, compta crypto, avocats crypto), pas exchanges/wallets/protocols ?" — pending réponse Andy.
+
+**Sub-verticals actuels qui matchent les groupes PRD (dérivation auto pendant migration S1)** :
 - "Corporate Lawyers", "M&A Lawyers", "Tax Lawyers", "International Contracts Lawyers" → **G2** Legal Deal-Flow
 - "Immigration Lawyers" → **G7B** Immigration Law
 - "RBI Specialists", "CBI Specialists" → **G3** Investment Gatekeepers
@@ -219,28 +226,15 @@ Aucun équivalent existant. Confirmé par grep.
 - "Real Estate Brokers", "Yacht Brokers", "Art Brokers", "Private Jets Brokers" → **G6** High-Ticket Settlement
 - "Luxury Concierges", "Relocation Agencies" → **G7A** Luxury Concierges
 
-**⚠️ Désalignement majeur identifié** : les 7 verticals + 28 sub-verticals actuels ne mappent pas 1-pour-1 avec les 8 groupes du PRD. Le mapping logique passe **par les sub-verticals**, pas par les verticals top-level.
+#### Décision finale — Option B (Coexister) — RETENUE
 
-#### Décision Vernon requise (3 options)
+- **`vertical` String[]** reste sur CrmContact (multi-select 7 valeurs marketing/segmentation)
+- **`group` ENUM** nouveau champ single value sur CrmContact, requis pour scoring + sequence routing
+- **`pain_tier` ENUM** (T1/T2/T3) nouveau champ single value sur CrmContact, default T2 pour la plupart, T1 pour FinTech/Crypto sub-verticals
+- Pas de migration data (sauf seed du group à partir de sub-verticals dans Sprint S1)
+- iGaming et Import/Export contacts existants : `group = NULL`, exclus du scoring engine (status `outreach_status: "excluded"` avec `exclusion_reason: "B2C, not intermediary"`)
 
-- **Option A — Renommer `vertical` → `group` et migration de mapping**
-  - Vertical disparaît, group devient le seul axe métier
-  - Migration : pour chaque CrmContact, dériver group depuis sub-verticals + jurisdictional info
-  - Impact : casse `verticals` filter sur CRM Pipeline, Reports, Marketing — tous les composants UI à mettre à jour
-  - Risque : data quality (combien de contacts ont sub-vertical rempli ?)
-
-- **Option B — Coexister (vertical = filtre marketing, group = filtre outbound scoring)**
-  - Vertical[] reste sur CrmContact (multi-select 7 valeurs marketing/segmentation)
-  - Group ENUM nouveau champ sur CrmContact (single value, requis pour scoring + sequence routing)
-  - Pas de migration data (sauf seed du group à partir de sub-verticals)
-  - Recommandée techniquement, mais double-source de vérité possible (un contact en G6 mais avec vertical "iGaming" — incohérence ?)
-
-- **Option C — Restructurer entièrement en 8 groupes G1-G7B**
-  - Suppression de `vertical` et `subVertical` → remplacés par `group` + `sub_group` (à définir)
-  - Impact maximum, risque maximum
-  - Réalignement complet aux conventions PRD
-
-**Recommandation** : **Option B (Coexister)** — minimise le risque migration, permet roll-out progressif. Vernon/Andy tranchent.
+**Conséquence opérationnelle** : seuls les contacts avec `group != NULL` sont éligibles au scoring + Lemlist routing. iGaming et Import/Export contacts restent dans le CRM (filtres marketing) mais pas de campagnes outbound automatisées.
 
 ### 3.3 Priority Level vs lifecycleStage
 
@@ -399,6 +393,54 @@ Référence `FEATURES.md` section T2 :
 
 ---
 
+## 5b. Décisions opérationnelles Andy (2026-05-05)
+
+Cette section documente les décisions opérationnelles tranchées par Andy le 2026-05-05 qui modifient ou précisent des choix initialement laissés ouverts dans le PRD.
+
+### 5b.1 — Auto-assignment BD (override section 6.10 PRD)
+
+**Décision Andy 2026-05-05** : auto-assignment = **Random 50/50 entre Andy et Paul Louis**. Override le code actuel `getOwnerForGeo`. Vernon (UAE) exclu de l'auto-assignment (cohérent avec ASSUMPTION PRD section 6.10).
+
+**Implications techniques** :
+- Le helper `src/lib/crm-config.ts:getOwnerForGeo()` ne sera plus utilisé pour le scoring engine
+- Nouvelle fonction `getRandomBdAssignment()` qui retourne aléatoirement Andy ou Paul Louis (50/50)
+- Le geo-based assignment existant reste actif pour les **leads inbound non-scoring** (`/api/crm/webhooks/inbound-lead`) — coexistence
+- Sprint S0 ou S1 : décider si on renomme `dealOwner` ou si `assigned_bd` est un nouveau champ
+
+**Conséquence sur backlog** : le bloquant **B6** (geo-based vs random 50/50) initialement marqué "garder geo-based" est **inversé** — Andy a tranché pour Random 50/50 sur scoring engine. Geo-based reste pour autres flux (inbound forms).
+
+### 5b.2 — Score override expiration (réponse Open Question #4)
+
+**Décision proposée Vernon** : override expire après 30 jours, ping Telegram BD 3 jours avant expiration.
+
+**Spécification technique** :
+- Nouveau champ `score_override_expires_at` TIMESTAMP NOT NULL (set à `score_override_set_at + 30 days`)
+- Daily Decay Job (`scoring:decay-recompute`) gère l'expiration : si `now() > score_override_expires_at`, reset `score_override = NULL` et `score_override_note = NULL`
+- Notification Telegram 3 jours avant expiration : nouveau job `scoring:override-expiry-notify` (daily check)
+- Audit log obligatoire pour chaque création / expiration / extension d'override
+
+**Statut** : **À VALIDER avec Andy** (sub-question pending).
+
+### 5b.3 — Market Signal workflow (résolution Open Question #5)
+
+**Décision Andy 2026-05-05** : Apify détecte signal → CRM crée draft Market Signal + Lemlist campaign en draft → BD reçoit notif Telegram → BD valide depuis Oxen OS (avec preview) ou Lemlist UI → campaign passe en active.
+
+**Workflow détaillé** :
+1. **Apify ou source détecte** un événement segment-wide (competitor restriction, regulatory change, etc.)
+2. **POST `/api/market-signals`** depuis Apify (via webhook ou n8n adapter) → crée `MarketSignal` record en `status: "draft"`
+3. **Auto-create Lemlist campaign** en draft via `createCampaign()` (nouvelle fonction à ajouter dans `src/lib/lemlist.ts` — n'existe pas actuellement)
+4. **Notif Telegram BD** (assigned_bd random 50/50) : preview du market signal + lien CRM
+5. **BD valide** depuis Oxen OS via `<MarketSignalPanel />` (recommandé) OU directement Lemlist UI
+6. **Sur validation** : `PUT /api/market-signals/:id/activate` → enroll non-sequenced accounts dans Lemlist campaign + inject context note dans sequenced accounts
+
+**Statut UX validation** : **À CONFIRMER avec Andy** — préfère-t-il valider depuis Oxen OS (avec preview structuré) ou directement Lemlist UI (plus rapide mais hors-app) ?
+
+**Implication code** :
+- Nouvelle fonction `createCampaign(name, draft=true)` dans `src/lib/lemlist.ts` (n'existe pas — vérifier API Lemlist supporte création de campaign programmatique)
+- Si NON supporté : fallback alerte Telegram avec lien manuel vers Lemlist UI
+
+---
+
 ## 6. UI components
 
 ### 6.1 Components PRD vs existant
@@ -547,14 +589,17 @@ company (optional)
 
 ## 8. Open Questions du PRD — réponses
 
-| # | Question PRD | Réponse découverte par audit |
-|---|---|---|
-| 1 | Lemlist API supports pause + step advancement ? | **NON IMPLÉMENTÉ dans le code Oxen OS** (cf. section 7.1) ; à vérifier côté docs Lemlist officielles. Workaround possible via remove + re-enroll. |
-| 2 | Existing CRM accounts tagged with industry, size, jurisdiction ? | **NON VÉRIFIÉ DB** — accès Railway non utilisé pour cet audit. À VALIDER VERNON via `npx prisma studio` ou query SQL : `SELECT count(*) FROM "CrmContact" WHERE vertical IS NOT NULL AND geoZone IS NOT NULL AND companySize IS NOT NULL`. **Backlog FEATURES.md mentionne déjà des items "vertical désaligné" et "Companies non fonctionnel"** → présomption : data quality moyenne. |
-| 3 | Signal API: auth per source ? | **OUI** ; chaque webhook a son env var dédié : `CLAY_WEBHOOK_SECRET`, `TRIGIFY_WEBHOOK_SECRET`, `N8N_WEBHOOK_SECRET`, `WEBSITE_WEBHOOK_SECRET`, `LEMLIST_WEBHOOK_SECRET` (HMAC). Sprint 0 hardened. **Pour `/api/signals` unifié** : choisir entre header `X-Signal-Source` + secret partagé ou maintenir 1 secret par source via `requireWebhookSecret()`. |
-| 4 | Should score_override expire ? | **À TRANCHER avec Vernon** — pas de réponse code (pas de mécanisme override). Recommandation : 30 jours par défaut, audit log mutations. |
-| 5 | Market campaigns auto-create Lemlist ? | **À TRANCHER** — code Lemlist actuel n'a pas de fonction `createCampaign()` (vérifié `src/lib/lemlist.ts`). Si auto-create voulu, ajouter cette fonction + templates Lemlist côté CRM. |
-| 6 | Clay mapping rules pour group + pain tier ? | **NON existant** — Clay enrichit champs neutres (`companySize`, `fundingStage`, `techStack`, etc.) sans dériver `group` ou `pain_tier`. À créer : règles de mapping admin-configurables (sub-vertical → group + pain_tier heuristics). |
+État au 2026-05-05 : **5/7 résolues**, 2 pending.
+
+| # | Question PRD | Statut | Réponse |
+|---|---|---|---|
+| 1 | Lemlist API supports pause + step advancement ? | **PENDING** | Pending Vernon vérification (cette semaine). Code Oxen OS actuel ne l'implémente pas (`src/lib/lemlist.ts` : enroll + remove only). À vérifier côté docs Lemlist officielles. |
+| 2 | Existing CRM accounts tagged with industry, size, jurisdiction ? | **RESOLVED** | DB check 2026-05-01 (`scripts/db/check-counts.ts`) : 9 contacts test seed, 5/9 sans vertical (55.6%), 0 IntentSignal. Pre-launch state — pas un blocker. |
+| 3 | Signal API: auth per source ? | **RESOLVED** | OUI ; chaque webhook a son env var dédié (`CLAY_WEBHOOK_SECRET`, `TRIGIFY_WEBHOOK_SECRET`, `N8N_WEBHOOK_SECRET`, `WEBSITE_WEBHOOK_SECRET`, `LEMLIST_WEBHOOK_SECRET` HMAC). Sprint 0 hardening déjà en place. Pour `/api/signals` unifié : maintenir le pattern par source via `requireWebhookSecret()`. |
+| 4 | Should score_override expire ? | **PENDING (Andy validation)** | Vernon proposes 30 jours auto-expire + ping Telegram BD 3 jours avant (cf. section 5b.2). À valider par Andy. |
+| 5 | Market campaigns auto-create Lemlist ? | **RESOLVED** | OUI — auto-create draft + BD validate manual (cf. section 5b.3). Implication code : nouvelle fonction `createCampaign(name, draft=true)` dans `src/lib/lemlist.ts` (vérifier API Lemlist supporte création programmatique). |
+| 6 | Clay mapping rules pour group + pain tier ? | **PENDING — to define in Sprint S0** | Mapping de base défini (cf. section 3.2) via sub-verticals → group + Pain Tier T1/T2 par sub-vertical. Règles fines (heuristiques companySize / country / fundingStage → group/tier) à formaliser admin-configurable en Sprint S0. |
+| 7 | Auto-assignment BD : geo-based (existing) vs random 50/50 (PRD) ? | **RESOLVED (Andy 2026-05-05)** | Random 50/50 Andy/Paul Louis pour scoring engine. Geo-based (`getOwnerForGeo`) reste pour autres flux (inbound forms). Vernon (UAE) exclu. Cf. section 5b.1. |
 
 ---
 
@@ -695,12 +740,20 @@ Semaine 2 :
 
 ### 11.1 À décider AVANT lancement (Sprint S0 obligatoire)
 
-1. **Mapping `vertical` → `group`** : Option B (Coexister) recommandée
-2. **Architecture `Signal`** : EXTEND IntentSignal recommandé
-3. **Pain Tier default value** : T2 (largest volume per PRD) recommandé
-4. **Score override expiration** : 30 jours par défaut + audit log recommandé
-5. **Lemlist auto-creation campaigns** : NON par défaut (templates manuels) recommandé
-6. **Auto-assignment** : garder geo-based (PRD random est erroné vs métier réel)
+**5 décisions tranchées** par Andy 2026-05-05 (cf. sections 3.2, 5b) :
+- ✅ Mapping `vertical` → `group` : Option B Coexister + table finale (Family Office=G4, CSP=G1, Luxury/Yacht=G6, FinTech-CSP=G1/T1, FinTech-compta=G5/T1, iGaming + Import/Export OUT)
+- ✅ Architecture `Signal` : EXTEND IntentSignal (Vernon proposed v1, retained)
+- ✅ Pain Tier default value : T2 (T1 pour FinTech/Crypto sub-verticals)
+- ✅ Auto-assignment : Random 50/50 Andy/Paul Louis pour scoring engine, geo-based reste pour inbound flows
+- ✅ Market campaigns auto-create Lemlist : auto-draft + BD validate manual
+
+**2 décisions encore en attente** :
+
+1. **Lemlist API capabilities** : Vernon vérifie cette semaine (Open Q #1) — pause/advance API support. Si NON, fallback alertes manuelles (cf. section 7.1).
+2. **Validation finale Andy** :
+   - Sub-question : "FinTech/Crypto IN scope = intermédiaires (CSP crypto, compta crypto, avocats crypto), pas exchanges/wallets/protocols ?" (cf. section 3.2)
+   - Sub-question : Override 30 jours auto-expire + Telegram 3 jours avant (cf. section 5b.2) — accepted ?
+   - Sub-question : UX Market Signal validation depuis Oxen OS vs Lemlist UI (cf. section 5b.3) — préférence ?
 
 ### 11.2 À discuter avec le PM lundi
 
