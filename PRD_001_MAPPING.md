@@ -1,16 +1,17 @@
-# PRD-001 v3.2 — Intent Scoring Engine
+# PRD-001 v3.3 — Intent Scoring Engine
 # Document de mapping vers le CRM Oxen OS existant
 
-> Document v3.2 — généré le 2026-05-01, révisé 2026-05-05 (Lemlist API verification close).
+> Document v3.3 — généré le 2026-05-01, révisé 2026-05-05 (Sprint S0 — Clay enrichment pipeline IMPLEMENTED).
 > Référence PRD : Andy / Oxen Finance — `CRM_scoring_brief.docx` — April 29, 2026
-> Statut : Draft pour validation Vernon avant décomposition en sprints
-> Aucun code modifié, aucune migration, aucune implémentation — audit + mapping uniquement.
+> Statut : Sprint S0 livré — Phase 2 prête (seed initial 2 692 rows depuis Clay)
+> Mapping doc, plus implémentation tracée dans les 5 commits Sprint S0.
 >
 > **Changelog** :
 > - **v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
 > - **v2 → v3** : intégration des décisions Andy reçues 2026-05-05 (mapping vertical→group finalisé, FinTech/Crypto IN scope intermediaries only, iGaming + Import/Export OUT, auto-assignment Random 50/50, Pain Tier T2 default, Market Signal workflow, 5/7 Open Questions résolues).
 > - **v3 → v3.1** : closure des 3 sub-questions Andy (crypto = intermédiaires UNIQUEMENT confirmé, override 30j validated, Market Signal UX = Oxen OS validated). 6 décisions structurelles confirmées.
 > - **v3.1 → v3.2** : Lemlist API verification complétée par Vernon 2026-05-05. Pause/Resume/Status disponibles ; advance/skip step non exposé → workaround pause + update `{{signal_context}}` variable + resume. Aucune réduction scope PRD section 6.7 nécessaire. Open Q #1 RESOLVED. **6/7 questions résolues, 1 pending (Clay mapping rules en S0)**.
+> - **v3.2 → v3.3** : **Sprint S0 IMPLEMENTED 2026-05-05**. 5 batches livrés (5 commits, 9 fichiers ajoutés/modifiés, 126 tests passants, 187/187 pages build OK). Pipeline Clay enrichment opérationnel — 2 modes (CSV import + HTTP API push) convergents sur les mêmes upsert helpers (single source of truth dans `src/lib/clay-enrichment.ts`). Phase 2 prête : seed des 2 692 rows existantes (1 711 companies + 981 people). Open Q #6 (Clay mapping rules) reste à formaliser début S1 — la base technique est en place.
 
 ---
 
@@ -27,6 +28,15 @@ Le **désalignement structurel le plus lourd** : (1) le PRD propose `Account` + 
 **Risque principal** : la cohabitation `IntentSignal` (existant) vs `Signal` (PRD) — à trancher avant tout dev. **Migration data en pratique inexistante** (0 IntentSignal en prod).
 
 **Décisions Andy reçues 2026-05-05** : Andy a confirmé **6 décisions structurelles** le 2026-05-05 : (1) iGaming et Import/Export **OUT of scope** outbound (B2C, pas intermédiaires), (2) **FinTech/Crypto IN scope = intermédiaires UNIQUEMENT** (CSP crypto → G1/T1, compta crypto → G5/T1, avocats crypto) — **PAS** exchanges, wallets, ou protocols, (3) auto-assignment Random 50/50 Andy/Paul Louis, (4) Pain Tier T2 par défaut, (5) Score override 30j auto-expire (validated), (6) Market Signals auto-create Lemlist draft + validation depuis Oxen OS (validated). Lemlist API verified par Vernon 2026-05-05 : pause/resume/status ✅, advance/skip step ❌ non exposé mais workaround simple via pause + update variables + resume. Reste pending : **Clay mapping rules** à formaliser en début de Sprint S0 (~30 min Vernon + Andy).
+
+**Sprint S0 IMPLEMENTED — 2026-05-05** : Pipeline Clay enrichment fully operational. **5 batches livrés** :
+- **Batch 1** (commit `2f6195c`) — Migration Prisma : 4 enums (`CrmGroup`, `CrmPainTier`, `CrmPersona`, `EnrichmentSource`) + extensions Company/CrmContact + rename `hqCountry → country`.
+- **Batch 2** (commit `2c9984b`) — Helpers `src/lib/clay-enrichment.ts` (`classifyPersona`, `extractClayTableSegment`, `assignRandomBD`) + cleanup script D2.
+- **Batch 3** (commit `b801a71`) — Endpoint `POST /api/webhooks/clay-enrichment` (auth `x-webhook-secret`, validation Zod, idempotency Company.domain + CrmContact.email).
+- **Batch 4** (commit `35270b0`) — Refactor upsert logic into reusable helpers (`upsertCompanyFromClay`, `upsertPersonFromClay`) + new authenticated batch endpoint `/api/crm/contacts/import-clay` + UI component `ClayImportWizard.tsx` + `parseClayTableName()` parser. **Single source of truth** : Mode A (CSV import) et Mode B (HTTP API push) convergent sur les mêmes helpers.
+- **Batch 5** (this commit) — Documentation (`docs/clay-setup-guide.md` pour Duy, `docs/clay-csv-import-guide.md` pour Andy) + PRD v3.3 + E2E manual test.
+
+**Métriques** : 9 fichiers nouveaux/modifiés, 126 tests passants (113 baseline + 13 nouveaux), build 187/187 pages OK, lint 0 nouveau warning. Phase 2 prête : seed des 2 692 rows existantes (1 711 companies G1-T1 + 981 people G1-T1) après exécution de `scripts/db/cleanup-seed-contacts.ts` pour drop des 9 seeds test.
 
 **Bloquants techniques (à résoudre AVANT dev)** :
 - ~~B1 : Open Q #1 Lemlist API pause/advance — code actuel ne l'implémente pas~~ → **RESOLVED 2026-05-05** (cf. section 7.1 — pause/resume API ✅, advance via workaround Option A)
@@ -532,24 +542,53 @@ Le step suivant utilise alors les nouvelles variables → contextualisation auto
 
 **Conclusion** : aucune réduction de scope nécessaire dans le PRD. Toutes les triggers section 6.7 sont implémentables.
 
-### 7.2 Clay — Pattern Match (Open Question PRD section 6.2)
+### 7.2 Clay — Pattern Match + architecture finale post-Sprint S0
 
 **Statement PRD** : "Pattern Match compares against converted clients and pipeline prospects. Clay used for enrichment only, not Pattern Match."
 
-#### État actuel
+#### Architecture Clay enrichment (Sprint S0 IMPLEMENTED)
 
-- Clay enrichit les CrmContacts (champs `companySize`, `fundingStage`, `techStack`, `annualRevenueRange`, `country`, `city`)
-- Clay webhook `/api/webhooks/clay/route.ts` crée des `IntentSignal` avec `source="clay"`, `signalType="tech_install"` (par défaut), `score=10`
-- **Aucune logique de Pattern Match dans le code** : pas de comparaison contre `closed_won` deals ou pipeline `Deal[]` actifs
+**2 endpoints, 1 logique** :
 
-**Confirmé** : Pattern Match (PRD section 6.2 — 5 points sur ICP) **n'existe pas actuellement**. À développer Sprint S2 (ICP Scoring).
+```
+[Mode A — CSV Import]                        [Mode B — HTTP API push]
+ClayImportWizard.tsx                         Clay HTTP API column
+        │                                            │
+        ▼                                            ▼
+POST /api/crm/contacts/import-clay        POST /api/webhooks/clay-enrichment
+(auth: requirePageAccess "crm")           (auth: x-webhook-secret)
+        │                                            │
+        ├──────────────┬─────────────────────────────┘
+                       ▼
+        @/lib/clay-enrichment.ts
+        upsertCompanyFromClay()  /  upsertPersonFromClay()
+                       │
+                       ▼
+                 [Prisma DB]
+```
 
-**Logique à implémenter** :
+**Idempotency** : Company match by `domain` (lowercased), Contact match by `email` (lowercased). Re-imports = updates, pas de duplications.
+
+**Persona auto-classification** : `classifyPersona(jobTitle)` → DM si keywords (ceo, founder, owner, managing director, chief, president, partner, director) ; sinon OP.
+
+**BD assignment** : nouveaux contacts → `assignRandomBD()` 50/50 Andy/Paul Louis ; contacts existants : `dealOwner` PRESERVÉ.
+
+**Mapping intentionnel** : Clay payload `primaryIndustry` → Oxen schema `industry` (decision C1 — kept for compat with 11 AI consumer files).
+
+#### Pattern Match (PRD section 6.2 — 5 points sur ICP)
+
+Pattern Match logic **n'existe pas encore dans le code**. À développer Sprint S2 (ICP Scoring).
+
+**Logique à implémenter** (Sprint S2) :
 - Pour un Account/CrmContact donné : query DB
   - Reference pool A : `Deal` where `stage = "closed_won"` (converted clients)
   - Reference pool B : `Deal` where `stage NOT IN ("closed_won", "closed_lost")` (pipeline prospects)
-- Comparer dimensions : `vertical`/`subVertical`, `companySize`, `geoZone`/`country`, `fundingStage`/`annualRevenueRange`
+- Comparer dimensions : `vertical`/`subVertical`, `companySize`, `geoZone`/`country`, `industry`, `fundingStage`/`annualRevenueRange`
 - Strong match (3+ dimensions) → 5 pts ; Partial (2 dimensions) → 3 pts ; Pipeline-only match → 3 pts ; No match → 0
+
+#### Webhook Clay legacy (intent signals — distinct du nouveau pipeline)
+
+Le webhook `/api/webhooks/clay/route.ts` (existant pré-Sprint S0) reste actif et gère uniquement les **intent signals** (création `IntentSignal` avec `source="clay"`). Ce webhook est **distinct** de `/api/webhooks/clay-enrichment` (nouveau Sprint S0) qui gère l'**enrichissement structurel** (Company + CrmContact upsert avec group/painTier/persona). Les deux peuvent coexister — Clay envoie selon le type d'événement.
 
 ### 7.3 Trigify, Apify, n8n
 
@@ -753,9 +792,11 @@ Semaine 2 :
 
 ## 11. Recommandations Vernon
 
-### 11.1 À décider AVANT lancement (Sprint S0 obligatoire)
+### 11.1 Sprint S0 — IMPLEMENTED 2026-05-05
 
-**6 décisions tranchées** par Andy 2026-05-05 (cf. sections 3.2, 5b) :
+**6 décisions structurelles tranchées par Andy + 5 batches Sprint S0 implémentés** :
+
+#### Décisions (Andy 2026-05-05)
 - ✅ Mapping `vertical` → `group` : Option B Coexister + table finale (Family Office=G4, CSP=G1, Luxury/Yacht=G6, FinTech-CSP=G1/T1, FinTech-compta=G5/T1, iGaming + Import/Export OUT)
 - ✅ FinTech/Crypto scope précisé : intermédiaires UNIQUEMENT (CSPs, accountants, lawyers) — **PAS** exchanges/wallets/protocols
 - ✅ Architecture `Signal` : EXTEND IntentSignal (Vernon proposed v1, retained)
@@ -764,18 +805,60 @@ Semaine 2 :
 - ✅ Score override expiration : 30 jours auto-expire + Telegram 3 jours avant (Andy validated)
 - ✅ Market campaigns auto-create Lemlist : auto-draft + validation BD depuis **Oxen OS** (Andy validated)
 
-**1 item encore en attente** :
+#### Pré-requis Sprint S0 (vérifications)
+- ✅ Lemlist API verification (Vernon, 2026-05-05) : pause/resume/status disponibles, advance/skip via workaround pause + update variables `{{signal_context}}` + resume. Helpers à ajouter en Sprint S5 : `pauseLemlistLead`, `resumeLemlistLead`, `getLemlistLeadStatus`. Convention Andy : utiliser `{{signal_context}}` dans templates Lemlist. Cf. section 7.1.
 
-1. **Clay mapping rules** sub-vertical → Group + Pain Tier (Vernon + Andy, ~30 min) — Open Q #6. Mapping de base existe (cf. section 3.2), règles fines (heuristiques companySize / country / fundingStage) à formaliser en début de Sprint S0.
+#### Items Sprint S0 livrés (5 batches, 5 commits)
 
-**Lemlist API verification** (Vernon, 2026-05-05) : ✅ RESOLVED — pause/resume/status disponibles, advance/skip via workaround pause + update variables `{{signal_context}}` + resume. Helpers à ajouter en Sprint S5 : `pauseLemlistLead`, `resumeLemlistLead`, `getLemlistLeadStatus`. Convention Andy : utiliser `{{signal_context}}` dans templates Lemlist. Cf. section 7.1.
+**Asymétrie volontaire documentée** : Clay payload utilise `primaryIndustry` mais le schema Oxen utilise `industry`. Mapping intentionnel dans le handler webhook (decision C1 — Sprint S0 batch 1). 11 AI consumer files n'ont PAS été migrés vers `primaryIndustry` pour éviter risque régression silencieuse des prompts Claude.
 
-### 11.2 À discuter avec le PM lundi
+| # | Item | Commit | Statut |
+|---|---|---|---|
+| 1 | Migration Prisma : 4 enums + Company/CrmContact extensions + rename hqCountry→country | `2f6195c` | ✅ DONE |
+| 2 | Helpers `classifyPersona`, `extractClayTableSegment`, `assignRandomBD` (`src/lib/clay-enrichment.ts`) | `2c9984b` | ✅ DONE |
+| 3 | Cleanup script (D2) `scripts/db/cleanup-seed-contacts.ts` (créé, à exécuter Phase 2) | `2c9984b` | ✅ DONE (script ready, NOT yet run) |
+| 4 | Endpoint `POST /api/webhooks/clay-enrichment` (Zod + idempotency Company.domain + CrmContact.email) | `b801a71` | ✅ DONE |
+| 5 | Refactor upsert helpers (`upsertCompanyFromClay`, `upsertPersonFromClay`) — single source of truth | `35270b0` | ✅ DONE |
+| 6 | Endpoint `POST /api/crm/contacts/import-clay` (batch CSV import, chunks de 100, allSettled) | `35270b0` | ✅ DONE |
+| 7 | UI component `ClayImportWizard.tsx` (5-step modal upload→source→mapping→preview→result) | `35270b0` | ✅ DONE |
+| 8 | Source-table parser `parseClayTableName()` (vDC_{group}_Tier {n}_{scope}_{filter}) | `35270b0` | ✅ DONE |
+| 9 | Documentation `docs/clay-setup-guide.md` (Duy, Mode B HTTP) + `docs/clay-csv-import-guide.md` (Andy, Mode A CSV) | this batch | ✅ DONE |
 
+#### 1 item en attente (formalisation, non bloquant pour Phase 2)
+
+1. **Clay mapping rules** sub-vertical → Group + Pain Tier (Vernon + Andy, ~30 min) — Open Q #6. Mapping de base existe (cf. section 3.2), règles fines (heuristiques companySize / country / fundingStage) à formaliser début Sprint S1. **N'empêche pas le seed Phase 2** : les rows Clay arrivent déjà tagged G1-T1 par construction (encodé dans le source_table).
+
+### 11.2 Phase 2 ready (post-Sprint S0)
+
+**Phase 2 lancement ready** : seed initial 2 692 rows depuis les tables Clay G1-T1 existantes.
+
+#### Pré-requis avant Phase 2
+1. **Run** `npx tsx scripts/db/cleanup-seed-contacts.ts` pour drop les 9 seeds test (D2 decision)
+   - Safeguard intégré : refuse si > 50 contacts en DB
+2. **Verify** `CRM_BD_EMAILS` env var en prod = `andy@oxen.finance,paullouis@oxen.finance`
+3. **Verify** `CLAY_WEBHOOK_SECRET` partagé avec Duy (Mode B) ou Andy (Mode A wizard ne nécessite pas le secret — auth NextAuth standard)
+
+#### Phase 2 — Choix d'exécution
+- **Option A — Mode A CSV import via UI** (Andy, immédiat) :
+  - Andy exporte les 2 tables Clay en 2 CSV
+  - Login Oxen → /crm/contacts → "Import (Clay)"
+  - 2 imports successifs : Company table puis People table
+  - Estimé : ~30 min total
+- **Option B — Mode B HTTP API push** (Duy, dépend de la config Clay HTTP API column) :
+  - Duy configure les colonnes HTTP API selon `docs/clay-setup-guide.md`
+  - Trigger "Run on row complete" → push automatique
+  - Idéal pour le futur (rows enrichies en temps réel sur les nouvelles tables G+T)
+
+**Reco Phase 2** : Option A (CSV) pour le seed initial puisque les 2 692 rows existent déjà. Option B pour les nouvelles tables (G+T en cours de création par Duy).
+
+#### Sprints suivants (S1, S2, ...)
+
+À discuter avec le PM lundi :
 - Roadmap 9-10 semaines : valider la cadence et les arbitrages
 - Frictions Andy observées en Semaine 1 d'onboarding → potentiellement modifier priorisation Sprint S5/S6
 - Quand brancher le PM sur la review des PRs Johnny ?
 - Métriques de succès post-launch : O1 (80% P1 → conversation 7j), O2 (P1 contact 2h), etc. — instrumentation via quels events ?
+- Open Q #6 (Clay mapping rules fines) : 30 min Vernon + Andy en début Sprint S1.
 
 ### 11.3 À discuter avec Andy
 
