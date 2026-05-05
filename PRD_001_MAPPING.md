@@ -1,22 +1,26 @@
 # PRD-001 v2 — Intent Scoring Engine
 # Document de mapping vers le CRM Oxen OS existant
 
-> Document généré le 2026-05-01 par audit code Claude Code.
+> Document v2 — généré le 2026-05-01, révisé 2026-05-05.
 > Référence PRD : Andy / Oxen Finance — `CRM_scoring_brief.docx` — April 29, 2026
 > Statut : Draft pour validation Vernon avant décomposition en sprints
 > Aucun code modifié, aucune migration, aucune implémentation — audit + mapping uniquement.
+>
+> **Changelog v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
 
 ---
 
 ## 1. Synthèse exécutive
 
+**Important contexte DB (vérifié 2026-05-01)** : la base est en état pre-launch — 9 CrmContacts seed test, 0 IntentSignal, 0 ICP scores alimentés, 0 relationshipScore. Le scoring engine entrera donc dans une DB vierge en pratique. Migration risk minimal, mais timing critique : implémenter AVANT que Andy démarre le marketing en production pour éviter retraitement des signaux générés.
+
 Le PRD décrit un **Intent Scoring Engine** ambitieux (3 nouveaux models, 22 champs, 9 endpoints, 4 background jobs, 9 React components). Le code actuel a posé **les fondations partielles** : `IntentSignal` existe avec source/signalType/score/expiresAt/raw, `relationshipScore` 0-100 sur `CrmContact`, et 4 champs pré-existants pour ICP (`icpFit`, `icpScore`, `icpScoreBreakdown`, `icpScoredAt`). Mais la couche manquante est **majoritaire** : pas de Pain Tier, pas de Group (G1-G7B), pas de Persona DM/OP, pas de Priority Level, pas de decay 3-paliers, pas de sequence routing par tier × persona, pas de `MarketSignal` model, pas d'endpoint unifié `/api/signals`.
 
 Le **désalignement structurel le plus lourd** : (1) le PRD propose `Account` + `Contact` (1-to-N) mais le CRM a `CrmContact` (qui mélange les deux concepts) + `Company` séparée — décision schéma à trancher. (2) `vertical` actuel (7 valeurs string[]) ne mappe pas 1-to-1 avec les 8 `group` du PRD (G1-G7B). (3) `dealOwner` est string hardcodée, pas FK Employee, ce qui bloque l'`assigned_bd` UUID FK du PRD. (4) **Lemlist library actuelle ne supporte que enroll + remove — pas de pause, pas d'advance, pas de step manipulation** : Open Question #1 du PRD est répondue NÉGATIVEMENT par le code (à vérifier côté API Lemlist mais aucune trace dans le code).
 
-**Verdict effort** : 9-10 semaines pour Vernon + Johnny (1 dev externe) + Claude Code, en assumant les 5 décisions structurelles tranchées en S0.
+**Verdict effort** : **8 semaines** pour Vernon + Johnny (1 dev externe) + Claude Code, en assumant les 5 décisions structurelles tranchées en S0. Estimation revue à la baisse (vs 9-10 v1) compte tenu du risque migration minimal confirmé.
 
-**Risque principal** : la cohabitation `IntentSignal` (existant) vs `Signal` (PRD) — à trancher avant tout dev. Si refactor, migration data des IntentSignal en prod.
+**Risque principal** : la cohabitation `IntentSignal` (existant) vs `Signal` (PRD) — à trancher avant tout dev. **Migration data en pratique inexistante** (0 IntentSignal en prod).
 
 **Bloquants techniques (à résoudre AVANT dev)** :
 - B1 : Open Q #1 Lemlist API pause/advance — code actuel ne l'implémente pas
@@ -35,8 +39,8 @@ Le **désalignement structurel le plus lourd** : (1) le PRD propose `Account` + 
 |---|---|---|---|
 | Nom de l'entité scoring | `Account` (1) | `CrmContact` (le scoring est sur le contact, pas la company) | **À TRANCHER** : refactor en `Account` ou continuer sur `CrmContact` ? |
 | Liée à des contacts | 1 Account → N Contacts | 1 `Company` → N `CrmContact` (FK `companyId` nullable) | **EXISTS différemment** : `Company` ≠ `Account` PRD ; `Account` PRD ≈ `Company` + scoring |
-| Champ scoring agrégé existant | - | `CrmContact.relationshipScore` (Int 0-100) | **EXISTS** mais pas de séparation ICP / Intent |
-| Champs ICP déjà présents | icp_score, icp_breakdown | `CrmContact.icpScore` (Int), `icpScoreBreakdown` (Json), `icpFit` (string), `icpScoredAt` (DateTime) | **EXISTS sur CrmContact** mais (a) plage Int 0-100 vs PRD 0-50, (b) breakdown structure inconnue, (c) pas de pattern match |
+| Champ scoring agrégé existant | - | `CrmContact.relationshipScore` (Int 0-100) | **EXISTS** mais pas de séparation ICP / Intent — **DEAD FIELD : 0/9 contacts > 0** |
+| Champs ICP déjà présents | icp_score, icp_breakdown | `CrmContact.icpScore` (Int), `icpScoreBreakdown` (Json), `icpFit` (string), `icpScoredAt` (DateTime) | **DEAD FIELDS** : les 4 champs existent au schema mais sont jamais alimentés en production (9/9 contacts à 0). Décision : conserver le schema existant, réimplémenter la computation logic from scratch en Sprint S2. Pas de migration data nécessaire. |
 | Source de vérité scoring | `Account` (account-level) + `Contact` (contact-level) qui rolle up | `CrmContact` uniquement | **GAP** : pas de scoring Company-level — à ajouter si on garde `Company` |
 
 **Décision recommandée** : **EXTEND `CrmContact`** plutôt que créer `Account`. Justifications :
@@ -53,8 +57,8 @@ Le **désalignement structurel le plus lourd** : (1) le PRD propose `Account` + 
 
 | Champ PRD | Type PRD | Existe déjà ? | Sous quel nom ? | Décision |
 |---|---|---|---|---|
-| `icp_score` | INT 0-50 | **OUI partiel** | `CrmContact.icpScore` (Int 0-100) | **EXTEND** : changer plage 0-100 → 0-50 (migration data) ou redéfinir comme nouveau champ `icp_score_v2` |
-| `icp_breakdown` | JSON | **OUI partiel** | `CrmContact.icpScoreBreakdown` (Json) | **EXTEND** : structure `{vertical_match, geo_match, company_size, engagement, revenue_potential}` actuelle vs PRD `{industry, size, decision_maker, geography, pattern}` — REDÉFINIR |
+| `icp_score` | INT 0-50 | **Schema OUI, données NON** | `CrmContact.icpScore` (Int 0-100, dead field) | **REUSE schema** : 0 row alimenté → réinterpréter le champ existant comme 0-50 (pas de migration) ; ou ajouter un nouveau check à la computation logic |
+| `icp_breakdown` | JSON | **Schema OUI, données NON** | `CrmContact.icpScoreBreakdown` (Json, dead field) | **REUSE schema** : 0 row alimenté → définir la nouvelle structure `{industry, size, decision_maker, geography, pattern}` directement |
 | `intent_score` | FLOAT 0-50 | **NON** | - | **NEW** |
 | `priority_score` | FLOAT 0-100 | **NON** (mais `relationshipScore` Int 0-100 existe avec sémantique différente) | - | **NEW** ; déprécier `relationshipScore` ou le redéfinir comme `priority_score` |
 | `signal_count` | INTEGER | **NON** | - | **NEW** ; calculé via `intentSignals.length` actuellement |
@@ -569,16 +573,22 @@ company (optional)
 
 ### 9.2 Risques de migration
 
-| # | Risque | Estimation | Mitigation |
-|---|---|---|---|
-| **M1** | CrmContacts existants sans `vertical` rempli | **% INCONNU** (DB non auditée) | Backfill manuel ou re-enrichment Clay ciblé |
-| **M2** | CrmContacts existants sans `geoZone` rempli | **% INCONNU** | Backfill via `country` + heuristique COUNTRY_GEO_MAP existant |
-| **M3** | Pas de Pain Tier sur les contacts existants | 100% | Default T2 + audit manuel par Andy/Paul Louis |
-| **M4** | Pas de Group sur les contacts existants | 100% | Mapping `subVertical` → group automatique via règles + audit manuel pour FinTech/iGaming/Import-Export (sans match) |
-| **M5** | Pas de Persona sur les contacts existants | 100% | Heuristique `jobTitle` (CFO/CEO/COO/Founder = DM, Operations/Manager = OP) + manuel |
-| **M6** | IntentSignal existants sans `signal_category` | 100% | Backfill via mapping `signalType` → category (PRD 6.3) ; admin manuel pour les types non-mappés |
-| **M7** | Migration `score` → `points` + recalc `effective_points` × decay | 100% | Script de migration avec calcul du `decay_coefficient` depuis `createdAt` |
-| **M8** | `dealOwner` string sur tous les CrmContacts/Deals → FK Employee | 100% | Script join sur `Employee.name` (3 valeurs uniques : "Andy"/"Paul Louis"/"Vernon"). Risque faible vu cardinalité fixe. |
+> **Risques migration drastiquement réduits par état DB pre-launch (vérifié 2026-05-01)**. M1-M8 deviennent triviaux sur 9 contacts test. Le vrai risque migration vient si Andy commence le marketing AVANT Sprint S1, créant des CrmContacts production sans Pain Tier / Group / Persona. **D'où l'urgence de Sprint S0 + S1.**
+
+| # | Risque | Estimation v1 | Réalité v2 (vérifié DB) | Mitigation |
+|---|---|---|---|---|
+| **M1** | CrmContacts sans `vertical` rempli | % INCONNU | **5/9 contacts** (55.6%) — sur 9 seeds test, négligeable | Backfill manuel sur 5 rows |
+| **M2** | CrmContacts sans `geoZone` rempli | % INCONNU | **non audité** mais sur 9 seeds, trivial | Backfill via `country` + COUNTRY_GEO_MAP |
+| **M3** | Pas de Pain Tier sur contacts existants | 100% | 100% sur 9 contacts seed | Default T2 (manual audit trivial) |
+| **M4** | Pas de Group sur contacts existants | 100% | 100% sur 9 contacts seed | Mapping `subVertical`→group automatique (trivial sur 9 rows) |
+| **M5** | Pas de Persona sur contacts existants | 100% | 100% sur 9 contacts seed | Heuristique `jobTitle` (trivial sur 9 rows) |
+| **M6** | IntentSignal existants sans `signal_category` | 100% | **0 IntentSignal en DB** — aucune migration data | **NON APPLICABLE** |
+| **M7** | Migration `score` → `points` + `effective_points` × decay | 100% | **0 IntentSignal** — aucun row à migrer | **NON APPLICABLE** |
+| **M8** | `dealOwner` string sur CrmContacts/Deals → FK Employee | 100% | trivial sur 9 contacts seed | Script join sur `Employee.name` (3 valeurs fixes) |
+
+**Risque dominant déplacé** : ce n'est plus la migration data, mais le **timing vs lancement marketing**. Si Andy lance des campagnes Lemlist en prod avant que Sprint S1 (Signal ingestion + scoring fields) soit livré, on génère des CrmContacts production qui devront être backfillés rétroactivement (Pain Tier / Group / Persona / icp_score / etc.). C'est exactement la situation à éviter.
+
+**Mitigation principale** : terminer Sprint S0 + S1 **avant le go-live marketing**. Si pas faisable, fallback : freeze des campagnes Andy jusqu'à S1 livré.
 
 ---
 
@@ -668,16 +678,16 @@ Semaine 2 :
 - [ ] `<ScoreOverrideModal />` avec justification text + audit log
 - [ ] **Signal Cleanup** weekly job (`scoring:signal-cleanup` archive >180j)
 
-### Sprint S8 — Tests, monitoring, polish (1 semaine)
+### Sprint S8 — Tests, monitoring, polish (3-4 jours)
 
 - [ ] Tests E2E workflows critiques (P1 alert flow, sequence enrollment DM+OP)
 - [ ] **Cost monitoring Anthropic** (cf. backlog `FEATURES.md` — pertinent ici car les workers AI seront sollicités pour Pattern Match + auto-classification)
 - [ ] **Rate limiting endpoints** scoring (cf. Sprint 4 prévu — pertinent pour `/api/signals`)
 - [ ] Doc utilisateur Andy/PM (vue Priority Queue, comprendre les badges)
-- [ ] Migration data CrmContacts existants (backfill group / pain_tier / persona en batch)
+- [ ] Migration data CrmContacts existants (backfill group / pain_tier / persona — **trivial sur 9 contacts seed**)
 - [ ] Audit logs (toutes les mutations score_override, priority_level transitions)
 
-**Total** : 9 semaines (~2.5 mois), avec marge.
+**Total revu v2** : **8 semaines** (vs 9-10 estimation v1) compte tenu du risque migration minimal confirmé. Sprint S8 (tests + migration data) ramené à 3-4 jours sur 9 contacts seed (vs 1 semaine v1).
 
 ---
 
@@ -735,19 +745,42 @@ Semaine 2 :
 
 ### 12.2 État DB actuel (samples)
 
-**NON AUDITÉ** — pas d'accès Railway DB pendant cet audit. À VALIDER VERNON via :
+**Audité 2026-05-01** via `scripts/db/check-counts.ts` (read-only, committed pour suivi récurrent).
 
-```bash
-npx prisma studio
-# OU
-psql $DATABASE_URL -c "SELECT count(*) FROM \"CrmContact\""
-psql $DATABASE_URL -c "SELECT count(*) FROM \"IntentSignal\""
-psql $DATABASE_URL -c "SELECT vertical, count(*) FROM \"CrmContact\" GROUP BY vertical"
-psql $DATABASE_URL -c "SELECT \"lifecycleStage\", count(*) FROM \"CrmContact\" GROUP BY \"lifecycleStage\""
-psql $DATABASE_URL -c "SELECT source, count(*) FROM \"IntentSignal\" GROUP BY source"
-```
+#### Snapshot baseline (2026-05-01) — pre-Sprint S0
 
-Ces stats sont nécessaires pour estimer l'effort de migration data (M1-M8 section 9.2).
+| Métrique | Valeur | % |
+|---|---|---|
+| Total CrmContacts | **9** | seeds test |
+| Total IntentSignals | **0** | clean migration possible |
+| CrmContacts sans `vertical` | 5 / 9 | 55.6% |
+| CrmContacts en stage `new_lead` (default, jamais avancé) | 9 / 9 | 100% |
+| CrmContacts avec `lifecycleStage` vide | 0 / 9 | 0% |
+| CrmContacts sans `icpScore` (= 0 ou null) | 9 / 9 | 100% — dead field |
+| CrmContacts avec `icpScore` > 0 | 0 / 9 | 0% |
+| CrmContacts avec `relationshipScore` > 0 | 0 / 9 | 0% — dead field |
+
+**Breakdown lifecycleStage** :
+- `new_lead` : 9 (100%)
+
+**Breakdown IntentSignal sources** : N/A (table vide).
+
+#### Implications
+
+- **DB en état pre-launch** : 9 contacts test, 0 production data
+- **Foundations ICP/Intent existent au schema mais sont dead code** (jamais alimentés)
+- **Migration data triviale** : pour chaque migration, max 9 rows à backfill
+- **Lemlist webhook + Clay webhook** ont écrit 0 fois en prod (cohérent avec 0 IntentSignal)
+- **Aucun risque de retraitement** sur les data existantes
+
+#### Re-runs récurrents
+
+Le script `scripts/db/check-counts.ts` doit être run :
+- **Avant chaque sprint PRD-001** : vérifier que la baseline n'a pas dérivé
+- **Après chaque sprint PRD-001** : confirmer que la migration s'est passée comme prévu
+- **Avant le go-live marketing** : confirmation finale de l'état DB
+
+Snapshots futurs à archiver dans le footer du script (template prêt).
 
 ### 12.3 Glossaire des termes nouveaux
 
