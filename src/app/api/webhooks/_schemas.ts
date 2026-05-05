@@ -136,3 +136,70 @@ export const n8nWebhookSchema = z.discriminatedUnion("action", [
     data: n8nCreateInteractionData,
   }),
 ])
+
+// ─────────────────────────────────────────────────────────────
+// Clay enrichment webhook — PRD-001 scoring engine
+// CLAY_ENRICHMENT_PAYLOAD_DRAFT.md v1.1 sections 3.1, 3.2, 3.3
+//
+// Discriminated by `scope`: "company" or "people".
+// Refine ensures the corresponding sub-object is present.
+// Domain and email lowercased downstream in the handler (Zod can't safely
+// transform on a refined union without losing the discriminator narrowing).
+// ─────────────────────────────────────────────────────────────
+
+const crmGroup = z.enum(["G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B"])
+const crmPainTier = z.enum(["T1", "T2", "T3"])
+const emailValidationStatus = z.enum(["valid", "invalid", "risky", "unknown"])
+
+const clayCompanyPayload = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(2000).optional(),
+  primaryIndustry: z.string().max(255).optional(),
+  size: z.string().max(50).optional(),
+  type: z.string().max(50).optional(),
+  location: z.string().max(255).optional(),
+  country: z.string().max(100).optional(),
+  domain: z.string().min(1).max(255),
+  linkedinUrl: z.string().url().max(500).optional(),
+})
+
+const clayPersonPayload = z.object({
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  fullName: z.string().max(255).optional(),
+  jobTitle: z.string().max(255).optional(),
+  email: z.string().email().max(320),
+  emailValidationStatus: emailValidationStatus.optional(),
+  emailProvider: z.string().max(50).optional(),
+  linkedinUrl: z.string().url().max(500).optional(),
+  location: z.string().max(255).optional(),
+  country: z.string().max(100).optional(),
+  company: z
+    .object({
+      name: z.string().max(255).optional(),
+      domain: z.string().min(1).max(255),
+      linkedinUrl: z.string().url().max(500).optional(),
+    })
+    .optional(),
+})
+
+export const clayEnrichmentSchema = z
+  .object({
+    source_table: z.string().min(1).max(200),
+    scope: z.enum(["company", "people"]),
+    group: crmGroup,
+    pain_tier: crmPainTier,
+    company: clayCompanyPayload.optional(),
+    person: clayPersonPayload.optional(),
+  })
+  .refine(
+    (data) =>
+      (data.scope === "company" && data.company !== undefined) ||
+      (data.scope === "people" && data.person !== undefined),
+    {
+      message:
+        "scope=company requires `company`, scope=people requires `person`",
+    },
+  )
+
+export type ClayEnrichmentPayload = z.infer<typeof clayEnrichmentSchema>
