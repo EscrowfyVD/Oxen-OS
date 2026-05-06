@@ -1,9 +1,9 @@
-# PRD-001 v3.4 — Intent Scoring Engine
+# PRD-001 v3.5 — Intent Scoring Engine
 # Document de mapping vers le CRM Oxen OS existant
 
-> Document v3.4 — généré le 2026-05-01, révisé 2026-05-05 (Sprint S0 livré + post-deploy clarifications).
+> Document v3.5 — généré le 2026-05-01, révisé 2026-05-06 (Sprint S0 livré + Phase 2 G1-T1 SEEDED).
 > Référence PRD : Andy / Oxen Finance — `CRM_scoring_brief.docx` — April 29, 2026
-> Statut : Sprint S0 livré + hotfix client/server boundary + BD emails clarification — Phase 2 prête.
+> Statut : Sprint S0 livré + 4 hotfixes (v1-v4) + Phase 2 G1-T1 seed terminé (1 586 Companies + 597 Contacts en DB).
 >
 > **Changelog** :
 > - **v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
@@ -12,6 +12,7 @@
 > - **v3.1 → v3.2** : Lemlist API verification complétée par Vernon 2026-05-05. Pause/Resume/Status disponibles ; advance/skip step non exposé → workaround pause + update `{{signal_context}}` variable + resume. Aucune réduction scope PRD section 6.7 nécessaire. Open Q #1 RESOLVED. **6/7 questions résolues, 1 pending (Clay mapping rules en S0)**.
 > - **v3.2 → v3.3** : **Sprint S0 IMPLEMENTED 2026-05-05**. 5 batches livrés (5 commits, 9 fichiers ajoutés/modifiés, 126 tests passants, 187/187 pages build OK). Pipeline Clay enrichment opérationnel — 2 modes (CSV import + HTTP API push) convergents sur les mêmes upsert helpers (single source of truth dans `src/lib/clay-enrichment.ts`). Phase 2 prête : seed des 2 692 rows existantes (1 711 companies + 981 people). Open Q #6 (Clay mapping rules) reste à formaliser début S1 — la base technique est en place.
 > - **v3.3 → v3.4** : Post-deploy clarifications (2026-05-05 soir). (1) Hotfix `477cb93` : extraction des helpers client-safe vers `@/lib/clay-helpers.ts` après crash `PrismaClient is unable to run in browser` sur `/crm/contacts` — `ClayImportWizard` importait transitivement `prisma` via `@/lib/clay-enrichment`. (2) BD emails clarification : `CRM_BD_EMAILS` Railway env var corrigée avec les emails réels DB (`ad@oxen.finance`, `pg@oxen.finance`) — ancien template `.env.example` (`andy@`, `paullouis@`) ne matchait pas. (3) Glossaire ajouté : "Paul Louis" = nom interne pour **Paul Garreau** (Deputy CEO, `pg@oxen.finance`), 2ème BD aux côtés d'Andy. (4) Décision explicite : `dealOwnerId` = ownership CRM Oxen interne uniquement, **distinct des sender identities Lemlist** (Lemlist gère ses outreach aliases séparément, hors scope de ce PRD).
+> - **v3.4 → v3.5** : **Phase 2 G1-T1 SEEDED 2026-05-06**. Import des 2 tables Clay G1-T1 effectué via wizard CSV (Mode A). Résultats : **1 586 Companies** (1 711 CSV − 2 errored description >2000 − 123 dedupe by domain) + **597 CrmContacts** (981 CSV − 384 dedupe by email Apollo cascade). 100% field coverage sur tous les champs critiques. Persona 99.3% DM (table Clay pré-filtrée upstream). Country distribution G1 : 73.7% UAE / 11.6% Cyprus / 8.7% Malta / 6.0% adjacents (UK/US/EU/SG/CA). dealOwner répartition 52.4% Andy / 47.6% Paul Garreau (random uniforme sain). **Phase 2 a révélé 4 hotfixes** (`477cb93` v1 client/server, `2cc7444` v2 per-row validation + `description.max(10000)`, `69c17fe` v3 Apollo aliases + `extractCountryFromLocation`, `cab3545` v4 country inheritance from Company) — tous fixés et déployés. Chaîne de protection country à 3 niveaux (explicit → location parsing → Company inheritance) garantit **0 contact avec country=NULL** sur 597. Scripts de vérification committed : `check-companies-phase2.ts` (`54f0217`) + `check-contacts-phase2.ts` (`8f1afdd`).
 
 ---
 
@@ -796,9 +797,9 @@ Semaine 2 :
 
 ## 11. Recommandations Vernon
 
-### 11.1 Sprint S0 — IMPLEMENTED 2026-05-05
+### 11.1 Sprint S0 — IMPLEMENTED 2026-05-05 + Phase 2 G1-T1 SEEDED 2026-05-06
 
-**6 décisions structurelles tranchées par Andy + 5 batches Sprint S0 implémentés** :
+**6 décisions structurelles tranchées par Andy + 5 batches Sprint S0 implémentés + 4 hotfixes (v1-v4) + Phase 2 G1-T1 seed terminé** :
 
 #### Décisions (Andy 2026-05-05)
 - ✅ Mapping `vertical` → `group` : Option B Coexister + table finale (Family Office=G4, CSP=G1, Luxury/Yacht=G6, FinTech-CSP=G1/T1, FinTech-compta=G5/T1, iGaming + Import/Export OUT)
@@ -826,34 +827,68 @@ Semaine 2 :
 | 6 | Endpoint `POST /api/crm/contacts/import-clay` (batch CSV import, chunks de 100, allSettled) | `35270b0` | ✅ DONE |
 | 7 | UI component `ClayImportWizard.tsx` (5-step modal upload→source→mapping→preview→result) | `35270b0` | ✅ DONE |
 | 8 | Source-table parser `parseClayTableName()` (vDC_{group}_Tier {n}_{scope}_{filter}) | `35270b0` | ✅ DONE |
-| 9 | Documentation `docs/clay-setup-guide.md` (Duy, Mode B HTTP) + `docs/clay-csv-import-guide.md` (Andy, Mode A CSV) | this batch | ✅ DONE |
+| 9 | Documentation `docs/clay-setup-guide.md` (Duy, Mode B HTTP) + `docs/clay-csv-import-guide.md` (Andy, Mode A CSV) | `600b313` | ✅ DONE |
 
-#### 1 item en attente (formalisation, non bloquant pour Phase 2)
+#### Hotfixes post-deploy (révélés par Phase 2)
 
-1. **Clay mapping rules** sub-vertical → Group + Pain Tier (Vernon + Andy, ~30 min) — Open Q #6. Mapping de base existe (cf. section 3.2), règles fines (heuristiques companySize / country / fundingStage) à formaliser début Sprint S1. **N'empêche pas le seed Phase 2** : les rows Clay arrivent déjà tagged G1-T1 par construction (encodé dans le source_table).
+| # | Issue | Commit | Statut |
+|---|---|---|---|
+| H1 | `PrismaClient is unable to run in browser` sur `/crm/contacts` — `ClayImportWizard` importait transitivement `prisma`. Fix : extract pures helpers vers `@/lib/clay-helpers.ts`. | `477cb93` | ✅ DONE |
+| H2 | Import 1 711 rows échoue avec 400 Invalid input car 2 rows ont description >2000 chars. Batch Zod rejette tout. Fix : `description.max(2000)` → `max(10000)` + per-row validation dans `Promise.allSettled` (1 bad row n'arrête plus le batch) + retry x1 sur exceptions. | `2cc7444` | ✅ DONE |
+| H3 | Apollo CSV columns non auto-mappées : `Work Email`, `Email Address`, etc. + Apollo Location `"City, Country"` non parsé. Fix : 5 alias Apollo dans `PEOPLE_AUTO_MAP` + nouveau helper `extractCountryFromLocation()` (whitelist 21 entrées, normalisation UAE/UK/USA → canonical). | `69c17fe` | ✅ DONE |
+| H4 | 2 contacts sur 5 (mini-test) ont country=NULL car `Location` en arabe (`دبي الإمارات العربية المتحدة`) non parseable. Fix : 3-step country resolution chain — explicit → `extractCountryFromLocation` → **inherit from `Company.country`** (universel multilingue). Backfill SQL appliqué sur les 2 rows. | `cab3545` | ✅ DONE |
 
-### 11.2 Phase 2 ready (post-Sprint S0)
+#### 1 item en attente (formalisation, non bloquant Phase 3)
 
-**Phase 2 lancement ready** : seed initial 2 692 rows depuis les tables Clay G1-T1 existantes.
+1. **Clay mapping rules** sub-vertical → Group + Pain Tier (Vernon + Andy, ~30 min) — Open Q #6. Mapping de base existe (cf. section 3.2), règles fines (heuristiques companySize / country / fundingStage) à formaliser début Sprint S1. **N'a pas empêché le seed Phase 2** : les rows Clay arrivent déjà tagged G1-T1 par construction (encodé dans le source_table).
 
-#### Pré-requis avant Phase 2
-1. **Run** `npx tsx scripts/db/cleanup-seed-contacts.ts` pour drop les 9 seeds test (D2 decision)
-   - Safeguard intégré : refuse si > 50 contacts en DB
-2. **Verify** `CRM_BD_EMAILS` env var en prod = `andy@oxen.finance,paullouis@oxen.finance`
-3. **Verify** `CLAY_WEBHOOK_SECRET` partagé avec Duy (Mode B) ou Andy (Mode A wizard ne nécessite pas le secret — auth NextAuth standard)
+### 11.2 Phase 2 G1-T1 — SEEDED 2026-05-06
 
-#### Phase 2 — Choix d'exécution
-- **Option A — Mode A CSV import via UI** (Andy, immédiat) :
-  - Andy exporte les 2 tables Clay en 2 CSV
-  - Login Oxen → /crm/contacts → "Import (Clay)"
-  - 2 imports successifs : Company table puis People table
-  - Estimé : ~30 min total
-- **Option B — Mode B HTTP API push** (Duy, dépend de la config Clay HTTP API column) :
-  - Duy configure les colonnes HTTP API selon `docs/clay-setup-guide.md`
-  - Trigger "Run on row complete" → push automatique
-  - Idéal pour le futur (rows enrichies en temps réel sur les nouvelles tables G+T)
+**Phase 2 lancement complet** : seed des 2 tables Clay G1-T1 (Company + People) effectué via Mode A (CSV wizard).
 
-**Reco Phase 2** : Option A (CSV) pour le seed initial puisque les 2 692 rows existent déjà. Option B pour les nouvelles tables (G+T en cours de création par Duy).
+#### Métriques DB post-seed (verifié `check-companies-phase2.ts` + `check-contacts-phase2.ts`)
+
+##### Companies (G1-T1)
+
+| Métrique | Valeur |
+|---|---|
+| Total Company en DB | **1 586** |
+| Source CSV input | 1 711 rows |
+| Errored (description >2000 chars, fixé en hotfix v2 mais déjà skippées) | 2 |
+| Dedupe by `domain` (idempotence) | 123 |
+| Field coverage : `name`, `domain`, `country`, `industry`, `linkedinUrl`, `clayTableSegment`, `enrichedAt` | **100%** |
+| Field coverage : `companySize` | 99.8% (3 nulls Apollo) |
+| Country distribution | 82.7% UAE / 11.8% Cyprus / 5.5% Malta |
+| Industry distribution | 52% Business Consulting / 38% Financial Services / 9% Legal / 1% Professional |
+| Company size distribution | 86.6% sont 2-50 employees (profil PME/CSP cible) |
+
+##### CrmContacts (G1-T1)
+
+| Métrique | Valeur |
+|---|---|
+| Total CrmContact en DB | **597** |
+| Source CSV input | 981 rows |
+| Dedupe by `email` (idempotence + Apollo cascade dedup) | 384 |
+| Field coverage : `email`, `jobTitle`, `persona`, `country`, `companyId`, `dealOwner` | **100%** |
+| Field coverage : `firstName` | 99.7% (2 nulls — données Apollo) |
+| **Country = NULL count** | **0 / 597** ✅ (chaîne d'inheritance fonctionne) |
+| Persona distribution | 99.3% DM / 0.7% OP (table Clay pré-filtrée DM upstream) |
+| Country distribution | 73.7% UAE / 11.6% Cyprus / 8.7% Malta / 6.0% adjacents (UK/US/EU/SG/CA) |
+| dealOwner distribution | 52.4% Andy Dessy / 47.6% Paul Garreau (random uniforme sain) |
+
+#### Implications pour Phase 3 (scoring engine)
+
+- **Foundations DB solides** : 1 586 Companies + 597 Contacts taggés G1-T1 avec 100% field coverage prêts à recevoir le scoring (icpScore, intentScore, priorityScore, priorityLevel).
+- **Chaîne de protection country bulletproof** : aucun contact orphelin geo, le scoring `geography` factor (max 10 pts) peut s'appliquer sur 100% du dataset.
+- **Persona ready** : 593 DM identifiés → outreach Lemlist `G1-T1-DM` peut démarrer dès que les sequences sont créées (Open Q Andy).
+- **dealOwner ready** : Telegram routing P1 (2h SLA) peut router vers Andy ou Paul Garreau immédiatement.
+- **6.0% Person.country ≠ Company.country** (cadres expat) — choix scoring à faire : downgrade léger ou égalité (cf. section 11.3).
+
+#### Pour les futures tables G+T (G1-T2, G2-T1, etc.)
+
+- **Mode A (CSV wizard)** : inchangé, ajouter le `source_table` au preset dropdown si récurrent (cf. `PRESET_TABLES` dans `ClayImportWizard.tsx`).
+- **Mode B (HTTP API push)** : prêt côté Oxen, dépend de la config Clay HTTP API column (Duy, cf. `docs/clay-setup-guide.md`).
+- **Vérification post-seed** : adapter les 2 scripts `check-companies-phase2.ts` / `check-contacts-phase2.ts` (changer le filtre `WHERE "group" = 'G1' AND "painTier" = 'T1'`).
 
 #### Sprints suivants (S1, S2, ...)
 
@@ -970,4 +1005,4 @@ Snapshots futurs à archiver dans le footer du script (template prêt).
 
 ---
 
-*Fin du document — PRD-001 v2 mapping vers Oxen OS CRM (2026-05-01)*
+*Fin du document — PRD-001 v3.5 mapping vers Oxen OS CRM (2026-05-01, révisé 2026-05-06 post-Phase 2 G1-T1 seed)*
