@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const vq = validateSearchParams(searchParams, listCompaniesQuery)
   if ("error" in vq) return vq.error
-  const { search, vertical, geoZone, industry, revenueRange } = vq.data
+  const { search, vertical, geoZone, industry, revenueRange, group, painTier, country } = vq.data
   const sortBy = vq.data.sortBy || "createdAt"
   const sortDir = vq.data.sortDir || "desc"
 
@@ -36,6 +36,18 @@ export async function GET(request: Request) {
   }
   if (revenueRange && revenueRange !== "all") {
     where.revenueRange = revenueRange
+  }
+  // Clay enrichment filters (Sprint S0.5 batch 4 — option γ). Values
+  // are validated by Zod (CrmGroup / CrmPainTier enums) upstream, so
+  // by the time we get here they are guaranteed safe to pass to Prisma.
+  if (group) {
+    where.group = group
+  }
+  if (painTier) {
+    where.painTier = painTier
+  }
+  if (country && country !== "all") {
+    where.country = country
   }
 
   const companies = await prisma.company.findMany({

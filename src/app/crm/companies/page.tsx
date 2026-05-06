@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Search, Plus, Building2, Users, TrendingUp, DollarSign } from "lucide-react"
 import {
   VERTICALS,
@@ -10,6 +10,34 @@ import {
   fmtCurrency,
   CRM_COLORS,
 } from "@/lib/crm-config"
+import {
+  getGroupColor,
+  getPainTierColor,
+  FALLBACK_BADGE_COLOR,
+} from "@/lib/crm-badge-colors"
+
+// PRD-001 in-scope + adjacent jurisdictions, aligned with the canonical
+// names used by extractCountryFromLocation (src/lib/clay-helpers.ts).
+// Drives the "All Countries" filter dropdown options.
+const COUNTRY_FILTER_OPTIONS = [
+  "United Arab Emirates",
+  "Cyprus",
+  "Malta",
+  "Switzerland",
+  "Luxembourg",
+  "France",
+  "United Kingdom",
+  "Germany",
+  "Italy",
+  "Spain",
+  "Portugal",
+  "Netherlands",
+  "Belgium",
+  "Singapore",
+  "Hong Kong",
+  "United States",
+  "Canada",
+] as const
 
 /* ── Design tokens ── */
 const CARD_BG = CRM_COLORS.card_bg
@@ -42,18 +70,48 @@ interface CompanyCard {
   geoZone: string | null
   domain: string | null
   website: string | null
+  // Clay enrichment (Sprint S0.5 batch 4) — populated by the Clay
+  // pipeline (`@/lib/clay-enrichment`). Cards render a Group/PainTier
+  // badge pair when these are set; otherwise the badge row is hidden.
+  group: string | null
+  painTier: string | null
   contacts: { id: string }[]
   deals: { id: string; stage: string; dealValue: number | null }[]
 }
 
 export default function CompaniesListPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [companies, setCompanies] = useState<CompanyCard[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [filterVertical, setFilterVertical] = useState("all")
   const [filterGeoZone, setFilterGeoZone] = useState("all")
   const [filterIndustry, setFilterIndustry] = useState("all")
+  // Clay enrichment filters (Sprint S0.5 batch 4) — bookmarkable via
+  // URL query params (?group=G1&painTier=T1&country=Cyprus). Initialized
+  // from the URL on mount and bidirectionally synced on change. Pattern
+  // mirrors the Contacts list filters added in Sprint S0.5 batch 2.
+  const [filterGroup, setFilterGroup] = useState<string>(() => searchParams.get("group") ?? "all")
+  const [filterPainTier, setFilterPainTier] = useState<string>(() => searchParams.get("painTier") ?? "all")
+  const [filterCountry, setFilterCountry] = useState<string>(() => searchParams.get("country") ?? "all")
+
+  // State → URL sync. The early-return guard prevents an infinite loop
+  // when `searchParams` reference changes after our own router.replace.
+  // Other filters (vertical/geoZone/industry) intentionally NOT in URL
+  // — out of scope for batch 4.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (filterGroup !== "all") params.set("group", filterGroup)
+    else params.delete("group")
+    if (filterPainTier !== "all") params.set("painTier", filterPainTier)
+    else params.delete("painTier")
+    if (filterCountry !== "all") params.set("country", filterCountry)
+    else params.delete("country")
+    if (params.toString() === searchParams.toString()) return
+    const qs = params.toString()
+    router.replace(qs ? `?${qs}` : "?", { scroll: false })
+  }, [filterGroup, filterPainTier, filterCountry, searchParams, router])
 
   const fetchCompanies = useCallback(() => {
     const params = new URLSearchParams()
@@ -61,6 +119,10 @@ export default function CompaniesListPage() {
     if (filterVertical !== "all") params.set("vertical", filterVertical)
     if (filterGeoZone !== "all") params.set("geoZone", filterGeoZone)
     if (filterIndustry !== "all") params.set("industry", filterIndustry)
+    // Clay enrichment filters (Sprint S0.5 batch 4)
+    if (filterGroup !== "all") params.set("group", filterGroup)
+    if (filterPainTier !== "all") params.set("painTier", filterPainTier)
+    if (filterCountry !== "all") params.set("country", filterCountry)
 
     fetch(`/api/crm/companies?${params}`)
       .then((r) => r.json())
@@ -69,7 +131,7 @@ export default function CompaniesListPage() {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [search, filterVertical, filterGeoZone, filterIndustry])
+  }, [search, filterVertical, filterGeoZone, filterIndustry, filterGroup, filterPainTier, filterCountry])
 
   useEffect(() => {
     fetchCompanies()
@@ -206,6 +268,45 @@ export default function CompaniesListPage() {
             <option key={i} value={i}>{i}</option>
           ))}
         </select>
+
+        {/* Clay enrichment filters (Sprint S0.5 batch 4 — option γ).
+            Bookmarkable via URL ?group=G1&painTier=T1&country=Cyprus.
+            Mirror the Contacts list filter pattern (batch 2). */}
+        <select
+          value={filterGroup}
+          onChange={(e) => setFilterGroup(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="all">All Groups</option>
+          <option value="G1">G1</option>
+          <option value="G2">G2</option>
+          <option value="G3">G3</option>
+          <option value="G4">G4</option>
+          <option value="G5">G5</option>
+          <option value="G6">G6</option>
+          <option value="G7A">G7A</option>
+          <option value="G7B">G7B</option>
+        </select>
+        <select
+          value={filterPainTier}
+          onChange={(e) => setFilterPainTier(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="all">All Pain Tiers</option>
+          <option value="T1">T1</option>
+          <option value="T2">T2</option>
+          <option value="T3">T3</option>
+        </select>
+        <select
+          value={filterCountry}
+          onChange={(e) => setFilterCountry(e.target.value)}
+          style={selectStyle}
+        >
+          <option value="all">All Countries</option>
+          {COUNTRY_FILTER_OPTIONS.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
       </div>
 
       {/* Loading */}
@@ -273,6 +374,51 @@ export default function CompaniesListPage() {
                   </div>
                   <Building2 size={18} strokeWidth={1.5} style={{ color: TEXT_TERTIARY, flexShrink: 0 }} />
                 </div>
+
+                {/* Clay enrichment badges (Sprint S0.5 batch 4) — only
+                    rendered when the company is Clay-enriched. Color
+                    palette shared with the Contacts list + detail page
+                    via @/lib/crm-badge-colors (single source of truth). */}
+                {(company.group || company.painTier) && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                    {company.group && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 16,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          fontFamily: "'DM Sans', sans-serif",
+                          background: `${getGroupColor(company.group) ?? FALLBACK_BADGE_COLOR}18`,
+                          color: getGroupColor(company.group) ?? FALLBACK_BADGE_COLOR,
+                          letterSpacing: 0.3,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {company.group}
+                      </span>
+                    )}
+                    {company.painTier && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 16,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          fontFamily: "'DM Sans', sans-serif",
+                          background: `${getPainTierColor(company.painTier) ?? FALLBACK_BADGE_COLOR}18`,
+                          color: getPainTierColor(company.painTier) ?? FALLBACK_BADGE_COLOR,
+                          letterSpacing: 0.3,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {company.painTier}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* HQ Location */}
                 {(company.hqCity || company.country) && (

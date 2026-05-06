@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import PipelineView from "@/components/crm/PipelineView"
 import TableView from "@/components/crm/TableView"
 import CardView from "@/components/crm/CardView"
@@ -763,15 +764,24 @@ export default function CrmPage() {
         )}
 
         {subNav === "companies" && (
+          // Sprint S0.5 batch 4 — replaced the "Companies view coming
+          // soon" placeholder with a navigation card linking to the
+          // existing standalone Companies page (/crm/companies). That
+          // page is the canonical Companies UI (grid view + Clay-aware
+          // filters added in this batch); this card just bridges the
+          // sub-nav tab to it without duplicating the table here.
           <div
             style={{
               background: CARD_BG,
               border: `1px solid ${CARD_BORDER}`,
               borderRadius: 14,
-              padding: "40px 20px",
-              textAlign: "center",
+              padding: "32px 24px",
               backdropFilter: "blur(20px)",
               WebkitBackdropFilter: "blur(20px)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 16,
             }}
           >
             <p
@@ -779,10 +789,30 @@ export default function CrmPage() {
                 fontSize: 14,
                 color: TEXT_SECONDARY,
                 fontFamily: "'DM Sans', sans-serif",
+                margin: 0,
+                textAlign: "center",
               }}
             >
-              Companies view coming soon.
+              The full Companies workspace lives on a dedicated page with
+              search, filters, and detail views.
             </p>
+            <Link
+              href="/crm/companies"
+              style={{
+                padding: "10px 24px",
+                background: `linear-gradient(135deg, ${ROSE_GOLD}, #A07070)`,
+                border: "none",
+                borderRadius: 10,
+                color: "#FFFFFF",
+                fontSize: 13,
+                fontWeight: 600,
+                fontFamily: "'DM Sans', sans-serif",
+                textDecoration: "none",
+                cursor: "pointer",
+              }}
+            >
+              Open Companies →
+            </Link>
           </div>
         )}
 

@@ -14,6 +14,11 @@ import {
   CRM_COLORS,
   ACTIVITY_ICONS,
 } from "@/lib/crm-config"
+import {
+  getGroupColor,
+  getPainTierColor,
+  FALLBACK_BADGE_COLOR,
+} from "@/lib/crm-badge-colors"
 
 /* ── Tokens ── */
 const CARD_BG = CRM_COLORS.card_bg
@@ -82,6 +87,14 @@ interface Company {
   techStack: string[]
   linkedinUrl: string | null
   socialProfiles: Record<string, string> | null
+  // Clay enrichment (Sprint S0.5 batch 4) — populated by the Clay
+  // pipeline (`@/lib/clay-enrichment`). Drives the new "Clay Enrichment"
+  // section in the Overview tab (read-only).
+  group: string | null
+  painTier: string | null
+  clayTableSegment: string | null
+  enrichmentSource: string | null
+  enrichedAt: string | null
   contacts: ContactRow[]
   deals: DealRow[]
   createdAt: string
@@ -385,6 +398,104 @@ export default function CompanyDetailPage() {
 
           {/* Enrichment / Verticals */}
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {/* Clay Enrichment (Sprint S0.5 batch 4 — option γ) ──
+                Read-only badges + metadata populated by the Clay
+                pipeline. Placed at the top of the right column so the
+                PRD-001 segmentation is the first signal a user sees on
+                the Overview tab. Empty-state for non-Clay companies
+                renders a single dimmed line. */}
+            {(() => {
+              const isEnriched =
+                company.group ||
+                company.painTier ||
+                company.clayTableSegment ||
+                company.enrichmentSource ||
+                company.enrichedAt
+              return (
+                <div style={glassCard}>
+                  <h3 style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 16, marginTop: 0 }}>
+                    Clay Enrichment
+                  </h3>
+                  {!isEnriched ? (
+                    <p style={{ fontSize: 12, color: TEXT_TERTIARY, fontFamily: "'DM Sans', sans-serif", margin: 0, fontStyle: "italic" }}>
+                      Not enriched via Clay
+                    </p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <div>
+                        <span style={labelStyle}>Group</span>
+                        {company.group ? (
+                          <div style={{ marginTop: 2 }}>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "3px 10px",
+                                borderRadius: 16,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                fontFamily: "'DM Sans', sans-serif",
+                                background: `${getGroupColor(company.group) ?? FALLBACK_BADGE_COLOR}18`,
+                                color: getGroupColor(company.group) ?? FALLBACK_BADGE_COLOR,
+                                letterSpacing: 0.3,
+                              }}
+                            >
+                              {company.group}
+                            </span>
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: 13, color: TEXT_TERTIARY, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>—</p>
+                        )}
+                      </div>
+                      <div>
+                        <span style={labelStyle}>Pain Tier</span>
+                        {company.painTier ? (
+                          <div style={{ marginTop: 2 }}>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "3px 10px",
+                                borderRadius: 16,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                fontFamily: "'DM Sans', sans-serif",
+                                background: `${getPainTierColor(company.painTier) ?? FALLBACK_BADGE_COLOR}18`,
+                                color: getPainTierColor(company.painTier) ?? FALLBACK_BADGE_COLOR,
+                                letterSpacing: 0.3,
+                              }}
+                            >
+                              {company.painTier}
+                            </span>
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: 13, color: TEXT_TERTIARY, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>—</p>
+                        )}
+                      </div>
+                      <div>
+                        <span style={labelStyle}>Table Segment</span>
+                        <p style={{ fontSize: 13, color: company.clayTableSegment ? TEXT_PRIMARY : TEXT_TERTIARY, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+                          {company.clayTableSegment || "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <span style={labelStyle}>Source</span>
+                        <p style={{ fontSize: 13, color: company.enrichmentSource ? TEXT_PRIMARY : TEXT_TERTIARY, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+                          {company.enrichmentSource || "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <span style={labelStyle}>Enriched At</span>
+                        <p style={{ fontSize: 13, color: company.enrichedAt ? TEXT_PRIMARY : TEXT_TERTIARY, margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+                          {company.enrichedAt
+                            ? new Date(company.enrichedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
             <div style={glassCard}>
               <h3 style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 16, marginTop: 0 }}>
                 Verticals & Sub-Verticals

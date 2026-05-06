@@ -309,6 +309,14 @@ export const listCompaniesQuery = z.object({
   geoZone: z.string().optional(),
   industry: z.string().optional(),
   revenueRange: z.string().optional(),
+  // Clay enrichment filters (Sprint S0.5 batch 4 — option γ).
+  // group / painTier reuse the Zod enums declared above for /api/crm/contacts;
+  // country is a free-string match (case-sensitive equality on Company.country)
+  // because Apollo / Clay normalize to canonical English names server-side
+  // (see extractCountryFromLocation whitelist in src/lib/clay-helpers.ts).
+  group: crmGroupEnum.optional(),
+  painTier: crmPainTierEnum.optional(),
+  country: z.string().max(100).optional(),
   sortBy: z.string().max(50).optional(),
   sortDir: sortDir.optional(),
 })
