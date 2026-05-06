@@ -9,11 +9,19 @@ export function proxy(req: NextRequest) {
 
   const { pathname } = req.nextUrl
 
-  // Allow auth API routes, webhooks, login page, and static assets
+  // Allow auth API routes, webhooks, login page, and static assets.
+  //
+  // /api/signals is also whitelisted (Sprint S1 batch 2 hotfix) — the
+  // route handler at src/app/api/signals/route.ts authenticates via
+  // bearer token (SIGNALS_INGESTION_SECRET) for server-to-server
+  // integrations, with a session fallback for UI calls. Without this
+  // bypass the middleware would 307-redirect bearer-only requests to
+  // /login before the handler ever runs.
   if (
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/telegram") ||
     pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/api/signals") ||
     pathname === "/login" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
