@@ -14,6 +14,7 @@
 // Refs: CLAY_ENRICHMENT_PAYLOAD_DRAFT.md v1.1 sections 4.2, 5, 10 (D1).
 
 import { prisma } from "@/lib/prisma"
+import { logger } from "@/lib/logger"
 import {
   classifyPersona,
   extractClayTableSegment,
@@ -195,11 +196,40 @@ export async function upsertPersonFromClay(
   // Step 2: upsert CrmContact
   const persona = classifyPersona(p.jobTitle)
 
-  // Country fallback: when Clay sends only `location` (Apollo CSV format
-  // "City, Country" in a single column), extract the trailing country
-  // segment server-side. Single source of truth for ALL entry paths
-  // (CSV import, HTTP webhook, manual curl). Sprint S0 batch 4 hotfix v3.
-  const personCountry = p.country ?? extractCountryFromLocation(p.location)
+  // Country resolution — three-step fallback chain:
+  //
+  //   1. Explicit `p.country` from Clay payload (unchanged — wins).
+  //   2. Parse "City, Country" from `p.location` via
+  //      extractCountryFromLocation (Sprint S0 hotfix v3).
+  //   3. Inherit from the linked Company (Sprint S0 hotfix v4) — covers
+  //      cases where Apollo emits a Location string we cannot parse
+  //      (e.g. Arabic / Cyrillic / non-comma-separated formats). A G1
+  //      contact in a UAE Company is, by business rule, UAE.
+  //
+  // Step 3 only fires when the first two yield null AND a companyId
+  // was resolved earlier in this same upsert call. We log the fallback
+  // at INFO level so we can later quantify how often it activates and
+  // decide whether to invest in language-specific Location parsers.
+  let personCountry =
+    p.country ?? extractCountryFromLocation(p.location) ?? null
+  if (!personCountry && companyId) {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { country: true },
+    })
+    if (company?.country) {
+      personCountry = company.country
+      logger.info(
+        {
+          source: "clay-enrichment",
+          companyId,
+          inheritedCountry: company.country,
+          rawLocation: p.location ?? null,
+        },
+        "Inherited Person.country from Company (location not extractable)",
+      )
+    }
+  }
 
   const personFieldsCommon = {
     jobTitle: p.jobTitle ?? null,

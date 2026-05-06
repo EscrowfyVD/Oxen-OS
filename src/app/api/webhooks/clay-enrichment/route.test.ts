@@ -448,4 +448,79 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     const args = vi.mocked(prisma.crmContact.create).mock.calls[0][0]
     expect(args.data.country).toBeNull()
   })
+
+  // ─── Sprint S0 batch 4 hotfix v4 — country inheritance from Company ─
+  it("[16] inherits country from Company when location is non-extractable", async () => {
+    // Real-world Apollo edge case: Person.location in Arabic
+    // (no Western comma + non-whitelisted chars). Helper returns null,
+    // so the helper must inherit from the linked Company's country.
+    const arabicPayload = {
+      ...PEOPLE_PAYLOAD_VALID,
+      person: {
+        ...PEOPLE_PAYLOAD_VALID.person,
+        country: undefined,
+        location: "دبي الإمارات العربية المتحدة",
+        company: {
+          name: "Metarabia",
+          domain: "metarabia.com",
+        },
+      },
+    }
+    // Ordered findUnique mocks:
+    //   1st (by domain)        — Company already exists with id co-existing-16
+    //   2nd (by id, fallback)  — returns the Company's country
+    vi.mocked(prisma.company.findUnique)
+      .mockResolvedValueOnce({ id: "co-existing-16" } as never)
+      .mockResolvedValueOnce({ country: "United Arab Emirates" } as never)
+    vi.mocked(prisma.company.update).mockResolvedValue({
+      id: "co-existing-16",
+    } as never)
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValue(null)
+    vi.mocked(prisma.crmContact.create).mockResolvedValue({
+      id: "ct-16",
+    } as never)
+
+    const res = await POST(makeReq(arabicPayload))
+
+    expect(res.status).toBe(200)
+    const args = vi.mocked(prisma.crmContact.create).mock.calls[0][0]
+    expect(args.data.country).toBe("United Arab Emirates")
+    // Sanity: the inheritance fallback fires the second findUnique call.
+    expect(prisma.company.findUnique).toHaveBeenCalledTimes(2)
+  })
+
+  it("[17] leaves country null when Company has no country either", async () => {
+    // Same Arabic location scenario, but the linked Company itself has
+    // country=null → inheritance has nothing to give → DB stays null.
+    // Confirms the fallback NEVER autofills with a fabricated value.
+    const arabicNoCompanyCountryPayload = {
+      ...PEOPLE_PAYLOAD_VALID,
+      person: {
+        ...PEOPLE_PAYLOAD_VALID.person,
+        country: undefined,
+        location: "دبي الإمارات العربية المتحدة",
+        company: {
+          name: "Metarabia",
+          domain: "metarabia.com",
+        },
+      },
+    }
+    vi.mocked(prisma.company.findUnique)
+      .mockResolvedValueOnce({ id: "co-existing-17" } as never)
+      .mockResolvedValueOnce({ country: null } as never)
+    vi.mocked(prisma.company.update).mockResolvedValue({
+      id: "co-existing-17",
+    } as never)
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValue(null)
+    vi.mocked(prisma.crmContact.create).mockResolvedValue({
+      id: "ct-17",
+    } as never)
+
+    const res = await POST(makeReq(arabicNoCompanyCountryPayload))
+
+    expect(res.status).toBe(200)
+    const args = vi.mocked(prisma.crmContact.create).mock.calls[0][0]
+    expect(args.data.country).toBeNull()
+    expect(prisma.company.findUnique).toHaveBeenCalledTimes(2)
+  })
 })
