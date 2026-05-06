@@ -25,20 +25,42 @@ export async function POST(request: Request) {
     if (!contact) return NextResponse.json({ ok: true })
 
     switch (action) {
-      case "create_signal":
+      case "create_signal": {
+        // Sprint S1 — IntentSignal now requires a SignalTypeRegistry FK.
+        // Upsert a placeholder entry by code ("n8n_external_signal")
+        // with sensible defaults (10 points / 90-day linear decay /
+        // INTENT) so this generic external-automation route can keep
+        // ingesting without knowing about the canonical catalog.
+        const registryEntry = await prisma.signalTypeRegistry.upsert({
+          where: { code: "n8n_external_signal" },
+          create: {
+            code: "n8n_external_signal",
+            label: "n8n external automation signal",
+            description:
+              "Placeholder for the generic /api/webhooks/n8n create_signal action — to be deprecated when each n8n workflow uses a canonical registry code.",
+            defaultPoints: 10,
+            decayDays: 90,
+            decayCurve: "LINEAR",
+            category: "INTENT",
+          },
+          update: {},
+        })
         await prisma.intentSignal.create({
           data: {
             contactId: contact.id,
+            companyId: contact.companyId,
+            signalTypeId: registryEntry.id,
             source: "n8n",
             signalType: data?.signalType || "web_visit",
             title: data?.title || "n8n Signal",
             detail: data?.detail || null,
-            score: data?.score ?? 10,
+            points: data?.score ?? 10,
             expiresAt: data?.expiresAt ? new Date(data.expiresAt) : null,
-            raw: body,
+            metadata: body,
           },
         })
         break
+      }
 
       case "update_contact": {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

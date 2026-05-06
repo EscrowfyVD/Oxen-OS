@@ -39,6 +39,30 @@ enum EnrichmentSource {
   inbound_form
 }
 
+// ─── Signal scoring enums (Sprint S1 — universal signal ingestion) ───
+
+// Decay curve applied to a signal's `points` over time.
+//   - LINEAR      : points decay linearly from full → 0 over decayDays
+//   - EXPONENTIAL : points decay exponentially (sharp early decay, long tail)
+//   - STEP        : points stay at full until decayDays, then drop to 0
+//
+// Used by `SignalTypeRegistry.decayCurve` and consumed by the scoring
+// worker when recomputing `IntentSignal.decayedPoints` /
+// `MarketSignal.decayedPoints`.
+enum SignalDecayCurve {
+  LINEAR
+  EXPONENTIAL
+  STEP
+}
+
+// Signal scope — INTENT signals are tied to a specific contact/company,
+// MARKET signals are tied to a country/vertical (no specific lead).
+// Drives which model the registry entry will be referenced from.
+enum SignalCategory {
+  INTENT
+  MARKET
+}
+
 // ─── NextAuth Models ───
 
 model Account {
@@ -330,6 +354,10 @@ model Company {
   // Relations
   contacts        CrmContact[]
   deals           Deal[]
+  // Sprint S1 — denormalized inverse for IntentSignal.companyId.
+  // Allows fast company-scoped intent signal queries without joining
+  // through CrmContact.
+  intentSignals   IntentSignal[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -997,20 +1025,118 @@ model Email {
 
 // ─── Agent model removed — introducers are now CrmContact with contactType="introducer" ───
 
-// ─── Intent Signals ───
+// ─── Signals (Sprint S1 — universal signal ingestion) ───
 
+// Catalog of all signal types the system can ingest. Each entry defines
+// the default scoring contract: how many `points` the signal is worth,
+// how it decays over `decayDays`, and which curve drives the decay.
+// IntentSignals + MarketSignals reference this registry by FK so we can
+// change scoring rules in one place without retroactive backfill of raw
+// point values.
+//
+// `code` is the stable string identifier used by webhooks to attach a
+// signal to its registry entry (e.g. "clay_business_loss"). `label` is
+// the display name. `category` decides whether the registry entry can
+// be referenced from IntentSignal (INTENT) or MarketSignal (MARKET) or
+// both.
+model SignalTypeRegistry {
+  id            String           @id @default(cuid())
+  code          String           @unique
+  label         String
+  description   String?
+  defaultPoints Int
+  decayDays     Int
+  decayCurve    SignalDecayCurve
+  category      SignalCategory
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  // Inverse relations
+  intentSignals IntentSignal[]
+  marketSignals MarketSignal[]
+
+  @@index([category, isActive])
+}
+
+// IntentSignal — a per-contact / per-company signal of buying intent.
+// Sprint S1 refactor:
+//   - `score` renamed to `points` (semantic clarity vs the various
+//     other "score" fields on CrmContact / Deal).
+//   - `raw` renamed to `metadata` (clearer intent: arbitrary payload
+//     from the source webhook).
+//   - `contactId` now nullable (allows signals scoped at the company
+//     level only, e.g. a funding round announcement attached to the
+//     company before any specific contact is identified).
+//   - `companyId` denormalized — populated by the writer when the
+//     contact is known, lets the scoring worker query company-level
+//     signal aggregates without going through CrmContact.
+//   - `signalTypeId` (FK) — links to SignalTypeRegistry. The legacy
+//     free-string `signalType` field is preserved during the
+//     transition and will be deprecated once all writers are migrated.
+//   - `decayedPoints` — cached value of `points × decay(now-occurredAt)`,
+//     recomputed periodically by the scoring worker so dashboard reads
+//     don't pay the decay math on every query.
 model IntentSignal {
-  id          String    @id @default(cuid())
-  contactId   String
-  contact     CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  source      String
-  signalType  String
-  title       String
-  detail      String?   @db.Text
-  score       Int       @default(0)
-  expiresAt   DateTime?
-  raw         Json?
-  createdAt   DateTime  @default(now())
+  id              String              @id @default(cuid())
+  // Optional contact + company linkage. Both may be set together (the
+  // contact's company), or company alone (no contact pinpointed yet).
+  contactId       String?
+  contact         CrmContact?         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  companyId       String?
+  company         Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  // Registry FK — the source of truth for points / decayDays / curve.
+  signalTypeId    String
+  signalTypeRef   SignalTypeRegistry  @relation(fields: [signalTypeId], references: [id], onDelete: Restrict)
+  // Legacy free-string descriptors (kept for back-compat during the
+  // transition; can be deprecated once all writers go through
+  // signalTypeId only).
+  source          String
+  signalType      String
+  // Display
+  title           String
+  detail          String?             @db.Text
+  // Scoring (Sprint S1 — `points` was `score` pre-S1)
+  points          Int                 @default(0)
+  decayedPoints   Int?
+  // Lifecycle
+  expiresAt       DateTime?
+  // Provenance + arbitrary payload (Sprint S1 — `metadata` was `raw`)
+  metadata        Json?
+  sourceUrl       String?
+  notes           String?             @db.Text
+  // Timestamps — `createdAt` doubles as the "occurredAt" anchor for
+  // the scoring decay math (no separate occurredAt field for now;
+  // can be added if backfill from older sources becomes a use-case).
+  createdAt       DateTime            @default(now())
+
+  @@index([companyId, signalTypeId, createdAt])
+  @@index([contactId, signalTypeId, createdAt])
+}
+
+// MarketSignal — a country / vertical-scoped signal that doesn't (yet)
+// point at a specific contact or company. Examples: regulatory change
+// in a jurisdiction, macro funding trend in a vertical, Google search
+// volume spike for a topic. Consumed by the scoring engine to lift the
+// priority of all leads matching the country / vertical filter.
+model MarketSignal {
+  id              String              @id @default(cuid())
+  signalTypeId    String
+  signalTypeRef   SignalTypeRegistry  @relation(fields: [signalTypeId], references: [id], onDelete: Restrict)
+  country         String              // REQUIRED — canonical English name
+  vertical        String?             // optional finer-grained niche
+  points          Int
+  decayedPoints   Int?
+  metadata        Json?
+  sourceUrl       String?
+  occurredAt      DateTime
+  expiresAt       DateTime?
+  notes           String?             @db.Text
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([country, signalTypeId, occurredAt])
+  @@index([vertical, signalTypeId, occurredAt])
 }
 
 // ─── OutreachSequence removed — tracked via Activity + Clay integration ───

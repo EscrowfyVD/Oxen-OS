@@ -1079,13 +1079,13 @@ export default function ContactDetailPage() {
               <div style={{ padding: "32px 0", textAlign: "center", color: TEXT3, fontSize: 13 }}>No signals detected</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {signals.map((s: { id: string; signalType: string; title: string; detail: string | null; score: number; source: string; createdAt: string }, i: number) => (
+                {signals.map((s: { id: string; signalType: string; title: string; detail: string | null; points: number; source: string; createdAt: string }, i: number) => (
                   <div key={s.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderTop: i > 0 ? `1px solid ${CARD_BORDER}` : "none" }}>
                     <div style={{ fontSize: 16, width: 24, textAlign: "center" }}>🔔</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ fontSize: 13, color: TEXT, fontWeight: 500, fontFamily: "'DM Sans', sans-serif" }}>{s.title}</span>
-                        <Badge label={`Score: ${s.score}`} color={s.score >= 70 ? "#34D399" : s.score >= 40 ? "#FBBF24" : "#9CA3AF"} />
+                        <Badge label={`Points: ${s.points}`} color={s.points >= 70 ? "#34D399" : s.points >= 40 ? "#FBBF24" : "#9CA3AF"} />
                       </div>
                       {s.detail && <div style={{ fontSize: 12, color: TEXT2, marginTop: 3 }}>{s.detail}</div>}
                       <div style={{ fontSize: 10, color: TEXT3, marginTop: 4 }}>{s.source} &middot; {fmtDate(s.createdAt)}</div>

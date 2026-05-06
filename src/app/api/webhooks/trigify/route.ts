@@ -41,17 +41,40 @@ export async function POST(request: Request) {
       })
     }
 
+    // Sprint S1 — IntentSignal now requires a SignalTypeRegistry FK.
+    // Upsert a placeholder entry by code ("trigify_intent_signal") with
+    // sensible defaults (15 points / 90-day linear decay / INTENT) so
+    // this legacy webhook can keep ingesting without knowing about the
+    // canonical signal type catalog. To be deprecated when the route
+    // is rewired in a follow-up batch.
+    const registryEntry = await prisma.signalTypeRegistry.upsert({
+      where: { code: "trigify_intent_signal" },
+      create: {
+        code: "trigify_intent_signal",
+        label: "Trigify intent signal",
+        description:
+          "Placeholder for the legacy /api/webhooks/trigify route — to be deprecated in a follow-up Sprint S1 batch.",
+        defaultPoints: 15,
+        decayDays: 90,
+        decayCurve: "LINEAR",
+        category: "INTENT",
+      },
+      update: {},
+    })
+
     // Create intent signal
     await prisma.intentSignal.create({
       data: {
         contactId: contact.id,
+        companyId: contact.companyId,
+        signalTypeId: registryEntry.id,
         source: "trigify",
         signalType: signal_type || "job_change",
         title: title || "Trigify Signal",
         detail: detail || null,
-        score: score ?? 15,
+        points: score ?? 15,
         expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days
-        raw: body,
+        metadata: body,
       },
     })
 
@@ -59,11 +82,11 @@ export async function POST(request: Request) {
     const now = new Date()
     const signals = await prisma.intentSignal.findMany({
       where: { contactId: contact.id },
-      select: { score: true, expiresAt: true },
+      select: { points: true, expiresAt: true },
     })
     const totalScore = signals
       .filter((s) => !s.expiresAt || s.expiresAt > now)
-      .reduce((sum, s) => sum + s.score, 0)
+      .reduce((sum, s) => sum + s.points, 0)
 
     await prisma.crmContact.update({
       where: { id: contact.id },

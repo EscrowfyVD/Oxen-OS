@@ -26,16 +26,40 @@ export async function POST(request: Request) {
 
     if (!contact) return NextResponse.json({ ok: true })
 
+    // Sprint S1 — IntentSignal now requires a SignalTypeRegistry FK.
+    // This legacy webhook upserts a placeholder registry entry by code
+    // ("clay_legacy_intent") so it can keep ingesting without knowing
+    // about the canonical signal types. The placeholder is created with
+    // sensible defaults (10 points, 90-day linear decay, INTENT) and
+    // can be deprecated in Sprint S1 batch 4 when this route is rewired
+    // to use the canonical registry codes.
+    const registryEntry = await prisma.signalTypeRegistry.upsert({
+      where: { code: "clay_legacy_intent" },
+      create: {
+        code: "clay_legacy_intent",
+        label: "Clay legacy intent signal",
+        description:
+          "Placeholder for the legacy /api/webhooks/clay route — to be deprecated in Sprint S1 batch 4.",
+        defaultPoints: 10,
+        decayDays: 90,
+        decayCurve: "LINEAR",
+        category: "INTENT",
+      },
+      update: {},
+    })
+
     await prisma.intentSignal.create({
       data: {
         contactId: contact.id,
+        companyId: contact.companyId,
+        signalTypeId: registryEntry.id,
         source: "clay",
         signalType: enrichment_type || "tech_install",
         title: title || "Clay Enrichment",
         detail: typeof data === "string" ? data : JSON.stringify(data),
-        score: score ?? 10,
+        points: score ?? 10,
         expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-        raw: body,
+        metadata: body,
       },
     })
 
@@ -43,11 +67,11 @@ export async function POST(request: Request) {
     const now = new Date()
     const signals = await prisma.intentSignal.findMany({
       where: { contactId: contact.id },
-      select: { score: true, expiresAt: true },
+      select: { points: true, expiresAt: true },
     })
     const totalScore = signals
       .filter((s) => !s.expiresAt || s.expiresAt > now)
-      .reduce((sum, s) => sum + s.score, 0)
+      .reduce((sum, s) => sum + s.points, 0)
 
     await prisma.crmContact.update({
       where: { id: contact.id },

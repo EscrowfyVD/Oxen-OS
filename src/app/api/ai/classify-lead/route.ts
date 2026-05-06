@@ -37,7 +37,7 @@ ICP Fit: ${contact.icpFit || "Unknown"}
 
 Recent Activities: ${contact.activities.map((a) => `${a.type}: ${(a.description || "").slice(0, 100)}`).join("; ") || "None"}
 Active Deals: ${contact.deals.map((d) => `${d.dealName} (${d.stage}, €${d.dealValue?.toLocaleString() ?? "0"})`).join("; ") || "None"}
-Intent Signals: ${contact.intentSignals.map((s) => `${s.signalType}: ${s.title} (score: ${s.score})`).join("; ") || "None"}
+Intent Signals: ${contact.intentSignals.map((s) => `${s.signalType}: ${s.title} (points: ${s.points})`).join("; ") || "None"}
 
 Return a JSON object with:
 - icpScore (0-100): How well they match our Ideal Customer Profile (payment services, crypto, iGaming, family offices, high-net-worth)
