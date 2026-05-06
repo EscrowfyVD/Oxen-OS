@@ -10,6 +10,12 @@ import {
   CONTACT_TYPES,
   getOwnerForGeo,
 } from "@/lib/crm-config"
+import {
+  GROUP_COLORS,
+  PAIN_TIER_COLORS,
+  PERSONA_COLORS,
+  FALLBACK_BADGE_COLOR,
+} from "@/lib/crm-badge-colors"
 
 /* ── Design Tokens ── */
 const CARD_BORDER = CRM_COLORS.card_border
@@ -20,30 +26,9 @@ const ROSE = CRM_COLORS.rose_gold
 const EDIT_BORDER = "rgba(91,155,191,0.7)"
 const FONT = "'DM Sans', sans-serif"
 
-/* ── PRD-001 Clay enrichment color maps (Sprint S0.5 batch 1) ──
-   Used by the readonly badge cells for `group`, `painTier`, `persona`.
-   These columns are populated by Clay enrichment (src/lib/clay-enrichment.ts)
-   and not yet user-editable from the inline table — schema migration to
-   accept them in updateContactSchema would be a follow-up. */
-const GROUP_COLORS: Record<string, string> = {
-  G1: "#DC2626",  // red — Structural Architects
-  G2: "#2563EB",  // blue — Legal Deal-Flow
-  G3: "#7C3AED",  // violet — Investment Gatekeepers
-  G4: "#059669",  // emerald — Wealth Intermediaries
-  G5: "#F59E0B",  // amber — Compliance & Accounting
-  G6: "#0891B2",  // cyan — High-Ticket Settlement
-  G7A: "#DB2777", // pink — Luxury Concierges
-  G7B: "#4F46E5", // indigo — Immigration Law
-}
-const PAIN_TIER_COLORS: Record<string, string> = {
-  T1: "#DC2626", // red — Maximum Pain
-  T2: "#F59E0B", // amber — Constant Friction
-  T3: "#6B7280", // gray — Suboptimal Solution
-}
-const PERSONA_COLORS: Record<string, string> = {
-  DM: "#C08B88", // rose-gold — Decision Maker
-  OP: "#6B7280", // gray — Operational
-}
+/* PRD-001 Clay enrichment color maps were extracted to
+   `@/lib/crm-badge-colors` in Sprint S0.5 batch 3 to share the same
+   palette with the contact detail page and Companies list. */
 
 /* ══════════════════════════════════════════════
    TYPES
@@ -551,7 +536,7 @@ export default function InlineEditableTable({
           : col.key === "painTier"
           ? PAIN_TIER_COLORS
           : PERSONA_COLORS
-      const color = colorMap[str] ?? "#9CA3AF"
+      const color = colorMap[str] ?? FALLBACK_BADGE_COLOR
       return (
         <span
           style={{

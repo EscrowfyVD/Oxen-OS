@@ -9,6 +9,12 @@ import {
   ACQUISITION_SOURCES, CRM_COLORS, fmtCurrency,
   OUTREACH_GROUPS, OUTREACH_GROUP_COLORS, LIFECYCLE_STAGES,
 } from "@/lib/crm-config"
+import {
+  getGroupColor,
+  getPainTierColor,
+  getPersonaColor,
+  FALLBACK_BADGE_COLOR,
+} from "@/lib/crm-badge-colors"
 import SupportTab from "@/components/crm/SupportTab"
 
 /* ── Design Tokens ── */
@@ -718,6 +724,85 @@ export default function ContactDetailPage() {
 
             {/* ── RIGHT COLUMN ── */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Clay Enrichment (PRD-001 — Sprint S0.5 batch 3) ──
+                  Read-only badges + metadata populated by the Clay
+                  enrichment pipeline (`@/lib/clay-enrichment`). Placed
+                  ahead of the legacy generic "Enrichment" card so that
+                  the PRD-001 segmentation is the first signal a user
+                  sees on the right column. Empty-state for non-Clay
+                  contacts (no group/painTier/persona/segment/source/
+                  enrichedAt set anywhere) shows a dimmed message. */}
+              {(() => {
+                const isEnriched =
+                  contact.group ||
+                  contact.painTier ||
+                  contact.persona ||
+                  contact.clayTableSegment ||
+                  contact.enrichmentSource ||
+                  contact.enrichedAt
+                return (
+                  <GlassCard>
+                    <SectionHeader label="Clay Enrichment" />
+                    {!isEnriched ? (
+                      <div style={{ fontSize: 12, color: TEXT3, fontFamily: "'DM Sans', sans-serif", padding: "8px 0", fontStyle: "italic" }}>
+                        Not enriched via Clay
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={fieldLabelStyle}>Group</div>
+                          <div style={{ padding: "5px 0" }}>
+                            {contact.group ? (
+                              <Badge label={contact.group} color={getGroupColor(contact.group) ?? FALLBACK_BADGE_COLOR} />
+                            ) : (
+                              <span style={{ fontSize: 13, color: TEXT3, fontFamily: "'DM Sans', sans-serif" }}>—</span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={fieldLabelStyle}>Pain Tier</div>
+                          <div style={{ padding: "5px 0" }}>
+                            {contact.painTier ? (
+                              <Badge label={contact.painTier} color={getPainTierColor(contact.painTier) ?? FALLBACK_BADGE_COLOR} />
+                            ) : (
+                              <span style={{ fontSize: 13, color: TEXT3, fontFamily: "'DM Sans', sans-serif" }}>—</span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={fieldLabelStyle}>Persona</div>
+                          <div style={{ padding: "5px 0" }}>
+                            {contact.persona ? (
+                              <Badge label={contact.persona} color={getPersonaColor(contact.persona) ?? FALLBACK_BADGE_COLOR} />
+                            ) : (
+                              <span style={{ fontSize: 13, color: TEXT3, fontFamily: "'DM Sans', sans-serif" }}>—</span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={fieldLabelStyle}>Table Segment</div>
+                          <div style={{ fontSize: 13, color: contact.clayTableSegment ? TEXT : TEXT3, fontFamily: "'DM Sans', sans-serif", padding: "5px 0" }}>
+                            {contact.clayTableSegment || "—"}
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={fieldLabelStyle}>Source</div>
+                          <div style={{ fontSize: 13, color: contact.enrichmentSource ? TEXT : TEXT3, fontFamily: "'DM Sans', sans-serif", padding: "5px 0" }}>
+                            {contact.enrichmentSource || "—"}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={fieldLabelStyle}>Enriched At</div>
+                          <div style={{ fontSize: 13, color: contact.enrichedAt ? TEXT : TEXT3, fontFamily: "'DM Sans', sans-serif", padding: "5px 0" }}>
+                            {contact.enrichedAt ? fmtDateTime(contact.enrichedAt) : "—"}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </GlassCard>
+                )
+              })()}
+
               {/* Enrichment */}
               <GlassCard>
                 <SectionHeader label="Enrichment" />
@@ -733,6 +818,18 @@ export default function ContactDetailPage() {
                 <EditableText label="Revenue Range" value={contact.annualRevenueRange || ""} onSave={(v) => patchContact({ annualRevenueRange: v })} />
                 <EditableText label="Country" value={contact.country || ""} onSave={(v) => patchContact({ country: v })} />
                 <EditableText label="City" value={contact.city || ""} onSave={(v) => patchContact({ city: v })} />
+                {/* Location (Apollo-style "City, Country" string) —
+                    populated by Clay enrichment. Read-only because
+                    `location` is not in updateContactSchema, so a PATCH
+                    would be silently stripped by Zod (footgun). The
+                    canonical Country / City pair above stays editable.
+                    Sprint S0.5 batch 3. */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={fieldLabelStyle}>Location</div>
+                  <div style={{ fontSize: 13, color: contact.location ? TEXT : TEXT3, fontFamily: "'DM Sans', sans-serif", padding: "5px 0", borderBottom: `1px dashed ${CARD_BORDER}` }}>
+                    {contact.location || "—"}
+                  </div>
+                </div>
               </GlassCard>
 
               {/* Smart Fields */}
