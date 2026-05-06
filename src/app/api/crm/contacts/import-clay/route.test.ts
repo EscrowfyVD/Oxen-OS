@@ -158,11 +158,15 @@ describe("POST /api/crm/contacts/import-clay", () => {
       { ...COMPANY_ROW_VALID, domain: "ok-2.com" },
     ]
     // Row 0 + 2: success path
-    // Row 1: prisma throws (simulated DB error)
+    // Row 1: prisma throws on BOTH the initial call AND the retry
+    //        (Sprint S0 batch 4 hotfix v2 added retry x1 in processRow,
+    //         so we queue 4 mocks: 1st row 0, 2nd row 1 attempt 1,
+    //         3rd row 2, 4th row 1 retry).
     vi.mocked(prisma.company.findUnique)
       .mockResolvedValueOnce(null)
       .mockRejectedValueOnce(new Error("DB connection lost"))
       .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("DB connection lost"))
     vi.mocked(prisma.company.create).mockResolvedValue({
       id: "co-x",
     } as never)
@@ -181,6 +185,94 @@ describe("POST /api/crm/contacts/import-clay", () => {
       index: 1,
       error: expect.stringContaining("DB connection lost"),
     })
+  })
+
+  // ──────────────────────────────────────────────────────────────────
+  // Sprint S0 batch 4 hotfix v2 — per-row Zod validation
+  // ──────────────────────────────────────────────────────────────────
+  it("isolates per-row Zod failures (1 valid + 1 invalid → 1 created, 1 errored)", async () => {
+    const rows = [
+      { ...COMPANY_ROW_VALID, domain: "valid.com" },
+      // Missing required `name` field → fails clayBatchCompanyRowSchema
+      { domain: "missing-name.com", country: "France" },
+    ]
+    // Only the valid row reaches Prisma — invalid one is rejected at
+    // the per-row Zod step before any DB call.
+    vi.mocked(prisma.company.findUnique).mockResolvedValueOnce(null)
+    vi.mocked(prisma.company.create).mockResolvedValue({
+      id: "co-valid",
+    } as never)
+
+    const res = await POST(
+      makeReq({ ...COMPANY_BATCH_VALID, rows }),
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.total).toBe(2)
+    expect(body.created).toBe(1)
+    expect(body.updated).toBe(0)
+    expect(body.errored).toBe(1)
+    expect(body.errors).toHaveLength(1)
+    expect(body.errors[0]).toMatchObject({
+      index: 1,
+      error: expect.stringContaining("Validation"),
+    })
+    // Invalid row must not have triggered any Prisma write
+    expect(prisma.company.create).toHaveBeenCalledTimes(1)
+  })
+
+  it("accepts a long description (>2000 but <10000 chars) after the bump", async () => {
+    // Pre-hotfix, this would fail upfront with 400 Invalid input. The
+    // schema bump (max 2000 → max 10000) lifts the limit; per-row
+    // validation lets it through to the upsert.
+    const longDescription = "A".repeat(8000)
+    const rows = [
+      { ...COMPANY_ROW_VALID, domain: "long-desc.com", description: longDescription },
+    ]
+    vi.mocked(prisma.company.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.company.create).mockResolvedValue({
+      id: "co-long",
+    } as never)
+
+    const res = await POST(
+      makeReq({ ...COMPANY_BATCH_VALID, rows }),
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.total).toBe(1)
+    expect(body.created).toBe(1)
+    expect(body.errored).toBe(0)
+    // Verify the long description reached prisma.company.create
+    const createArgs = vi.mocked(prisma.company.create).mock.calls[0][0]
+    expect((createArgs.data as { description: string }).description).toHaveLength(
+      8000,
+    )
+  })
+
+  it("rejects a description over 10000 chars at per-row validation", async () => {
+    const tooLong = "A".repeat(10001)
+    const rows = [
+      { ...COMPANY_ROW_VALID, domain: "way-too-long.com", description: tooLong },
+    ]
+
+    const res = await POST(
+      makeReq({ ...COMPANY_BATCH_VALID, rows }),
+    )
+    const body = await res.json()
+
+    // Batch metadata is fine (200) but the row is errored.
+    expect(res.status).toBe(200)
+    expect(body.total).toBe(1)
+    expect(body.created).toBe(0)
+    expect(body.errored).toBe(1)
+    expect(body.errors[0]).toMatchObject({
+      index: 0,
+      error: expect.stringContaining("description"),
+    })
+    // No DB write attempted for invalid row.
+    expect(prisma.company.create).not.toHaveBeenCalled()
   })
 
   it("processes 250-row batch in 3 chunks (CHUNK_SIZE=100)", async () => {

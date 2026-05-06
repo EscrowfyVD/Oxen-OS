@@ -153,7 +153,10 @@ const emailValidationStatus = z.enum(["valid", "invalid", "risky", "unknown"])
 
 const clayCompanyPayload = z.object({
   name: z.string().min(1).max(255),
-  description: z.string().max(2000).optional(),
+  // Apollo company descriptions can be long-form (multi-paragraph press
+  // releases, "About us" copy). Bumped 2000 → 10000 in Sprint S0 batch 4
+  // hotfix v2 after a 1711-row import failed because 2 rows exceeded 2000.
+  description: z.string().max(10000).optional(),
   primaryIndustry: z.string().max(255).optional(),
   size: z.string().max(50).optional(),
   type: z.string().max(50).optional(),
@@ -211,26 +214,27 @@ export type ClayEnrichmentPayload = z.infer<typeof clayEnrichmentSchema>
 // source_table / scope / group / pain_tier — the 4 axes are auto-detected
 // in the wizard from the source_table dropdown). Each row in `rows` is
 // the company OR person sub-payload (without the wrapping metadata).
+//
+// Sprint S0 batch 4 hotfix v2 — `rows` is intentionally `z.unknown()` at
+// the batch layer. The route validates each row INDIVIDUALLY inside its
+// Promise.allSettled chunk loop (using the per-row schemas exported
+// below) so that a single malformed row no longer rejects the whole
+// import. See route.ts for the per-row validation flow.
 // ─────────────────────────────────────────────────────────────
 
-const clayBatchCompanyRow = clayCompanyPayload
-const clayBatchPersonRow = clayPersonPayload
+// Per-row schemas — applied individually inside Promise.allSettled by
+// /api/crm/contacts/import-clay. Exported so the route picks the right
+// shape based on `payload.scope`.
+export const clayBatchCompanyRowSchema = clayCompanyPayload
+export const clayBatchPersonRowSchema = clayPersonPayload
 
-export const clayBatchImportSchema = z
-  .object({
-    source_table: z.string().min(1).max(200),
-    scope: z.enum(["company", "people"]),
-    group: crmGroup,
-    pain_tier: crmPainTier,
-    rows: z
-      .array(z.union([clayBatchCompanyRow, clayBatchPersonRow]))
-      .min(1)
-      .max(5000),
-  })
-  // The wizard provides homogeneous rows (all-Company or all-People per
-  // source_table). We don't enforce row-level shape via Zod here because
-  // each row is a partial payload — the route assembles the full
-  // ClayEnrichmentPayload before calling the upsert helpers, which
-  // perform the final validation.
+export const clayBatchImportSchema = z.object({
+  source_table: z.string().min(1).max(200),
+  scope: z.enum(["company", "people"]),
+  group: crmGroup,
+  pain_tier: crmPainTier,
+  // Lenient — per-row validation happens in the route (see comment above).
+  rows: z.array(z.unknown()).min(1).max(5000),
+})
 
 export type ClayBatchImportPayload = z.infer<typeof clayBatchImportSchema>
