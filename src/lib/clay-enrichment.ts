@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma"
 import {
   classifyPersona,
   extractClayTableSegment,
+  extractCountryFromLocation,
 } from "@/lib/clay-helpers"
 import type { ClayEnrichmentPayload } from "@/app/api/webhooks/_schemas"
 
@@ -27,6 +28,7 @@ import type { ClayEnrichmentPayload } from "@/app/api/webhooks/_schemas"
 export {
   classifyPersona,
   extractClayTableSegment,
+  extractCountryFromLocation,
   parseClayTableName,
 } from "@/lib/clay-helpers"
 export type { ParsedClayTableName } from "@/lib/clay-helpers"
@@ -193,11 +195,17 @@ export async function upsertPersonFromClay(
   // Step 2: upsert CrmContact
   const persona = classifyPersona(p.jobTitle)
 
+  // Country fallback: when Clay sends only `location` (Apollo CSV format
+  // "City, Country" in a single column), extract the trailing country
+  // segment server-side. Single source of truth for ALL entry paths
+  // (CSV import, HTTP webhook, manual curl). Sprint S0 batch 4 hotfix v3.
+  const personCountry = p.country ?? extractCountryFromLocation(p.location)
+
   const personFieldsCommon = {
     jobTitle: p.jobTitle ?? null,
     linkedinUrl: p.linkedinUrl ?? null,
     location: p.location ?? null,
-    country: p.country ?? null,
+    country: personCountry ?? null,
     companyId,
     group: data.group,
     painTier: data.pain_tier,

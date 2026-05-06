@@ -373,4 +373,79 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     const args = vi.mocked(prisma.crmContact.create).mock.calls[0][0]
     expect(args.data.persona).toBe("OP")
   })
+
+  // ─── Sprint S0 batch 4 hotfix v3 — country fallback from location ───
+  it('[13] derives country from location when payload omits country (Apollo CSV format)', async () => {
+    // Apollo single-column "Location" → no `country` field, only "City, Country"
+    // Server-side extractCountryFromLocation must populate the DB column.
+    const apolloLikePayload = {
+      ...PEOPLE_PAYLOAD_VALID,
+      person: {
+        ...PEOPLE_PAYLOAD_VALID.person,
+        country: undefined, // Apollo CSV does not expose this
+        location: "Dubai, United Arab Emirates",
+      },
+    }
+    vi.mocked(prisma.company.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.company.create).mockResolvedValue({
+      id: "co-13",
+    } as never)
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValue(null)
+    vi.mocked(prisma.crmContact.create).mockResolvedValue({
+      id: "ct-13",
+    } as never)
+
+    const res = await POST(makeReq(apolloLikePayload))
+
+    expect(res.status).toBe(200)
+    const args = vi.mocked(prisma.crmContact.create).mock.calls[0][0]
+    expect(args.data.country).toBe("United Arab Emirates")
+    expect(args.data.location).toBe("Dubai, United Arab Emirates")
+  })
+
+  it("[14] preserves explicit country when both country and location are provided", async () => {
+    // PEOPLE_PAYLOAD_VALID has country="Malta" + location="Valletta, Malta".
+    // The explicit country must win — extractCountryFromLocation must NOT
+    // run when country is already set (prevents normalization side-effects
+    // like overriding "Malta " → "Malta", which would still be Malta but
+    // wastes a call; more importantly, prevents accidental overwrite if a
+    // future caller passes a country outside the whitelist).
+    vi.mocked(prisma.company.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.company.create).mockResolvedValue({
+      id: "co-14",
+    } as never)
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValue(null)
+    vi.mocked(prisma.crmContact.create).mockResolvedValue({
+      id: "ct-14",
+    } as never)
+
+    await POST(makeReq(PEOPLE_PAYLOAD_VALID))
+
+    const args = vi.mocked(prisma.crmContact.create).mock.calls[0][0]
+    expect(args.data.country).toBe("Malta")
+  })
+
+  it("[15] leaves country null when location has unknown country (whitelist miss)", async () => {
+    const offWhitelistPayload = {
+      ...PEOPLE_PAYLOAD_VALID,
+      person: {
+        ...PEOPLE_PAYLOAD_VALID.person,
+        country: undefined,
+        location: "Some City, Atlantis",
+      },
+    }
+    vi.mocked(prisma.company.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.company.create).mockResolvedValue({
+      id: "co-15",
+    } as never)
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValue(null)
+    vi.mocked(prisma.crmContact.create).mockResolvedValue({
+      id: "ct-15",
+    } as never)
+
+    await POST(makeReq(offWhitelistPayload))
+
+    const args = vi.mocked(prisma.crmContact.create).mock.calls[0][0]
+    expect(args.data.country).toBeNull()
+  })
 })

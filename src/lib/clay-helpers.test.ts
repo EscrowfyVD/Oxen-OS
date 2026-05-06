@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest"
 import {
   classifyPersona,
   extractClayTableSegment,
+  extractCountryFromLocation,
   parseClayTableName,
 } from "./clay-helpers"
 
@@ -112,5 +113,75 @@ describe("parseClayTableName", () => {
   it("rejects invalid group token (G99 not in enum)", () => {
     const r = parseClayTableName("vDC_G99_Tier 1_Company_X")
     expect(r.group).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// Sprint S0 batch 4 hotfix v3 — Country extraction from location
+describe("extractCountryFromLocation", () => {
+  // Happy path — PRD-001 in-scope geographies
+  it("extracts United Arab Emirates from 'Dubai, United Arab Emirates'", () => {
+    expect(extractCountryFromLocation("Dubai, United Arab Emirates")).toBe(
+      "United Arab Emirates",
+    )
+  })
+  it("extracts Cyprus from 'Larnaca, Cyprus'", () => {
+    expect(extractCountryFromLocation("Larnaca, Cyprus")).toBe("Cyprus")
+  })
+  it("extracts Malta from 'Sliema, Malta'", () => {
+    expect(extractCountryFromLocation("Sliema, Malta")).toBe("Malta")
+  })
+  it("extracts France from 'Paris, France'", () => {
+    expect(extractCountryFromLocation("Paris, France")).toBe("France")
+  })
+
+  // Negative cases
+  it("returns null for single-token location 'London' (no comma)", () => {
+    expect(extractCountryFromLocation("London")).toBeNull()
+  })
+  it("returns null for empty string", () => {
+    expect(extractCountryFromLocation("")).toBeNull()
+  })
+  it("returns null for null input", () => {
+    expect(extractCountryFromLocation(null)).toBeNull()
+  })
+  it("returns null for undefined input", () => {
+    expect(extractCountryFromLocation(undefined)).toBeNull()
+  })
+  it("returns null for unknown country (whitelist miss)", () => {
+    expect(
+      extractCountryFromLocation("Some City, Unknown Country"),
+    ).toBeNull()
+  })
+
+  // Multi-segment & normalization
+  it("takes the LAST segment for 'City, Region, Country'", () => {
+    expect(extractCountryFromLocation("Dubai, Dubai Emirate, France")).toBe(
+      "France",
+    )
+  })
+  it("normalizes 'UAE' → 'United Arab Emirates'", () => {
+    expect(extractCountryFromLocation("Dubai, UAE")).toBe(
+      "United Arab Emirates",
+    )
+  })
+  it("normalizes 'UK' → 'United Kingdom'", () => {
+    expect(extractCountryFromLocation("London, UK")).toBe("United Kingdom")
+  })
+  it("normalizes 'USA' → 'United States'", () => {
+    expect(extractCountryFromLocation("New York, USA")).toBe("United States")
+  })
+  it("normalizes 'United States of America' → 'United States'", () => {
+    expect(
+      extractCountryFromLocation("New York, United States of America"),
+    ).toBe("United States")
+  })
+  it("matches case-insensitively ('cyprus' lowercase)", () => {
+    expect(extractCountryFromLocation("Limassol, cyprus")).toBe("Cyprus")
+  })
+  it("trims whitespace around segments ('Dubai , United Arab Emirates ')", () => {
+    expect(
+      extractCountryFromLocation("Dubai , United Arab Emirates "),
+    ).toBe("United Arab Emirates")
   })
 })

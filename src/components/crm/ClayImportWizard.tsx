@@ -83,6 +83,13 @@ const COMPANY_AUTO_MAP: Record<string, string> = {
 
 const PEOPLE_AUTO_MAP: Record<string, string> = {
   email: "email",
+  // Apollo CSV column aliases (Sprint S0 batch 4 hotfix v3 — observed
+  // in vDC_G1_Tier 1_People_Active Business Loss export):
+  "work email": "email",
+  "email address": "email",
+  "business email": "email",
+  "primary email": "email",
+  "work email status": "emailValidationStatus",
   "first name": "firstName",
   firstname: "firstName",
   "last name": "lastName",

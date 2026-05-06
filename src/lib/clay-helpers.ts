@@ -131,3 +131,102 @@ export function parseClayTableName(sourceTable: string): ParsedClayTableName {
 
   return result
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// Country extraction from Apollo-style location strings
+// (Sprint S0 batch 4 hotfix v3 — Apollo CSV exports "City, Country" as
+// a single Location column. This helper parses the trailing country
+// segment so /api/webhooks/clay-enrichment + /api/crm/contacts/import-clay
+// can populate Company/Contact `country` even when the raw Clay payload
+// only exposes `location`.)
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Whitelist of countries that PRD-001 cares about (in-scope geographies +
+ * adjacent jurisdictions where Oxen prospects are likely to be located).
+ *
+ * Anything outside the whitelist returns null — better to leave the
+ * country empty than autofill an unverified value (would taint scoring
+ * and downstream geo-routing rules).
+ *
+ * Aliases collapse to a canonical name:
+ *   UAE → United Arab Emirates
+ *   UK  → United Kingdom
+ *   USA → United States
+ */
+const KNOWN_COUNTRIES = [
+  "United Arab Emirates",
+  "UAE",
+  "Cyprus",
+  "Malta",
+  "Switzerland",
+  "Luxembourg",
+  "France",
+  "United Kingdom",
+  "UK",
+  "Germany",
+  "Italy",
+  "Spain",
+  "Portugal",
+  "Netherlands",
+  "Belgium",
+  "Singapore",
+  "Hong Kong",
+  "USA",
+  "United States",
+  "United States of America",
+  "Canada",
+] as const
+
+/**
+ * Extract a country from an Apollo-style location string.
+ *
+ * Examples:
+ *   "Dubai, United Arab Emirates"   → "United Arab Emirates"
+ *   "Larnaca, Cyprus"               → "Cyprus"
+ *   "Sliema, Malta"                 → "Malta"
+ *   "London"                        → null (no comma)
+ *   "City, Region, Country"         → "Country" (last segment)
+ *   "Dubai, UAE"                    → "United Arab Emirates" (normalized)
+ *   "London, UK"                    → "United Kingdom" (normalized)
+ *   "Some City, Unknown Country"    → null (not in whitelist)
+ *   "" / null / undefined           → null
+ *
+ * Returns null when:
+ *   - input is empty / null / undefined / not a string
+ *   - location has no comma (single-token, e.g. "London")
+ *   - the trailing token is not in the KNOWN_COUNTRIES whitelist
+ *
+ * The whitelist is conservative on purpose — wrong autofill is worse
+ * than missing data because it silently corrupts scoring/geo rules.
+ */
+export function extractCountryFromLocation(
+  location: string | null | undefined,
+): string | null {
+  if (!location || typeof location !== "string") return null
+  const trimmed = location.trim()
+  if (!trimmed) return null
+
+  const parts = trimmed
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+  if (parts.length < 2) return null
+
+  const lastPart = parts[parts.length - 1]
+  const lowered = lastPart.toLowerCase()
+
+  for (const country of KNOWN_COUNTRIES) {
+    if (lowered === country.toLowerCase()) {
+      // Normalize aliases → canonical names.
+      if (country === "UAE") return "United Arab Emirates"
+      if (country === "UK") return "United Kingdom"
+      if (country === "USA" || country === "United States of America") {
+        return "United States"
+      }
+      return country
+    }
+  }
+
+  return null
+}

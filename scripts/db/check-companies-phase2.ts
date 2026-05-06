@@ -99,8 +99,12 @@ async function main() {
     `SELECT COUNT(*)::bigint AS count FROM "Company" WHERE "group" = 'G1'`,
   )
   const tot = totalG1[0].count
+  // BigInt literals (0n) require ES2020+ target; tsconfig is ES2017, so
+  // use BigInt(0) for compatibility.
   const pct = (n: bigint) =>
-    tot > 0n ? `${((Number(n) / Number(tot)) * 100).toFixed(1)}%` : "0%"
+    tot > BigInt(0)
+      ? `${((Number(n) / Number(tot)) * 100).toFixed(1)}%`
+      : "0%"
 
   console.log(`\n--- Sanity check : field population (G1, total=${tot}) ---`)
   console.log(`  name             : ${s.has_name.toString().padStart(6)} (${pct(s.has_name)})`)
