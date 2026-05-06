@@ -104,6 +104,7 @@ const PEOPLE_AUTO_MAP: Record<string, string> = {
   "email validation status": "emailValidationStatus",
   "email provider": "emailProvider",
   "linkedin url": "linkedinUrl",
+  "linkedin profile": "linkedinUrl",
   linkedin: "linkedinUrl",
   location: "location",
   country: "country",

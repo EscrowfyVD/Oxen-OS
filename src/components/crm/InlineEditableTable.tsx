@@ -20,6 +20,31 @@ const ROSE = CRM_COLORS.rose_gold
 const EDIT_BORDER = "rgba(91,155,191,0.7)"
 const FONT = "'DM Sans', sans-serif"
 
+/* ── PRD-001 Clay enrichment color maps (Sprint S0.5 batch 1) ──
+   Used by the readonly badge cells for `group`, `painTier`, `persona`.
+   These columns are populated by Clay enrichment (src/lib/clay-enrichment.ts)
+   and not yet user-editable from the inline table — schema migration to
+   accept them in updateContactSchema would be a follow-up. */
+const GROUP_COLORS: Record<string, string> = {
+  G1: "#DC2626",  // red — Structural Architects
+  G2: "#2563EB",  // blue — Legal Deal-Flow
+  G3: "#7C3AED",  // violet — Investment Gatekeepers
+  G4: "#059669",  // emerald — Wealth Intermediaries
+  G5: "#F59E0B",  // amber — Compliance & Accounting
+  G6: "#0891B2",  // cyan — High-Ticket Settlement
+  G7A: "#DB2777", // pink — Luxury Concierges
+  G7B: "#4F46E5", // indigo — Immigration Law
+}
+const PAIN_TIER_COLORS: Record<string, string> = {
+  T1: "#DC2626", // red — Maximum Pain
+  T2: "#F59E0B", // amber — Constant Friction
+  T3: "#6B7280", // gray — Suboptimal Solution
+}
+const PERSONA_COLORS: Record<string, string> = {
+  DM: "#C08B88", // rose-gold — Decision Maker
+  OP: "#6B7280", // gray — Operational
+}
+
 /* ══════════════════════════════════════════════
    TYPES
    ══════════════════════════════════════════════ */
@@ -46,6 +71,11 @@ export interface TableContact {
   totalInteractions: number
   city: string | null
   country: string | null
+  // Clay enrichment — Sprint S0 PRD-001 (populated by /lib/clay-enrichment).
+  // Read-only in the table for now; edits via the import wizard or DB.
+  group: string | null
+  painTier: string | null
+  persona: string | null
   icpFit: string | null
   relationshipStrength: string | null
   lemlistCampaignId: string | null
@@ -102,6 +132,10 @@ const DEFAULT_COLUMNS: ColumnDef[] = [
   { key: "email", label: "Email", type: "text", field: "email", width: 200, minWidth: 120, defaultVisible: true, sortField: "email" },
   { key: "outreachGroup", label: "Outreach Group", type: "select", field: "outreachGroup", width: 155, minWidth: 100, defaultVisible: true,
     options: OUTREACH_GROUPS.map(g => ({ value: g.id, label: g.short, color: g.color })) },
+  // Clay enrichment columns (Sprint S0.5 batch 1) — readonly badges.
+  { key: "group", label: "Group", type: "readonly", field: "group", width: 80, minWidth: 60, defaultVisible: true, sortField: "group" },
+  { key: "painTier", label: "Pain", type: "readonly", field: "painTier", width: 70, minWidth: 50, defaultVisible: true, sortField: "painTier" },
+  { key: "persona", label: "Persona", type: "readonly", field: "persona", width: 80, minWidth: 60, defaultVisible: true, sortField: "persona" },
   { key: "lifecycleStage", label: "Stage", type: "select", field: "lifecycleStage", width: 145, minWidth: 100, defaultVisible: true, sortField: "lifecycleStage",
     options: LIFECYCLE_STAGES.map(s => ({ value: s, label: STAGE_LABELS[s] || s, color: STAGE_COLORS[s] })) },
   { key: "dealOwner", label: "Owner", type: "select", field: "dealOwner", width: 130, minWidth: 90, defaultVisible: true, sortField: "dealOwner",
@@ -190,6 +224,8 @@ function getCellValue(contact: TableContact, colKey: string): unknown {
     acquisitionSource: contact.acquisitionSource, city: contact.city,
     country: contact.country, icpFit: contact.icpFit,
     relationshipStrength: contact.relationshipStrength, contactType: contact.contactType,
+    // Clay enrichment columns (Sprint S0.5 batch 1)
+    group: contact.group, painTier: contact.painTier, persona: contact.persona,
   }
   return fieldMap[colKey] ?? null
 }
@@ -503,6 +539,37 @@ export default function InlineEditableTable({
 
     if (col.key === "totalInteractions") {
       return <span style={{ fontFamily: "'Bellfair', serif", fontSize: 14, color: TEXT }}>{val as number}</span>
+    }
+
+    // Clay enrichment readonly badges (Sprint S0.5 batch 1)
+    if (col.key === "group" || col.key === "painTier" || col.key === "persona") {
+      const str = val as string | null
+      if (!str) return <span style={{ color: TEXT3, fontSize: 12 }}>—</span>
+      const colorMap =
+        col.key === "group"
+          ? GROUP_COLORS
+          : col.key === "painTier"
+          ? PAIN_TIER_COLORS
+          : PERSONA_COLORS
+      const color = colorMap[str] ?? "#9CA3AF"
+      return (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "2px 8px",
+            fontSize: 10,
+            fontWeight: 600,
+            fontFamily: FONT,
+            borderRadius: 16,
+            background: `${color}18`,
+            color,
+            whiteSpace: "nowrap",
+            letterSpacing: 0.3,
+          }}
+        >
+          {str}
+        </span>
+      )
     }
 
     if (col.type === "select" && col.options) {

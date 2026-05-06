@@ -51,6 +51,10 @@ interface CrmContact {
   totalInteractions: number
   city: string | null
   country: string | null
+  // Clay enrichment (Sprint S0 PRD-001)
+  group: string | null
+  painTier: string | null
+  persona: string | null
   icpFit: string | null
   relationshipStrength: string | null
   lemlistCampaignId: string | null
