@@ -37,12 +37,25 @@ vi.mock("@/lib/prisma", () => ({
     },
     crmContact: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
     employee: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+    },
+    // Sprint S1 batch 4 — extended mock for the optional signal
+    // emission path. Tests that don't exercise signals[] leave these
+    // un-stubbed; tests that do override them per-case.
+    signalTypeRegistry: {
+      findUnique: vi.fn(),
+    },
+    intentSignal: {
+      create: vi.fn(),
+    },
+    marketSignal: {
+      create: vi.fn(),
     },
   },
 }))
@@ -522,5 +535,235 @@ describe("POST /api/webhooks/clay-enrichment", () => {
     const args = vi.mocked(prisma.crmContact.create).mock.calls[0][0]
     expect(args.data.country).toBeNull()
     expect(prisma.company.findUnique).toHaveBeenCalledTimes(2)
+  })
+
+  // ─── Sprint S1 batch 4 — optional signal emission ──────────────────
+  // Tests verify that the existing Phase 2 G1-T1 webhook flow is
+  // preserved (zero regression on the 12 prior tests above), AND that
+  // the new optional `signals[]` array, when present, triggers
+  // IntentSignal creation via ingestSignal() WITHOUT failing the
+  // webhook on per-signal errors.
+
+  // Shared registry stub for INTENT-category signals.
+  const INTENT_REGISTRY_STUB = {
+    id: "reg-intent-1",
+    code: "clay_business_loss",
+    label: "Clay — Active Business Loss",
+    description: null,
+    defaultPoints: 10,
+    decayDays: 90,
+    decayCurve: "LINEAR",
+    category: "INTENT",
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+
+  it("[S1-1] Phase 2 baseline: payload without signals[] field has zero regression (no IntentSignal touched)", async () => {
+    // Plain Sprint S0 company-scope payload — no signals[] array.
+    vi.mocked(prisma.company.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.company.create).mockResolvedValue({
+      id: "co-baseline",
+    } as never)
+
+    const res = await POST(makeReq(COMPANY_PAYLOAD_VALID))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body).toEqual({
+      success: true,
+      action: "created",
+      companyId: "co-baseline",
+    })
+    // Critical: signal-related Prisma surfaces NOT touched.
+    expect(prisma.signalTypeRegistry.findUnique).not.toHaveBeenCalled()
+    expect(prisma.intentSignal.create).not.toHaveBeenCalled()
+    // Response body should NOT contain signal-emission fields when no
+    // signals[] was sent (avoids contaminating Sprint S0 consumers).
+    expect(body).not.toHaveProperty("signalsIngested")
+  })
+
+  it("[S1-2] scope=company with 1 valid signal → upsert + 1 IntentSignal created", async () => {
+    vi.mocked(prisma.company.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.company.create).mockResolvedValue({
+      id: "co-with-signal",
+    } as never)
+    // Signal path
+    vi.mocked(prisma.signalTypeRegistry.findUnique).mockResolvedValue(
+      INTENT_REGISTRY_STUB as never,
+    )
+    vi.mocked(prisma.company.findUnique).mockResolvedValue({
+      id: "co-with-signal",
+    } as never) // second call from ingestSignal()
+    vi.mocked(prisma.intentSignal.create).mockResolvedValue({
+      id: "sig-1",
+      points: 10,
+    } as never)
+
+    const payloadWithSignal = {
+      ...COMPANY_PAYLOAD_VALID,
+      signals: [
+        {
+          signalTypeCode: "clay_business_loss",
+          metadata: { source: "clay-test" },
+        },
+      ],
+    }
+    const res = await POST(makeReq(payloadWithSignal))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.signalsIngested).toBe(1)
+    expect(body.signalsErrored).toBe(0)
+    expect(body.signalErrors).toEqual([])
+    expect(prisma.intentSignal.create).toHaveBeenCalledTimes(1)
+    const args = vi.mocked(prisma.intentSignal.create).mock.calls[0][0]
+    expect(args.data.companyId).toBe("co-with-signal")
+    expect(args.data.signalTypeId).toBe("reg-intent-1")
+    expect(args.data.points).toBe(10) // from registry default
+  })
+
+  it("[S1-3] scope=people with signals[] → contact-scope IntentSignal (companyId auto-denormalized)", async () => {
+    // First mock the upsert path (people scope).
+    vi.mocked(prisma.company.findUnique).mockResolvedValueOnce(null)
+    vi.mocked(prisma.company.create).mockResolvedValueOnce({
+      id: "co-from-person",
+    } as never)
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValueOnce(null)
+    vi.mocked(prisma.crmContact.create).mockResolvedValueOnce({
+      id: "ct-with-signal",
+    } as never)
+
+    // Then signal path (after upsert).
+    vi.mocked(prisma.signalTypeRegistry.findUnique).mockResolvedValueOnce(
+      INTENT_REGISTRY_STUB as never,
+    )
+    // ingestSignal() looks up the contact to denormalize companyId.
+    vi.mocked(prisma.crmContact.findUnique).mockResolvedValueOnce({
+      id: "ct-with-signal",
+      companyId: "co-from-person",
+    } as never)
+    vi.mocked(prisma.intentSignal.create).mockResolvedValueOnce({
+      id: "sig-2",
+      points: 10,
+    } as never)
+
+    const peoplePayload = {
+      ...PEOPLE_PAYLOAD_VALID,
+      signals: [{ signalTypeCode: "clay_business_loss" }],
+    }
+    const res = await POST(makeReq(peoplePayload))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.signalsIngested).toBe(1)
+    const sigArgs = vi.mocked(prisma.intentSignal.create).mock.calls[0][0]
+    expect(sigArgs.data.contactId).toBe("ct-with-signal")
+    // companyId auto-denormalized by ingestSignal() from CrmContact
+    expect(sigArgs.data.companyId).toBe("co-from-person")
+  })
+
+  it("[S1-4] signal with unknown signalTypeCode → upsert succeeds, signal errored, webhook returns 200", async () => {
+    vi.mocked(prisma.company.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.company.create).mockResolvedValue({
+      id: "co-unknown-sig",
+    } as never)
+    // signalTypeRegistry.findUnique returns null → UNKNOWN_SIGNAL_TYPE
+    vi.mocked(prisma.signalTypeRegistry.findUnique).mockResolvedValue(null)
+
+    const payloadWithBadSignal = {
+      ...COMPANY_PAYLOAD_VALID,
+      signals: [{ signalTypeCode: "totally_unknown_code" }],
+    }
+    const res = await POST(makeReq(payloadWithBadSignal))
+    const body = await res.json()
+
+    // Webhook STILL returns 200 — Phase 2 import robustness > scoring
+    expect(res.status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(body.signalsIngested).toBe(0)
+    expect(body.signalsErrored).toBe(1)
+    expect(body.signalErrors).toHaveLength(1)
+    expect(body.signalErrors[0]).toMatchObject({
+      index: 0,
+      code: "UNKNOWN_SIGNAL_TYPE",
+    })
+    // No IntentSignal was created
+    expect(prisma.intentSignal.create).not.toHaveBeenCalled()
+  })
+
+  it("[S1-5] mixed batch: 2 valid + 1 invalid signal → 2 ingested, 1 errored, webhook returns 200", async () => {
+    vi.mocked(prisma.company.findUnique).mockResolvedValueOnce(null)
+    vi.mocked(prisma.company.create).mockResolvedValueOnce({
+      id: "co-mixed",
+    } as never)
+
+    // Sequence: signal[0] valid, signal[1] valid, signal[2] unknown
+    vi.mocked(prisma.signalTypeRegistry.findUnique)
+      .mockResolvedValueOnce(INTENT_REGISTRY_STUB as never)
+      .mockResolvedValueOnce(INTENT_REGISTRY_STUB as never)
+      .mockResolvedValueOnce(null) // unknown code on 3rd entry
+
+    // Need findUnique on Company twice for the two valid company-scope
+    // signals (after the upsert findUnique). Upsert findUnique already
+    // happened above, so these are signal-path lookups.
+    vi.mocked(prisma.company.findUnique)
+      .mockResolvedValueOnce({ id: "co-mixed" } as never)
+      .mockResolvedValueOnce({ id: "co-mixed" } as never)
+
+    vi.mocked(prisma.intentSignal.create)
+      .mockResolvedValueOnce({ id: "sig-3a", points: 10 } as never)
+      .mockResolvedValueOnce({ id: "sig-3b", points: 10 } as never)
+
+    const mixedPayload = {
+      ...COMPANY_PAYLOAD_VALID,
+      signals: [
+        { signalTypeCode: "clay_business_loss" },
+        { signalTypeCode: "clay_business_loss" },
+        { signalTypeCode: "fictional_unknown_code" },
+      ],
+    }
+    const res = await POST(makeReq(mixedPayload))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.signalsIngested).toBe(2)
+    expect(body.signalsErrored).toBe(1)
+    expect(body.signalErrors).toHaveLength(1)
+    expect(body.signalErrors[0]).toMatchObject({
+      index: 2,
+      code: "UNKNOWN_SIGNAL_TYPE",
+    })
+    expect(prisma.intentSignal.create).toHaveBeenCalledTimes(2)
+  })
+
+  it("[S1-6] signal with customPoints overrides registry defaultPoints", async () => {
+    vi.mocked(prisma.company.findUnique).mockResolvedValueOnce(null)
+    vi.mocked(prisma.company.create).mockResolvedValueOnce({
+      id: "co-custom",
+    } as never)
+    vi.mocked(prisma.signalTypeRegistry.findUnique).mockResolvedValueOnce(
+      INTENT_REGISTRY_STUB as never, // defaultPoints = 10
+    )
+    vi.mocked(prisma.company.findUnique).mockResolvedValueOnce({
+      id: "co-custom",
+    } as never)
+    vi.mocked(prisma.intentSignal.create).mockResolvedValueOnce({
+      id: "sig-4",
+    } as never)
+
+    const customPayload = {
+      ...COMPANY_PAYLOAD_VALID,
+      signals: [
+        {
+          signalTypeCode: "clay_business_loss",
+          customPoints: 75,
+        },
+      ],
+    }
+    await POST(makeReq(customPayload))
+
+    const args = vi.mocked(prisma.intentSignal.create).mock.calls[0][0]
+    expect(args.data.points).toBe(75) // ← override, not 10
   })
 })

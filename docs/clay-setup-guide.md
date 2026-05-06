@@ -217,10 +217,82 @@ The Oxen endpoint validates payloads against a Zod schema (`clayEnrichmentSchema
 
 ---
 
-## 10. Reference
+## 10. Optional: emit signals via Clay payload (Sprint S1 batch 4)
+
+The webhook can optionally emit one or more `IntentSignal` rows after
+the Company / Contact upsert succeeds. Add an optional top-level
+`signals[]` array to your existing payload :
+
+```json
+{
+  "source_table": "vDC_G1_Tier 1_Company_Active Business Loss",
+  "scope": "company",
+  "group": "G1",
+  "pain_tier": "T1",
+  "company": { ... },
+  "signals": [
+    {
+      "signalTypeCode": "clay_business_loss",
+      "metadata": {
+        "claySource": "vDC_G1_Tier 1_Company_Active Business Loss",
+        "rawCellId": "abc-123"
+      },
+      "sourceUrl": "https://clay.com/...",
+      "occurredAt": "2026-05-06T10:00:00Z",
+      "notes": "Detected via Clay cascade query"
+    }
+  ]
+}
+```
+
+Per-signal fields :
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `signalTypeCode` | string (1-100 chars) | yes | Must match a `SignalTypeRegistry.code` row. The seed script (`scripts/db/seed-signal-types.ts`) registers 7 codes by default; new codes must be pre-registered or your signal will be returned as `signalErrors[].code = "UNKNOWN_SIGNAL_TYPE"`. |
+| `customPoints` | int 0-10000 | no | Override the registry's `defaultPoints` for this specific signal. |
+| `metadata` | JSON object | no | Arbitrary payload stored alongside the signal. Useful for source-tracking (raw Clay cell id, query name, etc.). |
+| `sourceUrl` | URL string | no | Link back to the source (Clay query, LinkedIn post, news article, etc.). |
+| `occurredAt` | ISO 8601 datetime | no | Real-world event time. Defaults to now. The signal's decay math anchors on this value, so backdating a signal correctly accounts for elapsed decay. |
+| `notes` | string ≤ 5000 | no | Operator-facing comment. |
+
+Behavior contract :
+
+- **Optional** — the field is missing → webhook behaves exactly as in Sprint S0 (upsert only, no signals touched). All existing Phase 2 G1-T1 payloads continue to work unchanged.
+- **Per-signal isolation** — each entry is ingested independently. A bad `signalTypeCode` (or any other per-signal error) is **logged and skipped**, and the webhook still returns `200`. The aggregate response includes a per-signal report :
+
+```json
+{
+  "success": true,
+  "action": "created",
+  "companyId": "ckxxxx...",
+  "signalsIngested": 2,
+  "signalsErrored": 1,
+  "signalErrors": [
+    { "index": 2, "code": "UNKNOWN_SIGNAL_TYPE", "error": "Unknown signal type code" }
+  ]
+}
+```
+
+Rationale : Phase 2 import robustness > scoring completeness. A single
+typoed signal code shouldn't break the broader Clay enrichment
+pipeline.
+
+- **Scope mapping** — Clay payload `scope = "company"` → signal scope = `"company"` (signal attaches to the upserted Company). `scope = "people"` → signal scope = `"contact"` (signal attaches to the upserted CrmContact; `companyId` is auto-denormalized from `CrmContact.companyId`).
+- **Cap at 50 signals per payload** — to keep webhook latency bounded and prevent runaway batches.
+
+Internally, the route delegates to `ingestSignal()` from
+`@/lib/signal-ingestion` (the same helper that backs `POST /api/signals`).
+
+---
+
+## 11. Reference
 
 - Endpoint code : `src/app/api/webhooks/clay-enrichment/route.ts`
 - Validation schema : `src/app/api/webhooks/_schemas.ts` (`clayEnrichmentSchema`)
 - Upsert helpers (single source of truth) : `src/lib/clay-enrichment.ts`
-- Decision history : `CLAY_ENRICHMENT_PAYLOAD_DRAFT.md` v1.1 + `PRD_001_MAPPING.md` v3.3
-- Sprint S0 implementation log : commits 2f6195c, 2c9984b, b801a71, 35270b0, plus this batch
+- Signal ingestion core : `src/lib/signal-ingestion.ts` (Sprint S1 batch 4)
+- Signal type registry seeds : `scripts/db/seed-signal-types.ts`
+- Decision history : `CLAY_ENRICHMENT_PAYLOAD_DRAFT.md` v1.1 + `PRD_001_MAPPING.md` v3.6
+- Sprint S0 implementation log : commits 2f6195c, 2c9984b, b801a71, 35270b0
+- Sprint S1 batches : a11161a (schema), af30e11 (POST /api/signals), 6565351 (decay cron), this batch (Clay signal emission)

@@ -186,6 +186,21 @@ const clayPersonPayload = z.object({
     .optional(),
 })
 
+// Sprint S1 batch 4 — optional signal emission on Clay enrichment.
+// When a Clay payload includes a non-empty `signals[]` array, the
+// webhook will emit one IntentSignal per entry after the Company /
+// Contact upsert succeeds. The field is OPTIONAL — every existing
+// Phase 2 G1-T1 payload (which doesn't carry it) keeps working
+// unchanged.
+const claySignalEntry = z.object({
+  signalTypeCode: z.string().min(1).max(100),
+  customPoints: z.number().int().min(0).max(10000).optional(),
+  metadata: z.record(z.unknown()).optional(),
+  sourceUrl: z.string().url().max(2000).optional(),
+  occurredAt: z.string().datetime({ offset: true }).optional(),
+  notes: z.string().max(5000).optional(),
+})
+
 export const clayEnrichmentSchema = z
   .object({
     source_table: z.string().min(1).max(200),
@@ -194,6 +209,9 @@ export const clayEnrichmentSchema = z
     pain_tier: crmPainTier,
     company: clayCompanyPayload.optional(),
     person: clayPersonPayload.optional(),
+    // Optional signals emission (Sprint S1 batch 4). When omitted or
+    // empty, the webhook behaves exactly as in Sprint S0 (upsert only).
+    signals: z.array(claySignalEntry).max(50).optional(),
   })
   .refine(
     (data) =>
@@ -206,6 +224,7 @@ export const clayEnrichmentSchema = z
   )
 
 export type ClayEnrichmentPayload = z.infer<typeof clayEnrichmentSchema>
+export type ClaySignalEntry = z.infer<typeof claySignalEntry>
 
 // ─────────────────────────────────────────────────────────────
 // Clay batch CSV import — /api/crm/contacts/import-clay
