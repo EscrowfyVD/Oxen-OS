@@ -1,10 +1,9 @@
-# PRD-001 v3.3 — Intent Scoring Engine
+# PRD-001 v3.4 — Intent Scoring Engine
 # Document de mapping vers le CRM Oxen OS existant
 
-> Document v3.3 — généré le 2026-05-01, révisé 2026-05-05 (Sprint S0 — Clay enrichment pipeline IMPLEMENTED).
+> Document v3.4 — généré le 2026-05-01, révisé 2026-05-05 (Sprint S0 livré + post-deploy clarifications).
 > Référence PRD : Andy / Oxen Finance — `CRM_scoring_brief.docx` — April 29, 2026
-> Statut : Sprint S0 livré — Phase 2 prête (seed initial 2 692 rows depuis Clay)
-> Mapping doc, plus implémentation tracée dans les 5 commits Sprint S0.
+> Statut : Sprint S0 livré + hotfix client/server boundary + BD emails clarification — Phase 2 prête.
 >
 > **Changelog** :
 > - **v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
@@ -12,6 +11,7 @@
 > - **v3 → v3.1** : closure des 3 sub-questions Andy (crypto = intermédiaires UNIQUEMENT confirmé, override 30j validated, Market Signal UX = Oxen OS validated). 6 décisions structurelles confirmées.
 > - **v3.1 → v3.2** : Lemlist API verification complétée par Vernon 2026-05-05. Pause/Resume/Status disponibles ; advance/skip step non exposé → workaround pause + update `{{signal_context}}` variable + resume. Aucune réduction scope PRD section 6.7 nécessaire. Open Q #1 RESOLVED. **6/7 questions résolues, 1 pending (Clay mapping rules en S0)**.
 > - **v3.2 → v3.3** : **Sprint S0 IMPLEMENTED 2026-05-05**. 5 batches livrés (5 commits, 9 fichiers ajoutés/modifiés, 126 tests passants, 187/187 pages build OK). Pipeline Clay enrichment opérationnel — 2 modes (CSV import + HTTP API push) convergents sur les mêmes upsert helpers (single source of truth dans `src/lib/clay-enrichment.ts`). Phase 2 prête : seed des 2 692 rows existantes (1 711 companies + 981 people). Open Q #6 (Clay mapping rules) reste à formaliser début S1 — la base technique est en place.
+> - **v3.3 → v3.4** : Post-deploy clarifications (2026-05-05 soir). (1) Hotfix `477cb93` : extraction des helpers client-safe vers `@/lib/clay-helpers.ts` après crash `PrismaClient is unable to run in browser` sur `/crm/contacts` — `ClayImportWizard` importait transitivement `prisma` via `@/lib/clay-enrichment`. (2) BD emails clarification : `CRM_BD_EMAILS` Railway env var corrigée avec les emails réels DB (`ad@oxen.finance`, `pg@oxen.finance`) — ancien template `.env.example` (`andy@`, `paullouis@`) ne matchait pas. (3) Glossaire ajouté : "Paul Louis" = nom interne pour **Paul Garreau** (Deputy CEO, `pg@oxen.finance`), 2ème BD aux côtés d'Andy. (4) Décision explicite : `dealOwnerId` = ownership CRM Oxen interne uniquement, **distinct des sender identities Lemlist** (Lemlist gère ses outreach aliases séparément, hors scope de ce PRD).
 
 ---
 
@@ -411,13 +411,17 @@ Cette section documente les décisions opérationnelles tranchées par Andy le 2
 
 ### 5b.1 — Auto-assignment BD (override section 6.10 PRD)
 
-**Décision Andy 2026-05-05** : auto-assignment = **Random 50/50 entre Andy et Paul Louis**. Override le code actuel `getOwnerForGeo`. Vernon (UAE) exclu de l'auto-assignment (cohérent avec ASSUMPTION PRD section 6.10).
+**Décision Andy 2026-05-05** : auto-assignment = **Random 50/50 entre Andy Dessy (`ad@oxen.finance`) et Paul Garreau (`pg@oxen.finance`, alias interne "Paul Louis")**. Override le code actuel `getOwnerForGeo`. Vernon (UAE) exclu de l'auto-assignment (cohérent avec ASSUMPTION PRD section 6.10).
+
+> **Important** — `dealOwner` (et le futur `dealOwnerId`) = **ownership CRM Oxen interne uniquement** : qui suit le contact dans le pipeline, qui reçoit les alertes Telegram P1, qui est responsable du compte. **C'est distinct des sender identities Lemlist** : Lemlist peut envoyer des emails depuis des aliases outreach (par ex. `andy@oxengroup.com`, `paullouis@joinoxen.com` cf. domains existants dans `OutreachDomain`) pour préserver la deliverability et les vrais inboxes des BDs. Les 2 systèmes sont **séparés et indépendants** — `dealOwner` ne dicte pas l'expéditeur Lemlist.
 
 **Implications techniques** :
 - Le helper `src/lib/crm-config.ts:getOwnerForGeo()` ne sera plus utilisé pour le scoring engine
-- Nouvelle fonction `getRandomBdAssignment()` qui retourne aléatoirement Andy ou Paul Louis (50/50)
+- Nouvelle fonction `assignRandomBD()` (livrée Sprint S0 batch 2 — `src/lib/clay-enrichment.ts`) qui retourne aléatoirement l'`Employee.id` correspondant à Andy ou Paul Garreau via lookup sur `CRM_BD_EMAILS` env var (50/50)
 - Le geo-based assignment existant reste actif pour les **leads inbound non-scoring** (`/api/crm/webhooks/inbound-lead`) — coexistence
 - Sprint S0 ou S1 : décider si on renomme `dealOwner` ou si `assigned_bd` est un nouveau champ
+
+**Configuration env var (Railway)** : `CRM_BD_EMAILS="ad@oxen.finance,pg@oxen.finance"`. Set 2026-05-05 post-deploy après que la query DB sur `Employee` ait révélé que les emails template initiaux (`andy@`, `paullouis@`) ne correspondaient pas aux records réels.
 
 **Conséquence sur backlog** : le bloquant **B6** (geo-based vs random 50/50) initialement marqué "garder geo-based" est **inversé** — Andy a tranché pour Random 50/50 sur scoring engine. Geo-based reste pour autres flux (inbound forms).
 
@@ -945,6 +949,14 @@ Snapshots futurs à archiver dans le footer du script (template prêt).
 - **Sequence Naming** : `{Group}-{PainTier}-{Persona}` (ex: G1-T1-DM, G7A-T2-OP)
 - **Hard entry rule** : Priority Score 40+ AND 2+ distinct intent signal types — pas d'exception
 - **Grace period** : 48h delay before priority level downgrade if account is in active Lemlist sequence
+
+### 12.3bis Team & terminology (clarification post-deploy 2026-05-05)
+
+- **"Paul Louis" = Paul Garreau** (`pg@oxen.finance`, Deputy CEO Oxen). "Paul Louis" est un slang interne issu d'anciens jours, le nom formel est **Paul Garreau**. Les deux noms désignent la **même personne** — c'est le **2ème BD** aux côtés d'Andy pour l'auto-assignment scoring engine.
+- **Andy = Andy Dessy** (`ad@oxen.finance`, Sales Manager) — 1er BD.
+- **`dealOwner` (et le futur `dealOwnerId`) = ownership CRM Oxen interne** : qui suit le contact dans le pipeline, qui reçoit les Telegram P1, qui est responsable. Distinct de l'expéditeur des emails Lemlist — voir ci-dessous.
+- **Lemlist sender identity = système séparé** : Lemlist peut utiliser des **outreach aliases** (par ex. emails sur les domains `oxengroup.com`, `joinoxen.com`, `oxenpartners.com` cf. seeds `OutreachDomain`) pour préserver la deliverability et les vrais inboxes des BDs. **Out of scope pour PRD-001** — géré côté Lemlist UI par l'équipe Outreach.
+- **`CRM_BD_EMAILS` env var** : utilise les **emails Employee réels** (`ad@oxen.finance`, `pg@oxen.finance`), pas les aliases Lemlist. Resolved par `assignRandomBD()` via `prisma.employee.findMany({ where: { email: { in: emails } } })`.
 
 ### 12.4 Décisions tranchées par Vernon (à compléter post-review)
 
