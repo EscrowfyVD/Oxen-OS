@@ -1,9 +1,9 @@
-# PRD-001 v3.6 — Intent Scoring Engine
+# PRD-001 v3.7 — Intent Scoring Engine
 # Document de mapping vers le CRM Oxen OS existant
 
-> Document v3.6 — généré le 2026-05-01, révisé 2026-05-06 (Sprint S0 livré + Phase 2 G1-T1 SEEDED + Sprint S0.5 UI Polish IMPLEMENTED).
+> Document v3.7 — généré le 2026-05-01, révisé 2026-05-06 (Sprint S0 livré + Phase 2 G1-T1 SEEDED + Sprint S0.5 UI Polish + Sprint S1 Universal Signal Ingestion IMPLEMENTED, migration NON encore appliquée sur Railway).
 > Référence PRD : Andy / Oxen Finance — `CRM_scoring_brief.docx` — April 29, 2026
-> Statut : Sprint S0 livré + 4 hotfixes (v1-v4) + Phase 2 G1-T1 seed (1 586 Companies + 597 Contacts en DB) + Sprint S0.5 UI Polish (4 batches, 168 tests passants).
+> Statut : Sprint S0 livré + 4 hotfixes (v1-v4) + Phase 2 G1-T1 seed (1 586 Companies + 597 Contacts en DB) + Sprint S0.5 UI Polish (4 batches) + Sprint S1 backbone scoring engine (4 batches locaux non-pushés, **deferred deployment** — voir `reference/SPRINT_S1_DEPLOYMENT_RUNBOOK.md`).
 >
 > **Changelog** :
 > - **v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
@@ -14,6 +14,7 @@
 > - **v3.3 → v3.4** : Post-deploy clarifications (2026-05-05 soir). (1) Hotfix `477cb93` : extraction des helpers client-safe vers `@/lib/clay-helpers.ts` après crash `PrismaClient is unable to run in browser` sur `/crm/contacts` — `ClayImportWizard` importait transitivement `prisma` via `@/lib/clay-enrichment`. (2) BD emails clarification : `CRM_BD_EMAILS` Railway env var corrigée avec les emails réels DB (`ad@oxen.finance`, `pg@oxen.finance`) — ancien template `.env.example` (`andy@`, `paullouis@`) ne matchait pas. (3) Glossaire ajouté : "Paul Louis" = nom interne pour **Paul Garreau** (Deputy CEO, `pg@oxen.finance`), 2ème BD aux côtés d'Andy. (4) Décision explicite : `dealOwnerId` = ownership CRM Oxen interne uniquement, **distinct des sender identities Lemlist** (Lemlist gère ses outreach aliases séparément, hors scope de ce PRD).
 > - **v3.4 → v3.5** : **Phase 2 G1-T1 SEEDED 2026-05-06**. Import des 2 tables Clay G1-T1 effectué via wizard CSV (Mode A). Résultats : **1 586 Companies** (1 711 CSV − 2 errored description >2000 − 123 dedupe by domain) + **597 CrmContacts** (981 CSV − 384 dedupe by email Apollo cascade). 100% field coverage sur tous les champs critiques. Persona 99.3% DM (table Clay pré-filtrée upstream). Country distribution G1 : 73.7% UAE / 11.6% Cyprus / 8.7% Malta / 6.0% adjacents (UK/US/EU/SG/CA). dealOwner répartition 52.4% Andy / 47.6% Paul Garreau (random uniforme sain). **Phase 2 a révélé 4 hotfixes** (`477cb93` v1 client/server, `2cc7444` v2 per-row validation + `description.max(10000)`, `69c17fe` v3 Apollo aliases + `extractCountryFromLocation`, `cab3545` v4 country inheritance from Company) — tous fixés et déployés. Chaîne de protection country à 3 niveaux (explicit → location parsing → Company inheritance) garantit **0 contact avec country=NULL** sur 597. Scripts de vérification committed : `check-companies-phase2.ts` (`54f0217`) + `check-contacts-phase2.ts` (`8f1afdd`).
 > - **v3.5 → v3.6** : **Sprint S0.5 UI Polish IMPLEMENTED 2026-05-06**. 4 batches (Mode B strict — commits locaux puis push global) pour rendre les fields PRD-001 (Group/PainTier/Persona) visibles dans toute l'UI : 3 nouvelles colonnes badges sur Contacts list (B1 `759d50b`), 3 dropdowns filters URL-bookmarkable + extension `listContactsQuery` Zod (B2 `858978d`), section "Clay Enrichment" sur fiche contact + extraction color maps vers `@/lib/crm-badge-colors.ts` (B3 `71ff38e`), badges Group/PainTier sur cards Companies + 3 dropdowns filters + section Clay Enrichment sur tab Overview détail company + fix bug placeholder vide tab Companies subNav `/crm` (B4 `06b1644`, option γ minimal viable). 13 fichiers touchés, ~940 insertions. Tests 158 → **168** (+10 nouveaux integration tests sur les 2 routes API étendues). Voir section **11.3** ci-dessous pour le détail complet.
+> - **v3.6 → v3.7** : **Sprint S1 — Universal Signal Ingestion IMPLEMENTED 2026-05-06** (locaux, non-pushés — deferred deployment). 4 batches mettant en place l'infrastructure scoring engine : refactor IntentSignal + nouveaux models `SignalTypeRegistry` / `MarketSignal` + 7 seeds + webhook compat layer pour les 3 routes legacy (B1 `a11161a`), endpoint universel `POST /api/signals` avec discriminated union 3 scopes + Bearer/session auth + strict registry lookup (B2 `af30e11`), helper `calculateDecayedPoints` 3 curves + cron idempotent `recompute-signal-decay.ts` (B3 `6565351`), extraction core dans `src/lib/signal-ingestion.ts` + augmentation webhook Clay enrichment avec `signals[]` optionnel zero-breaking-change (B4 `1e231b4`). ~24 fichiers, ~3 457 insertions. Tests 168 → **230** (+62 : 9 seed + 18 ingest + 21 decay + 8 cron + 6 webhook). **Migration `add_signal_universal_ingestion` générée localement (NON appliquée sur Railway encore)** — voir `reference/SPRINT_S1_DEPLOYMENT_RUNBOOK.md` pour la séquence de déploiement. Voir section **11.4** ci-dessous pour le détail complet.
 
 ---
 
@@ -1003,14 +1004,142 @@ Sprint d'amélioration UI pour rendre les nouveaux fields PRD-001 (`group`, `pai
 
 4. **Sprint S1 — Open Q #6 Clay mapping rules** (Vernon + Andy, ~30 min en début S1) — Heuristiques fines `companySize` / `country` / `fundingStage` → group + Pain Tier mapping (existing base déjà fonctionnelle via `source_table` parsing).
 
-### 11.4 À discuter avec Andy
+### 11.4 Sprint S1 — Universal Signal Ingestion IMPLEMENTED 2026-05-06 (deferred deployment)
+
+Sprint backbone du scoring engine. Met en place l'infrastructure pour ingérer des signaux de toutes sources (Clay, LinkedIn, Calendar, Slack, Email, market data) via un endpoint universel et un model unifié, avec time-decay configurable par type de signal.
+
+**Mode B strict respecté** : 4 batches avec commits locaux séquentiels, validation visuelle de Vernon entre chaque batch. **Push final déféré** (Phase 5B distincte) — la migration Prisma sera appliquée sur Railway lors du push global pour éviter le gap "code expects new schema but DB has old".
+
+#### Métriques
+
+| Métrique | Valeur |
+|---|---|
+| Batches commits locaux | 4 (`a11161a`, `af30e11`, `6565351`, `1e231b4`) |
+| Files touchés / créés | ~24 |
+| Insertions | ~3 457 lignes |
+| Tests | 168 → **230** (+62 nouveaux) |
+| Build | ✅ all batches green |
+| Typecheck | ✅ clean sur chaque batch |
+| Lint nouveau code | ✅ 0 nouveau warning/error (vérifié `git stash` baseline) |
+| Régressions | 0 (Sprint S0 / S0.5 tests passent unchanged après refactor) |
+| Migration appliquée Railway | **❌ NOT YET** (deferred to Phase 5B push) |
+
+#### Items implémentés par batch
+
+##### Batch 1 — Schema + migration + webhook compat (`a11161a`, 9 fichiers, +621 / -27)
+
+- **2 nouveaux enums** : `SignalDecayCurve` (LINEAR / EXPONENTIAL / STEP), `SignalCategory` (INTENT / MARKET).
+- **IntentSignal refactor** :
+  - rename `score` → `points`, rename `raw` → `metadata`
+  - `contactId` made nullable (allows market-style signals before contact pinpointed)
+  - new fields : `signalTypeId` (FK to SignalTypeRegistry, NOT NULL), `companyId` (FK to Company, denormalized), `decayedPoints`, `sourceUrl`, `notes`
+  - indexes : `(companyId, signalTypeId, createdAt)`, `(contactId, signalTypeId, createdAt)`
+  - legacy `source` + `signalType` String fields preserved (deprecate later)
+- **SignalTypeRegistry model** : `code` unique + `label` + `description` + `defaultPoints` + `decayDays` + `decayCurve` + `category` + `isActive` + indexes.
+- **MarketSignal model** : `country` (REQUIRED) + `vertical` (optional) + `points`/`decayedPoints` + `metadata` + `sourceUrl` + `occurredAt` + `expiresAt` + `notes` + indexes.
+- **Inverse relation `intentSignals IntentSignal[]`** ajoutée à `Company`.
+- **Migration SQL** générée via `prisma migrate diff` (read-only, no DB touch) → `prisma/migrations/20260506114414_add_signal_universal_ingestion/migration.sql` (81 lignes). **NOT applied to Railway encore**.
+- **7 SignalTypeRegistry seeds** dans `scripts/db/seed-signal-types.ts` :
+  - 4 canonical (Vernon spec) : `clay_business_loss` (10pts/90d/LINEAR/INTENT), `clay_director_change` (20/60/LINEAR/INTENT), `linkedin_post_funding` (30/30/EXPONENTIAL/INTENT), `market_country_regulation_change` (50/180/STEP/MARKET).
+  - 3 webhook back-compat placeholders : `clay_legacy_intent`, `trigify_intent_signal`, `n8n_external_signal` (à déprécier en Sprint S2).
+- **Webhook compat layer** : 3 routes legacy (`clay/route.ts`, `trigify/route.ts`, `n8n/route.ts`) refactorées avec `signalTypeRegistry.upsert` + rename `score→points` + rename `raw→metadata`. Plus 2 read-only consumers updatés (page contact + AI route).
+- **Tests** : 9 nouveaux unit tests sur le seed (`seed-signal-types.test.ts`) — exercent `seedSignalTypes()` contre Prisma mocked.
+
+##### Batch 2 — Endpoint POST /api/signals (`af30e11`, 4 fichiers, +882 insertions)
+
+- **Endpoint** : `POST /api/signals` accepte payload via Zod discriminated union sur `scope` :
+  - `contact` : per-contact intent signal (writes IntentSignal, contactId required, companyId auto-denormalized from CrmContact).
+  - `company` : per-company intent signal (writes IntentSignal, companyId required, contactId stays null).
+  - `market` : country/vertical-scoped signal (writes MarketSignal, country required, vertical optional).
+- **Auth fail-closed** : Bearer `SIGNALS_INGESTION_SECRET` (constant-time `timingSafeEqual`) → fallback `requirePageAccess("crm")` session si pas de Bearer header. Bearer invalide = 401 immediat (pas de fallback session — anti-brute-force).
+- **Strict registry lookup** : 400 si `signalTypeCode` inconnu OU inactive. Codes doivent être pré-enregistrés via le seed (ou auto-upsertés par les 3 webhooks legacy).
+- **Category-mismatch guard** : 400 si `scope=market` mais `registry.category=INTENT` (ou vice versa).
+- **Lifecycle math** : `expiresAt = occurredAt + decayDays`. `points = customPoints ?? registry.defaultPoints`. `IntentSignal.createdAt = occurredAt` (override Prisma `@default(now())` so decay anchors on real-world event time, not row insertion time).
+- **Auto-denormalize** : pour `scope=contact`, lookup `CrmContact.companyId` et écrit dans `IntentSignal.companyId`. Permet aux index `(companyId, signalTypeId, createdAt)` d'être utilisables sans JOIN.
+- **404 vs 400** : `signalTypeCode` inconnu = 400 (input invalide), `contactId/companyId` introuvable = 404 (resource manquante).
+- **Env** : `SIGNALS_INGESTION_SECRET` ajouté à `.env.example` avec génération `openssl rand -hex 32`.
+- **Tests** : 18 nouveaux integration tests couvrant auth (3) / Zod (3) / registry (2) / category-mismatch (2) / happy paths (4) / lifecycle (2) / 404 (2).
+
+##### Batch 3 — Time decay + cron precompute (`6565351`, 5 fichiers, +1 141 insertions)
+
+- **Helper `calculateDecayedPoints()`** dans `src/lib/signal-decay.ts` (pure, no Prisma) — 3 curves :
+  - **LINEAR** : straight-line, `points × (1 − ratio)`.
+  - **EXPONENTIAL** : half-life à `decayDays/2` (factor `exp(-ratio·LN2·2)`).
+  - **STEP** : 3 paliers — 100% (`ratio<0.33`), 50% (`<0.66`), 0% (`>=0.66`).
+- **Edge cases** :
+  - `decayDays <= 0` → returns originalPoints (signal permanent, never decays).
+  - `originalPoints = 0` → returns 0.
+  - `now < occurredAt` → returns originalPoints (clock drift / backdate).
+  - `elapsed >= decayDays` → returns 0 (clamp).
+- **Cron `scripts/cron/recompute-signal-decay.ts`** :
+  - 2 fonctions : `recomputeIntentSignals()` + `recomputeMarketSignals()` — chacune retourne `{ scanned, updated, skippedUnchanged, skippedTerminal }`.
+  - Cursor-based pagination, chunks de 1000.
+  - **Function-form `$transaction`** avec `{ timeout: 60_000 }` (Prisma 5 array-form ne supporte pas `timeout`).
+  - **2 layers idempotency** : skip if `computed === stored` (math layer) + skip if `expiresAt <= now && decayedPoints === 0` (terminal fast-path).
+  - Anchor decay sur `IntentSignal.createdAt` (route handler pin sur occurredAt à l'insert) vs `MarketSignal.occurredAt` (colonne explicite).
+- **Documentation** : `docs/signal-decay-cron.md` (231 lignes) — TL;DR table, per-curve behavior, scheduling Railway / GitHub Actions / manuel, frequency tuning, debugging guide, deploy checklist.
+- **Tests** : 21 unit tests (helper) + 8 integration tests (cron mocked Prisma) = **29 nouveaux**.
+
+##### Batch 4 — Webhook adapter + lib extraction (`1e231b4`, 6 fichiers, +813 / -262)
+
+- **Refactor** : extraction du core logic `signals/route.ts` → `src/lib/signal-ingestion.ts` (337 → 113 lignes pour le route handler).
+- **Helper `ingestSignal(payload)`** : reçoit un `SignalIngestionPayload` validé, retourne discriminated union :
+  - `{ ok: true, scope, signal }` pour le succès.
+  - `{ ok: false, status, code, error, details? }` avec `code` ∈ `{ UNKNOWN_SIGNAL_TYPE, INACTIVE_SIGNAL_TYPE, CATEGORY_MISMATCH, CONTACT_NOT_FOUND, COMPANY_NOT_FOUND, PERSIST_FAILED }`.
+  - Pas d'auth, pas de logging side-effect — callers handlent (route HTTP map status, webhook log + skip).
+- **HTTP route** `/api/signals/route.ts` devient thin wrapper : auth + Zod + `ingestSignal()` + map result → HTTP. Tous les 18 tests Sprint S1 batch 2 passent unchanged après refactor.
+- **Webhook Clay enrichment augmentation** :
+  - Schema `clayEnrichmentSchema` étendu avec `signals` array optionnel (capped à 50 entries) — **zero breaking change** Phase 2.
+  - Après upsert succès, boucle sur `payload.signals[]` et call `ingestSignal()` pour chaque.
+  - **Per-signal isolation** : 1 bad signal = log warn + skip, webhook retourne 200. Phase 2 robustness > scoring completeness.
+  - Response augmenté avec `signalsIngested / signalsErrored / signalErrors[]` (capped first 10) **uniquement** si `signals[]` était fourni — sinon shape Sprint S0 préservée à l'identique.
+  - Mapping scope : `clay.scope=company` → signal scope=company, `clay.scope=people` → signal scope=contact (companyId auto-denormalized).
+- **Documentation** : `docs/clay-setup-guide.md` §10 "Optional: emit signals via Clay payload" + §11 Reference updated.
+- **Tests** : 6 nouveaux integration tests + zero regression sur les 17 tests Sprint S0 + 18 tests Sprint S1 batch 2.
+
+#### Décisions structurelles
+
+1. **Mode B strict + deferred deployment** : 4 commits locaux non-pushés. Migration `add_signal_universal_ingestion` générée localement via `prisma migrate diff` (read-only) mais **NON appliquée** sur Railway pendant les batches. Justification : le code attend le nouveau schema (signalTypeId NOT NULL, points au lieu de score, etc.) → push isolé du code sans la migration crasherait runtime → push isolé de la migration sans le code introduirait un schema avec des champs jamais utilisés. Solution : push global au Batch 5 / Phase 5B, Railway run `migrate deploy` automatiquement, puis le code prend le relais.
+
+2. **`signalTypeId` non-nullable strict (Option 1 spec)** : Vernon décision après audit. Évite la dette d'une nullable temporaire à re-migrer. Contrainte forced les 3 webhooks legacy à upserter leur propre placeholder registry entry (ce qui sera utile pour le suivi par-source côté ops).
+
+3. **Discriminated union sur scope** (vs flat schema avec champs orphelins) : Zod refuse `{ scope: "market", contactId: "..." }`. Le typage TypeScript propage : `Extract<SignalIngestionPayload, { scope: "contact" }>` donne un type narrow avec `contactId: string` garanti.
+
+4. **Strict registry lookup** (vs auto-create) : 400 si `signalTypeCode` inconnu. Évite que des typos d'intégrations polluent le registry avec des codes erronés ("clay_buisness_loss" qui crée une nouvelle entrée silencieusement). Force chaque intégration à pré-enregistrer ses codes.
+
+5. **Bearer-first + session fallback** : Bearer invalide = 401 immédiat sans tomber sur session. Empêche un attacker de brute-forcer le secret en se connectant en session entre essais.
+
+6. **`createdAt = occurredAt` sur IntentSignal** : Prisma défaut `now()` overridé pour anchor le decay sur l'événement réel, pas l'insertion DB. Critique pour backfill historique (Lemlist replies de 30 jours en arrière, par ex.).
+
+7. **Single source of truth `ingestSignal()`** : extrait dans `src/lib/signal-ingestion.ts` (Batch 4). Consommé par le route HTTP + webhook Clay enrichment + futures intégrations server-side (N8N workflows, intelligence pipeline). DRY enforced.
+
+8. **Per-signal isolation Clay webhook** : 1 bad signal ne fail pas le webhook (Phase 2 robustness > scoring completeness). Test `[S1-5]` valide explicitement.
+
+9. **Cap 50 signals/payload** : `z.array(...).max(50)` — bound webhook latency, anti-runaway batches.
+
+10. **2 layers idempotency cron** : skip if `computed === stored` (math layer) + skip if `expiresAt <= now && decayedPoints === 0` (terminal fast-path). Test `recomputeIntentSignals` "run twice → 0 updates 2nd run" valide.
+
+#### Out of scope (deferred)
+
+1. **Sprint S2 — Lemlist hardening + signals** : 3 footguns identifiés (audit `bifjvm3lb`) + Lemlist webhook → ingestSignal pour replied/bounced/unsubscribed events.
+2. **Sprint S3 — LinkedIn signals** : Trigify enhancement + manual LinkedIn signal entry UI.
+3. **Sprint S4 — Calendar/Slack/Email signals** : Calendly, Slack message, email open/click → ingestSignal.
+4. **Phase 3 — Scoring engine** : ICP scoring + Intent scoring (consume `IntentSignal.decayedPoints` + `MarketSignal.decayedPoints`) + Priority levels P1/P2/P3/Monitoring.
+5. **Deprecate les 3 placeholder codes** (`clay_legacy_intent`, `trigify_intent_signal`, `n8n_external_signal`) une fois que chaque webhook est rewired pour utiliser des canonical codes (Sprint S2/S3).
+6. **`occurredAt` explicite sur IntentSignal** : pour l'instant on réutilise `createdAt`. Si le backfill historique devient un cas d'usage majeur, ajouter une colonne séparée + migration.
+
+#### Pour le déploiement
+
+Voir `reference/SPRINT_S1_DEPLOYMENT_RUNBOOK.md` (créé en Phase 5A) pour la séquence de push, application de la migration, seed canonical, smoke test, configuration cron, et plan de rollback.
+
+### 11.5 À discuter avec Andy
 
 - **Mapping vertical → group définitif** : vu les 3 verticals sans match (FinTech, iGaming, Import/Export), comment les classer ? Comme T1 high-intensity dans groupes existants ?
 - **Pain Tier criteria explicites** : quels signaux objectifs déterminent T1 vs T2 vs T3 par groupe ?
 - **Définitions DM vs OP par groupe** : G1 fiduciaries → DM = associé/managing partner, OP = compliance officer ? Lister par groupe.
 - **Sequences Lemlist actuelles** : combien existent déjà avec naming `{Group}-{PainTier}-{Persona}` ? Si zéro, Andy doit en créer ~24 (8 groupes × 3 tiers × 2 personas) ou commencer prioritaires.
 
-### 11.5 À discuter avec Johnny (dev externe)
+### 11.6 À discuter avec Johnny (dev externe)
 
 - Faisabilité technique 9 sprints en 9-10 semaines : capacity / parallelisable ?
 - Sprint S2 (ICP) et S3 (Intent) en parallèle possible ?
@@ -1109,4 +1238,4 @@ Snapshots futurs à archiver dans le footer du script (template prêt).
 
 ---
 
-*Fin du document — PRD-001 v3.6 mapping vers Oxen OS CRM (2026-05-01, révisé 2026-05-06 post-Sprint S0.5 UI Polish)*
+*Fin du document — PRD-001 v3.7 mapping vers Oxen OS CRM (2026-05-01, révisé 2026-05-06 post-Sprint S1 Universal Signal Ingestion — deferred deployment)*
