@@ -1,9 +1,9 @@
-# PRD-001 v3.5 — Intent Scoring Engine
+# PRD-001 v3.6 — Intent Scoring Engine
 # Document de mapping vers le CRM Oxen OS existant
 
-> Document v3.5 — généré le 2026-05-01, révisé 2026-05-06 (Sprint S0 livré + Phase 2 G1-T1 SEEDED).
+> Document v3.6 — généré le 2026-05-01, révisé 2026-05-06 (Sprint S0 livré + Phase 2 G1-T1 SEEDED + Sprint S0.5 UI Polish IMPLEMENTED).
 > Référence PRD : Andy / Oxen Finance — `CRM_scoring_brief.docx` — April 29, 2026
-> Statut : Sprint S0 livré + 4 hotfixes (v1-v4) + Phase 2 G1-T1 seed terminé (1 586 Companies + 597 Contacts en DB).
+> Statut : Sprint S0 livré + 4 hotfixes (v1-v4) + Phase 2 G1-T1 seed (1 586 Companies + 597 Contacts en DB) + Sprint S0.5 UI Polish (4 batches, 168 tests passants).
 >
 > **Changelog** :
 > - **v1 → v2** : ajout du contexte DB pre-launch (vérifié via `scripts/db/check-counts.ts`), mise à jour des risques migration (drastiquement réduits), estimation effort revue à la baisse.
@@ -13,6 +13,7 @@
 > - **v3.2 → v3.3** : **Sprint S0 IMPLEMENTED 2026-05-05**. 5 batches livrés (5 commits, 9 fichiers ajoutés/modifiés, 126 tests passants, 187/187 pages build OK). Pipeline Clay enrichment opérationnel — 2 modes (CSV import + HTTP API push) convergents sur les mêmes upsert helpers (single source of truth dans `src/lib/clay-enrichment.ts`). Phase 2 prête : seed des 2 692 rows existantes (1 711 companies + 981 people). Open Q #6 (Clay mapping rules) reste à formaliser début S1 — la base technique est en place.
 > - **v3.3 → v3.4** : Post-deploy clarifications (2026-05-05 soir). (1) Hotfix `477cb93` : extraction des helpers client-safe vers `@/lib/clay-helpers.ts` après crash `PrismaClient is unable to run in browser` sur `/crm/contacts` — `ClayImportWizard` importait transitivement `prisma` via `@/lib/clay-enrichment`. (2) BD emails clarification : `CRM_BD_EMAILS` Railway env var corrigée avec les emails réels DB (`ad@oxen.finance`, `pg@oxen.finance`) — ancien template `.env.example` (`andy@`, `paullouis@`) ne matchait pas. (3) Glossaire ajouté : "Paul Louis" = nom interne pour **Paul Garreau** (Deputy CEO, `pg@oxen.finance`), 2ème BD aux côtés d'Andy. (4) Décision explicite : `dealOwnerId` = ownership CRM Oxen interne uniquement, **distinct des sender identities Lemlist** (Lemlist gère ses outreach aliases séparément, hors scope de ce PRD).
 > - **v3.4 → v3.5** : **Phase 2 G1-T1 SEEDED 2026-05-06**. Import des 2 tables Clay G1-T1 effectué via wizard CSV (Mode A). Résultats : **1 586 Companies** (1 711 CSV − 2 errored description >2000 − 123 dedupe by domain) + **597 CrmContacts** (981 CSV − 384 dedupe by email Apollo cascade). 100% field coverage sur tous les champs critiques. Persona 99.3% DM (table Clay pré-filtrée upstream). Country distribution G1 : 73.7% UAE / 11.6% Cyprus / 8.7% Malta / 6.0% adjacents (UK/US/EU/SG/CA). dealOwner répartition 52.4% Andy / 47.6% Paul Garreau (random uniforme sain). **Phase 2 a révélé 4 hotfixes** (`477cb93` v1 client/server, `2cc7444` v2 per-row validation + `description.max(10000)`, `69c17fe` v3 Apollo aliases + `extractCountryFromLocation`, `cab3545` v4 country inheritance from Company) — tous fixés et déployés. Chaîne de protection country à 3 niveaux (explicit → location parsing → Company inheritance) garantit **0 contact avec country=NULL** sur 597. Scripts de vérification committed : `check-companies-phase2.ts` (`54f0217`) + `check-contacts-phase2.ts` (`8f1afdd`).
+> - **v3.5 → v3.6** : **Sprint S0.5 UI Polish IMPLEMENTED 2026-05-06**. 4 batches (Mode B strict — commits locaux puis push global) pour rendre les fields PRD-001 (Group/PainTier/Persona) visibles dans toute l'UI : 3 nouvelles colonnes badges sur Contacts list (B1 `759d50b`), 3 dropdowns filters URL-bookmarkable + extension `listContactsQuery` Zod (B2 `858978d`), section "Clay Enrichment" sur fiche contact + extraction color maps vers `@/lib/crm-badge-colors.ts` (B3 `71ff38e`), badges Group/PainTier sur cards Companies + 3 dropdowns filters + section Clay Enrichment sur tab Overview détail company + fix bug placeholder vide tab Companies subNav `/crm` (B4 `06b1644`, option γ minimal viable). 13 fichiers touchés, ~940 insertions. Tests 158 → **168** (+10 nouveaux integration tests sur les 2 routes API étendues). Voir section **11.3** ci-dessous pour le détail complet.
 
 ---
 
@@ -899,14 +900,117 @@ Semaine 2 :
 - Métriques de succès post-launch : O1 (80% P1 → conversation 7j), O2 (P1 contact 2h), etc. — instrumentation via quels events ?
 - Open Q #6 (Clay mapping rules fines) : 30 min Vernon + Andy en début Sprint S1.
 
-### 11.3 À discuter avec Andy
+### 11.3 Sprint S0.5 — UI Polish IMPLEMENTED 2026-05-06
+
+Sprint d'amélioration UI pour rendre les nouveaux fields PRD-001 (`group`, `painTier`, `persona`) populés par Clay enrichment **visibles dans toute l'application** : Contacts list + detail, Companies cards + detail, et fix du bug placeholder vide sur le subNav `/crm` Companies.
+
+**Mode B strict respecté** : 4 batches avec commits locaux séquentiels, validation visuelle de Vernon entre chaque batch via diff review, push global groupé en fin de sprint.
+
+#### Métriques
+
+| Métrique | Valeur |
+|---|---|
+| Batches commits locaux | 4 (`759d50b`, `858978d`, `71ff38e`, `06b1644`) |
+| Files touchés (uniques) | 13 |
+| Insertions | ~940 lignes |
+| Tests | 158 → **168** (+10 integration tests) |
+| Build | ✅ all batches green (`Compiled successfully` sur chaque) |
+| Typecheck | ✅ clean sur chaque batch |
+| Lint nouveau code | ✅ 0 nouveau warning/error (vérifié `git stash` baseline) |
+| Régressions | 0 (5 tabs detail Company préservés, 0 fonctionnalité supprimée) |
+
+#### Items implémentés par batch
+
+##### Batch 1 — Quick wins UI (`759d50b`, 3 fichiers, +72 / -0)
+
+- **Auto-mapping wizard** : ajout alias Apollo `"linkedin profile" → linkedinUrl` dans `PEOPLE_AUTO_MAP` (`ClayImportWizard.tsx`).
+- **3 columns Contacts list** : `Group` (G1..G7B), `Pain Tier` (T1..T3), `Persona` (DM/OP) avec badges colorés readonly, position entre legacy "Outreach Group" et "Stage" (`InlineEditableTable.tsx`).
+- **Color palette** : 8 hex distincts pour Groups (red→indigo), gradient d'intensité Pain Tier (red→amber→gray), DM rose-gold brand / OP gray. Inline dans `InlineEditableTable.tsx` à ce stade (extracted en B3).
+- **Type plumbing** : `TableContact` + `CrmContact` page-level interfaces étendues avec les 3 nouveaux fields.
+
+##### Batch 2 — Filters Contacts (`858978d`, 4 fichiers, +224 / -5)
+
+- **3 filter dropdowns** : `All Groups`, `All Pain Tiers`, `All Personas` ajoutés en toolbar `/crm/contacts`, positionnés avant le legacy `outreachGroup` filter (renommé `"All Outreach Groups"` pour disambiguation).
+- **URL query params** : `?group=G1&painTier=T1&persona=DM` bookmarkable / shareable via `useSearchParams` + `router.replace`. Anti-loop guard via early return sur `params.toString() === searchParams.toString()`.
+- **API extension** : `listContactsQuery` Zod schema gains 3 enum-validated optional fields (`crmGroupEnum` / `crmPainTierEnum` / `crmPersonaEnum`). Invalid values → 400 Invalid query parameters. GET handler forward dans `where` Prisma.
+- **Tests** : 8 nouveaux integration tests (`route.test.ts`) — forwarding individuel, combined, absent, invalid enum miss × 3, G7A/G7B sub-grouped, preservation legacy filters.
+
+##### Batch 3 — Contact detail (`71ff38e`, 3 fichiers, +191 / -25)
+
+- **Section "Clay Enrichment"** sur `/crm/contacts/[id]` colonne droite, AVANT le legacy `Enrichment` GlassCard. Read-only badges (Group / Pain Tier / Persona) + texte (Table Segment, Source, Enriched At formatté `fmtDateTime`).
+- **Empty state** : si aucun des 6 champs Clay n'est set, affiche `"Not enriched via Clay"` italique dimmed (1 ligne, évite 6 rows de "—").
+- **Refacto color maps** : extraits depuis `InlineEditableTable.tsx` vers nouveau module **`src/lib/crm-badge-colors.ts`** (single source of truth, client-safe). Exports : `GROUP_COLORS`, `PAIN_TIER_COLORS`, `PERSONA_COLORS`, `FALLBACK_BADGE_COLOR` + helpers `getGroupColor()` / `getPainTierColor()` / `getPersonaColor()` (signature `value | null | undefined → string | null`).
+- **Field Location** read-only display ajouté à la section legacy `Enrichment` (read-only car `location` n'est PAS dans `updateContactSchema` — défensif anti-footgun).
+
+##### Batch 4 — Companies grid + filters + detail (`06b1644`, 6 fichiers, +456 / -6)
+
+**Décision : option γ "minimal viable"** retenue (vs α coexistence / β wipe / δ unification) après audit révélant que `/crm/companies/page.tsx` (cards grid) + `/crm/companies/[id]/page.tsx` (5 tabs detail) existent déjà — Vernon's mental model "coming soon" était stale, le vrai placeholder vide est sur le **subNav `/crm` tab Companies** (`src/app/crm/page.tsx` ligne 765).
+
+- **Tab Companies subNav `/crm`** : placeholder `"Companies view coming soon."` remplacé par carte avec `<Link href="/crm/companies">` + bouton rose-gold "Open Companies →". Fixe le bug user-facing visible dans le screenshot Vernon, sans dupliquer la grid view.
+- **Cards Companies augmentées** : 2 badges (Group + Pain Tier) ajoutés sur chaque card Clay-enriched, positionnés sous le nom + industry, avant la HQ location. Companies non-Clay : pas de badges (clean empty).
+- **3 filter dropdowns** : `All Groups`, `All Pain Tiers`, `All Countries` (whitelist 17 entrées alignée avec `extractCountryFromLocation` canonical names) ajoutés en toolbar `/crm/companies`. URL sync identique à batch 2 (`?group=G1&painTier=T1&country=Cyprus`).
+- **API extension** : `listCompaniesQuery` Zod schema gains `group` / `painTier` (enum-validated, reuse des enums batch 2) + `country` (free-string, max 100 chars). GET handler forward dans `where` Prisma. `country='all'` traité comme no-op (sentinel page).
+- **Détail Company tab Overview** : nouvelle GlassCard "Clay Enrichment" en haut de la colonne droite (avant `Verticals & Sub-Verticals`). Champs : Group + Pain Tier (badges colorés) + Table Segment + Source + Enriched At. Empty state pour non-Clay. **Les 5 tabs (Overview / Contacts / Deals / Activity / Files) sont entièrement préservés** — 0 régression.
+- **Tests** : 10 nouveaux integration tests sur `route.test.ts` — forwarding par filter individuel, combined avec country UAE (URL-encoded), absent, invalid enum × 2, G7A/G7B, preservation legacy, country='all' no-op.
+
+#### Décisions structurelles
+
+1. **Color maps centralisés** : `src/lib/crm-badge-colors.ts` module unique, consommé par 3 endroits (`InlineEditableTable.tsx`, `/crm/contacts/[id]/page.tsx`, `/crm/companies/page.tsx` + `/crm/companies/[id]/page.tsx`). Évite drift de palette entre composants.
+
+2. **Pattern "Clay Enrichment" cohérent** entre Contact detail (B3) et Company detail (B4) — même titre de section, même empty state, mêmes badges, mêmes labels. UX prévisible quel que soit le contexte.
+
+3. **Persona reste contact-only** — pas affiché ni filtré sur Companies (le champ est sur `CrmContact`, pas sur `Company`). Volontaire et documenté.
+
+4. **Readonly badges** sur les nouveaux fields Clay : `type: "readonly"` côté inline table, display-only côté detail pages. Évite footgun UX où un edit inline serait silently stripped par Zod (champs non listés dans `updateContactSchema` / `updateCompanySchema`). Édition inline est un follow-up explicite si besoin.
+
+5. **Option γ pour Companies** : pas de wipe du code existant (cards UI, 5 tabs detail), pas de duplication d'UI (pas de table view créée en parallèle). Sprint S0.5 = polish, pas refacto archi. Si unification voulue plus tard → Sprint dédié.
+
+6. **URL query params seulement pour les nouveaux filters** : les filters legacy (vertical, geoZone, industry, contactType, etc.) restent ephemeral state — out of scope batch 2 et batch 4 pour éviter scope creep.
+
+#### Test E2E manuel récap (post-deploy)
+
+**`/crm/contacts`** :
+- ✅ 3 colonnes Group / Pain Tier / Persona affichent badges colorés sur les contacts G1-T1 Clay-enriched
+- ✅ Contacts non-Clay (legacy seeds) affichent `—` dimmed dans les 3 colonnes
+- ✅ 3 dropdowns toolbar fonctionnent + URL bookmarkable (`?group=G1&painTier=T1&persona=DM`)
+- ✅ Click contact → fiche détail affiche section "Clay Enrichment" en haut colonne droite
+
+**`/crm` (subNav Companies)** :
+- ✅ Card "Open Companies →" affichée (rose-gold gradient button) au lieu du placeholder
+- ✅ Click navigue vers `/crm/companies` (pas de redirect implicite)
+
+**`/crm/companies`** :
+- ✅ Cards G1-T1 affichent badges Group + Pain Tier sous le nom + industry
+- ✅ Cards non-Clay : pas de badges (clean)
+- ✅ 3 dropdowns toolbar (Groups / PainTiers / Countries) fonctionnent + URL bookmarkable (`?group=G1&painTier=T1&country=Cyprus`)
+- ✅ Click card → fiche détail
+
+**`/crm/companies/[id]`** :
+- ✅ Tab Overview affiche section "Clay Enrichment" en haut colonne droite (G1 + T1 badges, Table Segment, Source, Enriched At)
+- ✅ Empty state `"Not enriched via Clay"` italique pour companies legacy
+- ✅ 5 tabs (Overview / Contacts / Deals / Activity / Files) tous préservés et fonctionnels
+
+#### Out of scope (deferred → Sprint S0.6 ou suivants)
+
+1. **Sprint S0.6 — Lemlist hardening** (audit `bifjvm3lb` 2026-05-06) :
+   - **Footgun #1** : `Push to Lemlist (all)` UI label "Push all 597" mais ne pousse que la page courante (50). Bug UX critique.
+   - **Footgun #2** : `/api/lemlist/enroll` ne valide pas la cohérence cross-field `persona ↔ campaign name` (peut enroll un OP dans une campaign DM).
+   - **Footgun #3** : pas de retry / chunking / rate limit côté `bulk push` (séquentiel pur).
+
+2. **Unification subNav `/crm` ↔ pages standalone** (option δ batch 4) — Refacto archi, hors scope polish. Décision : déferrer à Sprint dédié si nécessaire.
+
+3. **Édition inline des fields Clay** (`group` / `painTier` / `persona` / `country`) sur table + fiches détail — nécessite extension de `updateContactSchema` / `updateCompanySchema` Zod. Pas urgent : ces fields sont populés par Clay, manual override est rare.
+
+4. **Sprint S1 — Open Q #6 Clay mapping rules** (Vernon + Andy, ~30 min en début S1) — Heuristiques fines `companySize` / `country` / `fundingStage` → group + Pain Tier mapping (existing base déjà fonctionnelle via `source_table` parsing).
+
+### 11.4 À discuter avec Andy
 
 - **Mapping vertical → group définitif** : vu les 3 verticals sans match (FinTech, iGaming, Import/Export), comment les classer ? Comme T1 high-intensity dans groupes existants ?
 - **Pain Tier criteria explicites** : quels signaux objectifs déterminent T1 vs T2 vs T3 par groupe ?
 - **Définitions DM vs OP par groupe** : G1 fiduciaries → DM = associé/managing partner, OP = compliance officer ? Lister par groupe.
 - **Sequences Lemlist actuelles** : combien existent déjà avec naming `{Group}-{PainTier}-{Persona}` ? Si zéro, Andy doit en créer ~24 (8 groupes × 3 tiers × 2 personas) ou commencer prioritaires.
 
-### 11.4 À discuter avec Johnny (dev externe)
+### 11.5 À discuter avec Johnny (dev externe)
 
 - Faisabilité technique 9 sprints en 9-10 semaines : capacity / parallelisable ?
 - Sprint S2 (ICP) et S3 (Intent) en parallèle possible ?
@@ -1005,4 +1109,4 @@ Snapshots futurs à archiver dans le footer du script (template prêt).
 
 ---
 
-*Fin du document — PRD-001 v3.5 mapping vers Oxen OS CRM (2026-05-01, révisé 2026-05-06 post-Phase 2 G1-T1 seed)*
+*Fin du document — PRD-001 v3.6 mapping vers Oxen OS CRM (2026-05-01, révisé 2026-05-06 post-Sprint S0.5 UI Polish)*
