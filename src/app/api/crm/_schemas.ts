@@ -169,6 +169,24 @@ export const updateContactSchema = createContactSchema.partial().extend({
   avgResponseTimeHours: z.number().min(0).finite().nullish(),
 })
 
+// PRD-001 Clay enrichment enums (Sprint S0.5 batch 2 — same values as
+// the Prisma `CrmGroup` / `CrmPainTier` / `CrmPersona` enums and as
+// `webhooks/_schemas.ts` `crmGroup` / `crmPainTier`). Duplicated here
+// rather than cross-imported from the webhooks schemas file to keep
+// modules self-contained — these tokens are unlikely to drift.
+const crmGroupEnum = z.enum([
+  "G1",
+  "G2",
+  "G3",
+  "G4",
+  "G5",
+  "G6",
+  "G7A",
+  "G7B",
+])
+const crmPainTierEnum = z.enum(["T1", "T2", "T3"])
+const crmPersonaEnum = z.enum(["DM", "OP"])
+
 export const listContactsQuery = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -178,6 +196,11 @@ export const listContactsQuery = z.object({
   dealOwner: z.string().optional(),
   contactType: z.string().optional(),
   outreachGroup: z.string().optional(),
+  // Clay enrichment filters (Sprint S0.5 batch 2). Strict enum
+  // validation — invalid values yield 400 Invalid query parameters.
+  group: crmGroupEnum.optional(),
+  painTier: crmPainTierEnum.optional(),
+  persona: crmPersonaEnum.optional(),
   lemlistCampaign: z.string().optional(),
   q: z.string().max(200).optional(),
   sortBy: z.string().max(50).optional(),

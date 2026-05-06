@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   STAGE_LABELS, LIFECYCLE_STAGES,
   VERTICALS, GEO_ZONES, DEAL_OWNERS, CONTACT_TYPES,
@@ -83,6 +83,7 @@ type SortField = "firstName" | "company" | "email" | "lifecycleStage" | "contact
    ════════════════════════════════════════════════════════════════ */
 export default function ContactListPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [contacts, setContacts] = useState<CrmContact[]>([])
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 1 })
@@ -122,6 +123,28 @@ export default function ContactListPage() {
   const [contactType, setContactType] = useState("all")
   const [lemlistCampaign, setLemlistCampaign] = useState("all")
   const [lemlistCampaigns, setLemlistCampaigns] = useState<string[]>([])
+  // Clay enrichment filters (Sprint S0.5 batch 2) — bookmarkable via
+  // URL query params (?group=G1&painTier=T1&persona=DM). Initialized
+  // from the URL on mount and bidirectionally synced on change.
+  const [group, setGroup] = useState<string>(() => searchParams.get("group") ?? "all")
+  const [painTier, setPainTier] = useState<string>(() => searchParams.get("painTier") ?? "all")
+  const [persona, setPersona] = useState<string>(() => searchParams.get("persona") ?? "all")
+
+  // State → URL sync. Other filters intentionally NOT in URL (out of
+  // scope for batch 2). The early-return guard prevents an infinite
+  // loop when `searchParams` reference changes after our own replace.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (group !== "all") params.set("group", group)
+    else params.delete("group")
+    if (painTier !== "all") params.set("painTier", painTier)
+    else params.delete("painTier")
+    if (persona !== "all") params.set("persona", persona)
+    else params.delete("persona")
+    if (params.toString() === searchParams.toString()) return
+    const qs = params.toString()
+    router.replace(qs ? `?${qs}` : "?", { scroll: false })
+  }, [group, painTier, persona, searchParams, router])
 
   // Sort
   const [sortBy, setSortBy] = useState<SortField>("createdAt")
@@ -142,6 +165,10 @@ export default function ContactListPage() {
     if (geoZone !== "all") params.set("geoZone", geoZone)
     if (contactType !== "all") params.set("contactType", contactType)
     if (lemlistCampaign !== "all") params.set("lemlistCampaign", lemlistCampaign)
+    // Clay enrichment filters (Sprint S0.5 batch 2)
+    if (group !== "all") params.set("group", group)
+    if (painTier !== "all") params.set("painTier", painTier)
+    if (persona !== "all") params.set("persona", persona)
 
     try {
       const res = await fetch(`/api/crm/contacts?${params.toString()}`)
@@ -150,7 +177,7 @@ export default function ContactListPage() {
       setPagination(data.pagination ?? { page: 1, limit: 50, total: 0, totalPages: 1 })
     } catch { /* ignore */ }
     setLoading(false)
-  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign, sortBy, sortDir])
+  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign, sortBy, sortDir, group, painTier, persona])
 
   const fetchKanbanContacts = useCallback(async () => {
     setKanbanLoading(true)
@@ -165,6 +192,10 @@ export default function ContactListPage() {
     if (geoZone !== "all") params.set("geoZone", geoZone)
     if (contactType !== "all") params.set("contactType", contactType)
     if (lemlistCampaign !== "all") params.set("lemlistCampaign", lemlistCampaign)
+    // Clay enrichment filters (Sprint S0.5 batch 2)
+    if (group !== "all") params.set("group", group)
+    if (painTier !== "all") params.set("painTier", painTier)
+    if (persona !== "all") params.set("persona", persona)
 
     try {
       const res = await fetch(`/api/crm/contacts?${params.toString()}`)
@@ -173,7 +204,7 @@ export default function ContactListPage() {
       setPagination(data.pagination ?? { page: 1, limit: 500, total: 0, totalPages: 1 })
     } catch { /* ignore */ }
     setKanbanLoading(false)
-  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign])
+  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign, group, painTier, persona])
 
   // Fetch distinct Lemlist campaign names for filter dropdown
   useEffect(() => {
@@ -392,8 +423,34 @@ export default function ContactListPage() {
             onChange={(e) => setSearch(e.target.value)}
             style={{ flex: "1 1 220px", background: "var(--surface-input)", border: `1px solid ${CARD_BORDER}`, borderRadius: 8, color: TEXT, padding: "7px 12px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", minWidth: 200 }}
           />
-          <select value={outreachGroup} onChange={(e) => setOutreachGroup(e.target.value)} style={selectStyle}>
+          {/* Clay enrichment filters (Sprint S0.5 batch 2). Bookmarkable
+              via URL ?group=G1&painTier=T1&persona=DM. Positioned ahead
+              of the legacy "Outreach Group" filter so the PRD-001
+              segmentation is the primary discovery axis. */}
+          <select value={group} onChange={(e) => setGroup(e.target.value)} style={selectStyle}>
             <option value="all">All Groups</option>
+            <option value="G1">G1</option>
+            <option value="G2">G2</option>
+            <option value="G3">G3</option>
+            <option value="G4">G4</option>
+            <option value="G5">G5</option>
+            <option value="G6">G6</option>
+            <option value="G7A">G7A</option>
+            <option value="G7B">G7B</option>
+          </select>
+          <select value={painTier} onChange={(e) => setPainTier(e.target.value)} style={selectStyle}>
+            <option value="all">All Pain Tiers</option>
+            <option value="T1">T1</option>
+            <option value="T2">T2</option>
+            <option value="T3">T3</option>
+          </select>
+          <select value={persona} onChange={(e) => setPersona(e.target.value)} style={selectStyle}>
+            <option value="all">All Personas</option>
+            <option value="DM">DM</option>
+            <option value="OP">OP</option>
+          </select>
+          <select value={outreachGroup} onChange={(e) => setOutreachGroup(e.target.value)} style={selectStyle}>
+            <option value="all">All Outreach Groups</option>
             {OUTREACH_GROUPS.map((g) => <option key={g.id} value={g.id}>{g.short}</option>)}
           </select>
           <select value={lifecycleStage} onChange={(e) => setLifecycleStage(e.target.value)} style={selectStyle}>

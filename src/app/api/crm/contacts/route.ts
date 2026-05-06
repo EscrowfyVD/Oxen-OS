@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const vq = validateSearchParams(searchParams, listContactsQuery)
   if ("error" in vq) return vq.error
-  const { page, limit, lifecycleStage, vertical, geoZone, dealOwner, contactType, outreachGroup, lemlistCampaign, q } = vq.data
+  const { page, limit, lifecycleStage, vertical, geoZone, dealOwner, contactType, outreachGroup, lemlistCampaign, q, group, painTier, persona } = vq.data
   const skip = (page - 1) * limit
   const sortBy = vq.data.sortBy || "createdAt"
   const sortDir = vq.data.sortDir || "desc"
@@ -38,6 +38,18 @@ export async function GET(request: Request) {
   }
   if (outreachGroup && outreachGroup !== "all") {
     where.outreachGroup = outreachGroup
+  }
+  // Clay enrichment filters (Sprint S0.5 batch 2). Values are validated
+  // by Zod against the CrmGroup / CrmPainTier / CrmPersona enums upstream
+  // — by the time we get here, they are guaranteed safe to pass to Prisma.
+  if (group) {
+    where.group = group
+  }
+  if (painTier) {
+    where.painTier = painTier
+  }
+  if (persona) {
+    where.persona = persona
   }
   if (lemlistCampaign && lemlistCampaign !== "all") {
     if (lemlistCampaign === "not_enrolled") {
