@@ -537,6 +537,24 @@ export default function ContactListPage() {
           contacts={lemlistContacts}
           mode={lemlistMode}
           totalFilteredCount={lemlistMode === "all" ? pagination.total : undefined}
+          // Sprint S0.6 — forward the current filter state so the
+          // modal can hit /api/crm/contacts/list-for-push and push
+          // EVERY filtered contact, not just the page-50 shown here.
+          // Only relevant for mode="all"; the modal ignores `filters`
+          // when mode="selected".
+          filters={{
+            ...(search && { q: search }),
+            ...(outreachGroup !== "all" && { outreachGroup }),
+            ...(lifecycleStage !== "all" && { lifecycleStage }),
+            ...(dealOwner !== "all" && { dealOwner }),
+            ...(vertical !== "all" && { vertical }),
+            ...(geoZone !== "all" && { geoZone }),
+            ...(contactType !== "all" && { contactType }),
+            ...(lemlistCampaign !== "all" && { lemlistCampaign }),
+            ...(group !== "all" && { group }),
+            ...(painTier !== "all" && { painTier }),
+            ...(persona !== "all" && { persona }),
+          }}
           onClose={() => setLemlistContacts(null)}
           onComplete={() => fetchContacts(pagination.page)}
         />

@@ -10,6 +10,13 @@ const GREEN = "var(--green)"
 const RED = "var(--red)"
 const FONT = "'DM Sans', sans-serif"
 
+// ── Sprint S0.6 hardening — chunking + retry tunables ───────────────
+const CHUNK_SIZE = 25
+const INTER_CHUNK_DELAY_MS = 1000
+const MAX_RETRIES = 2
+const RETRY_BACKOFF_MS = [2000, 5000] as const
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 interface Campaign {
   id: string
   name: string
@@ -38,6 +45,12 @@ interface PushToLemlistModalProps {
   onComplete: () => void
   mode: "selected" | "all"
   totalFilteredCount?: number
+  // Sprint S0.6 — when mode="all", these filters are forwarded to
+  // /api/crm/contacts/list-for-push so the bulk push covers EVERY
+  // filtered contact instead of just the page-50 currently rendered.
+  // Pass the same Record<string,string> the parent uses for
+  // /api/crm/contacts pagination calls.
+  filters?: Record<string, string>
 }
 
 export default function PushToLemlistModal({
@@ -46,6 +59,7 @@ export default function PushToLemlistModal({
   onComplete,
   mode,
   totalFilteredCount,
+  filters,
 }: PushToLemlistModalProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loadingCampaigns, setLoadingCampaigns] = useState(true)
@@ -53,7 +67,20 @@ export default function PushToLemlistModal({
   const [skipEnrolled, setSkipEnrolled] = useState(true)
   const [pushing, setPushing] = useState(false)
   const [progress, setProgress] = useState(0)
+  // Sprint S0.6 — real-time counters surfaced in the progress UI.
+  // Replaces the previous single % number which didn't tell the
+  // operator how many had succeeded vs failed mid-flight.
+  const [progressStats, setProgressStats] = useState<{
+    processed: number
+    succeeded: number
+    failed: number
+    total: number
+    phase: "idle" | "fetching" | "pushing"
+  }>({ processed: 0, succeeded: 0, failed: 0, total: 0, phase: "idle" })
   const [result, setResult] = useState<PushResult | null>(null)
+  // Sprint S0.6 — surface fetch-phase errors (filter too broad, network)
+  // in-modal so we don't silently abort.
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   const contactCount = contacts.length
 
@@ -68,33 +95,17 @@ export default function PushToLemlistModal({
       .finally(() => setLoadingCampaigns(false))
   }, [])
 
-  const handlePush = useCallback(async () => {
-    if (!selectedCampaign) return
-    setPushing(true)
-    setProgress(0)
-
-    const eligible = contacts.filter((c) => c.email && !c.doNotContact)
-    const total = eligible.length
-    let pushed = 0
-    let skipped = 0
-    let failed = 0
-    const details: PushResult["details"] = []
-
-    // Skip contacts without email or with doNotContact
-    contacts.forEach((c) => {
-      if (!c.email) {
-        skipped++
-        details.push({ email: "(no email)", status: "skipped", reason: "No email address" })
-      } else if (c.doNotContact) {
-        skipped++
-        details.push({ email: c.email, status: "skipped", reason: "Do Not Contact" })
-      }
-    })
-
-    for (let i = 0; i < eligible.length; i++) {
-      const contact = eligible[i]
-      setProgress(Math.round(((i + 1) / total) * 100))
-
+  // ── Sprint S0.6 — single attempt against /api/lemlist/enroll, with
+  // retry-on-5xx handled by the outer chunk loop (not in here). Returns
+  // a discriminated result so the loop can categorize. ──────────────
+  const enrollOne = useCallback(
+    async (
+      contact: PushContact,
+    ): Promise<
+      | { kind: "pushed" }
+      | { kind: "skipped"; reason: string }
+      | { kind: "failed"; reason: string; transient: boolean }
+    > => {
       try {
         const res = await fetch("/api/lemlist/enroll", {
           method: "POST",
@@ -104,33 +115,145 @@ export default function PushToLemlistModal({
             campaignId: selectedCampaign,
           }),
         })
+        if (res.ok) return { kind: "pushed" }
 
-        if (res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }))
+        const reason = err.error || `HTTP ${res.status}`
+
+        if (
+          skipEnrolled &&
+          (reason.includes("already") || reason.includes("409") || res.status === 409)
+        ) {
+          return { kind: "skipped", reason: "Already enrolled" }
+        }
+        // 5xx → transient (retry candidate). 4xx → permanent (no retry).
+        return { kind: "failed", reason, transient: res.status >= 500 }
+      } catch {
+        // Network error / fetch threw — treat as transient (retry).
+        return { kind: "failed", reason: "Network error", transient: true }
+      }
+    },
+    [selectedCampaign, skipEnrolled],
+  )
+
+  const handlePush = useCallback(async () => {
+    if (!selectedCampaign) return
+    setPushing(true)
+    setProgress(0)
+    setFetchError(null)
+
+    // ── Sprint S0.6 fix #1 — Pre-fetch the full filtered list when
+    // mode="all" so we push EVERY matched contact, not just the
+    // page-50 the parent rendered. mode="selected" keeps the
+    // existing behavior (use the contacts prop directly). ───────────
+    let workingList: PushContact[] = contacts
+    if (mode === "all") {
+      setProgressStats({
+        processed: 0,
+        succeeded: 0,
+        failed: 0,
+        total: 0,
+        phase: "fetching",
+      })
+      try {
+        const params = new URLSearchParams(filters ?? {})
+        const url = `/api/crm/contacts/list-for-push?${params.toString()}`
+        const res = await fetch(url)
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ error: "Fetch failed" }))
+          const msg =
+            body.error === "Filter too broad"
+              ? `Filter too broad (${body.details?.total ?? "?"} contacts match, max ${body.details?.cap ?? 5000}). Please narrow the filter and try again.`
+              : (body.error as string) || "Failed to load filtered contacts"
+          setFetchError(msg)
+          setPushing(false)
+          setProgressStats((s) => ({ ...s, phase: "idle" }))
+          return
+        }
+        const data: { contacts: PushContact[]; total: number } = await res.json()
+        workingList = data.contacts
+      } catch {
+        setFetchError("Network error while loading contacts. Please retry.")
+        setPushing(false)
+        setProgressStats((s) => ({ ...s, phase: "idle" }))
+        return
+      }
+    }
+
+    // Pre-filter eligibility (email + doNotContact). Server already
+    // filtered for mode="all", but mode="selected" passes raw selected
+    // contacts which may include ineligible rows.
+    const eligible = workingList.filter((c) => c.email && !c.doNotContact)
+    const total = eligible.length
+    let pushed = 0
+    let skipped = 0
+    let failed = 0
+    const details: PushResult["details"] = []
+
+    // Skip ineligible (only relevant for mode="selected" — server
+    // already excludes these for mode="all").
+    workingList.forEach((c) => {
+      if (!c.email) {
+        skipped++
+        details.push({ email: "(no email)", status: "skipped", reason: "No email address" })
+      } else if (c.doNotContact) {
+        skipped++
+        details.push({ email: c.email, status: "skipped", reason: "Do Not Contact" })
+      }
+    })
+
+    setProgressStats({
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      total,
+      phase: "pushing",
+    })
+
+    // ── Sprint S0.6 fix #3 — chunked + retry-aware enroll loop. ───
+    let processed = 0
+    for (let chunkStart = 0; chunkStart < eligible.length; chunkStart += CHUNK_SIZE) {
+      const chunk = eligible.slice(chunkStart, chunkStart + CHUNK_SIZE)
+      for (const contact of chunk) {
+        let attempt = 0
+        let outcome = await enrollOne(contact)
+        while (outcome.kind === "failed" && outcome.transient && attempt < MAX_RETRIES) {
+          await sleep(RETRY_BACKOFF_MS[attempt])
+          attempt++
+          outcome = await enrollOne(contact)
+        }
+
+        if (outcome.kind === "pushed") {
           pushed++
           details.push({ email: contact.email!, status: "pushed" })
+        } else if (outcome.kind === "skipped") {
+          skipped++
+          details.push({ email: contact.email!, status: "skipped", reason: outcome.reason })
         } else {
-          const err = await res.json().catch(() => ({ error: "Unknown error" }))
-          const reason = err.error || `HTTP ${res.status}`
-          if (
-            skipEnrolled &&
-            (reason.includes("already") || reason.includes("409") || res.status === 409)
-          ) {
-            skipped++
-            details.push({ email: contact.email!, status: "skipped", reason: "Already enrolled" })
-          } else {
-            failed++
-            details.push({ email: contact.email!, status: "failed", reason })
-          }
+          failed++
+          details.push({ email: contact.email!, status: "failed", reason: outcome.reason })
         }
-      } catch {
-        failed++
-        details.push({ email: contact.email!, status: "failed", reason: "Network error" })
+
+        processed++
+        setProgress(total > 0 ? Math.round((processed / total) * 100) : 100)
+        setProgressStats({
+          processed,
+          succeeded: pushed,
+          failed,
+          total,
+          phase: "pushing",
+        })
+      }
+      // Inter-chunk breather to avoid hammering Lemlist API.
+      if (chunkStart + CHUNK_SIZE < eligible.length) {
+        await sleep(INTER_CHUNK_DELAY_MS)
       }
     }
 
     setResult({ pushed, skipped, failed, details })
+    setProgressStats((s) => ({ ...s, phase: "idle" }))
     setPushing(false)
-  }, [contacts, selectedCampaign, skipEnrolled])
+  }, [contacts, mode, filters, selectedCampaign, enrollOne])
 
   /* ── Styles ── */
   const overlayStyle: React.CSSProperties = {
@@ -218,14 +341,49 @@ export default function PushToLemlistModal({
               </button>
             </div>
           ) : pushing ? (
-            /* ── Progress ── */
+            /* ── Progress (Sprint S0.6 — real-time counters) ── */
             <div style={{ textAlign: "center", padding: "40px 0" }}>
               <div style={{ width: "100%", height: 8, background: "var(--surface-input)", borderRadius: 4, overflow: "hidden", marginBottom: 16 }}>
                 <div style={{ width: `${progress}%`, height: "100%", background: `linear-gradient(90deg, ${ROSE}, ${GREEN})`, borderRadius: 4, transition: "width 0.3s ease" }} />
               </div>
-              <p style={{ fontSize: 13, fontFamily: FONT, color: TEXT2 }}>
-                Pushing contacts to Lemlist... {progress}%
+              {progressStats.phase === "fetching" ? (
+                <p style={{ fontSize: 13, fontFamily: FONT, color: TEXT2 }}>
+                  Loading filtered contacts…
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13, fontFamily: FONT, color: TEXT2, margin: 0 }}>
+                    {progressStats.processed} / {progressStats.total} processed
+                    {" — "}{progress}%
+                  </p>
+                  <p style={{ fontSize: 11, fontFamily: FONT, color: TEXT3, margin: "4px 0 0" }}>
+                    <span style={{ color: GREEN }}>{progressStats.succeeded} succeeded</span>
+                    {progressStats.failed > 0 && (
+                      <>
+                        {" · "}
+                        <span style={{ color: RED }}>{progressStats.failed} failed</span>
+                      </>
+                    )}
+                  </p>
+                </>
+              )}
+            </div>
+          ) : fetchError ? (
+            /* ── Fetch-phase error (Sprint S0.6 — surfaces filter-too-broad / network) ── */
+            <div style={{ textAlign: "center", padding: "32px 0" }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>{"⚠️"}</div>
+              <p style={{ fontFamily: "'Bellfair', serif", fontSize: 18, color: TEXT, margin: "0 0 12px" }}>
+                Cannot push
               </p>
+              <p style={{ fontSize: 13, fontFamily: FONT, color: RED, margin: "0 0 20px", padding: "0 24px" }}>
+                {fetchError}
+              </p>
+              <button
+                onClick={() => { setFetchError(null) }}
+                style={btnPrimary}
+              >
+                Back
+              </button>
             </div>
           ) : (
             /* ── Form ── */

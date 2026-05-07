@@ -207,6 +207,27 @@ export const listContactsQuery = z.object({
   sortDir: sortDir.optional(),
 })
 
+// Sprint S0.6 Lemlist hardening — query schema for the new
+// /api/crm/contacts/list-for-push endpoint. Same filter surface as
+// listContactsQuery but without pagination (we return ALL matches up
+// to a hard cap, see the route for the safety threshold). The endpoint
+// is consumed by PushToLemlistModal in mode="all" so the bulk push
+// covers every filtered contact, not just the page-50 currently
+// rendered (root cause of the 'Push all 597' footgun: only 50 pushed).
+export const listContactsForPushQuery = z.object({
+  lifecycleStage: z.string().optional(),
+  vertical: z.string().optional(),
+  geoZone: z.string().optional(),
+  dealOwner: z.string().optional(),
+  contactType: z.string().optional(),
+  outreachGroup: z.string().optional(),
+  group: crmGroupEnum.optional(),
+  painTier: crmPainTierEnum.optional(),
+  persona: crmPersonaEnum.optional(),
+  lemlistCampaign: z.string().optional(),
+  q: z.string().max(200).optional(),
+})
+
 export const exportContactsQuery = z.object({
   lifecycleStage: z.string().optional(),
   vertical: z.string().optional(),

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
+import { childLoggerFromRequest } from "@/lib/logger"
 
 const LEMLIST_API_KEY = process.env.LEMLIST_API_KEY ?? ""
 const LEMLIST_BASE_URL = "https://api.lemlist.com/api"
@@ -8,6 +9,93 @@ const LEMLIST_BASE_URL = "https://api.lemlist.com/api"
 interface EnrollBody {
   contactId: string
   campaignId: string
+  // Sprint S0.6 — operator override for the persona/campaign cross-
+  // field check. Set to true when the operator knows the mismatch is
+  // intentional (e.g. last-ditch outreach to an OP because no DM is
+  // available for that company, or specific campaign that targets
+  // both personas). Each override is logged at warn level for audit.
+  forcePersonaMismatch?: boolean
+}
+
+/**
+ * Sprint S0.6 — guards against silently enrolling a contact in a
+ * campaign whose name implies a different persona than the contact
+ * carries. Examples:
+ *   - persona=OP, campaign="G1_Tier 1_Decision-Maker"   → 400
+ *   - persona=DM, campaign="G5_Tier 2_Operational [v1]" → 400
+ *   - persona=DM, campaign="G1_Tier 1_Decision-Maker"   → ok
+ *   - persona=null/undefined                              → ok (skip)
+ *   - campaign not in local OutreachCampaign cache         → ok (skip,
+ *     defensive — don't block enroll on a missing local row, just
+ *     log a warn)
+ *
+ * Returns null when the enroll should proceed, or a NextResponse 400
+ * when the mismatch is detected and the override is NOT set.
+ */
+async function checkPersonaCampaignMatch(
+  contact: { persona: string | null },
+  campaignId: string,
+  forceOverride: boolean,
+  log: ReturnType<typeof childLoggerFromRequest>,
+): Promise<NextResponse | null> {
+  // Pull campaign name from the local OutreachCampaign cache (synced
+  // from Lemlist by /api/lemlist/sync). Avoids a per-enroll Lemlist
+  // API roundtrip just for the validation.
+  const campaign = await prisma.outreachCampaign.findUnique({
+    where: { lemlistCampaignId: campaignId },
+    select: { name: true },
+  })
+  if (!campaign) {
+    log.warn(
+      { campaignId },
+      "lemlist enroll: persona check skipped — campaign not in local cache (run /api/lemlist/sync to refresh)",
+    )
+    return null
+  }
+
+  // No persona on the contact → no mismatch possible.
+  if (contact.persona !== "DM" && contact.persona !== "OP") return null
+
+  // The campaign-name patterns mirror the naming convention Andy uses
+  // on Lemlist (verified Sprint S0 audit): `G{N}_Tier {N}_{Persona}`,
+  // optional `[vN]` suffix. We're tolerant on case and the suffix.
+  const isDecisionMakerCampaign = /Decision-?Maker/i.test(campaign.name)
+  const isOperationalCampaign = /Operational/i.test(campaign.name)
+
+  let mismatch: { contactPersona: "DM" | "OP"; expected: string } | null = null
+  if (contact.persona === "OP" && isDecisionMakerCampaign) {
+    mismatch = { contactPersona: "OP", expected: "Decision-Maker campaign expects DM contacts" }
+  } else if (contact.persona === "DM" && isOperationalCampaign) {
+    mismatch = { contactPersona: "DM", expected: "Operational campaign expects OP contacts" }
+  }
+
+  if (!mismatch) return null
+
+  if (forceOverride) {
+    log.warn(
+      {
+        campaignId,
+        campaignName: campaign.name,
+        contactPersona: mismatch.contactPersona,
+        forcePersonaMismatch: true,
+      },
+      "lemlist enroll: persona/campaign mismatch overridden by operator",
+    )
+    return null
+  }
+
+  return NextResponse.json(
+    {
+      error: "Persona mismatch",
+      details: {
+        contactPersona: mismatch.contactPersona,
+        campaignName: campaign.name,
+        explanation: mismatch.expected,
+        hint: "Use forcePersonaMismatch=true in the request body to override (logged for audit).",
+      },
+    },
+    { status: 400 },
+  )
 }
 
 interface LemlistLeadResponse {
@@ -31,9 +119,11 @@ export async function POST(request: Request) {
     )
   }
 
+  const log = childLoggerFromRequest(request).child({ route: "lemlist/enroll" })
+
   try {
     const body: EnrollBody = await request.json()
-    const { contactId, campaignId } = body
+    const { contactId, campaignId, forcePersonaMismatch } = body
 
     if (!contactId || !campaignId) {
       return NextResponse.json(
@@ -63,6 +153,17 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
+
+    // Sprint S0.6 — cross-field persona vs campaign-name guard.
+    // Returns null if OK or if forcePersonaMismatch=true override; a
+    // 400 NextResponse if mismatch detected without override.
+    const personaCheck = await checkPersonaCampaignMatch(
+      contact,
+      campaignId,
+      forcePersonaMismatch === true,
+      log,
+    )
+    if (personaCheck) return personaCheck
 
     // Push lead to Lemlist campaign
     const lemlistResponse = await fetch(
