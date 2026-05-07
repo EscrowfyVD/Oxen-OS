@@ -17,11 +17,17 @@ export function proxy(req: NextRequest) {
   // integrations, with a session fallback for UI calls. Without this
   // bypass the middleware would 307-redirect bearer-only requests to
   // /login before the handler ever runs.
+  //
+  // /api/cron/* is whitelisted (Sprint Conference Brief) — these
+  // endpoints authenticate via Bearer CRON_SECRET (same secret as the
+  // existing /api/lemlist/sync cron path). Reached by Railway Cron
+  // services without any user session.
   if (
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/telegram") ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/api/signals") ||
+    pathname.startsWith("/api/cron") ||
     pathname === "/login" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")

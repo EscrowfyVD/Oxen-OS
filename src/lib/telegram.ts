@@ -215,7 +215,7 @@ export function formatBriefForTelegram(brief: {
 
 // ─── Escape HTML special chars for Telegram ─────────────
 
-function escHtml(text: string): string {
+export function escHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
