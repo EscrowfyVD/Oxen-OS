@@ -7,6 +7,7 @@ import {
   VERTICALS, GEO_ZONES, DEAL_OWNERS, CONTACT_TYPES,
   CRM_COLORS,
   OUTREACH_GROUPS,
+  JURISDICTION_FILTER_OPTIONS,
 } from "@/lib/crm-config"
 import CsvImportWizard from "@/components/crm/CsvImportWizard"
 import ClayImportWizard from "@/components/crm/ClayImportWizard"
@@ -129,6 +130,13 @@ export default function ContactListPage() {
   const [group, setGroup] = useState<string>(() => searchParams.get("group") ?? "all")
   const [painTier, setPainTier] = useState<string>(() => searchParams.get("painTier") ?? "all")
   const [persona, setPersona] = useState<string>(() => searchParams.get("persona") ?? "all")
+  // Jurisdiction filter (Sprint Quick Wins Cleanup) — bookmarkable
+  // via ?country=Cyprus etc. Filters on the related Company.country
+  // (NOT the contact's residence — see audit pré-sprint findings:
+  // 36 G1-T1 contacts had Linkedin residence diverging from the
+  // company's legal jurisdiction). URL param kept as `country` for
+  // parity with the Companies list page; UI label says "Jurisdiction".
+  const [country, setCountry] = useState<string>(() => searchParams.get("country") ?? "all")
 
   // State → URL sync. Other filters intentionally NOT in URL (out of
   // scope for batch 2). The early-return guard prevents an infinite
@@ -141,10 +149,12 @@ export default function ContactListPage() {
     else params.delete("painTier")
     if (persona !== "all") params.set("persona", persona)
     else params.delete("persona")
+    if (country !== "all") params.set("country", country)
+    else params.delete("country")
     if (params.toString() === searchParams.toString()) return
     const qs = params.toString()
     router.replace(qs ? `?${qs}` : "?", { scroll: false })
-  }, [group, painTier, persona, searchParams, router])
+  }, [group, painTier, persona, country, searchParams, router])
 
   // Sort
   const [sortBy, setSortBy] = useState<SortField>("createdAt")
@@ -169,6 +179,8 @@ export default function ContactListPage() {
     if (group !== "all") params.set("group", group)
     if (painTier !== "all") params.set("painTier", painTier)
     if (persona !== "all") params.set("persona", persona)
+    // Jurisdiction filter (Sprint Quick Wins Cleanup)
+    if (country !== "all") params.set("country", country)
 
     try {
       const res = await fetch(`/api/crm/contacts?${params.toString()}`)
@@ -177,7 +189,7 @@ export default function ContactListPage() {
       setPagination(data.pagination ?? { page: 1, limit: 50, total: 0, totalPages: 1 })
     } catch { /* ignore */ }
     setLoading(false)
-  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign, sortBy, sortDir, group, painTier, persona])
+  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign, sortBy, sortDir, group, painTier, persona, country])
 
   const fetchKanbanContacts = useCallback(async () => {
     setKanbanLoading(true)
@@ -196,6 +208,8 @@ export default function ContactListPage() {
     if (group !== "all") params.set("group", group)
     if (painTier !== "all") params.set("painTier", painTier)
     if (persona !== "all") params.set("persona", persona)
+    // Jurisdiction filter (Sprint Quick Wins Cleanup)
+    if (country !== "all") params.set("country", country)
 
     try {
       const res = await fetch(`/api/crm/contacts?${params.toString()}`)
@@ -204,7 +218,7 @@ export default function ContactListPage() {
       setPagination(data.pagination ?? { page: 1, limit: 500, total: 0, totalPages: 1 })
     } catch { /* ignore */ }
     setKanbanLoading(false)
-  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign, group, painTier, persona])
+  }, [search, outreachGroup, lifecycleStage, dealOwner, vertical, geoZone, contactType, lemlistCampaign, group, painTier, persona, country])
 
   // Fetch distinct Lemlist campaign names for filter dropdown
   useEffect(() => {
@@ -448,6 +462,16 @@ export default function ContactListPage() {
             <option value="all">All Personas</option>
             <option value="DM">DM</option>
             <option value="OP">OP</option>
+          </select>
+          {/* Jurisdiction filter (Sprint Quick Wins Cleanup) — keys
+              on Company.country (legal entity) instead of contact.country
+              (residence). Audit found 36 G1-T1 contacts mis-segmented
+              by the previous absence of this filter. */}
+          <select value={country} onChange={(e) => setCountry(e.target.value)} style={selectStyle}>
+            <option value="all">All Jurisdictions</option>
+            {JURISDICTION_FILTER_OPTIONS.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
           </select>
           <select value={outreachGroup} onChange={(e) => setOutreachGroup(e.target.value)} style={selectStyle}>
             <option value="all">All Outreach Groups</option>

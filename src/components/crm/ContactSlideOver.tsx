@@ -9,6 +9,12 @@ import {
   ACQUISITION_SOURCES, fmtCurrency,
   OUTREACH_GROUPS, LIFECYCLE_STAGES,
 } from "@/lib/crm-config"
+import {
+  getGroupColor,
+  getPainTierColor,
+  getPersonaColor,
+  FALLBACK_BADGE_COLOR,
+} from "@/lib/crm-badge-colors"
 
 /* ── Design Tokens ── */
 const CARD_BORDER = "var(--border)"
@@ -486,6 +492,84 @@ export default function ContactSlideOver({ contactId, onClose, onContactUpdated 
                   )}
                 </div>
               )}
+
+              {/* Clay Enrichment (Sprint Quick Wins Cleanup) — mirror of
+                  the page detail section at /crm/contacts/[id] line 727+.
+                  Positioned at the top of the 'details' tab so the
+                  PRD-001 segmentation (Group / Pain Tier / Persona)
+                  is the first signal Andy/Paul see when opening the
+                  slide-over (they use the slide-over by default). The
+                  page detail showed it since Sprint S0.5 batch 3 but
+                  the slide-over was missing it — high-visibility gap. */}
+              {(() => {
+                const isEnriched =
+                  contact.group ||
+                  contact.painTier ||
+                  contact.persona ||
+                  contact.clayTableSegment ||
+                  contact.enrichmentSource ||
+                  contact.enrichedAt
+                return (
+                  <div style={{ marginBottom: 16, padding: "10px 12px", background: "var(--surface-elevated)", borderRadius: 6, border: `1px solid ${CARD_BORDER}` }}>
+                    <div style={{ fontSize: 10, color: TEXT3, textTransform: "uppercase", letterSpacing: 0.7, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, marginBottom: isEnriched ? 10 : 0 }}>
+                      Clay Enrichment
+                    </div>
+                    {!isEnriched ? (
+                      <div style={{ fontSize: 11, color: TEXT3, fontFamily: "'DM Sans', sans-serif", fontStyle: "italic", marginTop: 6 }}>
+                        Not enriched via Clay
+                      </div>
+                    ) : (
+                      <>
+                        {/* Compact 2-col grid for the 3 badge fields, full-width rows for text fields */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+                          <div>
+                            <div style={lbl}>Group</div>
+                            {contact.group ? (
+                              <Badge label={contact.group} color={getGroupColor(contact.group) ?? FALLBACK_BADGE_COLOR} />
+                            ) : (
+                              <span style={{ fontSize: 11, color: TEXT3, fontFamily: "'DM Sans', sans-serif" }}>—</span>
+                            )}
+                          </div>
+                          <div>
+                            <div style={lbl}>Pain Tier</div>
+                            {contact.painTier ? (
+                              <Badge label={contact.painTier} color={getPainTierColor(contact.painTier) ?? FALLBACK_BADGE_COLOR} />
+                            ) : (
+                              <span style={{ fontSize: 11, color: TEXT3, fontFamily: "'DM Sans', sans-serif" }}>—</span>
+                            )}
+                          </div>
+                          <div>
+                            <div style={lbl}>Persona</div>
+                            {contact.persona ? (
+                              <Badge label={contact.persona} color={getPersonaColor(contact.persona) ?? FALLBACK_BADGE_COLOR} />
+                            ) : (
+                              <span style={{ fontSize: 11, color: TEXT3, fontFamily: "'DM Sans', sans-serif" }}>—</span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={lbl}>Table Segment</div>
+                          <div style={{ fontSize: 11, color: contact.clayTableSegment ? TEXT : TEXT3, fontFamily: "'DM Sans', sans-serif" }}>
+                            {contact.clayTableSegment || "—"}
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={lbl}>Source</div>
+                          <div style={{ fontSize: 11, color: contact.enrichmentSource ? TEXT : TEXT3, fontFamily: "'DM Sans', sans-serif" }}>
+                            {contact.enrichmentSource || "—"}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={lbl}>Enriched At</div>
+                          <div style={{ fontSize: 11, color: contact.enrichedAt ? TEXT : TEXT3, fontFamily: "'DM Sans', sans-serif" }}>
+                            {contact.enrichedAt ? fmtDateTime(contact.enrichedAt) : "—"}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Status + Channel row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

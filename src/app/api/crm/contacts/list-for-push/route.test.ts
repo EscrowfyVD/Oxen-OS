@@ -83,6 +83,18 @@ describe("GET /api/crm/contacts/list-for-push (Sprint S0.6 Lemlist hardening)", 
     })
   })
 
+  // Jurisdiction filter parity (Sprint Quick Wins Cleanup) — the
+  // bulk-push endpoint must apply the same `where: { company: { country } }`
+  // semantics as GET /api/crm/contacts so 'Push all filtered' covers
+  // the same row set the operator sees in the list view.
+  it("forwards country=Cyprus into where.company.country (Sprint Quick Wins parity)", async () => {
+    const res = await GET(makeReq("country=Cyprus"))
+    expect(res.status).toBe(200)
+    const callArg = vi.mocked(prisma.crmContact.findMany).mock.calls[0][0]!
+    expect(callArg.where).toMatchObject({ company: { country: "Cyprus" } })
+    expect(callArg.where).not.toHaveProperty("country")
+  })
+
   // ─── Compliance pre-filtering ─────────────────────────────────────
   it("always applies email NOT NULL + doNotContact=false at SQL layer", async () => {
     const res = await GET(makeReq(""))

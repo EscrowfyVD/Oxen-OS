@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const vq = validateSearchParams(searchParams, listContactsQuery)
   if ("error" in vq) return vq.error
-  const { page, limit, lifecycleStage, vertical, geoZone, dealOwner, contactType, outreachGroup, lemlistCampaign, q, group, painTier, persona } = vq.data
+  const { page, limit, lifecycleStage, vertical, geoZone, dealOwner, contactType, outreachGroup, lemlistCampaign, q, group, painTier, persona, country } = vq.data
   const skip = (page - 1) * limit
   const sortBy = vq.data.sortBy || "createdAt"
   const sortDir = vq.data.sortDir || "desc"
@@ -50,6 +50,13 @@ export async function GET(request: Request) {
   }
   if (persona) {
     where.persona = persona
+  }
+  // Jurisdiction filter (Sprint Quick Wins Cleanup) — keys on the
+  // related Company.country, NOT the contact's residence. See the
+  // _schemas.ts comment for rationale (audit found 36 G1-T1 contacts
+  // mis-segmented when filtered on contact.country).
+  if (country && country !== "all") {
+    where.company = { country }
   }
   if (lemlistCampaign && lemlistCampaign !== "all") {
     if (lemlistCampaign === "not_enrolled") {

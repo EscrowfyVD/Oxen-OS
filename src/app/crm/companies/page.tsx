@@ -9,35 +9,17 @@ import {
   STAGE_LABELS,
   fmtCurrency,
   CRM_COLORS,
+  // Jurisdiction whitelist (Sprint Quick Wins Cleanup) — extracted to
+  // crm-config so the same source feeds both /crm/contacts (filters
+  // on Company.country relation) and /crm/companies (filters on
+  // Company.country directly).
+  JURISDICTION_FILTER_OPTIONS,
 } from "@/lib/crm-config"
 import {
   getGroupColor,
   getPainTierColor,
   FALLBACK_BADGE_COLOR,
 } from "@/lib/crm-badge-colors"
-
-// PRD-001 in-scope + adjacent jurisdictions, aligned with the canonical
-// names used by extractCountryFromLocation (src/lib/clay-helpers.ts).
-// Drives the "All Countries" filter dropdown options.
-const COUNTRY_FILTER_OPTIONS = [
-  "United Arab Emirates",
-  "Cyprus",
-  "Malta",
-  "Switzerland",
-  "Luxembourg",
-  "France",
-  "United Kingdom",
-  "Germany",
-  "Italy",
-  "Spain",
-  "Portugal",
-  "Netherlands",
-  "Belgium",
-  "Singapore",
-  "Hong Kong",
-  "United States",
-  "Canada",
-] as const
 
 /* ── Design tokens ── */
 const CARD_BG = CRM_COLORS.card_bg
@@ -302,8 +284,8 @@ export default function CompaniesListPage() {
           onChange={(e) => setFilterCountry(e.target.value)}
           style={selectStyle}
         >
-          <option value="all">All Countries</option>
-          {COUNTRY_FILTER_OPTIONS.map((c) => (
+          <option value="all">All Jurisdictions</option>
+          {JURISDICTION_FILTER_OPTIONS.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>

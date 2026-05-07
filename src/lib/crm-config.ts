@@ -294,3 +294,43 @@ export function fmtCurrencyFull(val: number, prefix = "€"): string {
   const sign = val < 0 ? "-" : ""
   return `${sign}${prefix}${Math.abs(val).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 }
+
+// ─── Jurisdictions (Sprint Quick Wins Cleanup) ───
+//
+// Drives the "All Jurisdictions" filter dropdown options on:
+//   - /crm/contacts (filters on Company.country via the relation —
+//     Sprint Quick Wins Cleanup audit showed contact.country is the
+//     person's residence whereas the legal entity's jurisdiction is
+//     what determines G1/G2/.../G7 segmentation per PRD-001)
+//   - /crm/companies (filters on Company.country directly)
+//
+// PRD-001 in-scope (UAE / Cyprus / Malta) come first, followed by
+// adjacent jurisdictions a contact's company might still legitimately
+// be in. Aligned with canonical names emitted by
+// `extractCountryFromLocation` in src/lib/clay-helpers.ts so a Clay
+// upsert + a UI filter resolve to the same string.
+//
+// Note: kept as a flat hardcoded list rather than queried from
+// `Company.country` distinct values for V1 — the BD set of in-scope
+// countries is small and stable, and a SELECT DISTINCT on every page
+// load would be cache-thrash for a stable dropdown.
+export const JURISDICTION_FILTER_OPTIONS = [
+  "United Arab Emirates",
+  "Cyprus",
+  "Malta",
+  "Switzerland",
+  "Luxembourg",
+  "France",
+  "United Kingdom",
+  "Germany",
+  "Italy",
+  "Spain",
+  "Portugal",
+  "Netherlands",
+  "Belgium",
+  "Singapore",
+  "Hong Kong",
+  "United States",
+  "Canada",
+] as const
+export type Jurisdiction = (typeof JURISDICTION_FILTER_OPTIONS)[number]

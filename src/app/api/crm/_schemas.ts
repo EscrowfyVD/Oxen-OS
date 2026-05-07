@@ -201,6 +201,18 @@ export const listContactsQuery = z.object({
   group: crmGroupEnum.optional(),
   painTier: crmPainTierEnum.optional(),
   persona: crmPersonaEnum.optional(),
+  // Jurisdiction filter (Sprint Quick Wins Cleanup) — filters on the
+  // related Company.country, NOT the contact's residence country.
+  // Rationale: PRD-001 G1/G2/.../G7 segmentation is keyed by the
+  // legal entity's jurisdiction (UAE/Cyprus/Malta primarily), not by
+  // where the individual lives. The audit found 36 G1-T1 contacts
+  // whose contact.country was the LinkedIn residence (UK/US/NL/etc)
+  // while company.country was correctly UAE/Cyprus/Malta. The route
+  // forwards this value into `where: { company: { country } }`.
+  // Free string match — accepts any value from JURISDICTION_FILTER_OPTIONS
+  // in @/lib/crm-config (whitelist enforced UI-side, not Zod-side, to
+  // avoid duplication with a config that may grow).
+  country: z.string().max(100).optional(),
   lemlistCampaign: z.string().optional(),
   q: z.string().max(200).optional(),
   sortBy: z.string().max(50).optional(),
@@ -224,6 +236,12 @@ export const listContactsForPushQuery = z.object({
   group: crmGroupEnum.optional(),
   painTier: crmPainTierEnum.optional(),
   persona: crmPersonaEnum.optional(),
+  // Jurisdiction filter parity with listContactsQuery
+  // (Sprint Quick Wins Cleanup) — same `where: { company: { country } }`
+  // semantics. Keeps the bulk-push surface aligned with the list filter
+  // so 'Push all filtered' covers exactly the same row set as the
+  // visible page in the modal.
+  country: z.string().max(100).optional(),
   lemlistCampaign: z.string().optional(),
   q: z.string().max(200).optional(),
 })

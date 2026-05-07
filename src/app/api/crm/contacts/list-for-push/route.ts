@@ -60,6 +60,7 @@ export async function GET(request: Request) {
     group,
     painTier,
     persona,
+    country,
     lemlistCampaign,
     q,
   } = vq.data
@@ -103,6 +104,11 @@ export async function GET(request: Request) {
   }
   if (persona) {
     where.persona = persona
+  }
+  // Jurisdiction filter (Sprint Quick Wins Cleanup) — same semantics
+  // as GET /api/crm/contacts: filters on Company.country relation.
+  if (country && country !== "all") {
+    where.company = { country }
   }
   if (lemlistCampaign && lemlistCampaign !== "all") {
     if (lemlistCampaign === "not_enrolled") {
