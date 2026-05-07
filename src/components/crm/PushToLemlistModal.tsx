@@ -83,6 +83,20 @@ export default function PushToLemlistModal({
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   const contactCount = contacts.length
+  // Sprint S0.6.1 — single source of truth for the count we display
+  // anywhere in the modal (header copy, confirmation banner, action
+  // button). Pre-S0.6.1 the button label drifted from the body copy
+  // because three different render sites picked different sources;
+  // unifying here prevents future drift.
+  //
+  // mode="all" : show the total filtered count from the parent (or
+  //              fall back to the prop array length if the parent
+  //              didn't pass it). The actual push fetches the full
+  //              list from /api/crm/contacts/list-for-push at click
+  //              time, so this is the count the operator should see.
+  // mode="selected" : the prop array IS the selection — count it.
+  const displayCount =
+    mode === "all" ? (totalFilteredCount ?? contactCount) : contactCount
 
   useEffect(() => {
     fetch("/api/lemlist/campaigns")
@@ -390,14 +404,14 @@ export default function PushToLemlistModal({
             <>
               <p style={{ fontFamily: FONT, fontSize: 13, color: TEXT2, margin: "0 0 20px" }}>
                 {mode === "selected"
-                  ? `Push ${contactCount} selected contact${contactCount !== 1 ? "s" : ""} to a Lemlist campaign.`
-                  : `Push all ${totalFilteredCount ?? contactCount} filtered contacts to a Lemlist campaign.`}
+                  ? `Push ${displayCount} selected contact${displayCount !== 1 ? "s" : ""} to a Lemlist campaign.`
+                  : `Push all ${displayCount} filtered contacts to a Lemlist campaign.`}
               </p>
 
               {mode === "all" && (
                 <div style={{ background: `${ROSE}12`, border: `1px solid ${ROSE}30`, borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
                   <p style={{ fontSize: 12, fontFamily: FONT, color: ROSE, margin: 0, fontWeight: 500 }}>
-                    This will push {totalFilteredCount ?? contactCount} contacts to the selected Lemlist campaign.
+                    This will push {displayCount} contacts to the selected Lemlist campaign.
                   </p>
                 </div>
               )}
@@ -467,7 +481,7 @@ export default function PushToLemlistModal({
                 cursor: !selectedCampaign || loadingCampaigns ? "not-allowed" : "pointer",
               }}
             >
-              Push {contactCount} Contact{contactCount !== 1 ? "s" : ""}
+              Push {displayCount} Contact{displayCount !== 1 ? "s" : ""}
             </button>
           </div>
         )}
