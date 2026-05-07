@@ -1,4 +1,6 @@
-// Unit tests for the signal-decay cron (Sprint S1 batch 3).
+// Unit tests for the signal-decay runner (Sprint S1 batch 3 — moved
+// from scripts/cron/recompute-signal-decay.test.ts in Sprint Activate
+// Signal Decay so the tests sit alongside the runner code).
 //
 // Mocks Prisma to verify the chunking + idempotency contract without a
 // real DB:
@@ -10,13 +12,16 @@
 //   - $transaction is called once per batch with the update array
 //   - running twice produces 0 updates on the second pass (true
 //     idempotency: post-first-run, every row is "unchanged")
+//   - runSignalDecayRecompute() aggregator returns the combined shape
+//     consumed by the HTTP route + CLI
 
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { PrismaClient } from "@prisma/client"
 import {
   recomputeIntentSignals,
   recomputeMarketSignals,
-} from "./recompute-signal-decay"
+  runSignalDecayRecompute,
+} from "./signal-decay-runner"
 
 const ANCHOR = new Date("2026-01-01T00:00:00Z")
 
@@ -124,8 +129,58 @@ function makeMarketMock(rows: MarketRow[]) {
   } as unknown as PrismaClient
 }
 
+/**
+ * Combined mock — both IntentSignal and MarketSignal populated. Used
+ * for `runSignalDecayRecompute()` aggregator tests where the runner
+ * touches both tables in sequence.
+ */
+function makeCombinedMock(intentRows: IntentRow[], marketRows: MarketRow[]) {
+  const intentFindMany = vi.fn(async (args: {
+    take: number
+    skip?: number
+    cursor?: { id: string }
+  }) => {
+    let startIdx = 0
+    if (args.cursor) {
+      const idx = intentRows.findIndex((r) => r.id === args.cursor!.id)
+      startIdx = idx >= 0 ? idx + (args.skip ?? 0) : 0
+    }
+    return intentRows.slice(startIdx, startIdx + args.take)
+  })
+  const marketFindMany = vi.fn(async (args: {
+    take: number
+    skip?: number
+    cursor?: { id: string }
+  }) => {
+    let startIdx = 0
+    if (args.cursor) {
+      const idx = marketRows.findIndex((r) => r.id === args.cursor!.id)
+      startIdx = idx >= 0 ? idx + (args.skip ?? 0) : 0
+    }
+    return marketRows.slice(startIdx, startIdx + args.take)
+  })
+  const intentUpdate = vi.fn(async () => ({ id: "updated" }))
+  const marketUpdate = vi.fn(async () => ({ id: "updated" }))
+  const transaction = vi.fn(
+    async (arg: ((tx: unknown) => Promise<unknown>) | unknown[]) => {
+      if (typeof arg === "function") {
+        return arg({
+          intentSignal: { update: intentUpdate },
+          marketSignal: { update: marketUpdate },
+        })
+      }
+      return Promise.all(arg)
+    },
+  )
+  return {
+    intentSignal: { findMany: intentFindMany, update: intentUpdate },
+    marketSignal: { findMany: marketFindMany, update: marketUpdate },
+    $transaction: transaction,
+  } as unknown as PrismaClient
+}
+
 // ─────────────────────────────────────────────────────────────────────
-// Tests
+// recomputeIntentSignals
 // ─────────────────────────────────────────────────────────────────────
 
 describe("recomputeIntentSignals (Sprint S1 batch 3)", () => {
@@ -286,6 +341,10 @@ describe("recomputeIntentSignals (Sprint S1 batch 3)", () => {
   })
 })
 
+// ─────────────────────────────────────────────────────────────────────
+// recomputeMarketSignals
+// ─────────────────────────────────────────────────────────────────────
+
 describe("recomputeMarketSignals (Sprint S1 batch 3)", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -329,5 +388,156 @@ describe("recomputeMarketSignals (Sprint S1 batch 3)", () => {
 
     await recomputeMarketSignals(client, now)
     expect(client.intentSignal.findMany).not.toHaveBeenCalled()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// runSignalDecayRecompute (aggregator — Sprint Activate Signal Decay)
+// ─────────────────────────────────────────────────────────────────────
+
+describe("runSignalDecayRecompute (Sprint Activate Signal Decay)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("aggregates IntentSignal + MarketSignal stats with mixed curves", async () => {
+    // Mix of stale rows across both tables + 3 different curves.
+    const intentRows: IntentRow[] = [
+      // LINEAR @ 50% — 100 → 50
+      {
+        id: "sig-i-1",
+        points: 100,
+        decayedPoints: 100,
+        createdAt: ANCHOR,
+        expiresAt: null,
+        signalTypeRef: { decayDays: 90, decayCurve: "LINEAR" },
+      },
+      // EXPONENTIAL @ half-life (45/90) → 50
+      {
+        id: "sig-i-2",
+        points: 100,
+        decayedPoints: 99,
+        createdAt: ANCHOR,
+        expiresAt: null,
+        signalTypeRef: { decayDays: 90, decayCurve: "EXPONENTIAL" },
+      },
+    ]
+    const marketRows: MarketRow[] = [
+      // STEP @ ratio 0.5 (45/90) → tier 50% → 50 → 25
+      {
+        id: "msig-m-1",
+        points: 50,
+        decayedPoints: 50,
+        occurredAt: ANCHOR,
+        expiresAt: null,
+        signalTypeRef: { decayDays: 90, decayCurve: "STEP" },
+      },
+    ]
+    const client = makeCombinedMock(intentRows, marketRows)
+    const now = new Date(ANCHOR.getTime() + 45 * 24 * 60 * 60 * 1000)
+
+    const result = await runSignalDecayRecompute(client, now)
+
+    expect(result.success).toBe(true)
+    expect(result.intent.scanned).toBe(2)
+    expect(result.intent.updated).toBe(2)
+    expect(result.market.scanned).toBe(1)
+    expect(result.market.updated).toBe(1)
+    expect(result.totalScanned).toBe(3)
+    expect(result.totalUpdated).toBe(3)
+    expect(result.startedAt).toBe(now.toISOString())
+    expect(typeof result.finishedAt).toBe("string")
+    expect(result.durationMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it("returns success=true and zero stats on empty DB (both tables clean)", async () => {
+    const client = makeCombinedMock([], [])
+    const result = await runSignalDecayRecompute(client, new Date())
+
+    expect(result.success).toBe(true)
+    expect(result.totalScanned).toBe(0)
+    expect(result.totalUpdated).toBe(0)
+    expect(result.intent).toEqual({
+      scanned: 0,
+      updated: 0,
+      skippedUnchanged: 0,
+      skippedTerminal: 0,
+    })
+    expect(result.market).toEqual({
+      scanned: 0,
+      updated: 0,
+      skippedUnchanged: 0,
+      skippedTerminal: 0,
+    })
+  })
+
+  it("processes IntentSignal first then MarketSignal (deterministic order)", async () => {
+    // Use spies on the per-table runners' surfaces to verify order.
+    const intentRows: IntentRow[] = [
+      {
+        id: "sig-i-order",
+        points: 100,
+        decayedPoints: 100,
+        createdAt: ANCHOR,
+        expiresAt: null,
+        signalTypeRef: { decayDays: 90, decayCurve: "LINEAR" },
+      },
+    ]
+    const marketRows: MarketRow[] = [
+      {
+        id: "msig-m-order",
+        points: 100,
+        decayedPoints: 100,
+        occurredAt: ANCHOR,
+        expiresAt: null,
+        signalTypeRef: { decayDays: 90, decayCurve: "LINEAR" },
+      },
+    ]
+    const client = makeCombinedMock(intentRows, marketRows)
+
+    // Track the order in which each findMany is called.
+    const callOrder: string[] = []
+    const origIntent = vi.mocked(client.intentSignal.findMany)
+    const origMarket = vi.mocked(client.marketSignal.findMany)
+    origIntent.mockImplementation(((args: unknown) => {
+      callOrder.push("intent")
+      const a = args as {
+        take: number
+        skip?: number
+        cursor?: { id: string }
+      }
+      let startIdx = 0
+      if (a.cursor) {
+        const idx = intentRows.findIndex((r) => r.id === a.cursor!.id)
+        startIdx = idx >= 0 ? idx + (a.skip ?? 0) : 0
+      }
+      return Promise.resolve(intentRows.slice(startIdx, startIdx + a.take))
+    }) as never)
+    origMarket.mockImplementation(((args: unknown) => {
+      callOrder.push("market")
+      const a = args as {
+        take: number
+        skip?: number
+        cursor?: { id: string }
+      }
+      let startIdx = 0
+      if (a.cursor) {
+        const idx = marketRows.findIndex((r) => r.id === a.cursor!.id)
+        startIdx = idx >= 0 ? idx + (a.skip ?? 0) : 0
+      }
+      return Promise.resolve(marketRows.slice(startIdx, startIdx + a.take))
+    }) as never)
+
+    await runSignalDecayRecompute(
+      client,
+      new Date(ANCHOR.getTime() + 45 * 24 * 60 * 60 * 1000),
+    )
+
+    // First call must be intent, last call must include market.
+    expect(callOrder[0]).toBe("intent")
+    expect(callOrder).toContain("market")
+    // Market is called only after intent is fully drained.
+    const firstMarket = callOrder.indexOf("market")
+    expect(callOrder.slice(0, firstMarket).every((c) => c === "intent")).toBe(true)
   })
 })
