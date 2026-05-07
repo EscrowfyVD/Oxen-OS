@@ -1,0 +1,32 @@
+name: Signal Decay Daily Recompute
+
+on:
+  schedule:
+    # Daily at 03:00 UTC
+    # = 07:00 GST (Vernon, UAE) / 05:00 CEST (Andy, summer)
+    # Off-peak hour minimizes GitHub Actions schedule drift risk.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # Safe to re-run: signal decay is fully idempotent.
+
+jobs:
+  recompute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Oxen OS signal decay endpoint
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://os.oxen.finance/api/cron/signal-decay \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "HTTP $http_code"
+          echo "$body"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::Signal decay failed with status $http_code"
+            exit 1
+          fi

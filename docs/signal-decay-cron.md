@@ -1,14 +1,14 @@
 # Signal decay cron — operator guide
 
 **Sprint S1 batch 3** (logic) **+ Sprint Activate Signal Decay** (HTTP
-endpoint, Railway Cron Service). This cron job recomputes the cached
-`decayedPoints` field on every active `IntentSignal` and `MarketSignal`
-in the database. The scoring engine reads `decayedPoints` (cached)
-instead of running the time-decay math on every dashboard query —
-this job materializes that cache.
+endpoint) **+ Sprint Cron Setup via GitHub Actions** (trigger). This
+cron job recomputes the cached `decayedPoints` field on every active
+`IntentSignal` and `MarketSignal` in the database. The scoring engine
+reads `decayedPoints` (cached) instead of running the time-decay math
+on every dashboard query — this job materializes that cache.
 
-This is the **second cron** activated on Railway, following the same
-pattern established by the Conference Brief sprint
+This is the **second cron** activated, following the same pattern
+established by the Conference Brief sprint
 (`docs/conference-brief-cron.md` + commit `8b0a785`). Reuses the
 shared `CRON_SECRET` for the HTTP variant. The `/api/cron/*` whitelist
 is already present in `src/proxy.ts` from that sprint.
@@ -23,9 +23,11 @@ is already present in `src/proxy.ts` from that sprint.
 | CLI script | `npx tsx scripts/cron/recompute-signal-decay.ts` |
 | Pure helper | `src/lib/signal-decay.ts` (`calculateDecayedPoints`) |
 | Orchestration | `src/lib/signal-decay-runner.ts` (`runSignalDecayRecompute`) |
-| Schedule (recommended) | `0 3 * * *` (daily at 03:00 UTC) |
+| Trigger (production) | `.github/workflows/signal-decay.yml` (GitHub Actions) |
+| Schedule | `0 3 * * *` (daily at 03:00 UTC) |
 | Auth (HTTP path) | `Authorization: Bearer <CRON_SECRET>` |
-| Required env | `DATABASE_URL`, `CRON_SECRET` (HTTP only) |
+| Required env (Railway) | `DATABASE_URL`, `CRON_SECRET` (HTTP only) |
+| Required secret (GitHub) | `CRON_SECRET` (Settings → Secrets → Actions) |
 | Idempotent | **Yes** — re-running produces 0 writes for unchanged rows |
 | Expected duration | < 30 s for ~10k signals; chunked at 1000 / batch |
 
@@ -95,63 +97,89 @@ curves + edge cases.
 
 ---
 
-## Railway Cron setup (one-time)
+## Scheduling — GitHub Actions (canonical)
 
-This is the **second cron service** in the Oxen OS Railway project
-(after `oxen-os-cron-conference-brief`). Uses the same Option A
-pattern (separate service via Railway dashboard) since Railway
-Nixpacks doesn't currently support inline `crons[]` arrays in
-`railway.json`.
+The cron is triggered by a GitHub Actions workflow committed to the
+repo at `.github/workflows/signal-decay.yml`. The workflow does
+**one thing**: a curl POST to the HTTP endpoint with the bearer
+token. No build, no Node, no Prisma — just a 30-second container
+that hits the deployed API. Costs ~30s × 31 daily runs ≈ 16 min/month
+on the GitHub Actions free tier (2000-min/month limit).
 
-### Steps
+This replaces an earlier attempt to use **Railway Cron Services**
+(separate Railway service per cron, building the full Next.js app
+just to run a script). That approach was abandoned for the same
+reasons documented in `docs/conference-brief-cron.md` (full Next.js
+build was unnecessary, Railway Postgres private networking caused
+P1001 deploy failures, logs were truncated, config drifted from
+the repo). GitHub Actions provides clean separation: the HTTP
+endpoint lives on Railway with the rest of the app; the trigger
+lives in the repo as code-reviewable YAML.
 
-1. Open the Railway project → **+ New Service** → **GitHub Repo** →
-   pick `EscrowfyVD/Oxen-OS`.
-2. Name the service `oxen-os-cron-signal-decay`
-   (or `cron-signal-decay`).
-3. In **Settings → Build** :
-   - Builder : `Nixpacks`
-   - Build Command : `npx prisma generate && npm install`
-     (skip `migrate deploy` and `next build` — this service doesn't
-     serve HTTP, it just runs the script once per cron tick)
-4. In **Settings → Deploy** :
-   - Start Command : `npx tsx scripts/cron/recompute-signal-decay.ts`
-   - **Cron Schedule** : `0 3 * * *`
-   - Restart Policy : `Never` (the script exits after a single run)
-5. In **Variables** : copy the `DATABASE_URL` from the main `oxen-os`
-   service. (`CRON_SECRET` is **NOT** required for the CLI path — only
-   the HTTP endpoint uses it.)
-6. **Deploy** the service.
+### One-time setup
 
-After the first successful cron tick, you'll see a Deployment log
-with the structured stats output of the script.
+1. **Add `CRON_SECRET` to GitHub repo secrets** — already done if
+   you configured the Conference Brief cron first (same secret).
+   Otherwise:
+   - Go to `https://github.com/EscrowfyVD/Oxen-OS/settings/secrets/actions`
+   - Click **New repository secret**
+   - Name: `CRON_SECRET`
+   - Value: copy from Railway env vars (same secret used by
+     `/api/cron/conference-brief` and `/api/lemlist/sync`)
+   - Save
+2. **Workflow file** is already in the repo at
+   `.github/workflows/signal-decay.yml`. No further setup —
+   GitHub picks it up automatically once the secret is in place.
 
-### Alternative: HTTP endpoint via external scheduler
-
-If you'd rather centralize all crons on an external scheduler
-(e.g. cron-job.org, GitHub Actions, etc.), the HTTP endpoint at
-`POST /api/cron/signal-decay` accepts a Bearer token and runs the
-same logic as the CLI script. Example with GitHub Actions :
+### Schedule
 
 ```yaml
-# .github/workflows/signal-decay.yml
-name: Signal Decay Daily
 on:
   schedule:
-    - cron: "0 3 * * *"
-jobs:
-  trigger:
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          curl -sS -X POST https://os.oxen.finance/api/cron/signal-decay \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -w "\nHTTP %{http_code}\n"
+    - cron: '0 3 * * *'   # daily at 03:00 UTC
 ```
 
-The Bearer token is the value of `CRON_SECRET` env var on Railway
-(same secret used by `/api/cron/conference-brief` and
-`/api/lemlist/sync`).
+03:00 UTC was chosen as an off-peak hour to minimize the GitHub
+Actions schedule drift risk (the runner queue is least loaded
+between 01:00–05:00 UTC). In practice, the daily run lands within
+a few minutes of 03:00 UTC most nights.
+
+### Schedule drift caveat
+
+GitHub Actions explicitly documents that scheduled workflows can
+be delayed by 15–30 minutes during peak hours. Daily 03:00 UTC is
+off-peak so this is rarely visible, but worth noting:
+- A 30-min delay on a daily idempotent recompute has zero user
+  impact — the dashboard reads `decayedPoints` cache, which is
+  refreshed at most one tick later
+- Worst-case staleness on a missed run = 24h instead of 24h±30min,
+  still under the 1.1%/day drift on 90-day LINEAR signals
+
+If precise timing matters in future, switch to a self-hosted GitHub
+runner or use an external scheduler (cron-job.org, EasyCron) hitting
+the same `/api/cron/signal-decay` endpoint.
+
+### Manual trigger (replay)
+
+`workflow_dispatch` is enabled on the workflow, so you can run it
+manually from the Actions tab:
+
+1. Go to `https://github.com/EscrowfyVD/Oxen-OS/actions/workflows/signal-decay.yml`
+2. Click **Run workflow** → **Run workflow** (defaults to `main`)
+
+✅ **Safe to manual-trigger anytime.** Signal decay is fully
+idempotent: re-running it produces 0 DB writes for unchanged rows
+(per-row skip-if-unchanged + terminal-state fast path). Use this
+to materialize `decayedPoints` after a deploy or to debug a stale
+signal — no risk of double-counting or duplicate side effects.
+
+### Alternative: local CLI for testing
+
+The CLI script `scripts/cron/recompute-signal-decay.ts` still works
+for local validation against any database. It's identical to what
+the HTTP endpoint runs internally (same `runSignalDecayRecompute()`
+runner) — but bypasses GitHub Actions / curl entirely. See **Manual
+smoke test** below.
 
 ---
 
@@ -301,8 +329,10 @@ After `prisma migrate deploy` runs the
    ```
    On a fresh Railway DB with 0 IntentSignal rows (verified Sprint
    S0 baseline), this is a no-op and prints `scanned=0 updated=0`.
-3. **Configure the recurring cron** — create the Railway Cron Service
-   per the steps above so the cache stays fresh going forward.
+3. **Configure the recurring cron** — add `CRON_SECRET` to GitHub
+   repo secrets (Settings → Secrets → Actions). The workflow at
+   `.github/workflows/signal-decay.yml` is already in the repo and
+   will run automatically once the secret is in place.
 
 ---
 
@@ -317,4 +347,5 @@ After `prisma migrate deploy` runs the
 - `src/app/api/cron/signal-decay/route.test.ts` — auth + delegate tests
 - `scripts/cron/recompute-signal-decay.ts` — CLI script
 - `prisma/schema.prisma` — `IntentSignal`, `MarketSignal`, `SignalTypeRegistry`
-- Pattern reference : `docs/conference-brief-cron.md` (first cron deployed)
+- Trigger workflow : `.github/workflows/signal-decay.yml`
+- Sibling cron pattern : `docs/conference-brief-cron.md` (monthly, non-idempotent)

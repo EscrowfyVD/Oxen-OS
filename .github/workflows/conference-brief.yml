@@ -1,0 +1,35 @@
+name: Conference Brief Monthly Digest
+
+on:
+  schedule:
+    # 1st of month at 07:00 UTC
+    # = 09:00 CEST (summer) / 08:00 CET (winter)
+    # NOTE: GitHub Actions schedule may drift 15-30min during peak
+    # hours; mensual cadence makes this acceptable.
+    - cron: '0 7 1 * *'
+  workflow_dispatch:
+    # WARNING: Conference Brief is NOT idempotent — manual re-run
+    # WILL re-send Telegram messages to all 3 BDs (Andy, Paul,
+    # Vernon). Coordinate before triggering manually.
+
+jobs:
+  send-brief:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Oxen OS conference brief endpoint
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://os.oxen.finance/api/cron/conference-brief \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "HTTP $http_code"
+          echo "$body"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::Conference brief failed with status $http_code"
+            exit 1
+          fi
