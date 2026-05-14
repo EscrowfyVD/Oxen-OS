@@ -1,6 +1,6 @@
 # PRD-002 — Trigify Integration Phase 2A
 
-**Version** : v1.0 — pré-spec  
+**Version** : v1.1 — pré-spec (with Trigify Listening doc findings)  
 **Date** : 2026-05-14 (Thu)  
 **Auteur** : Vernon Dessy + Claude (audit pré-sprint)  
 **Status** : 📋 Ready for review → Sprint code (~6-8h focus, Option β)  
@@ -63,6 +63,26 @@ Décision plan à prendre **avant le 21 mai**. Options :
 - **Scale $549/mo** — si plusieurs Cycles parallèles
 
 → **Recommandation** : Essential pour démarrer, upgrade après Cycle 1 selon volume observé.
+
+### 1.5 ⚠️ Credit-based pricing (NEW v1.1)
+
+**Discovery** : Trigify charge **1 credit per post returned** par search run (source : help.trigify.io filtering doc).
+
+**Implication** :
+- Max Results = 50 posts/run × 9 sources × Daily run = **13,500 credits/mois max possible**
+- En réalité, beaucoup moins (Profile Monitoring ne génère pas 50 posts/jour par profil — plutôt 1-10)
+- Estimation V1 réaliste : **2-5K credits/mois**
+
+**Action préalable au choix plan (D1)** :
+- Vérifier dans `Manage Plan` Trigify combien de credits inclut chaque tier (Essential / Growth / Scale)
+- Comparer au budget V1 estimé (2-5K credits/mois)
+- Décider si Essential suffit ou si Growth nécessaire pour buffer
+
+**Mitigation V1 si budget serré** :
+- Réduire Max Results : 50 → 25 par run
+- Réduire fréquence : Daily → 2x/semaine
+- Privilégier les sources high-value (Mercury + Wise + OXEN page) avant les autres
+
 
 ---
 
@@ -162,6 +182,75 @@ D'après help.trigify.io/articles/9504542-http-request :
 - `{{sourceProfile}}` — quel profil monitoré a généré le signal (= competitor name)
 
 → **Action validation** : au moment de configurer le HTTP Request node, tester avec **tous les fields possibles** et observer ce qui arrive côté Oxen-OS.
+
+### 2.4 Time Frame mechanics — overlap coverage (NEW v1.1)
+
+**Source** : help.trigify.io filtering doc.
+
+> "The time frame is the lookback period, not how often the search runs. For example, a search running Daily with a Last week time frame will check the last 7 days of posts every day. This overlapping coverage ensures no posts slip through between runs."
+
+**Implications pour Oxen-OS** :
+
+| Time Frame | Behavior | Duplicates risk |
+|---|---|---|
+| Last 24 hours | Each daily run rescans last 24h | LOW (1 day overlap max) |
+| Last week (default) | Each daily run rescans 7 days | **HIGH (6 days overlap)** |
+| Last month | Each daily run rescans 30 days | **VERY HIGH (29 days overlap)** |
+| All time | Each run rescans everything | **EXTREME** |
+
+→ **Conséquence critique** : avec Time Frame "Last week" (recommandé Trigify default), **chaque post engagé sera envoyé à notre webhook 7 jours de suite**.
+
+**Sans déduplication côté Oxen-OS** :
+- 1 post engagé = 7 IntentSignals créés en 7 jours
+- Score artificiellement gonflé × 7
+- DB pollution + alerting Telegram répété × 7
+
+→ **Action critique Sprint Code** : ajouter logique idempotence (voir Batch 2.5 §6.3.5).
+
+### 2.5 Job Title Filter — 6 max per search (NEW v1.1)
+
+**Source** : help.trigify.io filtering doc.
+
+> "Add up to 6 job titles per search"
+
+**Implication brief Andy §5.4** : le brief liste **15+ job titles cibles** :
+- CFO, COO, CEO, Managing Director, General Manager (5)
+- Head of Finance, Finance Director, Treasury Manager (3)
+- Compliance Officer, Head of Compliance, Chief Compliance Officer (3)
+- Managing Partner, Senior Partner, Founding Partner (3)
+- Head of Client Services, Client Relationship Director (2)
+
+→ **16 titles** but **max 6 per search**.
+
+**Décision V1 — prioritization** :
+
+3 stratégies possibles :
+
+**A. Multi-searches** (créer 3 saved searches avec 6 titles chacune) :
+- Search 1 "Decision Makers Finance" : CFO, COO, CEO, Managing Director, Finance Director, Treasury Manager
+- Search 2 "Decision Makers Compliance" : Compliance Officer, Head of Compliance, Chief Compliance Officer, Managing Partner, Senior Partner, Founding Partner
+- Search 3 "Operational" : General Manager, Head of Finance, Head of Client Services, Client Relationship Director, (2 slots libres)
+
+→ **Coût 3x credits** mais full coverage.
+
+**B. Top 6 prioritized** (1 search, focus high-value titles) :
+- CFO, CEO, Managing Director, Compliance Officer, Head of Finance, Managing Partner
+
+→ Coût 1x credits, manque 10 titles mais hit les profils les plus valuables (Decision-Makers + Compliance).
+
+**C. No filter V1** (capture tout, filter côté Oxen-OS scoring) :
+- Skip Job Title Filter dans Trigify
+- Tous les engagements sont captured
+- Filter côté Oxen-OS : `Contact.persona === "DM" || "OP"` (Sprint S0.5 segmentation)
+
+→ Coût 5-10x credits (volume élevé), mais simpler config, all data captured.
+
+**Recommandation V1** : **Stratégie B** (Top 6 prioritized).
+- Démarrage budget-controlled
+- Hit les profils les plus valuables (alignement PRD-001 G1-T1 DM persona)
+- Évolution V2 : étendre à stratégie A après stats Cycle 1
+
+
 
 ---
 
@@ -474,11 +563,78 @@ Tests numérotés `[1]`, `[2]`... avec sections par concern :
 
 **Important** : Trigify collecte engagement data des **7 derniers jours** au moment du setup (source : help.trigify.io). Donc une fois ajoutés, on récupère rétroactivement la semaine passée.
 
+### 5.2.5 Step 2.5 — Search configuration filters (NEW v1.1)
+
+**Source** : help.trigify.io filtering doc.
+
+Pour chaque saved search Profile Monitoring (les 9 sources), configurer les filtres pour optimiser credits + quality.
+
+#### Time Frame
+
+**Recommandation V1** : **"Last 24 hours"** (pas "Last week" default).
+
+**Rationale** :
+- Daily run avec Last 24h = 1 jour overlap max = duplicates risk LOW
+- Last week (default) = 6 jours overlap = duplicates risk HIGH (voir §2.4)
+- Pour Profile Monitoring, on cherche engagements **récents** (timing beats copywriting brief Andy)
+
+**V2 evolution** : si volume signal trop faible, étendre à "Last week" avec dedup côté Oxen-OS (§6.3.5).
+
+#### Job Title Filter — Top 6 prioritized (Stratégie B, §2.5)
+
+**6 titles V1** :
+1. CFO
+2. CEO
+3. Managing Director
+4. Compliance Officer
+5. Head of Finance
+6. Managing Partner
+
+**Rationale** :
+- Align brief Andy §5.4 + PRD-001 G1-T1 DM persona prioritization
+- Coût 1x credits (vs 3x si multi-searches)
+- High signal-to-noise ratio (decision-makers only)
+
+#### Content Type
+
+**Recommandation V1** : leave empty (capture all content types).
+
+#### Sort By
+
+**Recommandation V1** : `Date Posted` (default — most recent first).
+
+#### Max Number of Results
+
+**Recommandation V1** : **25** (vs 50 default).
+
+**Rationale** :
+- 9 sources × 25 max × Daily = 6,750 credits/mois max théorique
+- En pratique, Profile Monitoring sur 9 pages → ~50-200 engagements/jour total
+- 25 max suffit pour capturer engagements significatifs sans gaspiller credits
+
+**V2 evolution** : monitor credit usage 1 semaine, ajuster :
+- Si Max Results saturé chaque run → upgrade à 50
+- Si Max Results jamais saturé → baisse à 15 pour save credits
+
+#### Recap V1 search config
+
+| Param | V1 value | Rationale |
+|---|---|---|
+| Time Frame | Last 24 hours | Minimize duplicates overlap |
+| Job Title Filter | Top 6 (Stratégie B) | Decision-makers focus |
+| Content Type | (empty) | Capture all types |
+| Sort By | Date Posted | Default OK |
+| Max Results | 25 | Budget-controlled, ajustable V2 |
+| Sync Frequency | Daily | Balance fraîcheur/credits |
+
+→ Estimation total : **5,000-8,000 credits/mois** (besoin de confirmer credits inclus Essential plan).
+
 ### 5.3 Step 3 — Workflow "Linkedin oxen" configuration
 
 **État actuel** : Workflow draft existant, sans trigger configuré.
 
 **Configuration cible** :
+
 
 ```
 Workflow: "Linkedin oxen"
@@ -611,12 +767,13 @@ POST /api/webhooks/trigify
 |---|---|---|
 | **B1 — Schema + Seed** | 1h | Migration: index linkedinUrl. Update seed-signal-types.ts with 7 Trigify entries. |
 | **B2 — Matching upgrade** | 1h30 | Refactor route.ts matching: LinkedIn URL → email → name+company → auto-create |
+| **B2.5 — Idempotence (NEW v1.1)** | 45min | Dedup logic: composite unique key check, skip if signal already exists |
 | **B3 — Signal type mapping** | 1h | Map payload signal_type → SignalTypeRegistry canonical codes |
 | **B4 — Telegram alerts** | 1h30 | Immediate triggers detection + broadcast aux BDs |
-| **B5 — Tests** | 1h30 | Pattern clay-enrichment, 10-12 tests new |
+| **B5 — Tests** | 2h | Pattern clay-enrichment, 12-15 tests new (incl. dedup tests) |
 | **B6 — Doc + commit** | 30min | PRD update + commit message structuré |
 
-**Total : 7-8h focus en 1 journée.**
+**Total : ~8h focus en 1 journée** (v1.0 disait 7-8h, v1.1 ajoute ~45min pour idempotence + tests).
 
 ### 6.3 Batch 1 — Schema + Seed (1h)
 
@@ -798,12 +955,120 @@ async function matchContact(payload: TrigifyPayload): Promise<{
 
 **Note `lifecycleStage: "intent_sourced"`** : nouveau lifecycle stage à ajouter si pas déjà présent. Permet distinguer les contacts Trigify-discovered vs Clay-enriched vs manual.
 
+### 6.4.5 Batch 2.5 — Idempotence / Deduplication (NEW v1.1, ~45min)
+
+**Contexte** : Trigify Time Frame mechanics (§2.4) implique que **les mêmes posts engagés sont rescannés N jours de suite** selon la config Time Frame. Sans dedup, on créerait N IntentSignals pour le même event = score artificiellement gonflé + alerts Telegram répétées + DB pollution.
+
+**Stratégie** : composite unique check avant `intentSignal.create`.
+
+#### Option A — Application-level dedup (recommandé V1)
+
+Avant `prisma.intentSignal.create`, check si signal identique existe déjà :
+
+```typescript
+async function findExistingSignal(
+  contactId: string,
+  signalTypeCode: string,
+  signalDate: Date,
+  signalDetail?: string,
+): Promise<IntentSignal | null> {
+  // Window de matching: même contact + même signal_type + même jour
+  // (granularité 24h, pas la seconde — sinon retry HTTP peut créer 
+  //  duplicates sur le même run)
+  const dayStart = new Date(signalDate)
+  dayStart.setUTCHours(0, 0, 0, 0)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
+  
+  return prisma.intentSignal.findFirst({
+    where: {
+      contactId,
+      signalTypeCode,
+      signalDate: { gte: dayStart, lt: dayEnd },
+      // Optional: match also signal_detail if provided (more strict)
+      ...(signalDetail ? { sourceData: { path: ["signal_detail"], equals: signalDetail } } : {}),
+    },
+  })
+}
+```
+
+**Logic dans le webhook** :
+
+```typescript
+// After matching contact + mapping signal type
+const existingSignal = await findExistingSignal(
+  contact.id,
+  signalTypeCode,
+  signalDate,
+  payload.signal_detail,
+)
+
+if (existingSignal) {
+  console.log("[trigify] duplicate detected, skipping", {
+    contactId: contact.id,
+    signalTypeCode,
+    existingSignalId: existingSignal.id,
+  })
+  
+  return Response.json({
+    ok: true,
+    action: "duplicate_skipped",
+    contact_id: contact.id,
+    signal_id: existingSignal.id,
+  })
+}
+
+// Otherwise, proceed with intentSignal.create + alerts
+```
+
+**Critères de matching unicité** :
+- ✅ `contactId` — même personne
+- ✅ `signalTypeCode` — même type de signal
+- ✅ `signalDate` window 24h — même jour
+- ✅ `signal_detail` (optionnel, strict) — même contenu de post
+
+**Granularité jour-level (24h)** plutôt que seconde :
+- Si Trigify rescanne un post à 09:05 puis 09:10 le même jour → 1 seul IntentSignal créé
+- Si même post détecté demain à 09:05 → matching dayStart différent → potentiellement créé (mais on aura `signal_detail` identique pour le bloquer si fourni)
+
+#### Option B — DB-level constraint (V2)
+
+```prisma
+model IntentSignal {
+  // ... existing fields
+  
+  @@unique([contactId, signalTypeCode, signalDate, sourceDataHash])
+}
+```
+
+→ Plus robuste mais nécessite stable hash de signal_detail. Skip V1.
+
+#### Côté alerts Telegram
+
+**Bonus** : même si `findExistingSignal` retourne match, **ne PAS alerter à nouveau** sur Telegram. Le check dedup doit se faire **avant** `maybeAlertBDs()`.
+
+#### Tests B2.5
+
+3 tests new dans `route.test.ts` :
+1. Création signal pour contact + signalType + day = OK premier appel
+2. Re-envoi identique 5 min plus tard = `action: "duplicate_skipped"`, pas de re-create
+3. Re-envoi identique le lendemain = nouveau signal créé (window 24h passée)
+
+#### Acceptance criteria
+
+- [ ] Webhook retourne `200 { action: "duplicate_skipped" }` sur duplicate
+- [ ] Pas de nouveau IntentSignal créé sur duplicate
+- [ ] Pas d'alert Telegram envoyée sur duplicate
+- [ ] Log structuré indique le duplicate detection
+- [ ] 3 tests new dans test suite
+
 ### 6.5 Batch 3 — Signal type mapping (1h)
 
 **Mapping payload.signal_type → SignalTypeRegistry code** :
 
 ```typescript
 const SIGNAL_TYPE_MAPPING: Record<string, string> = {
+
   // Brief Andy signal types → Oxen canonical codes
   "oxen_engagement_comment":  "trigify_oxen_engagement_comment",
   "oxen_engagement_like":     "trigify_oxen_engagement_like",
@@ -1031,6 +1296,25 @@ Refs: PRD-002 Trigify Pre-Spec, Brief Trigify Andy (uploads)
 **Deadline** : 2026-05-21 (free trial expires)  
 **Recommandation** : Essential pour démarrer Cycle 1, upgrade après stats.
 
+**D1.2 — Credit budget verification (NEW v1.1)** :
+
+Avant de valider le plan, action préalable :
+
+1. Aller sur Trigify → `Manage Plan` (sidebar)
+2. Noter combien de **credits/mois** inclut chaque tier (Essential / Growth / Scale)
+3. Comparer au budget V1 estimé :
+   - 9 sources × 25 max results × Daily run = 6,750 credits/mois max théorique
+   - Réalisme : ~3,000-5,000 credits/mois (Profile Monitoring volume modéré)
+4. Décider :
+   - Si Essential inclut **≥ 5,000 credits/mois** → Essential OK
+   - Si Essential inclut **< 5,000 credits/mois** → upgrade Growth
+   - Si Growth inclut < 8,000 credits/mois → Scale (peu probable)
+
+**Mitigation si budget Essential trop juste** :
+- Réduire Max Results : 25 → 15
+- Réduire sources : 9 → 5 (drop OXEN page V1 + 2 BD profiles, garder 6 competitors prioritaires)
+- Switcher Daily → 2x/semaine
+
 ### D2 — Liste finale des competitors
 **Question** : Les 6 du brief (Mercury, Relay, Wise, Payoneer, Airwallex, BVNK) sont-ils définitifs ?  
 **Owner** : Andy  
@@ -1166,11 +1450,74 @@ Refactor src/app/api/webhooks/trigify/route.ts:
      contactId, signal_type, person_linkedin_url 
    })
 
+BATCH 2.5 — Idempotence / Deduplication (NEW v1.1, ~45min)
+
+Contexte critique: Trigify Time Frame "Last week" rescanne 7 jours 
+chaque run. Sans dedup, on créerait 7 IntentSignals pour le même 
+event. PRD §2.4 + §6.4.5.
+
+1. Create helper findExistingSignal() (peut être inline ou dans 
+   lib/trigify-dedup.ts):
+
+   async function findExistingSignal(
+     contactId, signalTypeCode, signalDate, signalDetail?
+   ): Promise<IntentSignal | null> {
+     const dayStart = new Date(signalDate)
+     dayStart.setUTCHours(0, 0, 0, 0)
+     const dayEnd = new Date(dayStart)
+     dayEnd.setUTCDate(dayEnd.getUTCDate() + 1)
+     
+     return prisma.intentSignal.findFirst({
+       where: {
+         contactId,
+         signalTypeCode,
+         signalDate: { gte: dayStart, lt: dayEnd },
+         ...(signalDetail 
+           ? { sourceData: { path: ["signal_detail"], equals: signalDetail } } 
+           : {}),
+       },
+     })
+   }
+
+2. Integration dans le webhook (avant intentSignal.create + avant 
+   maybeAlertBDs):
+   
+   const existingSignal = await findExistingSignal(
+     contact.id,
+     signalTypeCode,
+     signalDate,
+     payload.signal_detail,
+   )
+   
+   if (existingSignal) {
+     console.log("[trigify] duplicate detected, skipping", {
+       contactId: contact.id,
+       signalTypeCode,
+       existingSignalId: existingSignal.id,
+     })
+     return Response.json({
+       ok: true,
+       action: "duplicate_skipped",
+       contact_id: contact.id,
+       signal_id: existingSignal.id,
+     })
+   }
+   
+   // ... rest: create intentSignal + alerts
+
+3. Test acceptance:
+   - 1er appel: signal créé OK
+   - Re-envoi 5 min après (même contact + signalType + day): 
+     action: "duplicate_skipped"
+   - Re-envoi lendemain: nouveau signal créé (window 24h passée)
+   - Alert Telegram NE PAS envoyée si duplicate
+
 BATCH 3 — Signal type mapping (~1h)
 
 1. Create lib helper or colocate in route.ts:
    const SIGNAL_TYPE_MAPPING = {
      "oxen_engagement_comment":  "trigify_oxen_engagement_comment",
+
      "oxen_engagement_like":     "trigify_oxen_engagement_like",
      "profile_visit":            "trigify_profile_visit",
      "competitor_engagement":    "trigify_competitor_engagement",
@@ -1225,7 +1572,7 @@ BATCH 4 — Telegram alerts (~1h30)
 
 3. Webhook response toujours 200 même si alerts fail.
 
-BATCH 5 — Tests (~1h30)
+BATCH 5 — Tests (~2h)
 
 Create src/app/api/webhooks/trigify/route.test.ts (NEW) following 
 clay-enrichment pattern exactly. Sections:
@@ -1237,11 +1584,15 @@ clay-enrichment pattern exactly. Sections:
     selon decision matching)
 [5] Contact matching name+company fallback — 1 test
 [6] Contact matching auto-create — 3 tests
-[7] Signal type mapping — 3 tests (known/unknown/undefined)
-[8] Telegram alerts immediate triggers — 4 tests
-[9] IntentSignal persistence — 4 tests
+[7] Idempotence / dedup (NEW v1.1) — 3 tests:
+    - same contact + signalType + day → duplicate_skipped
+    - same contact + signalType + next day → new signal created
+    - duplicate detected → no Telegram alert sent
+[8] Signal type mapping — 3 tests (known/unknown/undefined)
+[9] Telegram alerts immediate triggers — 4 tests
+[10] IntentSignal persistence — 4 tests
 
-Total: ~24 tests (peut réduire à 12-15 essentiels si time-boxed).
+Total: ~27 tests (peut réduire à 15-18 essentiels si time-boxed).
 
 Mock prisma, telegram, signal-types-registry.
 Use makeReq() helper similar to clay-enrichment.test.ts.
@@ -1250,7 +1601,7 @@ BATCH 6 — Doc + commit (~30min)
 
 1. Update reference/PRD_002_TRIGIFY_PRESPEC.md:
    - Section 8 Sprint Plan: mark as ✅ LIVRÉ
-   - Add changelog v1.1 with commit hash
+   - Add changelog v1.2 with commit hash
 
 2. Update reference/PRD_001_MAPPING.md:
    - Phase 2 Sources section: add Trigify integration done
@@ -1276,13 +1627,15 @@ BATCH 6 — Doc + commit (~30min)
    Batches:
    - B1 schema: linkedinUrl index + 7 SignalTypeRegistry Trigify entries
    - B2 matching: LinkedIn URL → email → name+company → auto-create flow
+   - B2.5 idempotence: day-level dedup to prevent duplicates from 
+     Trigify rescans (Time Frame overlap coverage)
    - B3 signal type mapping: payload signal_type → canonical codes
    - B4 Telegram alerts: broadcast immediate triggers to CRM_BD_EMAILS
-   - B5 tests: ~24 tests pattern clay-enrichment (auth, matching, 
-     alerts, persistence)
+   - B5 tests: ~27 tests pattern clay-enrichment (auth, matching, 
+     dedup, alerts, persistence)
    - B6 doc: PRD-002 + journal update
 
-   Refs: PRD-002 Trigify Pre-Spec, Brief Trigify Andy (uploads)"
+   Refs: PRD-002 Trigify Pre-Spec v1.1, Brief Trigify Andy (uploads)"
 
 6. STOP avant push, me montrer:
    - Diff complet
@@ -1356,7 +1709,16 @@ Procède.
 
 ## Changelog
 
-- **v1.0** (2026-05-14) — initial pre-spec post-audit. Architecture Trigify validated via research (help.trigify.io). Sprint plan ready à coller dans Claude Code. 5 decisions pending Andy/Vernon.
+- **v1.0** (2026-05-14 morning) — initial pre-spec post-audit. Architecture Trigify validated via research (help.trigify.io). Sprint plan ready à coller dans Claude Code. 5 decisions pending Andy/Vernon.
+
+- **v1.1** (2026-05-14 afternoon) — integration of Trigify Listening filtering doc findings:
+  - §1.5 added: credit-based pricing (1 credit/post) → D1.2 budget verification step before plan choice
+  - §2.4 added: Time Frame mechanics — overlap coverage creates duplicates risk
+  - §2.5 added: Job Title Filter max 6/search → Top 6 prioritization (Stratégie B) recommended V1
+  - §5.2.5 added: search configuration filters (Last 24h, 6 job titles, 25 max results, daily sync)
+  - §6.4.5 added: Batch 2.5 — Idempotence / dedup logic (~45min)
+  - §8 prompt updated: BATCH 2.5 integrated, BATCH 5 tests increased to ~27 (3 dedup tests added)
+  - Total sprint estimate revised from 7-8h → ~8h
 
 ---
 
