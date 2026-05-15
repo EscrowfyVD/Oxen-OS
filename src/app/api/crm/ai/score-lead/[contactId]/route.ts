@@ -137,7 +137,7 @@ Return ONLY valid JSON with this exact structure:
       data: {
         icpScore: Math.round(total),
         icpFit,
-        icpScoredAt: new Date(),
+        lastScoredAt: new Date(),
         icpScoreBreakdown: breakdown,
       },
     })
@@ -146,7 +146,7 @@ Return ONLY valid JSON with this exact structure:
       contactId,
       icpScore: updated.icpScore,
       icpFit: updated.icpFit,
-      icpScoredAt: updated.icpScoredAt,
+      lastScoredAt: updated.lastScoredAt,
       breakdown,
     })
   } catch (error) {

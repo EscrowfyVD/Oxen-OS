@@ -385,9 +385,36 @@ model CrmContact {
   acquisitionSourceDetail String? // event name if conference, introducer name if referral
   lifecycleStage  String   @default("new_lead") // 9 stages
   icpFit          String?  // AI-generated: "tier_1", "tier_2", "tier_3"
-  icpScore        Int?     @default(0) // 0-100
-  icpScoredAt     DateTime?
+  // Phase 3 Sprint 3a — icpScore widened Int → Float for sub-integer
+  // arithmetic in the scoring engine (ICP factor weights can produce
+  // 12.5, 7.8, etc.). Existing 597 rows are all 0 → safe cast.
+  icpScore        Float?   @default(0) // 0-50
+  // Phase 3 Sprint 3a — renamed icpScoredAt → lastScoredAt to reflect
+  // the broader semantics: this timestamp covers the full
+  // ICP+Intent+Priority recomputation, not just the ICP sub-score.
+  lastScoredAt    DateTime?
   icpScoreBreakdown Json?  // {vertical_match, geo_match, company_size, engagement, revenue_potential}
+  // Phase 3 Sprint 3a — combined scoring fields (PRD-004 §2.1.3).
+  // intentScore drives the "warmth" signal axis; priorityScore is the
+  // combined ICP + Intent value that powers the Intent Feed sort.
+  intentScore     Float?   @default(0) // 0-50
+  priorityScore   Float?   @default(0) // 0-100 (icpScore + intentScore)
+  priorityLevel   String?  @default("Monitor") // "P1" | "P2" | "P3" | "Monitor"
+  // painTier (existing CrmPainTier enum) is the inferred value; the
+  // override field lets BD manually pin a tier via UI for special cases
+  // (e.g. high-value client with a non-obvious pain profile). The
+  // scoring engine reads override first, falls back to inferred.
+  painTierOverride String?
+  // Exclusion flags so the scoring engine can skip an account from
+  // outreach (no sequence enroll) or scoring entirely (e.g. internal
+  // test contacts). String[] over enum so V1 can add new buckets
+  // without a migration.
+  excludedFrom    String[] @default([]) // ["outreach"], ["scoring"], etc.
+  excludedReason  String?
+  // Materialized count of non-expired IntentSignals attached to this
+  // contact, refreshed by the scoring engine. Cached for fast Intent
+  // Feed reads + the P1/P2/P3 minSignals threshold checks.
+  signalCount     Int      @default(0)
   contactType     String   @default("prospect") // "prospect", "client", "introducer", "partner"
   outreachGroup   String?
   // Clay enrichment
@@ -469,6 +496,13 @@ model CrmContact {
   // does not provide an email in Get Post Likes output). Index supports the
   // findFirst({ linkedinUrl: insensitive }) lookup on every signal ingest.
   @@index([linkedinUrl])
+  // Phase 3 Sprint 3a — Intent Feed sort + P1/P2/P3 dashboard slices.
+  // Composite [priorityLevel, priorityScore] supports both "P1 only,
+  // top score first" filtering and "any level, top score first" via
+  // leftmost-prefix usage of priorityLevel-less queries (Postgres can
+  // still index-scan when the leading column isn't filtered, given a
+  // small distinct-value set on priorityLevel).
+  @@index([priorityLevel, priorityScore])
 }
 
 model Deal {
@@ -1055,6 +1089,16 @@ model SignalTypeRegistry {
   isActive      Boolean          @default(true)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+  // Phase 3 Sprint 3a — Andy's A-I taxonomy (orthogonal to the
+  // existing INTENT|MARKET `category` enum). Populated retroactively
+  // in B3 once Andy validates the per-code mapping. signalLevel
+  // mirrors IntentSignal.signalLevel for new writers that read the
+  // registry to derive defaults. triggerType drives the BD-alert
+  // policy: immediate (Telegram within 2h), rapid (24h), passive
+  // (score-only, no alert).
+  intentCategory String?
+  signalLevel    String           @default("contact")
+  triggerType    String?
 
   // Inverse relations
   intentSignals IntentSignal[]
@@ -1113,9 +1157,22 @@ model IntentSignal {
   // the scoring decay math (no separate occurredAt field for now;
   // can be added if backfill from older sources becomes a use-case).
   createdAt       DateTime            @default(now())
+  // Phase 3 Sprint 3a — categorical axes (PRD-004 §2.1.3). Named
+  // `intentCategory` (not `category`) to avoid colliding with the
+  // existing `SignalCategory` enum on SignalTypeRegistry which has
+  // unrelated semantics (INTENT vs MARKET scope). Values: A-I per
+  // Andy's doc. signalLevel distinguishes a person-attached signal
+  // ("contact") from an account-only signal ("account", e.g. a
+  // funding announcement at the company level).
+  intentCategory  String?
+  signalLevel     String?             @default("contact")
 
   @@index([companyId, signalTypeId, createdAt])
   @@index([contactId, signalTypeId, createdAt])
+  // Phase 3 Sprint 3a — intentCategory-scoped aggregates per account
+  // (compute_intent_score sums points by category over a date window).
+  @@index([contactId, intentCategory, createdAt])
+  @@index([companyId, intentCategory, createdAt])
 }
 
 // MarketSignal — a country / vertical-scoped signal that doesn't (yet)
@@ -1141,6 +1198,57 @@ model MarketSignal {
 
   @@index([country, signalTypeId, occurredAt])
   @@index([vertical, signalTypeId, occurredAt])
+}
+
+// ─── Phase 3 Scoring Engine (Sprint 3a) ─────────────────────────────
+
+// ScoringConfig — versioned JSONB blob storing all weights, thresholds,
+// and triggers consumed by the scoring engine. Exactly one row has
+// isActive=true at any time. A config edit ships as a new version row
+// + flag flip; full audit trail preserved via the version column.
+//
+// The JSONB shape is validated app-side by `src/lib/scoring/config-
+// validation.ts` (Zod). DB-side we keep it untyped so config-schema
+// migrations don't require Prisma migrations — we only bump version
+// and re-validate at load time.
+model ScoringConfig {
+  id        String   @id @default(cuid())
+  version   Int      @unique
+  isActive  Boolean  @default(false)
+  config    Json     // see ScoringConfigBlob in src/lib/scoring/config-types.ts
+  notes     String?  // changelog message
+  createdBy String?  // employee email
+  createdAt DateTime @default(now())
+
+  @@index([isActive])
+}
+
+// ScoreHistory — audit snapshot per scoring run, per account. Used by
+// the future "score timeline" UI and by the engine itself for delta
+// detection (P-level promotion → BD Telegram alert trigger).
+//
+// Polymorphic FK by design (PRD-004 §2.1.2 / Recon D8): accountId
+// references CrmContact.id OR Company.id, discriminated by accountType.
+// No Prisma `@relation` directive — integrity is enforced app-side at
+// write time. Two indexes (composite + priorityLevel) cover the
+// access patterns: timeline view (accountId + computedAt), and
+// "all P1 promotions in the last week" cross-account queries.
+model ScoreHistory {
+  id            String   @id @default(cuid())
+  accountId     String   // CrmContact.id or Company.id (no FK)
+  accountType   String   // "contact" | "company"
+  configVersion Int      // ScoringConfig.version used for this snapshot
+  icpScore      Float
+  intentScore   Float
+  priorityScore Float
+  priorityLevel String   // "P1" | "P2" | "P3" | "Monitor"
+  signalCount   Int
+  painTier      String?  // T1 | T2 | T3 | null
+  computedAt    DateTime @default(now())
+
+  @@index([accountId, computedAt])
+  @@index([priorityLevel])
+  @@index([configVersion])
 }
 
 // ─── OutreachSequence removed — tracked via Activity + Clay integration ───

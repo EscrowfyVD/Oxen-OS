@@ -96,7 +96,7 @@ Return ONLY valid JSON: {"vertical_match":<0-30>,"geographic_fit":<0-20>,"compan
       data: {
         icpScore: Math.round(total),
         icpFit,
-        icpScoredAt: new Date(),
+        lastScoredAt: new Date(),
         icpScoreBreakdown: {
           vertical_match: scores.vertical_match,
           geographic_fit: scores.geographic_fit,
@@ -126,8 +126,8 @@ export async function POST() {
     const contacts = await prisma.crmContact.findMany({
       where: {
         OR: [
-          { icpScoredAt: null },
-          { icpScoredAt: { lt: sevenDaysAgo } },
+          { lastScoredAt: null },
+          { lastScoredAt: { lt: sevenDaysAgo } },
         ],
       },
       include: {
