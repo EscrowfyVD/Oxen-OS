@@ -224,3 +224,91 @@ describe("computeICPScore", () => {
     expect(result.score).toBe(50)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────
+// DM access — long-form Chief X Officer titles
+// ─────────────────────────────────────────────────────────────────────
+//
+// Regression coverage for the Sprint 3b sample compute miss: Clay /
+// Apollo / LinkedIn emit either the acronym ("CEO") or the expanded
+// form ("Chief Executive Officer") depending on the source row, and
+// both must score identically as "direct" DM access.
+
+describe("computeDecisionMakerAccess — long-form titles", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(prisma.deal.findMany).mockResolvedValue([] as never)
+  })
+
+  it("[18] 'Chief Executive Officer' → direct DM (10pt)", async () => {
+    mockContact({
+      group: "G1",
+      email: "ceo@x.com",
+      jobTitle: "Chief Executive Officer",
+      company: { country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", config)
+    expect(result.breakdown.decisionMakerAccess.level).toBe("direct")
+    expect(result.breakdown.decisionMakerAccess.points).toBe(10)
+  })
+
+  it("[19] 'Chief Financial Officer' → direct DM (10pt)", async () => {
+    mockContact({
+      group: "G1",
+      email: "cfo@x.com",
+      jobTitle: "Chief Financial Officer",
+      company: { country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", config)
+    expect(result.breakdown.decisionMakerAccess.level).toBe("direct")
+    expect(result.breakdown.decisionMakerAccess.points).toBe(10)
+  })
+
+  it("[20] 'Chief Operating Officer' → direct DM (10pt)", async () => {
+    mockContact({
+      group: "G1",
+      email: "coo@x.com",
+      jobTitle: "Chief Operating Officer",
+      company: { country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", config)
+    expect(result.breakdown.decisionMakerAccess.level).toBe("direct")
+    expect(result.breakdown.decisionMakerAccess.points).toBe(10)
+  })
+
+  it("[21] 'Chief Technology Officer' → direct DM (10pt)", async () => {
+    mockContact({
+      group: "G1",
+      email: "cto@x.com",
+      jobTitle: "Chief Technology Officer",
+      company: { country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", config)
+    expect(result.breakdown.decisionMakerAccess.level).toBe("direct")
+    expect(result.breakdown.decisionMakerAccess.points).toBe(10)
+  })
+
+  it("[22] regression: 'CEO' acronym still matches as direct DM", async () => {
+    mockContact({
+      group: "G1",
+      email: "ceo@x.com",
+      jobTitle: "CEO",
+      company: { country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", config)
+    expect(result.breakdown.decisionMakerAccess.level).toBe("direct")
+    expect(result.breakdown.decisionMakerAccess.points).toBe(10)
+  })
+
+  it("[23] case insensitive: 'chief executive officer' → direct DM", async () => {
+    mockContact({
+      group: "G1",
+      email: "ceo@x.com",
+      jobTitle: "chief executive officer",
+      company: { country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", config)
+    expect(result.breakdown.decisionMakerAccess.level).toBe("direct")
+    expect(result.breakdown.decisionMakerAccess.points).toBe(10)
+  })
+})

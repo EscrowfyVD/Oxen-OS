@@ -132,11 +132,20 @@ function computeCompanySize(
 // proxy). Sprint 3c can swap in a real `emailVerified` boolean if
 // the import pipeline starts capturing one.
 
+// Acronyms + their expanded long forms paired together — Clay /
+// LinkedIn / Apollo all emit either variant depending on the source
+// row, and we want both to score identically. Discovered via Sprint
+// 3b sample compute (Tony Zero21 carried "Chief Executive Officer"
+// which the acronym-only regex missed entirely).
 const DIRECT_DM_PATTERNS = [
   /\bCEO\b/i,
+  /\bChief Executive Officer\b/i,
   /\bCFO\b/i,
+  /\bChief Financial Officer\b/i,
   /\bCOO\b/i,
+  /\bChief Operating Officer\b/i,
   /\bCTO\b/i,
+  /\bChief Technology Officer\b/i,
   /\bChairman\b/i,
   /\bPresident\b/i,
   /\bFounder\b/i,
