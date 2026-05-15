@@ -1,11 +1,15 @@
 /**
- * Unit tests for the SignalTypeRegistry seed script (Sprint S1 batch 1).
+ * Unit tests for the SignalTypeRegistry seed script
+ * (Sprint S1 batch 1 + Sprint Trigify Phase 2A).
  *
  * Exercises seedSignalTypes() against a mocked PrismaClient — verifies:
- *   - All 7 expected codes are upserted (4 canonical + 3 placeholder)
+ *   - All 14 expected codes are upserted
+ *     (4 canonical + 7 Trigify + 2 placeholder + 1 deprecated)
  *   - Idempotency: running twice produces the same calls per run
- *   - The generated upsert args have the correct shape (where.code +
- *     create.* fields per spec + empty update)
+ *   - The generated upsert args have the correct shape:
+ *     * Active entries: create with isActive:true + empty update
+ *     * Deprecated entries: create with isActive:false + update forces
+ *       isActive:false on every run
  *
  * No real DB connection is involved.
  */
@@ -26,15 +30,15 @@ function makeMockedPrisma(): PrismaClient {
   } as unknown as PrismaClient
 }
 
-describe("seedSignalTypes (Sprint S1 batch 1)", () => {
-  it("upserts exactly 7 entries (4 canonical + 3 placeholder)", async () => {
+describe("seedSignalTypes (Sprint S1 + Trigify Phase 2A)", () => {
+  it("upserts exactly 14 entries (4 canonical + 7 Trigify + 2 placeholder + 1 deprecated)", async () => {
     const client = makeMockedPrisma()
     const result = await seedSignalTypes(client)
-    expect(result.upserted).toBe(7)
-    expect(result.codes).toHaveLength(7)
+    expect(result.upserted).toBe(14)
+    expect(result.codes).toHaveLength(14)
   })
 
-  it("includes all 4 canonical codes from Vernon's spec", async () => {
+  it("includes all 4 canonical codes from Vernon's Sprint S1 spec", async () => {
     const client = makeMockedPrisma()
     const result = await seedSignalTypes(client)
     expect(result.codes).toContain("clay_business_loss")
@@ -43,30 +47,77 @@ describe("seedSignalTypes (Sprint S1 batch 1)", () => {
     expect(result.codes).toContain("market_country_regulation_change")
   })
 
-  it("includes all 3 webhook back-compat placeholder codes", async () => {
+  it("includes all 7 Trigify Phase 2A codes", async () => {
+    const client = makeMockedPrisma()
+    const result = await seedSignalTypes(client)
+    expect(result.codes).toContain("trigify_oxen_engagement_comment")
+    expect(result.codes).toContain("trigify_oxen_engagement_like")
+    expect(result.codes).toContain("trigify_profile_visit")
+    expect(result.codes).toContain("trigify_competitor_engagement")
+    expect(result.codes).toContain("trigify_follow_competitor")
+    expect(result.codes).toContain("trigify_role_change")
+    expect(result.codes).toContain("trigify_bio_change")
+  })
+
+  it("includes the 2 remaining webhook back-compat placeholder codes", async () => {
     const client = makeMockedPrisma()
     const result = await seedSignalTypes(client)
     expect(result.codes).toContain("clay_legacy_intent")
-    expect(result.codes).toContain("trigify_intent_signal")
     expect(result.codes).toContain("n8n_external_signal")
+  })
+
+  it("includes the deprecated trigify_intent_signal entry", async () => {
+    const client = makeMockedPrisma()
+    const result = await seedSignalTypes(client)
+    expect(result.codes).toContain("trigify_intent_signal")
   })
 
   it("upserts are keyed by `code` (idempotency anchor)", async () => {
     const client = makeMockedPrisma()
     await seedSignalTypes(client)
     const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
-    expect(calls).toHaveLength(7)
+    expect(calls).toHaveLength(14)
     for (const call of calls) {
       const arg = call[0] as {
         where: { code: string }
         create: Record<string, unknown>
-        update: Record<string, unknown>
       }
       expect(arg.where).toHaveProperty("code")
       expect(typeof arg.where.code).toBe("string")
-      // Empty update preserves operator tweaks across re-runs
+    }
+  })
+
+  it("active entries use empty update (preserve operator tweaks)", async () => {
+    const client = makeMockedPrisma()
+    await seedSignalTypes(client)
+    const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
+    const activeCalls = calls.filter((c) => {
+      const arg = c[0] as { where: { code: string } }
+      return arg.where.code !== "trigify_intent_signal"
+    })
+    expect(activeCalls).toHaveLength(13)
+    for (const call of activeCalls) {
+      const arg = call[0] as { update: Record<string, unknown> }
       expect(arg.update).toEqual({})
     }
+  })
+
+  it("trigify_intent_signal is created and updated with isActive=false (deprecated)", async () => {
+    const client = makeMockedPrisma()
+    await seedSignalTypes(client)
+    const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
+    const deprecated = calls.find(
+      (c) =>
+        (c[0] as { where: { code: string } }).where.code ===
+        "trigify_intent_signal",
+    )
+    expect(deprecated).toBeDefined()
+    const arg = deprecated![0] as {
+      create: { isActive: boolean }
+      update: { isActive?: boolean }
+    }
+    expect(arg.create.isActive).toBe(false)
+    expect(arg.update.isActive).toBe(false)
   })
 
   it("clay_business_loss carries the canonical scoring contract", async () => {
@@ -133,18 +184,79 @@ describe("seedSignalTypes (Sprint S1 batch 1)", () => {
     expect(arg.create.decayCurve).toBe("STEP")
   })
 
-  it("idempotent: running twice produces 14 total upsert calls (7 per run)", async () => {
+  it("trigify_profile_visit carries the Phase 2A scoring contract (10pt, 7d, STEP, INTENT)", async () => {
+    const client = makeMockedPrisma()
+    await seedSignalTypes(client)
+    const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
+    const found = calls.find(
+      (c) =>
+        (c[0] as { where: { code: string } }).where.code ===
+        "trigify_profile_visit",
+    )
+    expect(found).toBeDefined()
+    const arg = found![0] as {
+      create: {
+        defaultPoints: number
+        decayDays: number
+        decayCurve: string
+        category: string
+      }
+    }
+    expect(arg.create.defaultPoints).toBe(10)
+    expect(arg.create.decayDays).toBe(7)
+    expect(arg.create.decayCurve).toBe("STEP")
+    expect(arg.create.category).toBe("INTENT")
+  })
+
+  it("trigify_oxen_engagement_comment uses EXPONENTIAL decay over 30 days at 10pt", async () => {
+    const client = makeMockedPrisma()
+    await seedSignalTypes(client)
+    const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
+    const found = calls.find(
+      (c) =>
+        (c[0] as { where: { code: string } }).where.code ===
+        "trigify_oxen_engagement_comment",
+    )
+    expect(found).toBeDefined()
+    const arg = found![0] as {
+      create: {
+        defaultPoints: number
+        decayDays: number
+        decayCurve: string
+      }
+    }
+    expect(arg.create.defaultPoints).toBe(10)
+    expect(arg.create.decayDays).toBe(30)
+    expect(arg.create.decayCurve).toBe("EXPONENTIAL")
+  })
+
+  it("all 7 Trigify seeds carry the INTENT category", async () => {
+    const client = makeMockedPrisma()
+    await seedSignalTypes(client)
+    const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
+    const trigifyActive = calls.filter((c) => {
+      const code = (c[0] as { where: { code: string } }).where.code
+      return code.startsWith("trigify_") && code !== "trigify_intent_signal"
+    })
+    expect(trigifyActive).toHaveLength(7)
+    for (const call of trigifyActive) {
+      const arg = call[0] as { create: { category: string } }
+      expect(arg.create.category).toBe("INTENT")
+    }
+  })
+
+  it("idempotent: running twice produces 28 total upsert calls (14 per run)", async () => {
     const client = makeMockedPrisma()
     await seedSignalTypes(client)
     await seedSignalTypes(client)
     const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
-    expect(calls).toHaveLength(14)
+    expect(calls).toHaveLength(28)
     // Each run hits each code exactly once — no duplicates within a run
     const firstRunCodes = calls
-      .slice(0, 7)
+      .slice(0, 14)
       .map((c) => (c[0] as { where: { code: string } }).where.code)
     const secondRunCodes = calls
-      .slice(7, 14)
+      .slice(14, 28)
       .map((c) => (c[0] as { where: { code: string } }).where.code)
     expect(firstRunCodes).toEqual(secondRunCodes)
   })

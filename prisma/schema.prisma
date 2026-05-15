@@ -465,6 +465,10 @@ model CrmContact {
   @@index([group])
   @@index([painTier])
   @@index([persona])
+  // Sprint Trigify Phase 2A — webhook matches likers by LinkedIn URL (Trigify
+  // does not provide an email in Get Post Likes output). Index supports the
+  // findFirst({ linkedinUrl: insensitive }) lookup on every signal ingest.
+  @@index([linkedinUrl])
 }
 
 model Deal {

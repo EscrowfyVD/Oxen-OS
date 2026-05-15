@@ -51,19 +51,46 @@ export const lemlistWebhookSchema = z.object({
 })
 
 // ─────────────────────────────────────────────────────────────
-// Trigify webhook — job-change / intent signals
-// Payload observed in src/app/api/webhooks/trigify/route.ts
+// Trigify webhook — Phase 2A schema (PRD-002).
+//
+// Trigify "Get Post Likes LinkedIn" action does NOT return liker
+// emails, so the canonical Phase 2A payload uses person_linkedin_url
+// as the primary contact key. The legacy Sprint S1 fields (email,
+// name, title, detail, score, company) are preserved as optional so
+// existing curl tests and any operator scripts using the old shape
+// keep working — the route's matchContact() falls back through them
+// in order.
+//
+// All fields optional because the route gracefully no-ops on payloads
+// it cannot match (returns 200 with action="no_match" rather than 400
+// — Trigify retries on non-2xx and we don't want to flood it).
 // ─────────────────────────────────────────────────────────────
 
 export const trigifyWebhookSchema = z.object({
-  email: z.string().max(320).optional(),
+  // ── Phase 2A canonical fields ──
   signal_type: z.string().max(100).optional(),
+  signal_source: z.string().max(100).optional(),
+  signal_date: z.string().max(100).optional(),
+  person_name: z.string().max(300).optional(),
+  person_linkedin_url: z.string().url().max(500).optional(),
+  person_title: z.string().max(300).optional(),
+  company_name: z.string().max(300).optional(),
+  company_linkedin_url: z.string().url().max(500).optional(),
+  signal_detail: z.string().max(5000).optional(),
+  competitor_name: z.string().max(300).optional(),
+  intent_score_points: z.number().int().min(0).max(1000).optional(),
+  post_url: z.string().url().max(2000).optional(),
+  post_text: z.string().max(10000).optional(),
+  // ── Legacy Sprint S1 fields (backward compat) ──
+  email: z.string().max(320).optional(),
+  name: z.string().max(300).optional(),
   title: z.string().max(500).optional(),
   detail: z.string().max(5000).optional(),
   score: z.number().min(0).max(1000).optional(),
-  name: z.string().max(300).optional(),
   company: z.string().max(300).optional(),
 })
+
+export type TrigifyWebhookPayload = z.infer<typeof trigifyWebhookSchema>
 
 // ─────────────────────────────────────────────────────────────
 // N8N webhook — generic automation dispatcher
