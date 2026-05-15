@@ -1,0 +1,197 @@
+/**
+ * Tests for computeIntentScore (Sprint 3b B2).
+ *
+ * Mock prisma.intentSignal.findMany at the model level; the function
+ * shapes raw signal rows into the IntentScoreResult via applyTimeDecay
+ * + per-category aggregation + 50-cap. We don't mock applyTimeDecay —
+ * it's exercised end-to-end against the canonical v1 config so a bug
+ * in the decay math would surface here too.
+ */
+
+import { describe, it, expect, vi, beforeEach } from "vitest"
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    intentSignal: {
+      findMany: vi.fn(),
+    },
+  },
+}))
+
+import { computeIntentScore } from "./compute-intent-score"
+import { prisma } from "@/lib/prisma"
+import { buildScoringConfigV1 } from "../../../scripts/db/seed-scoring-config"
+
+const config = buildScoringConfigV1()
+const NOW = new Date("2026-05-15T12:00:00Z")
+
+function ageDays(days: number): Date {
+  return new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000)
+}
+
+function sig(overrides: {
+  points: number
+  intentCategory: string | null
+  ageDays?: number
+}) {
+  return {
+    points: overrides.points,
+    intentCategory: overrides.intentCategory,
+    createdAt: ageDays(overrides.ageDays ?? 1),
+  }
+}
+
+describe("computeIntentScore", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("[1] no signals → score 0, signalCount 0", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.score).toBe(0)
+    expect(result.signalCount).toBe(0)
+    expect(result.breakdown.byCategory).toEqual({})
+  })
+
+  it("[2] single recent Cat H 6pts → score 6, breakdown.H = 6", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 6, intentCategory: "H", ageDays: 1 }),
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.score).toBe(6)
+    expect(result.breakdown.byCategory).toEqual({ H: 6 })
+    expect(result.signalCount).toBe(1)
+  })
+
+  it("[3] multiple signals same category → category sum", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 5, intentCategory: "H", ageDays: 1 }),
+      sig({ points: 6, intentCategory: "H", ageDays: 2 }),
+      sig({ points: 3, intentCategory: "H", ageDays: 3 }),
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.breakdown.byCategory.H).toBe(14)
+    expect(result.signalCount).toBe(3)
+  })
+
+  it("[4] multiple categories → per-category breakdown preserved", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 10, intentCategory: "A", ageDays: 1 }),
+      sig({ points: 8, intentCategory: "B", ageDays: 1 }),
+      sig({ points: 6, intentCategory: "H", ageDays: 1 }),
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.breakdown.byCategory).toEqual({ A: 10, B: 8, H: 6 })
+    expect(result.score).toBe(24)
+  })
+
+  it("[5] total > 50 → capped at 50", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 25, intentCategory: "A", ageDays: 1 }),
+      sig({ points: 25, intentCategory: "F", ageDays: 1 }),
+      sig({ points: 20, intentCategory: "E", ageDays: 1 }),
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.score).toBe(50)
+    // Breakdown is NOT capped — preserves explain-UI visibility into
+    // the raw contributions.
+    const sum = Object.values(result.breakdown.byCategory).reduce((a, b) => a + b, 0)
+    expect(sum).toBe(70)
+  })
+
+  it("[6] 15-day-old signal → decayed to 0.75x in breakdown", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 12, intentCategory: "H", ageDays: 15 }),
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.breakdown.byCategory.H).toBe(9) // 12 * 0.75
+  })
+
+  it("[7] expired signals excluded (decayed = 0)", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 12, intentCategory: "H", ageDays: 1 }),
+      // Note: the route's `since` filter would normally drop this,
+      // but the in-memory aggregator must also defend against it.
+      sig({ points: 12, intentCategory: "A", ageDays: 200 }),
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.score).toBe(12)
+    expect(result.breakdown.byCategory.A).toBeUndefined()
+    expect(result.signalCount).toBe(1)
+  })
+
+  it("[8] signalCount only counts non-expired contributors", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 10, intentCategory: "A", ageDays: 1 }),
+      sig({ points: 10, intentCategory: "B", ageDays: 1 }),
+      sig({ points: 10, intentCategory: "F", ageDays: 999 }), // expired
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.signalCount).toBe(2)
+  })
+
+  it("[9] signalCountByCategory tracks per-category contributions", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 5, intentCategory: "H", ageDays: 1 }),
+      sig({ points: 5, intentCategory: "H", ageDays: 2 }),
+      sig({ points: 10, intentCategory: "A", ageDays: 1 }),
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.signalCountByCategory).toEqual({ H: 2, A: 1 })
+  })
+
+  it("[10] accountType='contact' → filters by contactId only", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
+    await computeIntentScore("ct-x", "contact", config, NOW)
+    const callArg = vi.mocked(prisma.intentSignal.findMany).mock.calls[0][0]!
+    expect(callArg.where).toMatchObject({ contactId: "ct-x" })
+    expect(callArg.where).not.toHaveProperty("companyId")
+  })
+
+  it("[11] accountType='company' → filters by companyId only", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
+    await computeIntentScore("co-y", "company", config, NOW)
+    const callArg = vi.mocked(prisma.intentSignal.findMany).mock.calls[0][0]!
+    expect(callArg.where).toMatchObject({ companyId: "co-y" })
+    expect(callArg.where).not.toHaveProperty("contactId")
+  })
+
+  it("[12] DB query excludes intentCategory NULL placeholders", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
+    await computeIntentScore("ct-x", "contact", config, NOW)
+    const callArg = vi.mocked(prisma.intentSignal.findMany).mock.calls[0][0]!
+    expect(callArg.where).toMatchObject({
+      intentCategory: { not: null },
+    })
+  })
+
+  it("[13] DB query filters by lookback window (90d from v1 config)", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
+    await computeIntentScore("ct-x", "contact", config, NOW)
+    const callArg = vi.mocked(prisma.intentSignal.findMany).mock.calls[0][0]!
+    const since = (callArg.where as { createdAt: { gte: Date } }).createdAt.gte
+    expect(since).toBeInstanceOf(Date)
+    const days = (NOW.getTime() - since.getTime()) / (1000 * 60 * 60 * 24)
+    expect(days).toBe(90)
+  })
+
+  it("[14] exact score = 50 → returns 50 (no over/under-cap)", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 25, intentCategory: "A", ageDays: 1 }),
+      sig({ points: 25, intentCategory: "F", ageDays: 1 }),
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.score).toBe(50)
+  })
+
+  it("[15] mix of recent + decayed → only weighted contribution counted", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 12, intentCategory: "H", ageDays: 1 }), // 12 * 1.0 = 12
+      sig({ points: 12, intentCategory: "H", ageDays: 60 }), // 12 * 0.5 = 6
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW)
+    expect(result.breakdown.byCategory.H).toBe(18)
+    expect(result.score).toBe(18)
+  })
+})
