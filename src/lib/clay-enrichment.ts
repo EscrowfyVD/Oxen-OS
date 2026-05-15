@@ -76,6 +76,23 @@ export async function assignRandomBD(): Promise<string | null> {
 // (consumed by both /api/webhooks/clay-enrichment and the CSV import).
 // ──────────────────────────────────────────────────────────────────────
 
+// Canonical acquisitionSource label written by upsertPersonFromClay on
+// CREATE. Hotfix R0 (Phase 3 recon, 2026-05-15) — pre-fix, the helper
+// silently left CrmContact.acquisitionSource NULL for 597 rows because
+// no one wrote it at upsert time. PRD-004 ICP scoring depends on this
+// label being set, so Sprint S0.5 lineage is retroactively pinned to
+// "Clay / Outbound Sequence" (matches the ACQUISITION_SOURCES
+// whitelist in crm-config.ts).
+//
+// Scope note: only CrmContact has acquisitionSource — Company tracks
+// origin via the `enrichmentSource` enum (already set to "clay" by
+// the helpers below). So this fix is contact-only.
+//
+// On UPDATE we only set this if the existing value is null — a
+// contact created via Conference / Referral and later re-enriched
+// via Clay must keep its original provenance.
+const CLAY_ACQUISITION_SOURCE = "Clay / Outbound Sequence"
+
 export type ClayUpsertResult =
   | {
       ok: true
@@ -246,19 +263,26 @@ export async function upsertPersonFromClay(
 
   const existing = await prisma.crmContact.findFirst({
     where: { email: { equals: email, mode: "insensitive" } },
-    select: { id: true, dealOwner: true },
+    // Include acquisitionSource so we can preserve any prior value
+    // (Conference / Referral / etc.) on Clay re-enrichment.
+    select: { id: true, dealOwner: true, acquisitionSource: true },
   })
 
   if (existing) {
     // PRESERVE existing.dealOwner (intentional — re-enrichment must
     // not reassign). firstName/lastName only updated if Clay sent
     // non-null values (they are required non-nullable on CrmContact).
+    // acquisitionSource also preserved if already set — only backfill
+    // legacy rows where it is null.
     await prisma.crmContact.update({
       where: { id: existing.id },
       data: {
         ...personFieldsCommon,
         firstName: p.firstName ?? undefined,
         lastName: p.lastName ?? undefined,
+        ...(existing.acquisitionSource
+          ? {}
+          : { acquisitionSource: CLAY_ACQUISITION_SOURCE }),
       },
     })
     return {
@@ -287,6 +311,7 @@ export async function upsertPersonFromClay(
       lastName: p.lastName ?? "",
       email,
       dealOwner: dealOwnerName,
+      acquisitionSource: CLAY_ACQUISITION_SOURCE,
     },
   })
 
