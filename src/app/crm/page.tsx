@@ -392,15 +392,20 @@ export default function CrmPage() {
                 [
                   { id: "dashboard", label: "Dashboard" },
                   { id: "pipeline", label: "Pipeline" },
+                  { id: "intent-feed", label: "Intent Feed" },
                   { id: "contacts", label: "Contacts" },
                   { id: "companies", label: "Companies" },
                   { id: "outreach", label: "Outreach" },
                   { id: "reports", label: "Reports" },
-                ] as { id: SubNav; label: string }[]
+                ] as { id: SubNav | "intent-feed"; label: string }[]
               ).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => {
+                    if (tab.id === "intent-feed") {
+                      router.push("/crm/intent-feed")
+                      return
+                    }
                     if (tab.id === "contacts") {
                       router.push("/crm/contacts")
                       return
@@ -409,7 +414,7 @@ export default function CrmPage() {
                       router.push("/crm/outreach")
                       return
                     }
-                    setSubNav(tab.id)
+                    setSubNav(tab.id as SubNav)
                   }}
                   style={{
                     padding: "6px 14px",

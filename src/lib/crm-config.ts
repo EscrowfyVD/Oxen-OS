@@ -103,9 +103,26 @@ for (const s of PIPELINE_STAGES) {
   STAGE_LABELS[s.id] = s.label
   STAGE_COLORS[s.id] = s.color
 }
+// "intent_sourced" is a lifecycle stage but NOT a pipeline stage —
+// it represents contacts auto-created by the Trigify webhook before
+// any human qualification. Added to STAGE_LABELS so filter dropdowns
+// and slide-overs can render the label without breaking on lookup.
+STAGE_LABELS["intent_sourced"] = "Intent Sourced"
+STAGE_COLORS["intent_sourced"] = "#7BAFD4"
+STAGE_PROBABILITY["intent_sourced"] = 0.02
 
-// ─── Lifecycle Stages (mirrors pipeline for contacts) ───
-export const LIFECYCLE_STAGES = PIPELINE_STAGES.map((s) => s.id)
+// ─── Lifecycle Stages (mirrors pipeline + Trigify pre-pipeline) ───
+//
+// "intent_sourced" is inserted after "new_lead" so Trigify-auto-created
+// contacts are visible in /crm/contacts filters (R2 fix from the Intent
+// Feed pre-sprint audit). Not a PIPELINE_STAGES entry — pipeline views
+// (forecast, kanban, revenue) intentionally skip this stage because it
+// has no probability/value attached.
+export const LIFECYCLE_STAGES = [
+  "new_lead",
+  "intent_sourced",
+  ...PIPELINE_STAGES.slice(1).map((s) => s.id),
+] as const
 
 // ─── Acquisition Sources ───
 export const ACQUISITION_SOURCES = [
