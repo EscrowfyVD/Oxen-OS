@@ -21,6 +21,7 @@ import {
   Search,
   Tent,
   Settings,
+  ClipboardCheck,
   LogOut,
   type LucideIcon,
 } from "lucide-react"
@@ -50,6 +51,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Intel", href: "/intel", icon: Search, badge: null, count: null },
   { label: "Conferences", href: "/conferences", icon: Tent, badge: null, count: null },
   { label: "Finance", href: "/finance", icon: Wallet, badge: null, count: null, pageKey: "finance" },
+  // SP16-002 — placed right before Compliance for visual grouping
+  // (same audience: Compliance/Legal dept + manager+). Hidden by the
+  // ONBOARDING_CONSOLE_ENABLED flag check in the navItems filter below.
+  { label: "Onboarding", href: "/onboarding", icon: ClipboardCheck, badge: null, count: null, pageKey: "onboarding" },
   { label: "Compliance", href: "/compliance", icon: ShieldCheck, badge: null, count: null, pageKey: "compliance" },
   { label: "Support", href: "/support", icon: Headphones, badge: null, count: null },
   // ── INTERNAL ──
@@ -72,6 +77,10 @@ export default function Sidebar() {
   const [userAvatarColor, setUserAvatarColor] = useState<string | null>(null)
   const [userIcon, setUserIcon] = useState<string | null>(null)
   const [userInitialsFromApi, setUserInitialsFromApi] = useState<string | null>(null)
+  // SP16-002 — feature flag resolved server-side, surfaced via /api/me
+  // so we can hide the Onboarding nav entry when the env flag is off
+  // without leaking the flag name into the client bundle.
+  const [onboardingEnabled, setOnboardingEnabled] = useState(false)
 
   useEffect(() => {
     fetch("/api/wiki?limit=1")
@@ -93,6 +102,9 @@ export default function Sidebar() {
           setUserIcon(data.employee.icon ?? null)
           setUserInitialsFromApi(data.employee.initials ?? null)
         }
+        if (data.featureFlags?.onboardingConsole) {
+          setOnboardingEnabled(true)
+        }
       })
       .catch(() => {})
   }, [session?.user?.email])
@@ -100,6 +112,10 @@ export default function Sidebar() {
   const navItems = NAV_ITEMS
     .filter((item) => {
       if (item.pageKey && !canAccessPage(userRole, userDepartment, item.pageKey)) return false
+      // SP16-002 — flag-gated nav. The page-access rule alone is not
+      // enough: when ONBOARDING_CONSOLE_ENABLED is off on prod, the
+      // module ships dark even to users who would otherwise qualify.
+      if (item.pageKey === "onboarding" && !onboardingEnabled) return false
       return true
     })
     .map((item) =>
