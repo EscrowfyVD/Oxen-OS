@@ -16,6 +16,7 @@ import StatusStrip from "./StatusStrip"
 import SectionPanel from "./SectionPanel"
 import ChatPanel from "./ChatPanel"
 import AuditPanel from "./AuditPanel"
+import DocumentsPanel from "./DocumentsPanel"
 import type { ConsolidatedSession, SectionPayload } from "./detail-types"
 import type { ProxyErrorBody } from "./types"
 
@@ -293,7 +294,7 @@ export default function OnboardingDetail({ id }: { id: string }) {
                   payload={payload}
                 />
               ))}
-              {renderSummaryAsSection("Documents", state.payload.documents)}
+              <DocumentsPanel documents={state.payload.documents} />
               {state.payload.cases && (
                 <SectionPanel
                   title={`Cases (${state.payload.cases.open_count} open)`}

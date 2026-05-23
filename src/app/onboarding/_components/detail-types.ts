@@ -47,6 +47,22 @@ export interface ChatSummary {
   total: number
 }
 
+// SP16-002b §2 — DocumentRow pinned against OCA staging on 2026-05-22.
+// All fields except id+file_name optional so a partially-populated
+// document still renders. Cases / screening / audit shapes are
+// updated in the SP16-002b §3 + §4 commits, not here, so this commit
+// can be atomic + build-green.
+
+export interface DocumentRow {
+  id: string
+  file_name: string
+  doc_type?: string | null
+  validation_status?: string | null
+  processing_status?: string | null
+  extraction_failed?: boolean | null
+  created_at?: string | null
+}
+
 export interface CaseItem {
   id: string
   type?: string | null
@@ -69,9 +85,10 @@ export interface AuditEvent {
 }
 
 /**
- * The consolidated GET payload. `data` / `documents` / `verifications`
- * / `screening` / `operator_audit` are loose to absorb upstream shape
- * drift — the panel components null-check every field they render.
+ * The consolidated GET payload. `data` / `verifications` /
+ * `screening` stay loose to absorb upstream shape drift — the
+ * SectionPanel null-checks every field it renders. `documents` is
+ * pinned to the verified DocumentRow[] shape (SP16-002b §2).
  */
 export interface ConsolidatedSession {
   // session core mirrors the list row plus possibly more timestamps.
@@ -79,7 +96,7 @@ export interface ConsolidatedSession {
   data: DataBlobs
   blocker_reason: BlockerReason | null
   chat: ChatSummary
-  documents: Record<string, unknown> | null
+  documents: DocumentRow[] | null
   cases: CasesSummary | null
   verifications: Record<string, unknown> | null
   screening: Record<string, unknown> | null
