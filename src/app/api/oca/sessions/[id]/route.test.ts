@@ -78,7 +78,7 @@ describe("GET /api/oca/sessions/[id]", () => {
   it("[1] happy path: proxies OCA 200 + consolidated session data", async () => {
     fetchSpy.mockResolvedValue(
       mockOcaResponse(200, {
-        session: { id: "sess-abc-123", status: "collecting" },
+        session: { id: "sess-abc-123", status: "active" },
         data: { personal_info: { _source_first_name: "user" } },
         chat: { messages: [], truncated: false, total: 0 },
       }),

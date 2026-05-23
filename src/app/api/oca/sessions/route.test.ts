@@ -87,7 +87,7 @@ describe("GET /api/oca/sessions", () => {
   it("[1] happy path: proxies OCA 200 + data verbatim", async () => {
     fetchSpy.mockResolvedValue(
       mockOcaResponse(200, {
-        data: [{ id: "sess-1", status: "collecting" }],
+        data: [{ id: "sess-1", status: "active" }],
         total: 1,
         page: 1,
         limit: 20,
@@ -177,11 +177,11 @@ describe("GET /api/oca/sessions", () => {
   // ─── [9] Query params forwarded ────────────────────────────────────
   it("[9] forwards query params verbatim to upstream URL", async () => {
     fetchSpy.mockResolvedValue(mockOcaResponse(200, { data: [], total: 0, page: 2, limit: 50 }))
-    await GET(makeReq("platform=escrowfy&status=collecting,blocked&page=2&limit=50"))
+    await GET(makeReq("platform=escrowfy&status=active,review&page=2&limit=50"))
     const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
     expect(url).toContain("/api/admin/sessions")
     expect(url).toContain("platform=escrowfy")
-    expect(url).toContain("status=collecting%2Cblocked") // URLSearchParams encodes comma
+    expect(url).toContain("status=active%2Creview") // URLSearchParams encodes comma
     expect(url).toContain("page=2")
     expect(url).toContain("limit=50")
   })
