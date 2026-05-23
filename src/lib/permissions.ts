@@ -42,6 +42,11 @@ export const PAGE_ACCESS: Record<string, DeptAccessRule> = {
   crm: { denyDepartments: ["Compliance"] },
   intel: { minRole: "manager" },
   compliance: { minRole: "manager", allowDepartments: ["Compliance", "Legal"] },
+  // SP16-002 onboarding console — mirrors compliance access rule (same
+  // audience: KYB sessions are operated by the same humans who manage
+  // policies / incidents). Gated additionally by the
+  // ONBOARDING_CONSOLE_ENABLED env flag (src/lib/onboarding/feature-flag.ts).
+  onboarding: { minRole: "manager", allowDepartments: ["Compliance", "Legal"] },
 }
 
 /**
