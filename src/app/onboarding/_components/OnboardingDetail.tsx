@@ -276,8 +276,10 @@ export default function OnboardingDetail({ id }: { id: string }) {
             </div>
           </div>
 
-          {/* Top status strip + blocker_reason */}
-          <StatusStrip payload={state.payload} />
+          {/* Top status strip + blocker_reason. SP16-003 — the
+              agent toggle inside StatusStrip uses loadSession() as
+              the hybrid optimistic+refetch callback. */}
+          <StatusStrip payload={state.payload} onAfterAction={loadSession} />
 
           {/* 2-column responsive layout */}
           <div
