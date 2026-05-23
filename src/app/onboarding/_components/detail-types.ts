@@ -63,12 +63,18 @@ export interface DocumentRow {
   created_at?: string | null
 }
 
+// SP16-002b §3 — CaseItem pinned against OCA staging on 2026-05-22.
+// All fields except id optional so a partially-populated case still
+// renders. Pre-fix the type used invented field names (type/summary/
+// createdAt) — replaced with the real OCA fields (case_type/title/
+// created_at) and the new severity field.
 export interface CaseItem {
   id: string
-  type?: string | null
+  case_type?: string | null
+  severity?: string | null
   status?: string | null
-  summary?: string | null
-  createdAt?: string | null
+  title?: string | null
+  created_at?: string | null
 }
 
 export interface CasesSummary {
