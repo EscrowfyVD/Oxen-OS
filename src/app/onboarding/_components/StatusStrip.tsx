@@ -11,6 +11,7 @@ import { CRM_COLORS } from "@/lib/crm-config"
 import { classifyIdle, statusColor, riskColor } from "./format"
 import type { ConsolidatedSession } from "./detail-types"
 import AgentToggleControl from "./AgentToggleControl"
+import ReopenControl from "./ReopenControl"
 
 const TEXT = CRM_COLORS.text_primary
 const TEXT2 = CRM_COLORS.text_secondary
@@ -95,6 +96,16 @@ export default function StatusStrip({
           idle {idle.label}
         </span>
         <span style={{ flex: 1 }} />
+        {/* SP16-003 Slice 4 — reopen button, conditionally
+            rendered (only when session.status === "rejected" — the
+            component self-gates and returns null otherwise). */}
+        <ReopenControl
+          sessionId={s.id}
+          sessionStatus={s.status}
+          legalRepName={s.legal_rep_name}
+          companyName={s.company_name}
+          onAfterAction={onAfterAction}
+        />
         <AgentToggleControl
           sessionId={s.id}
           agentActive={s.agent_active}
