@@ -43,11 +43,13 @@ describe("classifyIdle", () => {
 })
 
 describe("statusColor", () => {
-  it("returns canonical color for known statuses", () => {
-    expect(statusColor("collecting")).toBe("#3B82F6")
-    expect(statusColor("blocked")).toBe("#FBBF24")
-    expect(statusColor("closed_success")).toBe("#34D399")
-    expect(statusColor("closed_failed")).toBe("#F87171")
+  it("returns canonical color for the 5 real OCA KybSession.status values", () => {
+    // SP16-002b — verified against OCA staging on 2026-05-22.
+    expect(statusColor("active")).toBe("#3B82F6")
+    expect(statusColor("review")).toBe("#FBBF24")
+    expect(statusColor("paused")).toBe("#9CA3AF")
+    expect(statusColor("rejected")).toBe("#F87171")
+    expect(statusColor("completed")).toBe("#34D399")
   })
   it("falls back to neutral gray for unknown statuses (no crash)", () => {
     expect(statusColor("totally_new_status")).toBe("#9CA3AF")

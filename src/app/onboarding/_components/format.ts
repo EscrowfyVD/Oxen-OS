@@ -63,12 +63,18 @@ export function classifyIdle(minutes: number | null | undefined): {
  * sees a colorless badge. Per-status colors can be tuned in §12 Q4
  * follow-up without touching the UI components.
  */
+// SP16-002b — verified against OCA staging on 2026-05-22. The 5
+// values map to the real KybSession.status enum exposed by
+// /api/admin/sessions. The OnboardingFilters chip vocabulary and the
+// SessionRow badge use the same set, so a filterable status is also
+// a renderable status (and vice-versa). Unknown values still render
+// in neutral gray — defensive, in case OCA adds a new status mid-flight.
 const STATUS_COLOR: Record<string, string> = {
-  collecting: "#3B82F6",     // indigo — in progress
-  blocked: "#FBBF24",        // amber — operator action needed
-  closed_success: "#34D399", // green
-  closed_failed: "#F87171",  // red
-  closed_abandoned: "#9CA3AF", // gray
+  active: "#3B82F6",    // indigo — session in progress (user interacting)
+  review: "#FBBF24",    // amber — operator action needed
+  paused: "#9CA3AF",    // gray — agent paused, awaiting resume
+  rejected: "#F87171",  // red — terminated unsuccessfully
+  completed: "#34D399", // green — terminated successfully
 }
 
 export function statusColor(status: string): string {

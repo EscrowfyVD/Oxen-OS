@@ -38,12 +38,21 @@ const labelStyle: React.CSSProperties = {
 // appear in the dropdown. Per RECON Q4, this can be replaced by a
 // dynamic options fetch later — not V1.
 const PLATFORM_OPTIONS = ["all", "escrowfy", "oxen"]
+// SP16-002b — verified against OCA staging on 2026-05-22. The original
+// SP16-002 list ("collecting"/"blocked"/"closed_*") was a guess and
+// did not match any real OCA status value, which made e.g. `review`
+// sessions un-filterable. The 5-value set below mirrors the
+// KybSession.status enum used by OCA (`active` + `review` confirmed
+// live; `paused`, `rejected`, `completed` per the SP15 contract). The
+// value strings on the wire are lowercase; the labels are
+// human-readable. Both the chip and the row badge use these values
+// via statusColor() in format.ts.
 const STATUS_OPTIONS = [
-  { v: "collecting", label: "Collecting" },
-  { v: "blocked", label: "Blocked" },
-  { v: "closed_success", label: "Closed (success)" },
-  { v: "closed_failed", label: "Closed (failed)" },
-  { v: "closed_abandoned", label: "Closed (abandoned)" },
+  { v: "active", label: "Active" },
+  { v: "review", label: "In review" },
+  { v: "paused", label: "Paused" },
+  { v: "rejected", label: "Rejected" },
+  { v: "completed", label: "Completed" },
 ]
 const ENTITY_TYPE_OPTIONS = ["all", "company", "individual"]
 

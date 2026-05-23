@@ -16,6 +16,9 @@ import StatusStrip from "./StatusStrip"
 import SectionPanel from "./SectionPanel"
 import ChatPanel from "./ChatPanel"
 import AuditPanel from "./AuditPanel"
+import DocumentsPanel from "./DocumentsPanel"
+import CasesPanel from "./CasesPanel"
+import ScreeningPanel from "./ScreeningPanel"
 import type { ConsolidatedSession, SectionPayload } from "./detail-types"
 import type { ProxyErrorBody } from "./types"
 
@@ -293,18 +296,10 @@ export default function OnboardingDetail({ id }: { id: string }) {
                   payload={payload}
                 />
               ))}
-              {renderSummaryAsSection("Documents", state.payload.documents)}
-              {state.payload.cases && (
-                <SectionPanel
-                  title={`Cases (${state.payload.cases.open_count} open)`}
-                  payload={{
-                    open_count: state.payload.cases.open_count,
-                    items: state.payload.cases.items,
-                  }}
-                />
-              )}
+              <DocumentsPanel documents={state.payload.documents} />
+              <CasesPanel cases={state.payload.cases} />
               {renderSummaryAsSection("Verifications", state.payload.verifications)}
-              {renderSummaryAsSection("Screening", state.payload.screening)}
+              <ScreeningPanel screening={state.payload.screening} />
             </div>
 
             {/* RIGHT — chat + audit */}

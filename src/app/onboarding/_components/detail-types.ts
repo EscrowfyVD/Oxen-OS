@@ -47,12 +47,34 @@ export interface ChatSummary {
   total: number
 }
 
+// SP16-002b §2 — DocumentRow pinned against OCA staging on 2026-05-22.
+// All fields except id+file_name optional so a partially-populated
+// document still renders. Cases / screening / audit shapes are
+// updated in the SP16-002b §3 + §4 commits, not here, so this commit
+// can be atomic + build-green.
+
+export interface DocumentRow {
+  id: string
+  file_name: string
+  doc_type?: string | null
+  validation_status?: string | null
+  processing_status?: string | null
+  extraction_failed?: boolean | null
+  created_at?: string | null
+}
+
+// SP16-002b §3 — CaseItem pinned against OCA staging on 2026-05-22.
+// All fields except id optional so a partially-populated case still
+// renders. Pre-fix the type used invented field names (type/summary/
+// createdAt) — replaced with the real OCA fields (case_type/title/
+// created_at) and the new severity field.
 export interface CaseItem {
   id: string
-  type?: string | null
+  case_type?: string | null
+  severity?: string | null
   status?: string | null
-  summary?: string | null
-  createdAt?: string | null
+  title?: string | null
+  created_at?: string | null
 }
 
 export interface CasesSummary {
@@ -60,18 +82,42 @@ export interface CasesSummary {
   items: CaseItem[]
 }
 
+/**
+ * SP16-002b §4 — AuditEvent pinned against OCA staging on 2026-05-22.
+ * Real OCA field names:
+ *   - `actor` (NOT `operator_email`) holds the source identifier.
+ *     Example values seen live: `operator:vd@oxen.finance`,
+ *     `lifecycle-emitter`, `agent`.
+ *   - `created_at` (NOT camelCase `createdAt`) — proxy is pass-through,
+ *     no key normalization.
+ *   - `payload` (NOT `details`) is the arbitrary metadata blob.
+ *   - No `id` field is returned upstream — the AuditPanel synthesizes
+ *     a React key from action+created_at when listing.
+ */
 export interface AuditEvent {
-  id: string
-  operator_email: string | null
+  actor: string | null
   action: string
-  details?: string | Record<string, unknown> | null
-  createdAt: string
+  payload?: Record<string, unknown> | null
+  created_at: string
 }
 
 /**
- * The consolidated GET payload. `data` / `documents` / `verifications`
- * / `screening` / `operator_audit` are loose to absorb upstream shape
- * drift — the panel components null-check every field they render.
+ * SP16-002b §4 — ScreeningSummary pinned against OCA staging
+ * on 2026-05-22. `total: 0, by_result: {}` is the empty case the
+ * SectionPanel rendered as the literal "By Result: {}" pre-fix.
+ * Now consumed by a typed Screening renderer that shows an
+ * empty/"none" state when total === 0.
+ */
+export interface ScreeningSummary {
+  total: number
+  by_result: Record<string, number>
+}
+
+/**
+ * The consolidated GET payload. `data` / `verifications` stay loose
+ * to absorb upstream shape drift — the SectionPanel null-checks
+ * every field it renders. `documents` / `cases` / `screening` /
+ * `operator_audit` are pinned to verified shapes (SP16-002b §2-§4).
  */
 export interface ConsolidatedSession {
   // session core mirrors the list row plus possibly more timestamps.
@@ -79,10 +125,10 @@ export interface ConsolidatedSession {
   data: DataBlobs
   blocker_reason: BlockerReason | null
   chat: ChatSummary
-  documents: Record<string, unknown> | null
+  documents: DocumentRow[] | null
   cases: CasesSummary | null
   verifications: Record<string, unknown> | null
-  screening: Record<string, unknown> | null
+  screening: ScreeningSummary | null
   operator_audit: AuditEvent[]
 }
 
