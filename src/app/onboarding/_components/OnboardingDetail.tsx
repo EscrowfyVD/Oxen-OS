@@ -18,6 +18,7 @@ import ChatPanel from "./ChatPanel"
 import AuditPanel from "./AuditPanel"
 import DocumentsPanel from "./DocumentsPanel"
 import CasesPanel from "./CasesPanel"
+import ScreeningPanel from "./ScreeningPanel"
 import type { ConsolidatedSession, SectionPayload } from "./detail-types"
 import type { ProxyErrorBody } from "./types"
 
@@ -298,7 +299,7 @@ export default function OnboardingDetail({ id }: { id: string }) {
               <DocumentsPanel documents={state.payload.documents} />
               <CasesPanel cases={state.payload.cases} />
               {renderSummaryAsSection("Verifications", state.payload.verifications)}
-              {renderSummaryAsSection("Screening", state.payload.screening)}
+              <ScreeningPanel screening={state.payload.screening} />
             </div>
 
             {/* RIGHT — chat + audit */}
