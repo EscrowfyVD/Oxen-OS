@@ -41,48 +41,73 @@ function renderSummaryAsSection(
 }
 
 export default function OnboardingDetail({ id }: { id: string }) {
+  // Initial useState value carries the "loading" sentinel — avoids
+  // calling setState synchronously inside the fetch effect, which
+  // React 19's `react-hooks/set-state-in-effect` lint rejects. The
+  // effect only setStates AFTER the await (asynchronously) — safe.
   const [state, setState] = useState<LoadState>({ kind: "loading" })
 
-  const fetchSession = useCallback(async () => {
-    setState({ kind: "loading" })
-    try {
-      const res = await fetch(`/api/oca/sessions/${encodeURIComponent(id)}`, {
-        cache: "no-store",
-      })
-      const body = await res.json().catch(() => null)
-      if (res.status === 404) {
-        setState({ kind: "not_found" })
-        return
-      }
-      if (res.status === 403) {
-        const err = body as ProxyErrorBody | null
-        if (err && "error" in err && err.error === "not_authorized") {
+  const loadSession = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const res = await fetch(`/api/oca/sessions/${encodeURIComponent(id)}`, {
+          cache: "no-store",
+          signal,
+        })
+        const body = await res.json().catch(() => null)
+        if (res.status === 404) {
+          setState({ kind: "not_found" })
+          return
+        }
+        if (res.status === 403) {
+          const err = body as ProxyErrorBody | null
+          if (err && "error" in err && err.error === "not_authorized") {
+            setState({
+              kind: "not_authorized",
+              message:
+                err.message ??
+                "Your account is not authorized for the OCA operator console.",
+            })
+            return
+          }
+        }
+        if (!res.ok) {
+          const err = body as ProxyErrorBody | null
           setState({
-            kind: "not_authorized",
-            message:
-              err.message ??
-              "Your account is not authorized for the OCA operator console.",
+            kind: "error",
+            message: err?.message ?? `Failed to load session (HTTP ${res.status})`,
           })
           return
         }
+        setState({ kind: "ready", payload: body as ConsolidatedSession })
+      } catch (err) {
+        if ((err as Error)?.name === "AbortError") return
+        setState({ kind: "error", message: "Network error loading session" })
       }
-      if (!res.ok) {
-        const err = body as ProxyErrorBody | null
-        setState({
-          kind: "error",
-          message: err?.message ?? `Failed to load session (HTTP ${res.status})`,
-        })
-        return
-      }
-      setState({ kind: "ready", payload: body as ConsolidatedSession })
-    } catch {
-      setState({ kind: "error", message: "Network error loading session" })
-    }
-  }, [id])
+    },
+    [id],
+  )
 
   useEffect(() => {
-    fetchSession()
-  }, [fetchSession])
+    const ac = new AbortController()
+    // react-hooks/set-state-in-effect over-fires here: loadSession is
+    // async and every setState inside it happens AFTER the await (no
+    // synchronous render cascade). The AbortController cleanup pairs
+    // with the abort-aware catch in loadSession so a stale request
+    // never reaches setState. Same pattern as OnboardingList, where
+    // the rule does not fire because the setState path is
+    // conditional on a parameter.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSession(ac.signal)
+    return () => ac.abort()
+  }, [loadSession])
+
+  // Retry handler — called from event-handler context (button click),
+  // setState here is fine (not inside an effect).
+  const handleRetry = useCallback(() => {
+    setState({ kind: "loading" })
+    loadSession()
+  }, [loadSession])
 
   return (
     <div
@@ -193,7 +218,7 @@ export default function OnboardingDetail({ id }: { id: string }) {
           </div>
           <div style={{ marginBottom: 12 }}>{state.message}</div>
           <button
-            onClick={fetchSession}
+            onClick={handleRetry}
             style={{
               background: "transparent",
               border: `1px solid ${CRM_COLORS.card_border}`,
