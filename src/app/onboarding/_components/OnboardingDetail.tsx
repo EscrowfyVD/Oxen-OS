@@ -306,7 +306,11 @@ export default function OnboardingDetail({ id }: { id: string }) {
 
             {/* RIGHT — chat + audit */}
             <div style={{ minWidth: 0 }}>
-              <ChatPanel chat={state.payload.chat} />
+              <ChatPanel
+                chat={state.payload.chat}
+                sessionId={state.payload.session.id}
+                onAfterAction={loadSession}
+              />
               <AuditPanel events={state.payload.operator_audit ?? []} />
             </div>
           </div>
