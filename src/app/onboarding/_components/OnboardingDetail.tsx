@@ -276,8 +276,10 @@ export default function OnboardingDetail({ id }: { id: string }) {
             </div>
           </div>
 
-          {/* Top status strip + blocker_reason */}
-          <StatusStrip payload={state.payload} />
+          {/* Top status strip + blocker_reason. SP16-003 — the
+              agent toggle inside StatusStrip uses loadSession() as
+              the hybrid optimistic+refetch callback. */}
+          <StatusStrip payload={state.payload} onAfterAction={loadSession} />
 
           {/* 2-column responsive layout */}
           <div
@@ -304,7 +306,11 @@ export default function OnboardingDetail({ id }: { id: string }) {
 
             {/* RIGHT — chat + audit */}
             <div style={{ minWidth: 0 }}>
-              <ChatPanel chat={state.payload.chat} />
+              <ChatPanel
+                chat={state.payload.chat}
+                sessionId={state.payload.session.id}
+                onAfterAction={loadSession}
+              />
               <AuditPanel events={state.payload.operator_audit ?? []} />
             </div>
           </div>

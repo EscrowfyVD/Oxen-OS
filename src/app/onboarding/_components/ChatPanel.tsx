@@ -1,11 +1,22 @@
 "use client"
 
-// Read-only chat transcript. Bubbles per role (user / ai / operator /
-// system). Truncation banner when OCA returned the last-50 cap.
+// Chat transcript + operator composer.
+//
+// SP16-002 shipped this as read-only (transcript-only). SP16-003 Slice 3
+// added the inline operator composer below the transcript + the optimistic
+// pending-bubble rendering for messages in flight. Pending bubbles look
+// like operator bubbles with reduced opacity and a "Sending…" / "Failed"
+// state subtitle. They live alongside the canonical chat.messages and
+// disappear once the refetch lands the server-side canonical message.
 
+import { useState } from "react"
 import { CRM_COLORS } from "@/lib/crm-config"
 import { formatTimestamp } from "./format"
 import type { ChatMessage, ChatSummary } from "./detail-types"
+import MessageComposer, {
+  type PendingMessage,
+  type PendingMessageActions,
+} from "./MessageComposer"
 
 const TEXT = CRM_COLORS.text_primary
 const TEXT2 = CRM_COLORS.text_secondary
@@ -107,7 +118,81 @@ function Bubble({ msg }: { msg: ChatMessage }) {
   )
 }
 
-export default function ChatPanel({ chat }: { chat: ChatSummary | null }) {
+function PendingBubble({ msg }: { msg: PendingMessage }) {
+  // Renders like an operator bubble but with reduced opacity + a
+  // "Sending…" or red error subtitle. Stays in the transcript until
+  // the operator dismisses it (V1 only auto-removes on success).
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        marginBottom: 12,
+        fontFamily: "'DM Sans', sans-serif",
+        opacity: msg.error ? 1 : 0.6,
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "78%",
+          padding: "10px 14px",
+          background: "rgba(192,139,136,0.10)",
+          border: `1px solid ${msg.error ? "#F87171" : "rgba(192,139,136,0.35)"}`,
+          borderRadius: 12,
+          fontSize: 12,
+          color: TEXT,
+          lineHeight: 1.5,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        {msg.content}
+      </div>
+      <div
+        style={{
+          marginTop: 4,
+          fontSize: 10,
+          color: TEXT3,
+          display: "flex",
+          gap: 8,
+          alignItems: "center",
+        }}
+      >
+        <span style={{ color: "#C08B88", fontWeight: 600 }}>Operator</span>
+        <span style={{ color: msg.error ? "#F87171" : TEXT3 }}>
+          · {msg.error ?? "Sending…"}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+export default function ChatPanel({
+  chat,
+  sessionId,
+  onAfterAction,
+}: {
+  chat: ChatSummary | null
+  /** SP16-003 — required for the operator composer to know what
+   *  session to POST messages to. */
+  sessionId: string
+  /** SP16-003 — refetch the consolidated GET after a message lands. */
+  onAfterAction: () => Promise<void> | void
+}) {
+  const [pending, setPending] = useState<PendingMessage[]>([])
+
+  const pendingActions: PendingMessageActions = {
+    add: (tempId, content) =>
+      setPending((prev) => [...prev, { tempId, content, error: null }]),
+    remove: (tempId) =>
+      setPending((prev) => prev.filter((p) => p.tempId !== tempId)),
+    setError: (tempId, error) =>
+      setPending((prev) =>
+        prev.map((p) => (p.tempId === tempId ? { ...p, error } : p)),
+      ),
+  }
+
   return (
     <div
       style={{
@@ -157,7 +242,7 @@ export default function ChatPanel({ chat }: { chat: ChatSummary | null }) {
         </div>
       )}
 
-      {!chat || chat.messages.length === 0 ? (
+      {(!chat || chat.messages.length === 0) && pending.length === 0 ? (
         <div style={{ fontSize: 12, color: TEXT3, fontStyle: "italic" }}>
           No messages
         </div>
@@ -169,11 +254,20 @@ export default function ChatPanel({ chat }: { chat: ChatSummary | null }) {
             paddingRight: 6,
           }}
         >
-          {chat.messages.map((m) => (
+          {chat?.messages.map((m) => (
             <Bubble key={m.id} msg={m} />
+          ))}
+          {pending.map((p) => (
+            <PendingBubble key={p.tempId} msg={p} />
           ))}
         </div>
       )}
+
+      <MessageComposer
+        sessionId={sessionId}
+        pendingActions={pendingActions}
+        onAfterAction={onAfterAction}
+      />
     </div>
   )
 }

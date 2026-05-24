@@ -1,8 +1,11 @@
 // Server-side proxy helper for the OCA operator API.
 //
 // SP16-002 ships read-only GET proxies under /api/oca/sessions[/[id]].
-// All proxy routes share the same auth + env + error-mapping shape;
-// this helper centralizes it so each route handler is two lines.
+// SP16-003 adds 3 mutation routes (PATCH /agent, POST /messages,
+// POST /reopen). All proxy routes share the same 7-gate contract;
+// `proxyOcaJson` is the shared helper, with `proxyOcaGet` kept as a
+// 1-line backward-compatible wrapper so SP16-002 callers stay
+// untouched.
 //
 // Security contract (CRITICAL):
 //   - OCA_OPERATOR_API_KEY is read from server-only env (no
@@ -12,7 +15,8 @@
 //     session (`await auth()` via `requirePageAccess()`). The browser
 //     CANNOT forge or override it — even if the inbound request
 //     carries its own x-operator-email header, we ignore it and set
-//     our own from the session.
+//     our own from the session. The OCA audit log attributes the
+//     mutation to the real operator: `actor: "operator:<email>"`.
 //   - The ONBOARDING_CONSOLE_ENABLED flag gates every proxy call
 //     identically to the /onboarding/* pages: when off, the route
 //     surface returns 404 (invisible to unauthenticated probes too).
@@ -22,6 +26,12 @@
 //     recognizable message the UI can render as "your account is not
 //     on OCA's OPERATOR_ALLOWLIST_EMAILS yet" (distinct from a
 //     generic 500 so the user knows to ask Vernon, not retry).
+//   - Upstream OCA 409 → 409 `{ error: "status_conflict" }` (SP16-003)
+//     — only the reopen route triggers this, when called on a session
+//     whose status is not `rejected`. Distinct from "OCA upstream
+//     returned some 4xx" so the UI can refetch + drop the button
+//     (the session status changed in another tab between render and
+//     click).
 //   - Network error / OCA unreachable → 502 `{ error: "oca_unreachable" }`.
 //   - Any other non-2xx → pass-through with original status code.
 //   - 2xx → pass-through body verbatim.
@@ -36,6 +46,8 @@ export interface OcaProxyEnv {
   apiKey: string
 }
 
+export type OcaMutationMethod = "PATCH" | "POST" | "PUT" | "DELETE"
+
 /**
  * Read OCA env at call time (not module-init) so dev-server env
  * flips don't require a restart, and so tests can mutate
@@ -49,21 +61,28 @@ function readOcaEnv(): OcaProxyEnv | null {
 }
 
 /**
- * Proxy a GET request to the OCA operator API.
+ * Shared JSON-over-HTTP proxy helper. Both `proxyOcaGet` and
+ * `proxyOcaMutation` are thin wrappers — this is where the 7 gates
+ * live.
  *
- * @param request — the inbound Next.js Request (used for logger context only)
- * @param upstreamPath — the OCA path, e.g. "/api/admin/sessions"
- * @param upstreamQuery — optional query params to forward verbatim
- *                        (caller has already pre-validated via Zod
- *                        if it cares; the proxy itself is shape-blind)
+ * @param method        — HTTP method to forward
+ * @param request       — the inbound Next.js Request (used for logger context only)
+ * @param upstreamPath  — the OCA path, e.g. "/api/admin/sessions/:id/agent"
+ * @param opts.query    — optional URLSearchParams forwarded verbatim
+ * @param opts.body     — optional JSON-serializable body (mutation methods only)
  */
-export async function proxyOcaGet(
+export async function proxyOcaJson(
+  method: "GET" | OcaMutationMethod,
   request: Request,
   upstreamPath: string,
-  upstreamQuery?: URLSearchParams,
+  opts: {
+    query?: URLSearchParams
+    body?: unknown
+  } = {},
 ): Promise<Response> {
   const log = childLoggerFromRequest(request).child({
     proxy: "oca",
+    method,
     path: upstreamPath,
   })
 
@@ -106,20 +125,31 @@ export async function proxyOcaGet(
 
   // 5. Build upstream URL.
   const qs =
-    upstreamQuery && upstreamQuery.toString().length > 0
-      ? `?${upstreamQuery.toString()}`
+    opts.query && opts.query.toString().length > 0
+      ? `?${opts.query.toString()}`
       : ""
   const url = `${env.baseUrl}${upstreamPath}${qs}`
 
   // 6. Fetch + map errors.
+  //    The "x-operator-email" header is derived SERVER-SIDE (above) —
+  //    if the inbound request carries its own, it has already been
+  //    discarded; we use the session's email.
+  const headers: Record<string, string> = {
+    "x-api-key": env.apiKey,
+    "x-operator-email": operatorEmail,
+  }
+  let bodyInit: string | undefined
+  if (opts.body !== undefined) {
+    headers["content-type"] = "application/json"
+    bodyInit = JSON.stringify(opts.body)
+  }
+
   let upstream: Response
   try {
     upstream = await fetch(url, {
-      method: "GET",
-      headers: {
-        "x-api-key": env.apiKey,
-        "x-operator-email": operatorEmail,
-      },
+      method,
+      headers,
+      body: bodyInit,
       cache: "no-store",
     })
   } catch (err) {
@@ -135,7 +165,7 @@ export async function proxyOcaGet(
     )
   }
 
-  // 7. Distinct allowlist-mismatch mapping.
+  // 7a. Distinct allowlist-mismatch mapping (any method).
   if (upstream.status === 401) {
     log.warn(
       { operatorEmail },
@@ -152,8 +182,59 @@ export async function proxyOcaGet(
     )
   }
 
+  // 7b. Distinct status-conflict mapping for the reopen path. Any
+  //     409 from OCA flows through here — today only `reopen` produces
+  //     one (when status !== "rejected"); future endpoints emitting
+  //     409 for unrelated reasons would also map cleanly, since the
+  //     UI semantic ("the resource is not in the right state — refetch
+  //     to find out") is the same.
+  if (upstream.status === 409) {
+    log.warn({ method, path: upstreamPath }, "OCA returned 409 — status conflict")
+    const upstreamBody = await upstream.json().catch(() => null)
+    return NextResponse.json(
+      {
+        error: "status_conflict",
+        message:
+          (upstreamBody && typeof upstreamBody === "object" && "message" in upstreamBody
+            ? String(upstreamBody.message)
+            : null) ??
+          "The session is not in the right state for this action. " +
+            "Refresh to see its current status.",
+        upstream: upstreamBody,
+      },
+      { status: 409 },
+    )
+  }
+
   // 8. Pass-through (status + body). Body parse failures (e.g. OCA
   //    returns plain-text 500) fall through to null body.
   const body = await upstream.json().catch(() => null)
   return NextResponse.json(body, { status: upstream.status })
+}
+
+/**
+ * Backward-compatible GET wrapper. SP16-002 routes call this and
+ * stay unchanged. Internally delegates to proxyOcaJson.
+ */
+export async function proxyOcaGet(
+  request: Request,
+  upstreamPath: string,
+  upstreamQuery?: URLSearchParams,
+): Promise<Response> {
+  return proxyOcaJson("GET", request, upstreamPath, { query: upstreamQuery })
+}
+
+/**
+ * Mutation wrapper. SP16-003 routes call this with method + JSON body.
+ * The body is forwarded as-is — callers are expected to have already
+ * run their inbound body through a per-route Zod schema (the proxy
+ * itself is shape-blind beyond requiring `unknown`).
+ */
+export async function proxyOcaMutation(
+  method: OcaMutationMethod,
+  request: Request,
+  upstreamPath: string,
+  body: unknown,
+): Promise<Response> {
+  return proxyOcaJson(method, request, upstreamPath, { body })
 }

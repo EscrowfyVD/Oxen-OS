@@ -2,10 +2,16 @@
 
 // Top strip on the detail page — at-a-glance status: platform, status,
 // risk, idle, agent_active, plus a blocker_reason banner if present.
+//
+// SP16-003 Slice 2: the agent_active indicator was a static dot+label
+// in SP16-002 ; it now renders <AgentToggleControl /> which makes it
+// clickable (takeover / hand-back). Everything else stays static.
 
 import { CRM_COLORS } from "@/lib/crm-config"
 import { classifyIdle, statusColor, riskColor } from "./format"
 import type { ConsolidatedSession } from "./detail-types"
+import AgentToggleControl from "./AgentToggleControl"
+import ReopenControl from "./ReopenControl"
 
 const TEXT = CRM_COLORS.text_primary
 const TEXT2 = CRM_COLORS.text_secondary
@@ -39,8 +45,15 @@ const IDLE_COLOR: Record<string, string> = {
 
 export default function StatusStrip({
   payload,
+  onAfterAction,
 }: {
   payload: ConsolidatedSession
+  /**
+   * SP16-003 — refetch the consolidated session after an operator
+   * action mutates state. Wired to OnboardingDetail.loadSession so
+   * the hybrid optimistic+refetch UX settles on canonical data.
+   */
+  onAfterAction: () => Promise<void> | void
 }) {
   const s = payload.session
   const idle = classifyIdle(s.idle_minutes)
@@ -83,27 +96,21 @@ export default function StatusStrip({
           idle {idle.label}
         </span>
         <span style={{ flex: 1 }} />
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 12,
-            color: TEXT2,
-          }}
-        >
-          <span
-            aria-label={s.agent_active ? "agent active" : "agent idle"}
-            style={{
-              display: "inline-block",
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: s.agent_active ? "#34D399" : "#6B7280",
-            }}
-          />
-          {s.agent_active ? "Agent active" : "Agent idle"}
-        </span>
+        {/* SP16-003 Slice 4 — reopen button, conditionally
+            rendered (only when session.status === "rejected" — the
+            component self-gates and returns null otherwise). */}
+        <ReopenControl
+          sessionId={s.id}
+          sessionStatus={s.status}
+          legalRepName={s.legal_rep_name}
+          companyName={s.company_name}
+          onAfterAction={onAfterAction}
+        />
+        <AgentToggleControl
+          sessionId={s.id}
+          agentActive={s.agent_active}
+          onAfterAction={onAfterAction}
+        />
       </div>
 
       {payload.blocker_reason && (
