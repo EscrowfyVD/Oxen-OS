@@ -11,6 +11,10 @@ import {
   statusColor,
   riskColor,
 } from "./format"
+import {
+  labelForEntityType,
+  labelForOnboardingStep,
+} from "@/lib/onboarding/labels"
 import type { SessionRow as SessionRowData } from "./types"
 
 const TEXT = CRM_COLORS.text_primary
@@ -106,7 +110,7 @@ export default function SessionRow({ row }: { row: SessionRowData }) {
         >
           {row.company_name || "—"}
         </div>
-        <div style={{ fontSize: 11, color: TEXT3 }}>{row.entity_type}</div>
+        <div style={{ fontSize: 11, color: TEXT3 }}>{labelForEntityType(row.entity_type)}</div>
       </div>
 
       {/* Platform */}
@@ -128,7 +132,7 @@ export default function SessionRow({ row }: { row: SessionRowData }) {
               whiteSpace: "nowrap",
             }}
           >
-            {row.current_step}
+            {labelForOnboardingStep(row.current_step)}
           </div>
         )}
       </div>

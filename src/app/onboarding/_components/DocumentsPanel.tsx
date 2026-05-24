@@ -13,6 +13,11 @@
 // here so a partially-populated document still renders.
 
 import { CRM_COLORS } from "@/lib/crm-config"
+import {
+  labelForDocType,
+  labelForDocValidationStatus,
+  humanizeToken,
+} from "@/lib/onboarding/labels"
 import { formatTimestamp } from "./format"
 import type { DocumentRow } from "./detail-types"
 
@@ -109,7 +114,7 @@ export default function DocumentsPanel({ documents }: { documents: DocumentRow[]
                 >
                   <span style={{ color: TEXT, fontWeight: 500 }}>{doc.file_name}</span>
                   {doc.doc_type && (
-                    <span style={{ color: TEXT3, fontSize: 11 }}>· {doc.doc_type}</span>
+                    <span style={{ color: TEXT3, fontSize: 11 }}>· {labelForDocType(doc.doc_type)}</span>
                   )}
                   {doc.extraction_failed && (
                     <span style={pillStyle("#F87171")}>extraction failed</span>
@@ -127,10 +132,10 @@ export default function DocumentsPanel({ documents }: { documents: DocumentRow[]
                   }}
                 >
                   {validation && validationColor && (
-                    <span style={pillStyle(validationColor)}>{validation}</span>
+                    <span style={pillStyle(validationColor)}>{labelForDocValidationStatus(validation)}</span>
                   )}
                   {processing && processingColor && (
-                    <span style={pillStyle(processingColor)}>{processing}</span>
+                    <span style={pillStyle(processingColor)}>{humanizeToken(processing)}</span>
                   )}
                   {doc.created_at && (
                     <span style={{ color: TEXT3 }}>· {formatTimestamp(doc.created_at)}</span>

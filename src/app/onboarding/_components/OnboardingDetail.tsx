@@ -18,6 +18,10 @@ import ChatPanel from "./ChatPanel"
 import AuditPanel from "./AuditPanel"
 import DocumentsPanel from "./DocumentsPanel"
 import CasesPanel from "./CasesPanel"
+import {
+  labelForEntityType,
+  labelForOnboardingStep,
+} from "@/lib/onboarding/labels"
 import ScreeningPanel from "./ScreeningPanel"
 import type { ConsolidatedSession, SectionPayload } from "./detail-types"
 import type { ProxyErrorBody } from "./types"
@@ -264,12 +268,12 @@ export default function OnboardingDetail({ id }: { id: string }) {
             >
               {state.payload.session.legal_rep_email}
               {" · "}
-              {state.payload.session.entity_type}
+              {labelForEntityType(state.payload.session.entity_type)}
               {state.payload.session.current_step && (
                 <>
                   {" · "}step{" "}
                   <span style={{ color: TEXT2 }}>
-                    {state.payload.session.current_step}
+                    {labelForOnboardingStep(state.payload.session.current_step)}
                   </span>
                 </>
               )}

@@ -26,11 +26,14 @@ describe("DocumentsPanel", () => {
     expect(out).toContain("No documents uploaded yet")
   })
 
-  it("renders one row per document with file_name + doc_type", () => {
+  it("renders one row per document with file_name + doc_type (humanized)", () => {
     const out = html([
       {
         id: "d1",
         file_name: "passport.pdf",
+        // "passport" is not in the DocType enum (test fixture; not
+        // upstream-validated) — labelForDocType falls through to
+        // humanizeToken, yielding "Passport".
         doc_type: "passport",
         validation_status: "validated",
         processing_status: "done",
@@ -44,9 +47,11 @@ describe("DocumentsPanel", () => {
       },
     ])
     expect(out).toContain("passport.pdf")
-    expect(out).toContain("passport")
+    expect(out).toContain("Passport")
     expect(out).toContain("incorporation.pdf")
-    expect(out).toContain("incorporation_doc")
+    expect(out).toContain("Incorporation doc")
+    // Raw underscore token must NOT leak through.
+    expect(out).not.toContain("incorporation_doc")
     // No "No documents" empty-state copy when rows are present.
     expect(out).not.toContain("No documents uploaded yet")
   })
@@ -70,7 +75,7 @@ describe("DocumentsPanel", () => {
     expect(out).not.toContain("extraction failed")
   })
 
-  it("renders validation_status + processing_status pills when present", () => {
+  it("renders validation_status + processing_status pills when present (humanized)", () => {
     const out = html([
       {
         id: "d1",
@@ -79,8 +84,12 @@ describe("DocumentsPanel", () => {
         processing_status: "done",
       },
     ])
-    expect(out).toContain("validated")
-    expect(out).toContain("done")
+    // labelForDocValidationStatus falls through to humanizeToken for
+    // "validated" (not in the upstream DocValidationStatus enum which
+    // uses `valid` — test fixture is intentionally loose to exercise
+    // the fallback). processing_status is always humanize-generic.
+    expect(out).toContain("Validated")
+    expect(out).toContain("Done")
   })
 
   it("renders defensively when only file_name is set (all other fields missing)", () => {

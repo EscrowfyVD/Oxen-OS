@@ -32,7 +32,7 @@ describe("CasesPanel", () => {
     expect(out).toContain("Cases (2 open)")
   })
 
-  it("renders severity + status + case_type + title + date for a full row", () => {
+  it("renders severity + status + case_type + title + date for a full row (humanized labels)", () => {
     const out = html({
       open_count: 1,
       items: [
@@ -46,10 +46,19 @@ describe("CasesPanel", () => {
         },
       ],
     })
-    expect(out).toContain("high")
-    expect(out).toContain("new")
-    expect(out).toContain("smoke_test_escalation")
+    // SP16-004 — these fields render via labelForCaseSeverity /
+    // humanizeToken, so the user sees "High" / "New" / "Smoke test
+    // escalation" (badges' CSS uppercase styling preserves uppercase
+    // pills regardless). Tests assert the humanized form to lock in
+    // the label module's wiring; the raw enum values would also pass
+    // a case-insensitive match but the explicit humanized assertion
+    // catches a regression to raw.
+    expect(out).toContain("High")
+    expect(out).toContain("New")
+    expect(out).toContain("Smoke test escalation")
     expect(out).toContain("SP15-001 SMOKE TEST")
+    // Raw underscore tokens must NOT leak through.
+    expect(out).not.toContain("smoke_test_escalation")
     // No raw JSON dump.
     expect(out).not.toContain('"id":"c1"')
   })
