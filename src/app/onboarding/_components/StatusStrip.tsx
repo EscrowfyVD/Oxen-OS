@@ -9,6 +9,7 @@
 
 import { CRM_COLORS } from "@/lib/crm-config"
 import { classifyIdle, statusColor, riskColor } from "./format"
+import { labelForBlockerReason } from "@/lib/onboarding/labels"
 import type { ConsolidatedSession } from "./detail-types"
 import AgentToggleControl from "./AgentToggleControl"
 import ReopenControl from "./ReopenControl"
@@ -134,7 +135,7 @@ export default function StatusStrip({
               marginBottom: 4,
             }}
           >
-            Blocker · {payload.blocker_reason.code}
+            Blocker · {labelForBlockerReason(payload.blocker_reason.code)}
           </div>
           <div style={{ fontSize: 13, color: TEXT, lineHeight: 1.5 }}>
             {payload.blocker_reason.message}

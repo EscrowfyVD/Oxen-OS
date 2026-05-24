@@ -12,6 +12,10 @@
 
 import { CRM_COLORS } from "@/lib/crm-config"
 import { formatTimestamp } from "./format"
+import {
+  labelForCaseSeverity,
+  humanizeToken,
+} from "@/lib/onboarding/labels"
 import type { CasesSummary } from "./detail-types"
 
 const TEXT = CRM_COLORS.text_primary
@@ -111,13 +115,13 @@ export default function CasesPanel({ cases }: { cases: CasesSummary | null }) {
                   }}
                 >
                   {c.severity && severityColor && (
-                    <span style={pillStyle(severityColor)}>{c.severity}</span>
+                    <span style={pillStyle(severityColor)}>{labelForCaseSeverity(c.severity)}</span>
                   )}
                   {c.status && statusColor && (
-                    <span style={pillStyle(statusColor)}>{c.status}</span>
+                    <span style={pillStyle(statusColor)}>{humanizeToken(c.status)}</span>
                   )}
                   {c.case_type && (
-                    <span style={{ color: TEXT2, fontSize: 11 }}>{c.case_type}</span>
+                    <span style={{ color: TEXT2, fontSize: 11 }}>{humanizeToken(c.case_type)}</span>
                   )}
                 </div>
                 {c.title && (
