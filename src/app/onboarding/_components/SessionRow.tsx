@@ -14,6 +14,7 @@ import {
 import {
   labelForEntityType,
   labelForOnboardingStep,
+  labelForRiskLevel,
 } from "@/lib/onboarding/labels"
 import type { SessionRow as SessionRowData } from "./types"
 
@@ -137,11 +138,15 @@ export default function SessionRow({ row }: { row: SessionRowData }) {
         )}
       </div>
 
-      {/* Risk score + level */}
+      {/* Risk score + level. SP16-005 — pill label flows through
+          labelForRiskLevel so an OCA enum value renders cleanly
+          ("standard" → "Standard" → CSS-uppercased to "STANDARD" in
+          the badge). Null state: a single muted "—" — never an
+          empty colored pill, never the word "null". */}
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {row.risk_level && (
           <span style={badgeStyle(riskColor(row.risk_level))}>
-            {row.risk_level}
+            {labelForRiskLevel(row.risk_level)}
           </span>
         )}
         {row.risk_score !== null && (
