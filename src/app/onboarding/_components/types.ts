@@ -7,7 +7,14 @@
 // docs/sprint-16/SP16_002_RECON.md Context anchors.
 
 export type SessionStatus = string
-export type SessionRiskLevel = "low" | "medium" | "high" | "critical" | string
+// OCA Prisma `RiskLevel` enum — verified against
+// /Users/vd/Code/oxen-compliance-agent/prisma/schema.prisma on
+// 2026-05-24 (SP16-005 Step 0). Only 2 values upstream. The trailing
+// `string` union keeps forward-compat for an OCA enum addition
+// without requiring a console redeploy — the unknown value renders
+// in neutral gray via riskColor()'s fallback and via humanizeToken
+// via labelForRiskLevel().
+export type SessionRiskLevel = "standard" | "high" | string
 
 export interface SessionRow {
   id: string

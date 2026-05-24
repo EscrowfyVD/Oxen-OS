@@ -9,7 +9,7 @@
 
 import { CRM_COLORS } from "@/lib/crm-config"
 import { classifyIdle, statusColor, riskColor } from "./format"
-import { labelForBlockerReason } from "@/lib/onboarding/labels"
+import { labelForBlockerReason, labelForRiskLevel } from "@/lib/onboarding/labels"
 import type { ConsolidatedSession } from "./detail-types"
 import AgentToggleControl from "./AgentToggleControl"
 import ReopenControl from "./ReopenControl"
@@ -77,10 +77,24 @@ export default function StatusStrip({
       >
         <span style={badgeStyle("#A78BFA")}>{s.platform}</span>
         <span style={badgeStyle(statusColor(s.status))}>{s.status}</span>
-        {s.risk_level && (
+        {/* Risk — SP16-005. risk_level + risk_score come from OCA's
+            AdminSessionView DTO (admin-session-view.ts:76-77). Both
+            are nullable: OCA only sets them once the session has
+            progressed past TRIAGE into risk assessment. When null
+            we render a clear muted "Risk: Not yet assessed" instead
+            of just hiding — the absence is informative (operator
+            knows assessment hasn't happened, not that we forgot to
+            render). When present: pill in the OCA-RiskLevel color
+            (Slice 1 RISK_COLOR pin) + label via labelForRiskLevel
+            + the numeric score inline. */}
+        {s.risk_level ? (
           <span style={badgeStyle(riskColor(s.risk_level))}>
-            {s.risk_level}
+            {labelForRiskLevel(s.risk_level)}
             {s.risk_score !== null && ` · ${s.risk_score}`}
+          </span>
+        ) : (
+          <span style={{ fontSize: 12, color: TEXT3, fontStyle: "italic" }}>
+            Risk: not yet assessed
           </span>
         )}
         <span

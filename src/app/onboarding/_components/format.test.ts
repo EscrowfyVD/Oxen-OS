@@ -57,12 +57,23 @@ describe("statusColor", () => {
 })
 
 describe("riskColor", () => {
-  it("returns canonical color for known risk levels", () => {
-    expect(riskColor("low")).toBe("#34D399")
+  it("returns canonical color for the 2 real OCA RiskLevel values", () => {
+    // SP16-005 — verified against
+    // /Users/vd/Code/oxen-compliance-agent/prisma/schema.prisma on
+    // 2026-05-24. Only 2 values upstream; the SP16-002 RISK_COLOR
+    // keyed on low/medium/high/critical (a guess) — the actual
+    // `standard` value rendered as gray, which this fix corrects.
+    expect(riskColor("standard")).toBe("#34D399")
     expect(riskColor("high")).toBe("#F87171")
   })
   it("null / unknown → neutral gray", () => {
     expect(riskColor(null)).toBe("#9CA3AF")
     expect(riskColor("very_high")).toBe("#9CA3AF")
+    // Legacy SP16-002 values (low/medium/critical) are NOT in the
+    // OCA enum — they now fall through to the gray fallback. This
+    // assertion locks in the pinned behavior.
+    expect(riskColor("low")).toBe("#9CA3AF")
+    expect(riskColor("medium")).toBe("#9CA3AF")
+    expect(riskColor("critical")).toBe("#9CA3AF")
   })
 })
