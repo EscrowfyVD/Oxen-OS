@@ -179,8 +179,16 @@ describe("labelForPersonRole", () => {
 
 describe("remaining maps — at least one known + fallback per", () => {
   it("labelForRiskLevel", () => {
+    // SP16-005 — pinned to the verified OCA RiskLevel enum (2 values:
+    // `standard`, `high`). The map covers both ; unknowns fall through
+    // to humanizeToken (the SP16-002 legacy "low"/"medium"/"critical"
+    // values are NOT in OCA's enum and will land here as fallbacks).
     expect(labelForRiskLevel("standard")).toBe("Standard")
-    expect(labelForRiskLevel("critical")).toBe("Critical") // unknown → fallback
+    expect(labelForRiskLevel("high")).toBe("High")
+    expect(labelForRiskLevel("critical")).toBe("Critical") // unknown → humanizeToken fallback
+    expect(labelForRiskLevel("very_high")).toBe("Very high")
+    expect(labelForRiskLevel(null)).toBe("")
+    expect(labelForRiskLevel(undefined)).toBe("")
   })
   it("labelForDocValidationStatus", () => {
     expect(labelForDocValidationStatus("deferred")).toBe("Deferred")

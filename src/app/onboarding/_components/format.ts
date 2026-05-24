@@ -81,11 +81,20 @@ export function statusColor(status: string): string {
   return STATUS_COLOR[status] ?? "#9CA3AF"
 }
 
+// SP16-005 — pin to the verified OCA Prisma RiskLevel enum.
+// /Users/vd/Code/oxen-compliance-agent/prisma/schema.prisma → 2 values:
+//   - `standard` — green (lower risk)
+//   - `high`     — red   (escalated risk)
+//
+// The SP16-002 RISK_COLOR keyed on `low/medium/high/critical` — a
+// speculative guess that mis-rendered OCA's real `standard` value as
+// the gray fallback. Pinning fixes that. Unknown values still render
+// gray via the fallback — defensive for a future OCA enum addition
+// (the trailing `string` in SessionRiskLevel preserves type-side
+// flexibility too).
 const RISK_COLOR: Record<string, string> = {
-  low: "#34D399",
-  medium: "#FBBF24",
+  standard: "#34D399",
   high: "#F87171",
-  critical: "#F87171",
 }
 
 export function riskColor(level: string | null | undefined): string {
