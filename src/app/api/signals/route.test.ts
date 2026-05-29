@@ -85,6 +85,10 @@ const INTENT_REGISTRY = {
   decayDays: 90,
   decayCurve: "LINEAR",
   category: "INTENT",
+  // Sprint 3a categorical axes — the writer must copy these onto the row.
+  intentCategory: "A",
+  signalLevel: "contact",
+  triggerType: "rapid",
   isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -292,6 +296,9 @@ describe("POST /api/signals (Sprint S1 batch 2)", () => {
     expect(args.data.companyId).toBe("co-42") // ← denormalized
     expect(args.data.signalTypeId).toBe("reg-intent-1")
     expect(args.data.points).toBe(10) // default from registry
+    // Allumage gate — categorical axes copied from the registry onto the row.
+    expect(args.data.intentCategory).toBe("A")
+    expect(args.data.signalLevel).toBe("contact")
   })
 
   it("[12] scope=company happy path — companyId set, contactId null", async () => {
@@ -454,5 +461,35 @@ describe("POST /api/signals (Sprint S1 batch 2)", () => {
     )
     expect(res.status).toBe(404)
     expect(prisma.intentSignal.create).not.toHaveBeenCalled()
+  })
+
+  // ─── Allumage gate — uncategorized placeholder stays null ─────────
+  it("[19] stamps null intentCategory for a placeholder (uncategorized) registry entry", async () => {
+    vi.mocked(prisma.signalTypeRegistry.findUnique).mockResolvedValue({
+      ...INTENT_REGISTRY,
+      code: "clay_legacy_intent",
+      intentCategory: null, // legacy / un-categorized — must pass through as null
+      signalLevel: "contact",
+    } as never)
+    vi.mocked(prisma.crmContact.findUnique).mockResolvedValue({
+      id: "ct-ph",
+      companyId: null,
+    } as never)
+    vi.mocked(prisma.intentSignal.create).mockResolvedValue({
+      id: "sig-ph",
+    } as never)
+
+    const res = await POST(
+      makeReq({
+        scope: "contact",
+        contactId: "ct-ph",
+        signalTypeCode: "clay_legacy_intent",
+      }),
+    )
+    expect(res.status).toBe(200)
+    const args = vi.mocked(prisma.intentSignal.create).mock.calls[0][0]
+    // Null category passes through → computeIntentScore correctly skips it.
+    expect(args.data.intentCategory).toBeNull()
+    expect(args.data.signalLevel).toBe("contact")
   })
 })

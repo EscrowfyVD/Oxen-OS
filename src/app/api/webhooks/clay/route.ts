@@ -59,6 +59,13 @@ export async function POST(request: Request) {
         detail: typeof data === "string" ? data : JSON.stringify(data),
         points: score ?? 10,
         expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+        // Sprint 3a categorical axes — copied from the (placeholder) registry.
+        // clay_legacy_intent has intentCategory=null, so these signals stay
+        // correctly excluded from the A-I Intent score until this route is
+        // rewired to canonical codes (sub-backlog). Stamping it now closes the
+        // "column added, writer not wired" gap uniformly across all writers.
+        intentCategory: registryEntry.intentCategory,
+        signalLevel: registryEntry.signalLevel,
         metadata: body,
       },
     })

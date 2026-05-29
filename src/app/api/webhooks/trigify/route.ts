@@ -133,6 +133,14 @@ export async function POST(request: Request) {
         points,
         expiresAt,
         createdAt: occurredAt,
+        // Allumage GATE (Sprint 3a categorical axes) — copy the registry's
+        // intentCategory + signalLevel ONTO the row. computeIntentScore
+        // filters `intentCategory != null` on the IntentSignal itself, so a
+        // Trigify signal written without this scores 0 → priority level never
+        // moves → no promotion → no BD alert. This is the switch that makes
+        // the reactive loop produce score movement once Trigify is flipped.
+        intentCategory: registryEntry.intentCategory,
+        signalLevel: registryEntry.signalLevel,
         sourceUrl: payload.post_url ?? null,
         metadata: {
           signal_detail: payload.signal_detail ?? null,

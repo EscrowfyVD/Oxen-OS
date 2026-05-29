@@ -116,6 +116,9 @@ const REGISTRY_ENTRIES: Record<string, unknown> = {
     code: "trigify_competitor_engagement",
     label: "Trigify — Competitor engagement",
     category: "INTENT",
+    // Sprint 3a categorical axes — the route must copy these onto the signal.
+    intentCategory: "C",
+    signalLevel: "contact",
     defaultPoints: 6,
     decayDays: 60,
     decayCurve: "LINEAR",
@@ -705,6 +708,29 @@ describe("POST /api/webhooks/trigify (Phase 2A)", () => {
       expect(data.metadata.signal_detail).toBe("Liked competitor post")
       expect(data.metadata.post_url).toBe(TRIGIFY_PAYLOAD_VALID.post_url)
       expect(data.metadata.raw_payload).toBeDefined()
+    })
+
+    it("[10.5] stamps intentCategory + signalLevel from the registry (allumage gate)", async () => {
+      vi.mocked(prisma.crmContact.findFirst).mockResolvedValueOnce({
+        id: "ct-x",
+        email: "e@x.com",
+        firstName: "X",
+        lastName: "Y",
+        linkedinUrl: TRIGIFY_PAYLOAD_VALID.person_linkedin_url,
+        companyId: null,
+      } as never)
+      await POST(makeReq(TRIGIFY_PAYLOAD_VALID))
+      const args = vi.mocked(prisma.intentSignal.create).mock.calls[0][0]
+      const data = (
+        args as {
+          data: { intentCategory: string | null; signalLevel: string | null }
+        }
+      ).data
+      // Without this denormalization the signal lands NULL-category and
+      // computeIntentScore skips it → priority never moves → no promotion,
+      // no BD alert. This assertion guards the reactive loop's ignition.
+      expect(data.intentCategory).toBe("C")
+      expect(data.signalLevel).toBe("contact")
     })
   })
 })

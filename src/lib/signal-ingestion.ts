@@ -227,6 +227,14 @@ export async function ingestSignal(
           metadata: metadataInput,
           sourceUrl: payload.sourceUrl ?? null,
           notes: payload.notes ?? null,
+          // Sprint 3a categorical axes — denormalized from the registry onto
+          // the row. computeIntentScore filters `intentCategory != null` ON
+          // THE ROW (not via a join to signalTypeRef), so a signal written
+          // without this stays NULL-category and contributes 0 to the Intent
+          // score forever. Placeholders (registry.intentCategory === null)
+          // correctly stay null and remain excluded.
+          intentCategory: registry.intentCategory,
+          signalLevel: registry.signalLevel,
           createdAt: occurredAt, // anchor decay on event time, not insert time
         },
       })
@@ -261,6 +269,10 @@ export async function ingestSignal(
           metadata: metadataInput,
           sourceUrl: payload.sourceUrl ?? null,
           notes: payload.notes ?? null,
+          // Sprint 3a categorical axes — see the contact branch above for why
+          // this denormalization is load-bearing for computeIntentScore.
+          intentCategory: registry.intentCategory,
+          signalLevel: registry.signalLevel,
           createdAt: occurredAt,
         },
       })

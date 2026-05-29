@@ -56,6 +56,12 @@ export async function POST(request: Request) {
             detail: data?.detail || null,
             points: data?.score ?? 10,
             expiresAt: data?.expiresAt ? new Date(data.expiresAt) : null,
+            // Sprint 3a categorical axes — copied from the (placeholder)
+            // registry. n8n_external_signal has intentCategory=null, so these
+            // stay correctly excluded from the A-I Intent score until rewired
+            // to canonical codes (sub-backlog).
+            intentCategory: registryEntry.intentCategory,
+            signalLevel: registryEntry.signalLevel,
             metadata: body,
           },
         })
