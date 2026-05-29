@@ -2,17 +2,23 @@ name: Score Recompute Hourly
 
 on:
   schedule:
-    # Every hour on the hour (UTC).
+    # Every hour at :17 past the hour (UTC). The off-peak minute is
+    # deliberate: GitHub's scheduler is most congested at the top of the
+    # hour (everyone defaults to '0 * * * *'), where queued runs are delayed
+    # 5-30 min or occasionally dropped under load. :17 dodges that
+    # contention for lower latency and fewer missed ticks. Still hourly, so
+    # promotion-detection latency stays <=1h.
+    #
     # Powers the reactive scoring loop: recomputes every scoring-active
     # CrmContact and fires BD Telegram alerts on P-level promotions.
-    # Hourly keeps promotion-detection latency <=1h, honoring the
-    # "contact within 2h" recommendation written into the promotion alert.
+    # The <=1h cadence honors the "contact within 2h" recommendation
+    # written into the promotion alert.
     #
     # Independent of signal-decay (daily 03:00 UTC): computeIntentScore
     # decays live via applyTimeDecay, so this does NOT depend on the
-    # decayedPoints cache being fresh. The 03:00 overlap is harmless at the
-    # current ~10-contact pool size.
-    - cron: '0 * * * *'
+    # decayedPoints cache being fresh. The 03:00 / 03:17 proximity is
+    # harmless at the current ~10-contact pool size.
+    - cron: '17 * * * *'
   workflow_dispatch:
     # Safe to re-run on demand. Each run writes one ScoreHistory row per
     # account (audit trail) and is last-write-wins on the CrmContact columns
