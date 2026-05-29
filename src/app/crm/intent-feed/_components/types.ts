@@ -13,6 +13,10 @@ export interface SignalContact {
   group: string | null
   painTier: string | null
   persona: string | null
+  /** Sprint 3d — rolled-up account priority. null when the contact
+   *  has never been scored. Renders as a badge in SignalCard header. */
+  priorityLevel: string | null
+  priorityScore: number | null
 }
 
 export interface SignalCompany {

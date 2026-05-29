@@ -17,6 +17,7 @@ import { validateBody } from "@/lib/validate"
 import { childLoggerFromRequest, serializeError } from "@/lib/logger"
 import { getActiveScoringConfig } from "@/lib/scoring/config-loader"
 import { persistScore } from "@/lib/scoring/persist-score"
+import { alertBDsOnPromotion } from "@/lib/scoring/alert-on-promotion"
 
 const bodySchema = z.object({
   accountId: z.string().min(1).max(100),
@@ -34,7 +35,9 @@ export async function POST(request: Request) {
   if ("error" in v) return v.error
   const { accountId } = v.data
 
-  // Snapshot the "before" state for the UI to show a delta.
+  // Snapshot the "before" state for the UI to show a delta. Sprint 3d
+  // B3 — also pulls the person + company fields needed for the
+  // promotion alert without a second findUnique.
   const before = await prisma.crmContact.findUnique({
     where: { id: accountId },
     select: {
@@ -46,6 +49,10 @@ export async function POST(request: Request) {
       signalCount: true,
       painTier: true,
       lastScoredAt: true,
+      firstName: true,
+      lastName: true,
+      country: true,
+      company: { select: { name: true, country: true } },
     },
   })
   if (!before) {
@@ -57,6 +64,35 @@ export async function POST(request: Request) {
     const config = await getActiveScoringConfig()
     const result = await persistScore(accountId, "contact", config)
     const durationMs = Date.now() - start
+
+    // Sprint 3d D3 — fire-and-forget BD alert on promotion. Wrapped in
+    // try/catch defensively; alertBDsOnPromotion already swallows
+    // per-recipient errors, but a synchronous throw here must not flip
+    // the 200 success into a 500.
+    if (result.promoted) {
+      try {
+        await alertBDsOnPromotion(
+          {
+            id: before.id,
+            firstName: before.firstName,
+            lastName: before.lastName,
+            companyName: before.company?.name ?? null,
+            jurisdiction: before.company?.country ?? before.country ?? null,
+          },
+          result.previousLevel,
+          result.newLevel,
+          {
+            score: result.priorityScore,
+            signalCount: result.signalCount,
+          },
+        )
+      } catch (alertErr) {
+        log.error(
+          { err: serializeError(alertErr), accountId },
+          "promotion alert dispatch threw — score persisted regardless",
+        )
+      }
+    }
 
     log.info(
       {

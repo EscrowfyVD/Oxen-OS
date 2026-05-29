@@ -34,6 +34,8 @@ export interface RawIntentSignalForFeed {
     group: string | null
     painTier: string | null
     persona: string | null
+    priorityLevel: string | null
+    priorityScore: number | null
     company: { id: string; name: string; country: string | null } | null
   } | null
   company: { id: string; name: string; country: string | null } | null
@@ -72,6 +74,9 @@ export interface IntentFeedSignal {
     group: string | null
     painTier: string | null
     persona: string | null
+    /** Sprint 3d — rolled-up CrmContact.priorityLevel (Option C). */
+    priorityLevel: string | null
+    priorityScore: number | null
   } | null
   company: {
     id: string
@@ -141,6 +146,8 @@ export function formatSignal(
           group: row.contact.group,
           painTier: row.contact.painTier,
           persona: row.contact.persona,
+          priorityLevel: row.contact.priorityLevel,
+          priorityScore: row.contact.priorityScore,
         }
       : null,
     company: resolvedCompany,

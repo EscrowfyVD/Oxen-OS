@@ -23,6 +23,10 @@
 import { prisma } from "@/lib/prisma"
 import { getActiveScoringConfig } from "./config-loader"
 import { persistScore } from "./persist-score"
+import { alertBDsOnPromotion } from "./alert-on-promotion"
+import { logger, serializeError } from "@/lib/logger"
+
+const log = logger.child({ component: "score-recompute-runner" })
 
 export interface ScoreRecomputeRunnerResult {
   /** Total CrmContacts the runner processed (excluded ones are skipped). */
@@ -57,11 +61,21 @@ export async function runScoreRecompute(
 ): Promise<ScoreRecomputeRunnerResult> {
   const config = await getActiveScoringConfig()
 
+  // Sprint 3d B3 — extended select pulls the fields alertBDsOnPromotion
+  // needs (firstName, lastName, company.name, company.country) so we
+  // don't issue a second findUnique per promoted contact. Cheap denorm
+  // for the ~10-contact V1 pool.
   const contacts = await prisma.crmContact.findMany({
     where: {
       NOT: { excludedFrom: { has: "scoring" } },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      country: true,
+      company: { select: { name: true, country: true } },
+    },
   })
 
   let processed = 0
@@ -72,7 +86,37 @@ export async function runScoreRecompute(
     try {
       const result = await persistScore(c.id, "contact", config, now)
       processed++
-      if (result.promoted) promoted++
+      if (result.promoted) {
+        promoted++
+        // Fire-and-forget — Sprint 3d D3. We awaited here only because
+        // the runner is sync V1 and a single batch is tiny; the alert
+        // result is never used to gate persistence (errors are
+        // swallowed inside alertBDsOnPromotion).
+        try {
+          await alertBDsOnPromotion(
+            {
+              id: c.id,
+              firstName: c.firstName,
+              lastName: c.lastName,
+              companyName: c.company?.name ?? null,
+              jurisdiction: c.company?.country ?? c.country ?? null,
+            },
+            result.previousLevel,
+            result.newLevel,
+            {
+              score: result.priorityScore,
+              signalCount: result.signalCount,
+            },
+          )
+        } catch (alertErr) {
+          // Defensive — alertBDsOnPromotion already swallows per-recipient
+          // errors, but we belt-and-braces against any synchronous throw.
+          log.error(
+            { err: serializeError(alertErr), accountId: c.id },
+            "promotion alert dispatch threw — score persisted regardless",
+          )
+        }
+      }
     } catch (err) {
       errors.push({
         accountId: c.id,
