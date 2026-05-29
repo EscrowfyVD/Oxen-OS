@@ -1,0 +1,41 @@
+name: Score Recompute Hourly
+
+on:
+  schedule:
+    # Every hour on the hour (UTC).
+    # Powers the reactive scoring loop: recomputes every scoring-active
+    # CrmContact and fires BD Telegram alerts on P-level promotions.
+    # Hourly keeps promotion-detection latency <=1h, honoring the
+    # "contact within 2h" recommendation written into the promotion alert.
+    #
+    # Independent of signal-decay (daily 03:00 UTC): computeIntentScore
+    # decays live via applyTimeDecay, so this does NOT depend on the
+    # decayedPoints cache being fresh. The 03:00 overlap is harmless at the
+    # current ~10-contact pool size.
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    # Safe to re-run on demand. Each run writes one ScoreHistory row per
+    # account (audit trail) and is last-write-wins on the CrmContact columns
+    # (Sprint 3c D8) — no double-counting of side effects.
+
+jobs:
+  recompute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Oxen OS score recompute endpoint
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://os.oxen.finance/api/cron/recompute-scores \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "HTTP $http_code"
+          echo "$body"
+
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::Score recompute failed with status $http_code"
+            exit 1
+          fi
