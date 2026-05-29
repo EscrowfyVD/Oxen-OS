@@ -5,24 +5,22 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-05-29 (Sprint 3a B3 merged via PR #6 ; Sprint 3c local awaiting push)
+> **Last updated** : 2026-05-29 (Sprint 3c merged via PR #7 + run-recompute PR #8 ; Sprint 3d local awaiting push — Phase 3 100%)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **613/613** passing (was 555 ;
-  +58 from Sprint 3c) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
+- **Repo health** : `npm run build` green ; tests **652/652** passing (was 613 ;
+  +39 from Sprint 3d) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
   pre-existing debt).
-- **Active workstreams** : (1) **Phase 3 Scoring Engine** — Sprint 3a (Phase A
-  `8ad6274` + B3 `c945151`/PR #6 `7ee4b7f`) in prod ; Sprint 3b in prod ;
-  **Sprint 3c local commits ready** (priority level + pain tier + negatives
-  + persist + 3 endpoints + cron) ; Sprint 3d (alerts + Lemlist + Intent
-  Feed integration) next. (2) **SP16 — Onboarding Console** — 5 SP16 PRs
-  merged, no SP16-006 defined yet (open).
-- **Local branches awaiting push** : `docs/state-sprint-3a-complete`
-  (STATE.md refresh from earlier — superseded by this update) ;
-  `scoring-3c-priority-pain-negatives-persist` (Sprint 3c).
+- **Active workstreams** : (1) **Phase 3 Scoring Engine** — **🎉 100% COMPLETE
+  locally** : Sprint 3a (PR #6) + Sprint 3b + Sprint 3c (PR #7/#8) **in prod** ;
+  **Sprint 3d local** (triggers + Lemlist adapt-only + BD alerts + Intent Feed
+  Option C + /api/accounts) ready for push. (2) **SP16 — Onboarding Console** —
+  5 SP16 PRs merged, no SP16-006 defined yet (open).
+- **Local branches awaiting push** :
+  `scoring-3d-triggers-lemlist-alerts-feed` (Sprint 3d — final Phase 3 sprint).
 - **Production** : main = `os.oxen.finance` (Railway auto-deploy). No staging
   branch. Push = prod. Onboarding console stays dark behind
   `ONBOARDING_CONSOLE_ENABLED`.
@@ -55,11 +53,11 @@
 **Priority Level** (P1/P2/P3/Monitor/Excluded) → drives Intent Feed sort + future
 BD alerts + Lemlist sequence orchestration.
 
-**Status** : Sprint 3a (Phase A + B3) **in prod** ; Sprint 3b in prod ;
-**Sprint 3c local commits ready for push** (priority level + pain tier
-override + Option A negatives + persist transaction + 3 endpoints + cron
-runner). Sprint 3d (BD alerts + Lemlist orchestration + Intent Feed
-priorityScore integration) is the last sprint of Phase 3.
+**Status** : 🎉 **Phase 3 100% COMPLETE** (locally — Sprint 3d ready for push).
+Sprint 3a/3b/3c **in prod**. Sprint 3d wires the engine end-to-end : triggers
+classification → Lemlist adapt-only (V1 reframe per recon Finding 6) → BD
+Telegram alerts on promotion → Intent Feed Option C badge + filter →
+/api/accounts ILIKE fuzzy match.
 
 **Shipped** :
 
@@ -69,16 +67,14 @@ priorityScore integration) is the last sprint of Phase 3.
 | `eb43057` | 2026-05-15 | **Sprint 3b** — compute engine. Pure functions: `apply-time-decay`, `compute-intent-score`, `pattern-match` (graceful 0-deals fallback), `compute-icp-score` (5 factors summing to 50), `compute-priority-score` orchestrator. 60 new tests. |
 | `90b7748` | 2026-05-15 | **Mini-patch DM patterns** — DIRECT_DM_PATTERNS extended with long-form "Chief X Officer" alongside acronyms. Sample Tony Zero21 ICP 25 → 35. |
 | `c945151` (PR #6 → `7ee4b7f`) | 2026-05-24 | **Sprint 3a B3** — backfill SignalTypeRegistry `intentCategory`/`signalLevel`/`triggerType` on 11 active codes per Andy mapping ; deactivate 3 legacy placeholders ; recalibrate `clay_business_loss` defaultPoints 10 → 4. 7 tests. Backfill script runs in prod : `npx tsx scripts/db/backfill-signal-types-categories.ts`. |
-| **(local)** | **2026-05-29** | **Sprint 3c — Priority Level + Pain Tier + Negatives + Persist** — `assignPriorityLevel` (P1/P2/P3/Monitor/Excluded, D1) ; `inferPainTier` override-only V1 (D2/D10) ; `applyNegativeSignals` Option A reads CrmContact direct fields (D3) ; `persistScore` transaction CrmContact + ScoreHistory, returns `{previousLevel, newLevel, promoted}` delta (D7) ; `score-recompute-runner` ; 3 endpoints (`POST /api/scoring/recalculate` admin + `recalculate-all` admin + `cron/recompute-scores` CRON_SECRET). 58 new tests (613/613 total). Live smoke on Tony Christoforou : ICP 35 + Intent 0 → Monitor (consistent with recon projection). |
+| `9bca8a2` (PR #7) + `becfa51` (PR #8) | 2026-05-29 | **Sprint 3c — Priority Level + Pain Tier + Negatives + Persist** — `assignPriorityLevel` (P1/P2/P3/Monitor/Excluded, D1) ; `inferPainTier` override-only V1 (D2/D10) ; `applyNegativeSignals` Option A reads CrmContact direct fields (D3) ; `persistScore` transaction CrmContact + ScoreHistory, returns `{previousLevel, newLevel, promoted}` delta (D7) ; `score-recompute-runner` ; 3 endpoints (`POST /api/scoring/recalculate` admin + `recalculate-all` admin + `cron/recompute-scores` CRON_SECRET). 58 new tests. Live smoke on Tony Christoforou : ICP 35 + Intent 0 → Monitor (consistent with recon projection). PR #8 = `run-recompute.ts` manual batch helper. |
+| **(local)** | **2026-05-29** | **Sprint 3d — Triggers + Lemlist adapt + BD alerts + Intent Feed** — Final Phase 3 sprint. `classifyTrigger` (config-driven, D2) ; `orchestrateSequence` Lemlist adapt-only V1 (D1 — recon proved API can't reschedule, so adapt = PATCH custom variables, accelerate adds Telegram BD manual-move alert) ; `lemlist.ts` extended with `updateLeadVariables` + token-bucket rate limiter (20 req/2s) + 429 retry-on-backoff ; `alertBDsOnPromotion` + `formatPromotionAlert` Telegram broadcast on Monitor/P3→P1/P2 promotions (D3 caller-side, reuse `trigify-alerts` pattern) wired at 3 sites (runner + recalculate + recalculate-all) ; Intent Feed Option C — `priorityLevelBadge` helper + single-select `priority_level` filter merging with `group` (D4) ; `/api/accounts` GET with ILIKE OR + tiered JS scoring (exact 100 / name 90 / starts-with 70 / contains 40) + union response shape (D6/D8). 39 new tests (652/652 total). |
 
-**Next — Sprint 3d (~1 week)** :
-- P1 promotion → Telegram BD alert (reuse trigify-alerts pattern)
-- Lemlist sequence acceleration (POST /api/lemlist/accelerate on immediate
-  triggers)
-- Intent Feed UI integration — replace `proxy-score` V1 with `priorityScore`
-  read from CrmContact
+**Phase 3 = 100% locally**. Branch `scoring-3d-triggers-lemlist-alerts-feed`
+ready for push → PR → Railway redeploy. Backlog post-Phase 3 in §Backlog
+below.
 
-**Known V1 limitations** (acknowledged in PRD-004) :
+**Known V1 limitations** (acknowledged in PRD-004 + Sprint 3d recon) :
 - 0 IntentSignals in prod DB → Intent score = 0 for every account until
   Trigify pipeline starts producing real data
 - 0 closed_won Deals → Pattern Match returns noMatch=0 for every account
@@ -91,6 +87,30 @@ priorityScore integration) is the last sprint of Phase 3.
 - Negative signals V1 covers 3/7 types (lemlist bounced, lemlist unsubscribed,
   doNotContact) — the other 4 need upstream Lemlist webhook distinction +
   enrichment-diff detection, deferred to a future emission V2 layer
+- **Sprint 3d Lemlist acceleration is content-adapt only** (recon Finding 6) —
+  the public API does not allow rescheduling a launched lead's next send
+  date or skipping to the next step. V1 reframes `accelerate` as
+  `adapt + Telegram BD manual-move recommendation`. Programmatic
+  cross-campaign move (2-call enrol+remove workaround) deferred V2 once
+  atomicity story is worked out.
+- **Sprint 3d "rewrite next touch"** (Andy §8 Q3) = V1 template variable
+  substitution (`customField1..3` slot contract documented in
+  `orchestrate-sequence.ts`). AI-generated rewrite via Claude API = V2.
+- **Sprint 3d Intent Feed Option C** keeps proxy-score sort + adds
+  `priorityLevel` badge per card + single-select filter. Sort by
+  `contact.priorityScore` (Option A) deferred to Sprint 3e if dogfooding
+  asks for it. Multi-select priority filter also V2.
+- **Sprint 3d `/api/accounts` ILIKE V1** — `pg_trgm` not installed (current
+  ~600-contact volume doesn't justify it). V2 = trigram + GIN indexes +
+  Postgres `similarity()` ranking.
+- **Lemlist BD alerts require `telegramChatId` populated for ad@/pg@/vd@**
+  on `Employee` row via the /team page UI (seeds don't populate it). Pre-Sprint
+  3d deploy check : confirmed by Vernon 2026-05-29.
+- **Custom field slot contract** (Sprint 3d Lemlist adapt) — campaigns
+  must reference `{{customField1}}` (signal type), `{{customField2}}`
+  (priorityLevel), `{{customField3}}` (context snippet) in their templates,
+  otherwise the `updateLeadVariables` call writes the fields but the next
+  email won't pick them up. Coordinate with Andy on existing campaigns.
 
 ### 2. SP16 — Onboarding Console (OCA operator UI)
 
@@ -150,8 +170,20 @@ session display + 3 operator actions. Feature-flagged behind
 
 | # | Ticket | Effort | Trigger |
 |---|---|---|---|
-| 1 | **Push Sprint 3c** + Railway cron config (`POST /api/cron/recompute-scores` daily 03:30 UTC, Bearer $CRON_SECRET) + optional `POST /api/scoring/recalculate-all` to seed | 10 min push + 5 min Railway scheduler setup + 5s recalc-all batch | Vernon green-lights the local commits |
-| 2 | **Sprint 3d — BD alerts on promotion + Lemlist orchestration + Intent Feed priorityScore swap** | ~1 week | Sprint 3c merged (consumes the `promoted` flag returned by persistScore) |
+| 1 | **Push Sprint 3d** + Railway redeploy → Phase 3 100% in prod | 10 min push + 5 min redeploy | Vernon green-lights the local commits |
+| 2 | **Re-activate Trigify pipeline** → first real IntentSignals → first promotions → first BD alerts in prod | varies (Andy/Trigify side) | Sprint 3d in prod |
+| 3 | **Coordinate Lemlist templates with `customField1..3` slot contract** — campaigns need `{{customField1}}` placeholders for adapt to actually surface in emails | ~30 min Andy + Vernon | Sprint 3d in prod + real Lemlist enrollments |
+| 4 | **Optional Sprint 3e** — Intent Feed sort by `priorityScore` (Option A), if BD dogfooding asks for it | ~0.5 day | First real signal volume + BD feedback |
+| 5 | **PRD-005 Apify+n8n** — Cat C/D/E/F/I signal sources beyond Trigify/Clay | TBD | Phase 3 in prod, signal data flowing |
+| 6 | **PRD-006 Apollo switch** | TBD | TBD |
+
+### Sprint 3d sub-backlog (post-merge cleanup)
+
+| # | Item | Effort | Why deferred |
+|---|---|---|---|
+| 1 | Refactor `clay/route.ts` + `n8n/route.ts` webhooks to delegate to `ingestSignal()` (clay-enrichment already does) | ~0.5 day | Out of Sprint 3d scope ; `/api/signals` exists since S1 and works ; webhooks remain as compat shims |
+| 2 | Lemlist webhook hotfix — `emailsUnsubscribed` missing from `stageMap` (line 156-169 of `src/app/api/webhooks/lemlist/route.ts`). `lifecycleStage` does not flip on unsubscribe ; 1-line fix. Side-find from Sprint 3d recon Finding 4. | 15 min | Out of Sprint 3d scope ; safe in standalone commit |
+| 3 | Sprint 3d V2 path — programmatic Lemlist cross-campaign move (2-call enrol+remove with atomicity story) ; AI-rewrite next touch via Claude API ; pg_trgm fuzzy match | weeks (V2 milestone) | Lemlist API public surface limits V1 ; pg_trgm volume not justified |
 
 ### Specced but blocked / awaiting decision
 
@@ -191,6 +223,8 @@ session display + 3 operator actions. Feature-flagged behind
 | OCA does not expose session rejection reason | 🟡 LOW | OCA-side ticket queued. SP16-004 NOTES Step 0 documents. |
 | `acquisitionSource` was NULL on 597 contacts | ✅ FIXED | Hotfix R0 (`fe3b40a`) + backfill SQL ran 2026-05-15. |
 | Lemlist webhook doesn't distinguish soft vs hard not-interested | 🟡 LOW | Sprint 3c V1 Option A ignores the distinction. Sprint 3c notes the gap. Upstream Lemlist webhook would need a change. |
+| Lemlist API cannot accelerate a launched lead | 🟠 MED | Confirmed by Sprint 3d recon (no `next_send_at`, no skip post-launch). V1 = adapt content via custom variables + Telegram BD alert for manual move. Programmatic cross-campaign move = V2. |
+| Lemlist webhook `emailsUnsubscribed` missing from `stageMap` | 🟡 LOW | Side-find of Sprint 3d recon — `lifecycleStage` doesn't update on unsubscribe (it's still in `lemlistStatusMap`, just not `stageMap`). Hotfix queued in Sprint 3d sub-backlog. |
 
 ---
 

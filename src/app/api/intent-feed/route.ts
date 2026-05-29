@@ -47,6 +47,7 @@ export async function GET(request: Request) {
     dateFrom: filters.date_from,
     dateTo: filters.date_to,
     group: filters.group,
+    priorityLevel: filters.priority_level,
     status: filters.status,
   } satisfies IntentFeedFilters)
 
@@ -58,11 +59,27 @@ export async function GET(request: Request) {
     const take = isInMemoryPath ? 500 : filters.limit
     const skip = isInMemoryPath ? 0 : filters.offset
 
+    // Sprint 3d B4 — switched contact `include` → `select` so we can
+    // pull the new priorityLevel + priorityScore fields plus the
+    // nested company. Adding them via include alone would force a
+    // SELECT * on CrmContact (49 columns); explicit select is leaner
+    // and documents what the feed actually needs.
     const rows = await prisma.intentSignal.findMany({
       where,
       include: {
         contact: {
-          include: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            jobTitle: true,
+            linkedinUrl: true,
+            group: true,
+            painTier: true,
+            persona: true,
+            priorityLevel: true,
+            priorityScore: true,
             company: {
               select: { id: true, name: true, country: true },
             },
@@ -119,6 +136,7 @@ export async function GET(request: Request) {
         date_from: filters.date_from ?? null,
         date_to: filters.date_to ?? null,
         group: filters.group ?? null,
+        priority_level: filters.priority_level ?? null,
         hot_only: filters.hot_only,
         status: filters.status ?? "all",
         sort: filters.sort,

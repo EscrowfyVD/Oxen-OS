@@ -12,6 +12,8 @@ export interface IntentFeedFilters {
   dateFrom?: string // ISO
   dateTo?: string // ISO
   group?: string
+  /** Sprint 3d Option C — single-select P1/P2/P3/Monitor. */
+  priorityLevel?: string
   hotOnly?: boolean // applied in-memory post-fetch (relies on proxyScore)
   status?: "actioned" | "unactioned" | "all"
 }
@@ -48,12 +50,17 @@ export function buildIntentFeedWhere(
     where.createdAt = range
   }
 
-  // Group — lives on CrmContact, so we filter through the relation.
-  // Signals with no contact (company-only signals) are excluded when
-  // this filter is active, which matches the user intent ("show me
-  // G1 signals").
-  if (filters.group) {
-    where.contact = { group: filters.group as CrmGroup }
+  // Group + priorityLevel — both live on CrmContact and target the same
+  // `where.contact` relation object. Setting them sequentially via `=`
+  // would overwrite each other; merge into a single object so they
+  // AND together. Signals with no contact (company-only) are excluded
+  // when either filter is active — matches the operator intent
+  // ("show me G1 signals at P1").
+  if (filters.group || filters.priorityLevel) {
+    const contactFilter: Prisma.CrmContactWhereInput = {}
+    if (filters.group) contactFilter.group = filters.group as CrmGroup
+    if (filters.priorityLevel) contactFilter.priorityLevel = filters.priorityLevel
+    where.contact = contactFilter
   }
 
   // Status — relies on the `metadata.actioned_at` JSON path written

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { CRM_COLORS } from "@/lib/crm-config"
 import { formatSignalDate } from "@/lib/intent-feed/format-date"
+import { priorityLevelBadgeProps } from "@/lib/intent-feed/priority-level-badge"
 import SignalCardActions from "./SignalCardActions"
 import type { IntentFeedSignalView } from "./types"
 
@@ -50,6 +51,10 @@ interface SignalCardProps {
 export default function SignalCard({ signal, onActioned, onSuccess }: SignalCardProps) {
   const sourceColor = SOURCE_COLOR[signal.source] ?? "#9CA3AF"
   const isActioned = !!signal.actionedAt
+  // Sprint 3d Option C — rolled-up account priority badge. Returns
+  // null for company-only signals and for Excluded contacts (the
+  // helper handles the "no render" cases centrally).
+  const priorityBadge = priorityLevelBadgeProps(signal.contact?.priorityLevel)
 
   return (
     <div
@@ -78,6 +83,11 @@ export default function SignalCard({ signal, onActioned, onSuccess }: SignalCard
           <span style={badgeStyle("#EF4444", 0.18)}>🔥 Hot</span>
         )}
         <span style={badgeStyle(sourceColor)}>{signal.source}</span>
+        {priorityBadge && (
+          <span style={badgeStyle(priorityBadge.color, priorityBadge.opacity)}>
+            {priorityBadge.label}
+          </span>
+        )}
         <span style={badgeStyle(ROSE, 0.12)}>{signal.points} pt</span>
         {isActioned && (
           <span style={badgeStyle("#34D399", 0.15)}>✓ Actioned</span>

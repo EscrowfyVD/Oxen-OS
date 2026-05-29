@@ -32,6 +32,10 @@ const labelStyle: React.CSSProperties = {
 
 const SOURCE_OPTIONS = ["all", "trigify", "clay", "api/signals", "lemlist", "n8n"]
 const GROUP_OPTIONS = ["all", "G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B"]
+// Sprint 3d Option C — Excluded omitted on purpose (operators don't
+// want to surface excluded contacts in the feed). V2 may add a
+// separate ?include_excluded toggle if requested.
+const PRIORITY_LEVEL_OPTIONS = ["all", "P1", "P2", "P3", "Monitor"]
 const STATUS_OPTIONS = [
   { v: "all", label: "All" },
   { v: "unactioned", label: "Unactioned" },
@@ -78,6 +82,7 @@ export default function IntentFeedFilters() {
   const source = searchParams.get("source") ?? "all"
   const signalTypeCode = searchParams.get("signal_type_code") ?? "all"
   const group = searchParams.get("group") ?? "all"
+  const priorityLevel = searchParams.get("priority_level") ?? "all"
   const status = searchParams.get("status") ?? "all"
   const hotOnly = searchParams.get("hot_only") === "1"
   const dateOption = dateOptionFromIso(searchParams.get("date_from"))
@@ -124,6 +129,7 @@ export default function IntentFeedFilters() {
     source !== "all" ||
     signalTypeCode !== "all" ||
     group !== "all" ||
+    priorityLevel !== "all" ||
     status !== "all" ||
     hotOnly ||
     dateOption !== "all"
@@ -200,6 +206,21 @@ export default function IntentFeedFilters() {
           {GROUP_OPTIONS.map((g) => (
             <option key={g} value={g}>
               {g === "all" ? "All groups" : g}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label style={labelStyle}>Priority</label>
+        <select
+          style={selectStyle}
+          value={priorityLevel}
+          onChange={(e) => updateFilter("priority_level", e.target.value)}
+        >
+          {PRIORITY_LEVEL_OPTIONS.map((p) => (
+            <option key={p} value={p}>
+              {p === "all" ? "All priorities" : p}
             </option>
           ))}
         </select>
