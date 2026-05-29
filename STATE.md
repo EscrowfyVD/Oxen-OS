@@ -5,20 +5,24 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-05-24
+> **Last updated** : 2026-05-29 (Sprint 3a B3 merged via PR #6 ; Sprint 3c local awaiting push)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **555/555** passing ; lint baseline
-  79 errors + 159 warnings (CI non-blocking, pre-existing debt).
-- **Active workstreams** : (1) **Phase 3 Scoring Engine** — Sprint 3a complete
-  (Phase A + B3) + Sprint 3b shipped, Sprint 3c next. (2) **SP16 — Onboarding
-  Console** — 5 SP16 PRs merged, no SP16-006 defined yet (open).
-- **Local branch awaiting push** : `scoring-3a-b3-backfill-categories`
-  (commit `c945151` — SignalTypeRegistry category backfill, Andy mapping
-  validated 2026-05-15).
+- **Repo health** : `npm run build` green ; tests **613/613** passing (was 555 ;
+  +58 from Sprint 3c) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
+  pre-existing debt).
+- **Active workstreams** : (1) **Phase 3 Scoring Engine** — Sprint 3a (Phase A
+  `8ad6274` + B3 `c945151`/PR #6 `7ee4b7f`) in prod ; Sprint 3b in prod ;
+  **Sprint 3c local commits ready** (priority level + pain tier + negatives
+  + persist + 3 endpoints + cron) ; Sprint 3d (alerts + Lemlist + Intent
+  Feed integration) next. (2) **SP16 — Onboarding Console** — 5 SP16 PRs
+  merged, no SP16-006 defined yet (open).
+- **Local branches awaiting push** : `docs/state-sprint-3a-complete`
+  (STATE.md refresh from earlier — superseded by this update) ;
+  `scoring-3c-priority-pain-negatives-persist` (Sprint 3c).
 - **Production** : main = `os.oxen.finance` (Railway auto-deploy). No staging
   branch. Push = prod. Onboarding console stays dark behind
   `ONBOARDING_CONSOLE_ENABLED`.
@@ -51,9 +55,11 @@
 **Priority Level** (P1/P2/P3/Monitor/Excluded) → drives Intent Feed sort + future
 BD alerts + Lemlist sequence orchestration.
 
-**Status** : Foundation + compute engine shipped. Schema + ScoringConfig v1
-seeded. Sprint 3b compute lib is pure (no DB writes). Sprint 3a B3 category
-backfill ready to push.
+**Status** : Sprint 3a (Phase A + B3) **in prod** ; Sprint 3b in prod ;
+**Sprint 3c local commits ready for push** (priority level + pain tier
+override + Option A negatives + persist transaction + 3 endpoints + cron
+runner). Sprint 3d (BD alerts + Lemlist orchestration + Intent Feed
+priorityScore integration) is the last sprint of Phase 3.
 
 **Shipped** :
 
@@ -62,20 +68,10 @@ backfill ready to push.
 | `8ad6274` | 2026-05-15 | **Sprint 3a Phase A** — schema (ScoringConfig + ScoreHistory + CrmContact/IntentSignal/SignalTypeRegistry extensions) + ScoringConfig v1 seed from Andy's reference doc + config-loader (module cache, 60s TTL) + Zod validation. 17 new tests. |
 | `eb43057` | 2026-05-15 | **Sprint 3b** — compute engine. Pure functions: `apply-time-decay`, `compute-intent-score`, `pattern-match` (graceful 0-deals fallback), `compute-icp-score` (5 factors summing to 50), `compute-priority-score` orchestrator. 60 new tests. |
 | `90b7748` | 2026-05-15 | **Mini-patch DM patterns** — DIRECT_DM_PATTERNS extended with long-form "Chief X Officer" alongside acronyms. Sample Tony Zero21 ICP 25 → 35. |
-| `c945151` | 2026-05-24 | **Sprint 3a B3** (local, awaiting push) — backfill SignalTypeRegistry `intentCategory`/`signalLevel`/`triggerType` on 11 active codes per Andy mapping ; deactivate 3 legacy placeholders ; recalibrate `clay_business_loss` defaultPoints 10 → 4. 7 tests. |
+| `c945151` (PR #6 → `7ee4b7f`) | 2026-05-24 | **Sprint 3a B3** — backfill SignalTypeRegistry `intentCategory`/`signalLevel`/`triggerType` on 11 active codes per Andy mapping ; deactivate 3 legacy placeholders ; recalibrate `clay_business_loss` defaultPoints 10 → 4. 7 tests. Backfill script runs in prod : `npx tsx scripts/db/backfill-signal-types-categories.ts`. |
+| **(local)** | **2026-05-29** | **Sprint 3c — Priority Level + Pain Tier + Negatives + Persist** — `assignPriorityLevel` (P1/P2/P3/Monitor/Excluded, D1) ; `inferPainTier` override-only V1 (D2/D10) ; `applyNegativeSignals` Option A reads CrmContact direct fields (D3) ; `persistScore` transaction CrmContact + ScoreHistory, returns `{previousLevel, newLevel, promoted}` delta (D7) ; `score-recompute-runner` ; 3 endpoints (`POST /api/scoring/recalculate` admin + `recalculate-all` admin + `cron/recompute-scores` CRON_SECRET). 58 new tests (613/613 total). Live smoke on Tony Christoforou : ICP 35 + Intent 0 → Monitor (consistent with recon projection). |
 
-**Next — Sprint 3c (sized ~3.5 days)** :
-- `assignPriorityLevel({score, signalCount, excludedFrom}, config)` pure
-- `inferPainTier` — override-only V1 (defer full inference per Recon Q1)
-- `applyNegativeSignals` — Option A V1 (read CrmContact.lemlistStatus +
-  doNotContact directly ; emission layer deferred)
-- `persistScore` — `prisma.$transaction` updating CrmContact + inserting
-  ScoreHistory row + returning P-level delta
-- `POST /api/scoring/recalculate` + `POST /api/scoring/recalculate-all` (admin)
-- `POST /api/cron/recompute-scores` + `score-recompute-runner` lib (reuse the
-  signal-decay cron pattern)
-
-**Future — Sprint 3d (~1 week)** :
+**Next — Sprint 3d (~1 week)** :
 - P1 promotion → Telegram BD alert (reuse trigify-alerts pattern)
 - Lemlist sequence acceleration (POST /api/lemlist/accelerate on immediate
   triggers)
@@ -87,7 +83,14 @@ backfill ready to push.
   Trigify pipeline starts producing real data
 - 0 closed_won Deals → Pattern Match returns noMatch=0 for every account
   (graceful fallback)
-- SignalTypeRegistry.intentCategory all NULL until B3 backfill runs in prod
+- ~~SignalTypeRegistry.intentCategory all NULL until B3 backfill runs in
+  prod~~ → ✅ resolved 2026-05-24 (B3 backfill ran ; 11 active codes
+  mapped, 3 placeholders deactivated)
+- Pain Tier V1 = OVERRIDE ONLY (Sprint 3c D2/D10) — full inference deferred
+  V2 pending Andy's algorithm validation (his §10 Q1)
+- Negative signals V1 covers 3/7 types (lemlist bounced, lemlist unsubscribed,
+  doNotContact) — the other 4 need upstream Lemlist webhook distinction +
+  enrichment-diff detection, deferred to a future emission V2 layer
 
 ### 2. SP16 — Onboarding Console (OCA operator UI)
 
@@ -147,9 +150,8 @@ session display + 3 operator actions. Feature-flagged behind
 
 | # | Ticket | Effort | Trigger |
 |---|---|---|---|
-| 1 | **Push Sprint 3a B3** + run backfill in prod | 5 min push + 30 sec script | Vernon green-lights `c945151` PR |
-| 2 | **Sprint 3c — Priority Level + Pain Tier + Negative + Persist + Recalc + Cron** | ~3.5 days | Open after B3 lands |
-| 3 | **Sprint 3d — Triggers + Lemlist + Intent Feed integration** | ~1 week | Blocked on Sprint 3c |
+| 1 | **Push Sprint 3c** + Railway cron config (`POST /api/cron/recompute-scores` daily 03:30 UTC, Bearer $CRON_SECRET) + optional `POST /api/scoring/recalculate-all` to seed | 10 min push + 5 min Railway scheduler setup + 5s recalc-all batch | Vernon green-lights the local commits |
+| 2 | **Sprint 3d — BD alerts on promotion + Lemlist orchestration + Intent Feed priorityScore swap** | ~1 week | Sprint 3c merged (consumes the `promoted` flag returned by persistScore) |
 
 ### Specced but blocked / awaiting decision
 
