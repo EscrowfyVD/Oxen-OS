@@ -31,7 +31,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 const SOURCE_OPTIONS = ["all", "trigify", "clay", "api/signals", "lemlist", "n8n"]
-const GROUP_OPTIONS = ["all", "G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B"]
+const GROUP_OPTIONS = ["all", "G1", "G2", "G3", "G4", "G5", "G6"]
 // Sprint 3d Option C — Excluded omitted on purpose (operators don't
 // want to surface excluded contacts in the feed). V2 may add a
 // separate ?include_excluded toggle if requested.

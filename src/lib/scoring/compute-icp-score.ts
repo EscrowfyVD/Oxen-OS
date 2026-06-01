@@ -38,10 +38,10 @@ export interface ICPScoreResult {
 // Factor 1 — Intermediary Type
 // ─────────────────────────────────────────────────────────────────────
 //
-// Andy's primary tier = "in CrmGroup G1-G7B whitelist" (V1: the
-// whitelist IS all 8 codes, so any non-null group hits primary).
-// secondary/peripheral are placeholders for future groups beyond
-// the canonical 8.
+// Andy's primary tier = "in CrmGroup whitelist". Under the active v2
+// config the whitelist is G1-G6 — the full enum after closeout #4 dropped
+// G7A/G7B — so any non-null group hits primary. secondary/peripheral are
+// placeholders for future groups beyond the canonical set.
 
 function computeIntermediaryType(
   group: string | null,

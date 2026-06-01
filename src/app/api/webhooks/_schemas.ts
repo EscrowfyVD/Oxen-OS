@@ -174,7 +174,7 @@ export const n8nWebhookSchema = z.discriminatedUnion("action", [
 // transform on a refined union without losing the discriminator narrowing).
 // ─────────────────────────────────────────────────────────────
 
-const crmGroup = z.enum(["G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B"])
+const crmGroup = z.enum(["G1", "G2", "G3", "G4", "G5", "G6"])
 const crmPainTier = z.enum(["T1", "T2", "T3"])
 const emailValidationStatus = z.enum(["valid", "invalid", "risky", "unknown"])
 

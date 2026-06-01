@@ -17,7 +17,7 @@ export const intentFeedFiltersSchema = z.object({
   signal_type_code: z.string().max(100).optional(),
   date_from: z.string().datetime({ offset: true }).optional(),
   date_to: z.string().datetime({ offset: true }).optional(),
-  group: z.enum(["G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B"]).optional(),
+  group: z.enum(["G1", "G2", "G3", "G4", "G5", "G6"]).optional(),
   // Sprint 3d Option C — single-select priority level filter. Excluded
   // is intentionally NOT exposed via this dropdown (operators don't
   // want excluded accounts surfaced); a separate ?include_excluded
