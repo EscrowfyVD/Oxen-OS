@@ -10,10 +10,33 @@
 //   - signalLevel     ("contact" | "account")
 //   - triggerType     ("immediate" | "rapid" | "passive")
 //
-// Plus one explicit recalibration:
-//   - clay_business_loss.defaultPoints  10 → 4 (per Andy — negative
-//     financial event, ambiguous intent, low confidence ; revisit
-//     after one outbound cycle)
+// Point recalibrations (defaultPoints) — pinned to Andy's doc:
+//   - clay_business_loss     10 → 4  (Sprint 3a — negative financial
+//     event, ambiguous intent, low confidence ; revisit after one
+//     outbound cycle)
+//   - linkedin_post_funding  30 → 8  (Sprint 3d ScoringConfig v2 — a
+//     funding post is account-level warmth, not a buying signal; 30
+//     over-weighted it vs the Cat F intent band)
+//   - clay_director_change   20 → 6  (Sprint 3d ScoringConfig v2 —
+//     leadership transition is a moderate account-level event, Cat H
+//     §4.8; 20 over-weighted it ~3x)
+//
+// Trigger reclassifications (triggerType, registry side) — Sprint 3d:
+//   - trigify_oxen_engagement_comment  rapid → immediate (doc §8.3 — a
+//     substantive comment on an Oxen post is high-intent; config
+//     followUpTriggers already had it in `immediate`, this realigns the
+//     registry/canonical source to match)
+//   - trigify_role_change              passive → rapid    (doc §8.3 — a
+//     target's role change is a 24h-window signal; moved in BOTH the
+//     registry here AND config.followUpTriggers in seed-scoring-config)
+//
+// Deliberately NOT touched here (Sprint 3d scoping decisions):
+//   - trigify_competitor_engagement — registry stays `rapid` (already
+//     doc-§8.3-correct). The drift was in config (it sat in `passive`);
+//     fixed there in the v2 blob — registry needs no change.
+//   - market_country_regulation_change.defaultPoints stays 50 — dormant
+//     (category=MARKET → MarketSignal → excluded from individual scoring
+//     by construction). Re-point deferred to PRD-008.
 //
 // And 3 placeholders deactivated (kept in DB so their FK-bearing
 // IntentSignals remain valid — `isActive=false` is the soft-retire
@@ -75,7 +98,8 @@ export const MAPPING: SignalCategoryMapping[] = [
     code: "trigify_oxen_engagement_comment",
     intentCategory: "A",
     signalLevel: "contact",
-    triggerType: "rapid",
+    // Sprint 3d ScoringConfig v2 — rapid → immediate (see header).
+    triggerType: "immediate",
   },
   {
     code: "trigify_oxen_engagement_like",
@@ -107,14 +131,17 @@ export const MAPPING: SignalCategoryMapping[] = [
     intentCategory: "F",
     signalLevel: "account",
     triggerType: "rapid",
+    // Sprint 3d ScoringConfig v2 — recalibrated 30 → 8 (see header).
+    defaultPoints: 8,
   },
   {
     code: "clay_business_loss",
     intentCategory: "F",
     signalLevel: "account",
     triggerType: "passive",
-    // Recalibrated 10 → 4 per Andy. Single explicit defaultPoints
-    // change in this backfill.
+    // Recalibrated 10 → 4 per Andy (Sprint 3a). One of 3 point
+    // recalibrations now — see header (linkedin_post_funding=8,
+    // clay_director_change=6 are the other two).
     defaultPoints: 4,
   },
 
@@ -145,13 +172,17 @@ export const MAPPING: SignalCategoryMapping[] = [
     code: "trigify_role_change",
     intentCategory: "H",
     signalLevel: "contact",
-    triggerType: "passive",
+    // Sprint 3d ScoringConfig v2 — passive → rapid (see header). Moved
+    // in config.followUpTriggers (seed-scoring-config) too.
+    triggerType: "rapid",
   },
   {
     code: "clay_director_change",
     intentCategory: "H",
     signalLevel: "account",
     triggerType: "rapid",
+    // Sprint 3d ScoringConfig v2 — recalibrated 20 → 6 (see header).
+    defaultPoints: 6,
   },
 ]
 

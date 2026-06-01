@@ -9,7 +9,10 @@
 
 import { describe, it, expect } from "vitest"
 import { classifyTrigger } from "./classify-trigger"
-import { buildScoringConfigV1 } from "../../../scripts/db/seed-scoring-config"
+import {
+  buildScoringConfigV1,
+  buildScoringConfigV2,
+} from "../../../scripts/db/seed-scoring-config"
 
 const config = buildScoringConfigV1()
 
@@ -59,5 +62,30 @@ describe("classifyTrigger", () => {
     expect(config.followUpTriggers.passive.signals).not.toContain(
       "clay_director_change",
     )
+  })
+})
+
+// ─── v2 reconciliation (Sprint 3d) — reclassified runtime behavior ───
+// Pinned to buildScoringConfigV2() so the runtime consumer (classifyTrigger)
+// is proven to reflect the doc §8.3 reclassifications. Each case also
+// asserts the v1 value to make the v2-scoped delta explicit.
+describe("classifyTrigger (ScoringConfig v2)", () => {
+  const v2 = buildScoringConfigV2()
+  const v1 = buildScoringConfigV1()
+
+  it("[7] trigify_oxen_engagement_comment → immediate (unchanged from v1 config)", () => {
+    expect(classifyTrigger("trigify_oxen_engagement_comment", v2)).toBe(
+      "immediate",
+    )
+  })
+
+  it("[8] trigify_role_change → rapid in v2 (was passive in v1)", () => {
+    expect(classifyTrigger("trigify_role_change", v2)).toBe("rapid")
+    expect(classifyTrigger("trigify_role_change", v1)).toBe("passive")
+  })
+
+  it("[9] trigify_competitor_engagement → rapid in v2 (was passive in v1)", () => {
+    expect(classifyTrigger("trigify_competitor_engagement", v2)).toBe("rapid")
+    expect(classifyTrigger("trigify_competitor_engagement", v1)).toBe("passive")
   })
 })

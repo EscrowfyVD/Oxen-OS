@@ -84,8 +84,8 @@ describe("backfillSignalTypesCategories", () => {
     expect((directorChange![0] as Call).data.intentCategory).toBe("H")
     expect((directorChange![0] as Call).data.signalLevel).toBe("account")
     expect((directorChange![0] as Call).data.triggerType).toBe("rapid")
-    // No explicit recalibration — defaultPoints absent from the update.
-    expect((directorChange![0] as Call).data.defaultPoints).toBeUndefined()
+    // Sprint 3d ScoringConfig v2 — recalibrated 20 → 6.
+    expect((directorChange![0] as Call).data.defaultPoints).toBe(6)
   })
 
   // ─── [5] 3 placeholders deactivated ───────────────────────────────
@@ -123,5 +123,60 @@ describe("backfillSignalTypesCategories", () => {
       (c) => (c[0] as Call).data.intentCategory === "G",
     )
     expect(catG).toHaveLength(0)
+  })
+
+  // ─── Sprint 3d — ScoringConfig v2 reconciliation ──────────────────
+
+  // ─── [8] linkedin_post_funding recalibration (30 → 8) ─────────────
+  it("[8] recalibrates linkedin_post_funding defaultPoints to 8", async () => {
+    const { client, updateMock } = makeMockClient()
+    await backfillSignalTypesCategories(client)
+
+    const funding = updateMock.mock.calls.find(
+      (c) => (c[0] as Call).where.code === "linkedin_post_funding",
+    )
+    expect(funding).toBeDefined()
+    expect((funding![0] as Call).data.defaultPoints).toBe(8)
+    expect((funding![0] as Call).data.triggerType).toBe("rapid")
+  })
+
+  // ─── [9] comment trigger reclassification (rapid → immediate) ─────
+  it("[9] sets trigify_oxen_engagement_comment triggerType to immediate", async () => {
+    const { client, updateMock } = makeMockClient()
+    await backfillSignalTypesCategories(client)
+
+    const comment = updateMock.mock.calls.find(
+      (c) => (c[0] as Call).where.code === "trigify_oxen_engagement_comment",
+    )
+    expect(comment).toBeDefined()
+    expect((comment![0] as Call).data.triggerType).toBe("immediate")
+  })
+
+  // ─── [10] role_change trigger reclassification (passive → rapid) ──
+  it("[10] sets trigify_role_change triggerType to rapid", async () => {
+    const { client, updateMock } = makeMockClient()
+    await backfillSignalTypesCategories(client)
+
+    const roleChange = updateMock.mock.calls.find(
+      (c) => (c[0] as Call).where.code === "trigify_role_change",
+    )
+    expect(roleChange).toBeDefined()
+    expect((roleChange![0] as Call).data.triggerType).toBe("rapid")
+  })
+
+  // ─── [11] competitor_engagement deliberately untouched ────────────
+  // Registry stays `rapid` (already doc-§8.3-correct); the v2 drift fix
+  // for this code is in config.followUpTriggers, NOT the registry. Guard
+  // against a future edit "helpfully" recalibrating it here.
+  it("[11] leaves trigify_competitor_engagement at rapid with no points override", async () => {
+    const { client, updateMock } = makeMockClient()
+    await backfillSignalTypesCategories(client)
+
+    const competitor = updateMock.mock.calls.find(
+      (c) => (c[0] as Call).where.code === "trigify_competitor_engagement",
+    )
+    expect(competitor).toBeDefined()
+    expect((competitor![0] as Call).data.triggerType).toBe("rapid")
+    expect((competitor![0] as Call).data.defaultPoints).toBeUndefined()
   })
 })

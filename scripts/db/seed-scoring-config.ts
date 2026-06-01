@@ -1,20 +1,23 @@
-// Seed script for ScoringConfig v1 (Phase 3 Sprint 3a B2).
+// Seed script for ScoringConfig v1 + v2 (Phase 3 Sprint 3a B2 / Sprint 3d).
 //
 // Run AFTER the `phase3_scoring_foundation` migration is applied
 // (Railway runs `prisma migrate deploy` on push; the seed must be
 // triggered manually or via a deploy step).
 //
 // Usage: npx tsx scripts/db/seed-scoring-config.ts
+//   → seeds v1 (preserved, inactive) then v2 (active). v2 is the
+//     ScoringConfig v2 reconciliation to Andy's doc (May 2026).
 //
 // Idempotency:
-//   - Upsert by `version=1`. Re-running this script produces no
-//     change if v1 already exists (mirrors the seed-signal-types
-//     pattern). To update v1, edit `buildScoringConfigV1()` and
-//     pass --force, OR ship a v2 with the new values and flip
-//     isActive (the canonical edit path post-deploy).
-//   - Sets isActive=true on v1. Deactivates any other active rows
-//     so the "exactly one active" invariant is preserved even if a
-//     v2 was experimentally inserted before re-running.
+//   - Upsert by `version`. Re-running this script converges to the same
+//     end state — v1 + v2 rows present, v2 active — with no drift
+//     (mirrors the seed-signal-types pattern).
+//   - The canonical edit path is "ship a new version + flip isActive":
+//     edit `buildScoringConfigV2()` (never mutate a live DB row), or add
+//     `buildScoringConfigV3()` for the next bump. v1 stays frozen.
+//   - Each seed fn deactivates every OTHER version so the "exactly one
+//     active" invariant survives any insertion order. main() seeds v1
+//     then v2, so the committed end state is always v2-active.
 //
 // Refs:
 //   - PRD-004 §2.2 (reference/PRD_004_PHASE3_SCORING.md)
@@ -298,6 +301,94 @@ export function buildScoringConfigV1(): ScoringConfigBlob {
   }
 }
 
+/**
+ * Build the canonical v2 config blob — the ScoringConfig v2
+ * reconciliation to Andy's scoring doc (May 2026, Sprint 3d).
+ *
+ * v2 is defined as a delta over v1 (`structuredClone` + targeted
+ * overrides) so the diff reads as exactly "what changed vs v1" and
+ * nothing silently drifts in the ~260 untouched lines. v1 stays frozen
+ * and reproducible via `buildScoringConfigV1()`; `seedScoringConfigV2()`
+ * preserves the v1 DB row as inactive (audit history, doc §13.3).
+ *
+ * Deltas (all pinned to Andy's doc):
+ *   - icpFactors.intermediaryType — 6-group model: the primary (tier-1)
+ *     whitelist becomes G1–G6 only. G7A/G7B are dropped from the
+ *     scoring whitelist. The enum *values* are retired in a separate
+ *     migration PR; here we only stop tier-1-crediting them. A contact
+ *     still carrying G7A/G7B (none in prod today) falls to `secondary`
+ *     (non-null group → secondary points) rather than primary.
+ *   - icpFactors.companySize — brackets realigned:
+ *       ideal  20–500 emp / $2M+    = 10
+ *       viable  5–19 emp / $500K–2M =  7  (was 6)
+ *       edge   <5 OR >500 emp       =  3
+ *     The "<5 OR >500" two-tailed edge can't be one contiguous bracket,
+ *     so edgeCases.employeesMax=null makes it the catch-all under
+ *     compute-icp-score's first-match-wins: ideal/viable are checked
+ *     first, so everything else — both the <5 and the >500 tails —
+ *     lands in edge. (In v1, >500-employee accounts matched no bracket
+ *     and scored 0; v2 fixes that to 3.)
+ *   - followUpTriggers — trigify_role_change AND
+ *     trigify_competitor_engagement move passive → rapid (doc §8.3).
+ *     trigify_oxen_engagement_comment is already in `immediate` here
+ *     (v1); it's the registry/backfill that realigns to match.
+ *
+ * NOTE — point recalibrations (linkedin_post_funding 30→8,
+ * clay_director_change 20→6) do NOT live in this blob. computeIntentScore
+ * reads points off the ingested IntentSignal row (stamped from
+ * SignalTypeRegistry.defaultPoints at ingest), not config.intentCategories.
+ * Those changes live in backfill-signal-types-categories.ts.
+ */
+export function buildScoringConfigV2(): ScoringConfigBlob {
+  const blob = structuredClone(buildScoringConfigV1())
+
+  // 6-group model — drop G7A/G7B from the tier-1 whitelist.
+  blob.icpFactors.intermediaryType.tiers.primary.groups = [
+    "G1",
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+    "G6",
+  ]
+
+  // companySize brackets realigned to Andy doc (May 2026).
+  blob.icpFactors.companySize.brackets.ideal = {
+    points: 10,
+    employeesMin: 20,
+    employeesMax: 500,
+    revenueMin: 2_000_000,
+  }
+  blob.icpFactors.companySize.brackets.viable = {
+    points: 7,
+    employeesMin: 5,
+    employeesMax: 20,
+    revenueMin: 500_000,
+  }
+  blob.icpFactors.companySize.brackets.edgeCases = {
+    points: 3,
+    employeesMin: 1,
+    employeesMax: null, // catch-all tail: <5 (fails ideal/viable) AND >500
+    revenueMin: 0,
+  }
+
+  // Follow-up trigger reclassifications (doc §8.3): role_change and
+  // competitor_engagement graduate passive → rapid. comment is already
+  // in `immediate` (v1) — only the registry realigns there.
+  blob.followUpTriggers.passive.signals =
+    blob.followUpTriggers.passive.signals.filter(
+      (code) =>
+        code !== "trigify_role_change" &&
+        code !== "trigify_competitor_engagement",
+    )
+  blob.followUpTriggers.rapid.signals.push(
+    "trigify_competitor_engagement",
+    "trigify_role_change",
+  )
+
+  return blob
+}
+
 export interface SeedResult {
   version: number
   action: "created" | "updated" | "no-op"
@@ -363,10 +454,79 @@ export async function seedScoringConfigV1(
   return { version: 1, action: "created" }
 }
 
+/**
+ * Insert (or refresh) ScoringConfig v2 and make it the active config.
+ * Mirrors seedScoringConfigV1's invariant handling:
+ *   - validate the blob via Zod BEFORE touching DB
+ *   - deactivate every other version (incl. v1) so "exactly one active"
+ *     holds with v2 as the active config
+ *   - upsert v2 with isActive=true
+ * v1 is preserved as an inactive row (audit history, doc §13.3) — never
+ * deleted.
+ */
+export async function seedScoringConfigV2(
+  client: PrismaClient = prisma,
+): Promise<SeedResult> {
+  const blob = buildScoringConfigV2()
+
+  const validation = validateScoringConfig(blob)
+  if (!validation.ok) {
+    throw new Error(
+      `buildScoringConfigV2 produced an invalid blob: ${validation.error}\n` +
+        `Details: ${JSON.stringify(validation.details, null, 2)}`,
+    )
+  }
+
+  const configJson = blob as unknown as Parameters<
+    typeof client.scoringConfig.upsert
+  >[0]["create"]["config"]
+
+  const existing = await client.scoringConfig.findUnique({
+    where: { version: 2 },
+    select: { id: true, isActive: true },
+  })
+
+  // Deactivate every other version (v1 + any experimental rows) so the
+  // "exactly one active" invariant holds with v2 as the active config.
+  await client.scoringConfig.updateMany({
+    where: { isActive: true, version: { not: 2 } },
+    data: { isActive: false },
+  })
+
+  if (existing) {
+    await client.scoringConfig.update({
+      where: { version: 2 },
+      data: { config: configJson, isActive: true },
+    })
+    return { version: 2, action: existing.isActive ? "no-op" : "updated" }
+  }
+
+  await client.scoringConfig.create({
+    data: {
+      version: 2,
+      isActive: true,
+      config: configJson,
+      notes:
+        "v2 reconciliation to Andy scoring doc (May 2026): 6-group model " +
+        "(intermediaryType primary G1-G6), companySize realign, " +
+        "role_change + competitor_engagement -> rapid. Paired with backfill " +
+        "point recals (linkedin_post_funding 30->8, clay_director_change " +
+        "20->6) + comment->immediate on the registry.",
+      createdBy: "seed-script",
+    },
+  })
+  return { version: 2, action: "created" }
+}
+
 async function main() {
-  console.log("\n=== Seed ScoringConfig v1 (Phase 3 Sprint 3a) ===\n")
-  const result = await seedScoringConfigV1(prisma)
-  console.log(`Result: v${result.version} ${result.action}\n`)
+  // Seed v1 first (idempotent — guarantees the preserved history row
+  // exists even on a fresh environment), then v2 which becomes the
+  // active config and deactivates v1. End state: exactly one active = v2.
+  console.log("\n=== Seed ScoringConfig (Phase 3) ===\n")
+  const v1 = await seedScoringConfigV1(prisma)
+  console.log(`Result: v${v1.version} ${v1.action}`)
+  const v2 = await seedScoringConfigV2(prisma)
+  console.log(`Result: v${v2.version} ${v2.action} (now active)\n`)
 }
 
 // Run main() only when invoked directly (mirrors seed-signal-types.ts).
