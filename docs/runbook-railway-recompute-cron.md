@@ -73,7 +73,13 @@ In the **same Railway project** as the `os.oxen.finance` web service:
 | Variable | Why | Source |
 |---|---|---|
 | `DATABASE_URL` | Prisma — the recompute reads/writes prod DB | **Reference the Postgres service** (same value the web service uses), do NOT paste a literal |
-| `TELEGRAM_BOT_TOKEN` | promotion alerts (`alertBDsOnPromotion` → Telegram). Without it, alerts are silently skipped; the recompute itself still succeeds | same value as the web service |
+| `CRM_BD_EMAILS` | comma-separated BD emails that receive promotion alerts. **Empty → alerts are skipped entirely** (`alertBDsOnPromotion` early-returns `no_bd_emails`). Required for Option 3's whole point (timely alerts) | same value as the web service |
+| `TELEGRAM_BOT_TOKEN` | delivers each alert to the BD's `telegramChatId` (`notifyEmployee`). Without it, alerts are silently skipped; the recompute itself still succeeds | same value as the web service |
+
+> All three alert-path vars (`CRM_BD_EMAILS`, `TELEGRAM_BOT_TOKEN`, plus each BD's
+> `telegramChatId` set via /team) must be present for promotion alerts to fire —
+> exactly as on the web service. Missing any one → recompute still succeeds, alert
+> is silently skipped.
 
 `CRON_SECRET` is **not** required here (no HTTP hop). If Railway doesn't inject
 `NODE_ENV`, set `NODE_ENV=production`.
