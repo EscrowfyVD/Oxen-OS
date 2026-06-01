@@ -56,10 +56,13 @@ In the **same Railway project** as the `os.oxen.finance` web service:
    ```
 5. **Settings → Cron Schedule**:
    ```
-   17 * * * *
+   47 * * * *
    ```
-   (hourly at :17 UTC — matches the current GHA schedule; promotion-detection
-   latency stays ≤1h.)
+   Hourly. **Offset to :47 (not :17) during the parallel transition** so the
+   Railway tick never coincides with GHA's :17 — zero simultaneous overlap, plus
+   ~2× interim coverage (a tick roughly every 30 min across the two). After GHA
+   is decommissioned (§6), keep :47 or move back to :17 — immaterial once GHA is
+   gone. Promotion-detection latency stays ≤1h either way.
 6. **Settings → Deploy → Restart Policy**: leave default / "On Failure". Railway
    cron semantics treat a clean exit (0) as "job done", not a crash — it will
    **not** loop. (A non-zero exit will retry per policy, which is what we want
@@ -109,6 +112,14 @@ A run only Telegram-alerts a contact whose `newLevel` ranks strictly above its
 previous persisted level. Because each run persists the new level first, a
 *subsequent* run sees `previousLevel == newLevel` → no re-alert. So re-running
 (or running GHA + Railway in parallel, §5) does **not** double-alert.
+
+**Exit-safe.** Alerts are awaited end-to-end: `runScoreRecompute()` `await`s
+`alertBDsOnPromotion()`, which `await`s `Promise.all(...)` of the per-recipient
+Telegram sends. The runner does not resolve until every alert completes, so the
+cron's process exit cannot truncate an in-flight alert. (The "fire-and-forget"
+in the code comments means "an alert failure must not roll back ScoreHistory",
+not an un-awaited promise.) Verified by code; consistent with the clean ~0.5s
+exit on a no-promotion run.
 
 ---
 
