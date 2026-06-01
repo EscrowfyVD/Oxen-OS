@@ -5,22 +5,23 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-05-29 (Sprint 3c merged via PR #7 + run-recompute PR #8 ; Sprint 3d local awaiting push — Phase 3 100%)
+> **Last updated** : 2026-06-01 (Sprint 3d merged via PR #9 ; IntentSignal stamping fix + hourly recompute cron ; ScoringConfig v2 reconciled to Andy's doc & deployed ; Finding 1 configVersion fix — Phase 3 **100% in prod**, Trigify "LinkedIn oxen" workflow enabled)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **652/652** passing (was 613 ;
-  +39 from Sprint 3d) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
-  pre-existing debt).
+- **Repo health** : `npm run build` green ; tests **678/678** passing (64 files ;
+  was 652 at Sprint 3d local — +26 from ScoringConfig v2 reconcile + Finding 1) ;
+  lint baseline 79 errors + 159 warnings (CI non-blocking, pre-existing debt).
 - **Active workstreams** : (1) **Phase 3 Scoring Engine** — **🎉 100% COMPLETE
-  locally** : Sprint 3a (PR #6) + Sprint 3b + Sprint 3c (PR #7/#8) **in prod** ;
-  **Sprint 3d local** (triggers + Lemlist adapt-only + BD alerts + Intent Feed
-  Option C + /api/accounts) ready for push. (2) **SP16 — Onboarding Console** —
+  IN PROD** : Sprint 3a (PR #6) + 3b + 3c (PR #7/#8) + 3d (PR #9) all merged ;
+  ScoringConfig **v2** reconciled to Andy's doc & deployed ; Finding 1
+  (configVersion) fixed. Trigify "LinkedIn oxen" workflow enabled 2026-06-01 —
+  awaiting first organic IntentSignals. (2) **SP16 — Onboarding Console** —
   5 SP16 PRs merged, no SP16-006 defined yet (open).
-- **Local branches awaiting push** :
-  `scoring-3d-triggers-lemlist-alerts-feed` (Sprint 3d — final Phase 3 sprint).
+- **Local branches awaiting push** : none — Sprint 3d (PR #9) + ScoringConfig v2
+  + Finding 1 all merged/pushed to main.
 - **Production** : main = `os.oxen.finance` (Railway auto-deploy). No staging
   branch. Push = prod. Onboarding console stays dark behind
   `ONBOARDING_CONSOLE_ENABLED`.
@@ -53,11 +54,12 @@
 **Priority Level** (P1/P2/P3/Monitor/Excluded) → drives Intent Feed sort + future
 BD alerts + Lemlist sequence orchestration.
 
-**Status** : 🎉 **Phase 3 100% COMPLETE** (locally — Sprint 3d ready for push).
-Sprint 3a/3b/3c **in prod**. Sprint 3d wires the engine end-to-end : triggers
-classification → Lemlist adapt-only (V1 reframe per recon Finding 6) → BD
-Telegram alerts on promotion → Intent Feed Option C badge + filter →
-/api/accounts ILIKE fuzzy match.
+**Status** : 🎉 **Phase 3 100% COMPLETE IN PROD**. Sprint 3a/3b/3c/3d all merged
+(3d = PR #9). ScoringConfig **v2** reconciled to Andy's doc & deployed ; Finding 1
+(real configVersion stamped on ScoreHistory) fixed. Sprint 3d wires the engine
+end-to-end : triggers classification → Lemlist adapt-only (V1 reframe per recon
+Finding 6) → BD Telegram alerts on promotion → Intent Feed Option C badge +
+filter → /api/accounts ILIKE fuzzy match.
 
 **Shipped** :
 
@@ -68,17 +70,31 @@ Telegram alerts on promotion → Intent Feed Option C badge + filter →
 | `90b7748` | 2026-05-15 | **Mini-patch DM patterns** — DIRECT_DM_PATTERNS extended with long-form "Chief X Officer" alongside acronyms. Sample Tony Zero21 ICP 25 → 35. |
 | `c945151` (PR #6 → `7ee4b7f`) | 2026-05-24 | **Sprint 3a B3** — backfill SignalTypeRegistry `intentCategory`/`signalLevel`/`triggerType` on 11 active codes per Andy mapping ; deactivate 3 legacy placeholders ; recalibrate `clay_business_loss` defaultPoints 10 → 4. 7 tests. Backfill script runs in prod : `npx tsx scripts/db/backfill-signal-types-categories.ts`. |
 | `9bca8a2` (PR #7) + `becfa51` (PR #8) | 2026-05-29 | **Sprint 3c — Priority Level + Pain Tier + Negatives + Persist** — `assignPriorityLevel` (P1/P2/P3/Monitor/Excluded, D1) ; `inferPainTier` override-only V1 (D2/D10) ; `applyNegativeSignals` Option A reads CrmContact direct fields (D3) ; `persistScore` transaction CrmContact + ScoreHistory, returns `{previousLevel, newLevel, promoted}` delta (D7) ; `score-recompute-runner` ; 3 endpoints (`POST /api/scoring/recalculate` admin + `recalculate-all` admin + `cron/recompute-scores` CRON_SECRET). 58 new tests. Live smoke on Tony Christoforou : ICP 35 + Intent 0 → Monitor (consistent with recon projection). PR #8 = `run-recompute.ts` manual batch helper. |
-| **(local)** | **2026-05-29** | **Sprint 3d — Triggers + Lemlist adapt + BD alerts + Intent Feed** — Final Phase 3 sprint. `classifyTrigger` (config-driven, D2) ; `orchestrateSequence` Lemlist adapt-only V1 (D1 — recon proved API can't reschedule, so adapt = PATCH custom variables, accelerate adds Telegram BD manual-move alert) ; `lemlist.ts` extended with `updateLeadVariables` + token-bucket rate limiter (20 req/2s) + 429 retry-on-backoff ; `alertBDsOnPromotion` + `formatPromotionAlert` Telegram broadcast on Monitor/P3→P1/P2 promotions (D3 caller-side, reuse `trigify-alerts` pattern) wired at 3 sites (runner + recalculate + recalculate-all) ; Intent Feed Option C — `priorityLevelBadge` helper + single-select `priority_level` filter merging with `group` (D4) ; `/api/accounts` GET with ILIKE OR + tiered JS scoring (exact 100 / name 90 / starts-with 70 / contains 40) + union response shape (D6/D8). 39 new tests (652/652 total). |
+| `d184334` (PR #9 → `d45dfe0`) | 2026-05-29 | **Sprint 3d — Triggers + Lemlist adapt + BD alerts + Intent Feed** — Final Phase 3 sprint. `classifyTrigger` (config-driven, D2) ; `orchestrateSequence` Lemlist adapt-only V1 (D1 — recon proved API can't reschedule, so adapt = PATCH custom variables, accelerate adds Telegram BD manual-move alert) ; `lemlist.ts` extended with `updateLeadVariables` + token-bucket rate limiter (20 req/2s) + 429 retry-on-backoff ; `alertBDsOnPromotion` + `formatPromotionAlert` Telegram broadcast on Monitor/P3→P1/P2 promotions (D3 caller-side, reuse `trigify-alerts` pattern) wired at 3 sites (runner + recalculate + recalculate-all) ; Intent Feed Option C — `priorityLevelBadge` helper + single-select `priority_level` filter merging with `group` (D4) ; `/api/accounts` GET with ILIKE OR + tiered JS scoring (exact 100 / name 90 / starts-with 70 / contains 40) + union response shape (D6/D8). 39 new tests (652/652 total). |
+| `aa6a9d0` | 2026-05-29 | **IntentSignal stamping fix** — stamp `intentCategory` + `signalLevel` on the IntentSignal row at creation (was left NULL, recomputed downstream). Direct to main. |
+| `7809de3` + `52febd3` | 2026-05-29 | **Hourly recompute cron** — GitHub Actions workflow "Score Recompute Hourly" calls `POST /api/scoring/cron/recompute-scores` (CRON_SECRET) ; moved off top-of-hour to `:17` to dodge GHA's congested `:00` queue. Confirmed firing in prod (≈13 success runs over ~30h ; GHA schedule is best-effort — timestamps drift + some ticks drop, normal). Direct to main. |
+| `7184061` | 2026-06-01 | **ScoringConfig v2 — reconcile to Andy's doc** — `structuredClone(v1)` + deltas : 6-group model (G1-G6), companySize realign, trigger reclassifications, point recalc on registry. v2 active, v1 preserved inactive. Seed/backfill/recompute ran in prod. Direct to main. |
+| `65de6d9` | 2026-06-01 | **Finding 1 — stamp real config version on ScoreHistory** — `persistScore` stamps the active ScoringConfig version (was hardcoded `1`). New accessor `getActiveScoringConfigWithVersion()` returns `{config, version}` from one DB row / cache entry → zero config↔version drift ; `getActiveScoringConfig()` becomes a thin wrapper. `configVersion` threaded as a required param into `score-recompute-runner` + `/api/scoring/recalculate`. Sentinel test (`=2≠1`) locks against re-hardcode. +4 tests. No backfill of the ~10 boundary rows (ScoreHistory append-only ; v1→v2 blip explainable). Direct to main. |
 
-**Phase 3 = 100% locally**. Branch `scoring-3d-triggers-lemlist-alerts-feed`
-ready for push → PR → Railway redeploy. Backlog post-Phase 3 in §Backlog
-below.
+**Phase 3 = 100% in prod.** All sprints merged + ScoringConfig v2 deployed +
+Finding 1 fixed. The engine runs hourly in prod (recompute cron) and Trigify is
+enabled — next milestone is the first organic IntentSignals flowing in. Backlog
+post-Phase 3 in §Backlog below.
 
 **Known V1 limitations** (acknowledged in PRD-004 + Sprint 3d recon) :
 - 0 IntentSignals in prod DB → Intent score = 0 for every account until
-  Trigify pipeline starts producing real data
+  Trigify produces real data. ⏳ Trigify "LinkedIn oxen" workflow **enabled
+  2026-06-01** ; awaiting the first organic signals (hours/days). The hourly
+  recompute cron (`:17`) already fires green — it *consumes* signals, so scores
+  move on the next tick once they land.
 - 0 closed_won Deals → Pattern Match returns noMatch=0 for every account
   (graceful fallback)
+- **ICP companySize bracket** (Finding 2, deferred) — `compute-icp-score` keys
+  off `employeeCount`/`revenueRange`, both NULL for current prospects, so the
+  size factor falls to the edge/0 bracket. Real fix = parse the `companySize`
+  string label (finite Clay/Apollo format set) into a bracket, fall back to
+  edge/0, unit-test the formats. Deferred until real prospect volume arrives to
+  validate the format set.
 - ~~SignalTypeRegistry.intentCategory all NULL until B3 backfill runs in
   prod~~ → ✅ resolved 2026-05-24 (B3 backfill ran ; 11 active codes
   mapped, 3 placeholders deactivated)
@@ -170,12 +186,13 @@ session display + 3 operator actions. Feature-flagged behind
 
 | # | Ticket | Effort | Trigger |
 |---|---|---|---|
-| 1 | **Push Sprint 3d** + Railway redeploy → Phase 3 100% in prod | 10 min push + 5 min redeploy | Vernon green-lights the local commits |
-| 2 | **Re-activate Trigify pipeline** → first real IntentSignals → first promotions → first BD alerts in prod | varies (Andy/Trigify side) | Sprint 3d in prod |
-| 3 | **Coordinate Lemlist templates with `customField1..3` slot contract** — campaigns need `{{customField1}}` placeholders for adapt to actually surface in emails | ~30 min Andy + Vernon | Sprint 3d in prod + real Lemlist enrollments |
-| 4 | **Optional Sprint 3e** — Intent Feed sort by `priorityScore` (Option A), if BD dogfooding asks for it | ~0.5 day | First real signal volume + BD feedback |
-| 5 | **PRD-005 Apify+n8n** — Cat C/D/E/F/I signal sources beyond Trigify/Clay | TBD | Phase 3 in prod, signal data flowing |
-| 6 | **PRD-006 Apollo switch** | TBD | TBD |
+| 1 | **Await first organic IntentSignals** (Trigify "LinkedIn oxen" enabled 2026-06-01) → first promotions → first BD alerts in prod. Watch the webhook + IntentSignal row count, not the cron (already green). | varies (Trigify side ; hours/days) | Trigify enabled — now waiting |
+| 2 | **Coordinate Lemlist templates with `customField1..3` slot contract** — campaigns need `{{customField1}}` placeholders for adapt to actually surface in emails | ~30 min Andy + Vernon | Real Lemlist enrollments |
+| 3 | **Finding 2 — ICP companySize bracket** — parse the `companySize` string label (Clay/Apollo format set) into a size bracket + unit-test the formats ; fixes the size factor falling to 0 when `employeeCount`/`revenueRange` are NULL | ~0.5 day | Real prospect volume to validate the format set |
+| 4 | **Enum #9 — drop unused `CrmGroup` G7A/G7B** (separate PR) | ~15 min | Anytime (low priority) |
+| 5 | **Optional Sprint 3e** — Intent Feed sort by `priorityScore` (Option A), if BD dogfooding asks for it | ~0.5 day | First real signal volume + BD feedback |
+| 6 | **PRD-005 Apify+n8n** — Cat C/D/E/F/I signal sources beyond Trigify/Clay | TBD | Phase 3 in prod, signal data flowing |
+| 7 | **PRD-006 Apollo switch** | TBD | TBD |
 
 ### Sprint 3d sub-backlog (post-merge cleanup)
 
@@ -217,8 +234,9 @@ session display + 3 operator actions. Feature-flagged behind
 | Lint baseline 79 errors + 159 warnings | 🟡 LOW | CI job `continue-on-error: true` — non-blocking. Cleanup sprint sized in backlog. |
 | No staging branch → push = prod | 🟠 MED | Hard gate : `npm run build` green AND tests green at every commit. Feature flags for risky new surfaces (ONBOARDING_CONSOLE_ENABLED). |
 | No component test infra | 🟡 LOW | Coverage gap on interactive React components. TS strict mode + visual QA + API-route tests catch most regressions. Backlog item. |
-| 0 IntentSignals in prod DB | 🟠 MED | Trigify pipeline live but no real engagement since 2026-05-15. Intent score = 0 for every account until production traffic flows. Sprint 3b compute lib tested with synthetic data. |
+| 0 IntentSignals in prod DB | 🟠 MED | Trigify "LinkedIn oxen" workflow enabled 2026-06-01 ; awaiting first organic signals (hours/days). Intent score = 0 for every account until they land. Hourly recompute cron (`:17`) already firing green — consumes signals on the next tick once they arrive. Sprint 3b compute lib tested with synthetic data. |
 | 0 closed_won Deals → Pattern Match noMatch=0 | 🟡 LOW | Graceful fallback documented in Sprint 3b. Real Pattern Match validation awaits the first closed_won. |
+| ICP companySize falls to edge/0 bracket (Finding 2) | 🟡 LOW | `compute-icp-score` keys off `employeeCount`/`revenueRange`, both NULL for current prospects → size factor = 0. Fix = parse `companySize` string label into a bracket (backlog Ready-to-start #3). Deferred until real prospect volume validates the format set. |
 | OCA risk live validation pending | 🟡 LOW | Both staging sessions stuck at TRIAGE with null risk. Colored pill rendering locked by unit tests ; live visual check awaits a risk-assessed session. |
 | OCA does not expose session rejection reason | 🟡 LOW | OCA-side ticket queued. SP16-004 NOTES Step 0 documents. |
 | `acquisitionSource` was NULL on 597 contacts | ✅ FIXED | Hotfix R0 (`fe3b40a`) + backfill SQL ran 2026-05-15. |
