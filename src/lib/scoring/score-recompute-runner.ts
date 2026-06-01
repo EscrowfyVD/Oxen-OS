@@ -21,7 +21,7 @@
 // CrmContact write wins on the columns. Acceptable for V1.
 
 import { prisma } from "@/lib/prisma"
-import { getActiveScoringConfig } from "./config-loader"
+import { getActiveScoringConfigWithVersion } from "./config-loader"
 import { persistScore } from "./persist-score"
 import { alertBDsOnPromotion } from "./alert-on-promotion"
 import { logger, serializeError } from "@/lib/logger"
@@ -59,7 +59,8 @@ export interface ScoreRecomputeRunnerResult {
 export async function runScoreRecompute(
   now: Date = new Date(),
 ): Promise<ScoreRecomputeRunnerResult> {
-  const config = await getActiveScoringConfig()
+  const { config, version: configVersion } =
+    await getActiveScoringConfigWithVersion()
 
   // Sprint 3d B3 — extended select pulls the fields alertBDsOnPromotion
   // needs (firstName, lastName, company.name, company.country) so we
@@ -84,7 +85,13 @@ export async function runScoreRecompute(
 
   for (const c of contacts) {
     try {
-      const result = await persistScore(c.id, "contact", config, now)
+      const result = await persistScore(
+        c.id,
+        "contact",
+        config,
+        configVersion,
+        now,
+      )
       processed++
       if (result.promoted) {
         promoted++

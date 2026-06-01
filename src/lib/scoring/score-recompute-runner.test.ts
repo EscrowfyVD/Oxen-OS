@@ -13,7 +13,7 @@ vi.mock("@/lib/prisma", () => ({
 }))
 
 vi.mock("./config-loader", () => ({
-  getActiveScoringConfig: vi.fn(),
+  getActiveScoringConfigWithVersion: vi.fn(),
 }))
 
 vi.mock("./persist-score", () => ({
@@ -22,16 +22,21 @@ vi.mock("./persist-score", () => ({
 
 import { runScoreRecompute } from "./score-recompute-runner"
 import { prisma } from "@/lib/prisma"
-import { getActiveScoringConfig } from "./config-loader"
+import { getActiveScoringConfigWithVersion } from "./config-loader"
 import { persistScore } from "./persist-score"
 import { buildScoringConfigV1 } from "../../../scripts/db/seed-scoring-config"
 
 const config = buildScoringConfigV1()
+// != 1 to prove the real active version threads through (Finding 1).
+const CONFIG_VERSION = 2
 
 describe("runScoreRecompute", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getActiveScoringConfig).mockResolvedValue(config)
+    vi.mocked(getActiveScoringConfigWithVersion).mockResolvedValue({
+      config,
+      version: CONFIG_VERSION,
+    })
   })
 
   // ─── [1] Iterates each active contact, calls persistScore once ────
@@ -99,13 +104,21 @@ describe("runScoreRecompute", () => {
     expect(persistScore).not.toHaveBeenCalled()
   })
 
-  // ─── [6] Reads config once, not per contact ───────────────────────
-  it("[6] reads ScoringConfig once (cache-friendly)", async () => {
+  // ─── [6] Reads config+version once, threads version to persistScore ─
+  it("[6] reads config+version once and threads the version into persistScore", async () => {
     vi.mocked(prisma.crmContact.findMany).mockResolvedValue([
       { id: "ct-1" }, { id: "ct-2" },
     ] as never)
     vi.mocked(persistScore).mockResolvedValue({ promoted: false } as never)
     await runScoreRecompute()
-    expect(getActiveScoringConfig).toHaveBeenCalledTimes(1)
+    expect(getActiveScoringConfigWithVersion).toHaveBeenCalledTimes(1)
+    // The version from the loader must reach persistScore (Finding 1).
+    expect(persistScore).toHaveBeenCalledWith(
+      "ct-1",
+      "contact",
+      config,
+      CONFIG_VERSION,
+      expect.any(Date),
+    )
   })
 })

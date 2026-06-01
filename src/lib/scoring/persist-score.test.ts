@@ -39,6 +39,11 @@ import { buildScoringConfigV1 } from "../../../scripts/db/seed-scoring-config"
 
 const config = buildScoringConfigV1()
 const NOW = new Date("2026-05-25T12:00:00Z")
+// Intentionally != 1 so a reintroduced hardcode (Finding 1) trips the
+// configVersion stamp assertion in test [11]. The version is an
+// independent param from the blob — the loader pairs them; here we just
+// prove it threads through to ScoreHistory unchanged.
+const CONFIG_VERSION = 2
 
 /**
  * Wires the $transaction mock to invoke its callback with a `tx`
@@ -96,7 +101,7 @@ describe("persistScore", () => {
   it("[1] CrmContact updated + ScoreHistory inserted in one transaction", async () => {
     mockContact()
     mockScore()
-    await persistScore("ct-x", "contact", config, NOW)
+    await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1)
     expect(prisma.crmContact.update).toHaveBeenCalledTimes(1)
@@ -115,7 +120,7 @@ describe("persistScore", () => {
   it("[2] icpScoreBreakdown stored in Sprint 3b shape (D4 overwrite)", async () => {
     mockContact()
     mockScore()
-    await persistScore("ct-x", "contact", config, NOW)
+    await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
 
     const updateArg = vi.mocked(prisma.crmContact.update).mock.calls[0][0]
     const breakdown = updateArg.data.icpScoreBreakdown as unknown as {
@@ -130,7 +135,7 @@ describe("persistScore", () => {
   it("[3] previousLevel null → newLevel P1 → promoted=true", async () => {
     mockContact({ priorityLevel: null })
     mockScore({ total: 75, signalCount: 3 })
-    const result = await persistScore("ct-x", "contact", config, NOW)
+    const result = await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
     expect(result.previousLevel).toBe(null)
     expect(result.newLevel).toBe("P1")
     expect(result.promoted).toBe(true)
@@ -140,7 +145,7 @@ describe("persistScore", () => {
   it("[4] previousLevel 'P1' → newLevel 'P1' → promoted=false", async () => {
     mockContact({ priorityLevel: "P1" })
     mockScore({ total: 75, signalCount: 3 })
-    const result = await persistScore("ct-x", "contact", config, NOW)
+    const result = await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
     expect(result.promoted).toBe(false)
   })
 
@@ -148,7 +153,7 @@ describe("persistScore", () => {
   it("[5] previousLevel 'P1' → newLevel 'P3' → promoted=false (demotion)", async () => {
     mockContact({ priorityLevel: "P1" })
     mockScore({ total: 40, signalCount: 2 })
-    const result = await persistScore("ct-x", "contact", config, NOW)
+    const result = await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
     expect(result.newLevel).toBe("P3")
     expect(result.promoted).toBe(false)
   })
@@ -157,7 +162,7 @@ describe("persistScore", () => {
   it("[6] bounced contact → adjustedScore = total - 15", async () => {
     mockContact({ lemlistStatus: "bounced" })
     mockScore({ total: 80, signalCount: 3 })
-    const result = await persistScore("ct-x", "contact", config, NOW)
+    const result = await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
     expect(result.priorityScore).toBe(65) // 80 - 15
     expect(result.actions).toContain("flag_invalid")
   })
@@ -166,7 +171,7 @@ describe("persistScore", () => {
   it("[7] excludedFrom contains 'scoring' → priorityLevel 'Excluded' + ScoreHistory still inserted", async () => {
     mockContact({ excludedFrom: ["scoring"], priorityLevel: "Excluded" })
     mockScore({ total: 90, signalCount: 5 }) // High score still excluded
-    const result = await persistScore("ct-x", "contact", config, NOW)
+    const result = await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
     expect(result.newLevel).toBe("Excluded")
     expect(result.actions).toContain("already_excluded")
     // Audit trail still produced — important for the timeline view.
@@ -179,7 +184,7 @@ describe("persistScore", () => {
   it("[8] painTierOverride='T2' surfaces in the persisted painTier (V1 override path)", async () => {
     mockContact({ painTierOverride: "T2" })
     mockScore()
-    const result = await persistScore("ct-x", "contact", config, NOW)
+    const result = await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
     expect(result.painTier).toBe("T2")
 
     const updateArg = vi.mocked(prisma.crmContact.update).mock.calls[0][0]
@@ -192,7 +197,7 @@ describe("persistScore", () => {
   it("[9] throws when contact not found", async () => {
     vi.mocked(prisma.crmContact.findUnique).mockResolvedValue(null)
     mockScore()
-    await expect(persistScore("ct-missing", "contact", config, NOW)).rejects.toThrow(/not found/)
+    await expect(persistScore("ct-missing", "contact", config, CONFIG_VERSION, NOW)).rejects.toThrow(/not found/)
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
@@ -200,12 +205,24 @@ describe("persistScore", () => {
   it("[10] unsubscribed contact → excludedFrom gets 'scoring' appended, newLevel 'Excluded'", async () => {
     mockContact({ lemlistStatus: "unsubscribed", excludedFrom: [], priorityLevel: "P3" })
     mockScore({ total: 60, signalCount: 2 })
-    const result = await persistScore("ct-x", "contact", config, NOW)
+    const result = await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
     expect(result.newLevel).toBe("Excluded")
     expect(result.excluded).toBe(true)
     expect(result.actions).toContain("exclude")
 
     const updateArg = vi.mocked(prisma.crmContact.update).mock.calls[0][0]
     expect(updateArg.data.excludedFrom).toEqual(["scoring"])
+  })
+
+  // ─── [11] configVersion stamped from the param, not hardcoded (Finding 1) ─
+  it("[11] stamps ScoreHistory.configVersion from the param (not a hardcoded 1)", async () => {
+    mockContact()
+    mockScore()
+    await persistScore("ct-x", "contact", config, CONFIG_VERSION, NOW)
+
+    const historyArg = vi.mocked(prisma.scoreHistory.create).mock.calls[0][0]
+    // CONFIG_VERSION is intentionally != 1, so a reintroduced hardcode
+    // would fail here — this is the Finding 1 regression guard.
+    expect(historyArg.data.configVersion).toBe(CONFIG_VERSION)
   })
 })

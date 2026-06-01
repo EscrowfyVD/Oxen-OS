@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/admin"
 import { validateBody } from "@/lib/validate"
 import { childLoggerFromRequest, serializeError } from "@/lib/logger"
-import { getActiveScoringConfig } from "@/lib/scoring/config-loader"
+import { getActiveScoringConfigWithVersion } from "@/lib/scoring/config-loader"
 import { persistScore } from "@/lib/scoring/persist-score"
 import { alertBDsOnPromotion } from "@/lib/scoring/alert-on-promotion"
 
@@ -61,8 +61,14 @@ export async function POST(request: Request) {
 
   const start = Date.now()
   try {
-    const config = await getActiveScoringConfig()
-    const result = await persistScore(accountId, "contact", config)
+    const { config, version: configVersion } =
+      await getActiveScoringConfigWithVersion()
+    const result = await persistScore(
+      accountId,
+      "contact",
+      config,
+      configVersion,
+    )
     const durationMs = Date.now() - start
 
     // Sprint 3d D3 — fire-and-forget BD alert on promotion. Wrapped in

@@ -20,6 +20,10 @@ const TTL_MS = 60_000 // 60 seconds
 
 interface CachedConfig {
   config: ScoringConfigBlob
+  /** The ScoringConfig.version that produced `config`. Stamped onto
+   *  ScoreHistory.configVersion so the audit timeline records WHICH
+   *  config generated each snapshot (Finding 1 / doc §13.3). */
+  version: number
   ts: number
 }
 
@@ -28,9 +32,17 @@ interface CachedConfig {
 let cached: CachedConfig | null = null
 
 /**
- * Fetch the currently-active ScoringConfig. Caches the validated
- * blob for `TTL_MS`. Re-fetches on miss, on staleness, and after an
- * explicit `invalidateScoringConfigCache()`.
+ * Fetch the currently-active ScoringConfig blob AND its version.
+ *
+ * The version travels alongside the blob (not inside it — `version` is
+ * a ScoringConfig column, not part of the Zod-validated JSON) so callers
+ * can stamp ScoreHistory.configVersion with the config that actually
+ * produced the score rather than a hardcoded constant (Finding 1).
+ * Reading both from the same cache entry / DB row guarantees they never
+ * drift apart.
+ *
+ * Caches the validated blob for `TTL_MS`. Re-fetches on miss, on
+ * staleness, and after an explicit `invalidateScoringConfigCache()`.
  *
  * Throws if:
  *   - no `isActive=true` row exists in DB (seed-scoring-config not run)
@@ -42,11 +54,11 @@ let cached: CachedConfig | null = null
  *
  * Accepts an optional `now` (for tests) — defaults to `Date.now()`.
  */
-export async function getActiveScoringConfig(
+export async function getActiveScoringConfigWithVersion(
   now: number = Date.now(),
-): Promise<ScoringConfigBlob> {
+): Promise<{ config: ScoringConfigBlob; version: number }> {
   if (cached && now - cached.ts < TTL_MS) {
-    return cached.config
+    return { config: cached.config, version: cached.version }
   }
 
   const row = await prisma.scoringConfig.findFirst({
@@ -70,8 +82,21 @@ export async function getActiveScoringConfig(
     )
   }
 
-  cached = { config: validation.data, ts: now }
-  return validation.data
+  cached = { config: validation.data, version: row.version, ts: now }
+  return { config: validation.data, version: row.version }
+}
+
+/**
+ * Fetch the currently-active ScoringConfig blob. Thin wrapper over
+ * `getActiveScoringConfigWithVersion` for the many callers that only
+ * need the blob (the compute pipeline, the Intent Feed sort). Shares
+ * the same cache.
+ */
+export async function getActiveScoringConfig(
+  now: number = Date.now(),
+): Promise<ScoringConfigBlob> {
+  const { config } = await getActiveScoringConfigWithVersion(now)
+  return config
 }
 
 /**

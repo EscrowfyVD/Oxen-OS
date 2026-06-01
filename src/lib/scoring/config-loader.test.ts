@@ -20,6 +20,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import {
   getActiveScoringConfig,
+  getActiveScoringConfigWithVersion,
   invalidateScoringConfigCache,
 } from "./config-loader"
 import { prisma } from "@/lib/prisma"
@@ -112,6 +113,50 @@ describe("getActiveScoringConfig", () => {
 
     await expect(getActiveScoringConfig()).rejects.toThrow(
       /version=99.*invalid/,
+    )
+  })
+})
+
+describe("getActiveScoringConfigWithVersion", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    invalidateScoringConfigCache()
+  })
+
+  it("[1] returns the active config blob AND its version", async () => {
+    const blob = buildScoringConfigV1()
+    vi.mocked(prisma.scoringConfig.findFirst).mockResolvedValue({
+      version: 2,
+      config: blob,
+    } as never)
+
+    const { config, version } = await getActiveScoringConfigWithVersion()
+    expect(version).toBe(2)
+    expect(config.entryRules.minPriorityScore).toBe(40)
+    expect(prisma.scoringConfig.findFirst).toHaveBeenCalledTimes(1)
+  })
+
+  it("[2] shares the cache with getActiveScoringConfig (single DB read)", async () => {
+    const blob = buildScoringConfigV1()
+    vi.mocked(prisma.scoringConfig.findFirst).mockResolvedValue({
+      version: 2,
+      config: blob,
+    } as never)
+
+    const t0 = 1_000_000_000_000
+    const { version } = await getActiveScoringConfigWithVersion(t0)
+    // 30s later, within the 60s TTL — the blob-only accessor must hit
+    // the same cache entry rather than issuing a second DB read.
+    await getActiveScoringConfig(t0 + 30_000)
+
+    expect(version).toBe(2)
+    expect(prisma.scoringConfig.findFirst).toHaveBeenCalledTimes(1)
+  })
+
+  it("[3] throws when no active config is found in DB", async () => {
+    vi.mocked(prisma.scoringConfig.findFirst).mockResolvedValue(null)
+    await expect(getActiveScoringConfigWithVersion()).rejects.toThrow(
+      /No active ScoringConfig found/,
     )
   })
 })

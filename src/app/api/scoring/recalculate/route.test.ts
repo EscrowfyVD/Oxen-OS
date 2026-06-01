@@ -17,7 +17,7 @@ vi.mock("@/lib/admin", () => ({
 }))
 
 vi.mock("@/lib/scoring/config-loader", () => ({
-  getActiveScoringConfig: vi.fn(),
+  getActiveScoringConfigWithVersion: vi.fn(),
 }))
 
 vi.mock("@/lib/scoring/persist-score", () => ({
@@ -27,7 +27,7 @@ vi.mock("@/lib/scoring/persist-score", () => ({
 import { POST } from "./route"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/admin"
-import { getActiveScoringConfig } from "@/lib/scoring/config-loader"
+import { getActiveScoringConfigWithVersion } from "@/lib/scoring/config-loader"
 import { persistScore } from "@/lib/scoring/persist-score"
 import { buildScoringConfigV1 } from "../../../../../scripts/db/seed-scoring-config"
 
@@ -47,7 +47,10 @@ describe("POST /api/scoring/recalculate", () => {
       session: { user: { email: "vd@oxen.finance" } },
       employee: { id: "emp-1", email: "vd@oxen.finance", isAdmin: true },
     } as never)
-    vi.mocked(getActiveScoringConfig).mockResolvedValue(buildScoringConfigV1())
+    vi.mocked(getActiveScoringConfigWithVersion).mockResolvedValue({
+      config: buildScoringConfigV1(),
+      version: 2,
+    })
   })
 
   it("[1] 403 when not admin (requireAdmin returns error)", async () => {
@@ -101,6 +104,13 @@ describe("POST /api/scoring/recalculate", () => {
     expect(body.after.priorityLevel).toBe("P3")
     expect(body.after.promoted).toBe(true)
     expect(typeof body.durationMs).toBe("number")
+    // Version threads from the loader into persistScore (Finding 1).
+    expect(persistScore).toHaveBeenCalledWith(
+      "ct-x",
+      "contact",
+      expect.anything(),
+      2,
+    )
   })
 
   it("[4] 400 on invalid body", async () => {

@@ -26,7 +26,11 @@
 // Out of scope (deferred Sprint 3d) :
 //   - The promotion alert side-effect itself (this fn only RETURNS
 //     the delta ; the caller decides whether to alert).
-//   - Reading ScoringConfig.version dynamically — V1 hardcodes 1.
+//
+// Finding 1 (resolved) — configVersion is no longer hardcoded. The
+// caller threads the real active version (from
+// getActiveScoringConfigWithVersion) into the `configVersion` param so
+// each ScoreHistory row records which config produced it (doc §13.3).
 
 import { prisma } from "@/lib/prisma"
 import { computePriorityScore } from "./compute-priority-score"
@@ -75,16 +79,17 @@ const LEVEL_RANK: Record<string, number> = {
 
 const TRANSACTION_TIMEOUT_MS = 5000
 
-// V1 — hardcoded until config-loader exposes the version. Today only
-// v1 exists ; the seed-scoring-config script inserts version=1 and the
-// loader always picks the active row. If v2 ships, replace this with
-// a read from getActiveScoringConfig metadata (loader extension TODO).
-const SCORING_CONFIG_VERSION_V1 = 1
-
 export async function persistScore(
   accountId: string,
   accountType: "contact" | "company",
   config: ScoringConfigBlob,
+  /**
+   * The active ScoringConfig.version (Finding 1). Threaded from the
+   * caller's getActiveScoringConfigWithVersion() so the ScoreHistory row
+   * records which config produced this snapshot — was hardcoded to 1
+   * before v2 shipped, which would have mislabelled every v2 conversion.
+   */
+  configVersion: number,
   now: Date = new Date(),
 ): Promise<PersistScoreResult> {
   // 1. Fetch the contact's negative-signal-relevant + override fields
@@ -184,7 +189,11 @@ export async function persistScore(
         data: {
           accountId,
           accountType,
-          configVersion: SCORING_CONFIG_VERSION_V1,
+          // Stamp the REAL active config version (Finding 1) — threaded
+          // by the caller from getActiveScoringConfigWithVersion so each
+          // audit row records which config produced it (doc §13.3). Was
+          // hardcoded to 1 before v2 shipped.
+          configVersion,
           icpScore: score.icp,
           intentScore: score.intent,
           priorityScore: negatives.adjustedScore,
