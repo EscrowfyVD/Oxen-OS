@@ -16,8 +16,6 @@ enum CrmGroup {
   G4
   G5
   G6
-  G7A
-  G7B
 }
 
 enum CrmPainTier {

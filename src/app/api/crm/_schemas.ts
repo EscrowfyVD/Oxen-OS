@@ -174,16 +174,7 @@ export const updateContactSchema = createContactSchema.partial().extend({
 // `webhooks/_schemas.ts` `crmGroup` / `crmPainTier`). Duplicated here
 // rather than cross-imported from the webhooks schemas file to keep
 // modules self-contained — these tokens are unlikely to drift.
-const crmGroupEnum = z.enum([
-  "G1",
-  "G2",
-  "G3",
-  "G4",
-  "G5",
-  "G6",
-  "G7A",
-  "G7B",
-])
+const crmGroupEnum = z.enum(["G1", "G2", "G3", "G4", "G5", "G6"])
 const crmPainTierEnum = z.enum(["T1", "T2", "T3"])
 const crmPersonaEnum = z.enum(["DM", "OP"])
 

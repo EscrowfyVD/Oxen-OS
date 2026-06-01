@@ -112,11 +112,10 @@ describe("GET /api/crm/companies — Clay enrichment filters (Sprint S0.5 batch 
     expect(prisma.company.findMany).not.toHaveBeenCalled()
   })
 
-  it("accepts G7A and G7B (sub-grouped enum values)", async () => {
+  it("returns 400 on retired group=G7B (closeout #4 dropped G7A/G7B)", async () => {
     const res = await GET(makeReq("group=G7B"))
-    expect(res.status).toBe(200)
-    const callArg = vi.mocked(prisma.company.findMany).mock.calls[0][0]!
-    expect(callArg.where).toMatchObject({ group: "G7B" })
+    expect(res.status).toBe(400)
+    expect(prisma.company.findMany).not.toHaveBeenCalled()
   })
 
   it("preserves existing legacy filters alongside the new ones", async () => {

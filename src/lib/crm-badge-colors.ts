@@ -15,8 +15,8 @@
  */
 
 /**
- * 8 distinct hex colors, intuitively ordered from G1 (highest priority,
- * structural architects of offshore) through G7B (mobility/relocation).
+ * 6 distinct hex colors, intuitively ordered from G1 (highest priority,
+ * structural architects of offshore) through G6 (high-ticket settlement).
  * Each color was chosen to be distinguishable from its neighbors and
  * to read well at small badge sizes against the dark glass background.
  */
@@ -27,8 +27,6 @@ export const GROUP_COLORS: Record<string, string> = {
   G4: "#059669", // emerald — Wealth Intermediaries (MFOs)
   G5: "#F59E0B", // amber — Compliance & Accounting
   G6: "#0891B2", // cyan — High-Ticket Settlement (luxury brokers)
-  G7A: "#DB2777", // pink — Lifestyle / Luxury Concierges
-  G7B: "#4F46E5", // indigo — Mobility / Immigration / Relocation
 }
 
 /**

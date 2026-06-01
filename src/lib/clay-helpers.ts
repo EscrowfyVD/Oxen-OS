@@ -67,7 +67,7 @@ export function extractClayTableSegment(sourceTable: string): string | null {
 // Source-table parser (used by CSV import wizard auto-detection)
 // ──────────────────────────────────────────────────────────────────────
 
-const VALID_GROUPS = ["G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B"] as const
+const VALID_GROUPS = ["G1", "G2", "G3", "G4", "G5", "G6"] as const
 const VALID_TIERS = ["T1", "T2", "T3"] as const
 
 type Group = (typeof VALID_GROUPS)[number]
@@ -84,7 +84,7 @@ export interface ParsedClayTableName {
  * Parse a Clay source-table name into its constituent parts.
  *
  * Convention: `vDC_{group}_Tier {tierNum}_{scope}_{segment}`
- *   group   = G1..G7B
+ *   group   = G1..G6
  *   tierNum = 1..3 → T1..T3
  *   scope   = "Company" | "People"
  *   segment = free-text filter description

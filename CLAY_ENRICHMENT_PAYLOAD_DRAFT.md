@@ -17,7 +17,7 @@ Andy a engagé Duy Cao (freelance Clay) pour construire un pipeline d'enrichisse
   - `vDC_G1_Tier 1_People_Active Business Loss` — 981 people enrichis (100% complété)
 - **23 autres combinaisons** (G+T) à créer progressivement
 - **Naming convention** : `vDC_{group}_Tier {tier}_{scope}_{filter}` où :
-  - `group` ∈ {G1, G2, G3, G4, G5, G6, G7A, G7B}
+  - `group` ∈ {G1, G2, G3, G4, G5, G6}
   - `tier` ∈ {1, 2, 3}
   - `scope` ∈ {Company, People}
   - `filter` = description du segment (ex: "Active Business Loss")
@@ -122,7 +122,7 @@ Clay Table → HTTP API column → POST /api/webhooks/clay-enrichment → Oxen D
 export const clayEnrichmentSchema = z.object({
   source_table: z.string().min(1).max(200),
   scope: z.enum(["company", "people"]),
-  group: z.enum(["G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B"]),
+  group: z.enum(["G1", "G2", "G3", "G4", "G5", "G6"]),
   pain_tier: z.enum(["T1", "T2", "T3"]),
   company: z.object({
     name: z.string().min(1).max(255),
@@ -390,8 +390,6 @@ enum CrmGroup {
   G4
   G5
   G6
-  G7A
-  G7B
 }
 
 enum CrmPainTier {

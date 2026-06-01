@@ -82,15 +82,27 @@ describe("parseClayTableName", () => {
     })
   })
 
-  it("parses a People table name with G7B + T2", () => {
+  it("parses a People table name with a kept group (G6) + T2", () => {
     expect(
-      parseClayTableName("vDC_G7B_Tier 2_People_Crypto Funds Series A"),
+      parseClayTableName("vDC_G6_Tier 2_People_Crypto Funds Series A"),
     ).toEqual({
       scope: "people",
-      group: "G7B",
+      group: "G6",
       painTier: "T2",
       segment: "Crypto Funds Series A",
     })
+  })
+
+  it("does NOT resolve a retired group (G7B) — closeout #4 dropped G7A/G7B", () => {
+    // The regex still matches the token, but G7B is no longer in VALID_GROUPS,
+    // so `group` stays null while the rest of the name still parses.
+    const parsed = parseClayTableName(
+      "vDC_G7B_Tier 2_People_Crypto Funds Series A",
+    )
+    expect(parsed.group).toBeNull()
+    expect(parsed.scope).toBe("people")
+    expect(parsed.painTier).toBe("T2")
+    expect(parsed.segment).toBe("Crypto Funds Series A")
   })
 
   it("returns nulls for malformed table name", () => {

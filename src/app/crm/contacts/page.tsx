@@ -449,8 +449,6 @@ export default function ContactListPage() {
             <option value="G4">G4</option>
             <option value="G5">G5</option>
             <option value="G6">G6</option>
-            <option value="G7A">G7A</option>
-            <option value="G7B">G7B</option>
           </select>
           <select value={painTier} onChange={(e) => setPainTier(e.target.value)} style={selectStyle}>
             <option value="all">All Pain Tiers</option>

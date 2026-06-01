@@ -143,7 +143,7 @@ vDC_{group}_Tier {tier}_{scope}_{filter}
 | Component | Allowed values | Example |
 |---|---|---|
 | `vDC_` | literal prefix | — |
-| `{group}` | `G1`, `G2`, `G3`, `G4`, `G5`, `G6`, `G7A`, `G7B` | `G1` |
+| `{group}` | `G1`, `G2`, `G3`, `G4`, `G5`, `G6` | `G1` |
 | `Tier ` | literal (note the space after Tier) | — |
 | `{tier}` | `1`, `2`, `3` | `1` |
 | `_{scope}_` | `Company` or `People` (capitalized) | `Company` |
@@ -151,7 +151,7 @@ vDC_{group}_Tier {tier}_{scope}_{filter}
 
 Examples :
 - `vDC_G1_Tier 1_Company_Active Business Loss` ✅
-- `vDC_G7B_Tier 2_People_Crypto Funds Series A` ✅
+- `vDC_G6_Tier 2_People_Crypto Funds Series A` ✅
 - `Clay_Companies_2026` ❌ (does not match — Oxen wizard auto-detection will fail)
 
 The Oxen webhook does **not** parse the table name to derive `group`/`pain_tier` — those are sent explicitly in the JSON body. But the in-app CSV wizard relies on the convention to auto-detect, so consistency matters.
@@ -165,7 +165,7 @@ The Oxen endpoint validates payloads against a Zod schema (`clayEnrichmentSchema
 ### Top-level
 - `source_table` : string, max 200 chars
 - `scope` : `"company"` | `"people"`
-- `group` : enum `G1`..`G7B`
+- `group` : enum `G1`..`G6`
 - `pain_tier` : enum `T1`..`T3`
 
 ### `company` sub-object (required when `scope="company"`)
