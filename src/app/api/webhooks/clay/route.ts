@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
 import { validateBody } from "@/lib/validate"
 import { childLoggerFromRequest, serializeError } from "@/lib/logger"
+import { deriveSignalStamp } from "@/lib/scoring/derive-signal-stamp"
 import { clayWebhookSchema } from "../_schemas"
 
 export async function POST(request: Request) {
@@ -48,24 +49,31 @@ export async function POST(request: Request) {
       update: {},
     })
 
+    // Stamp (intentCategory/signalLevel/points) via the shared
+    // deriveSignalStamp helper. Parity with the previous inline `score ?? 10`
+    // is exact: clay_legacy_intent.defaultPoints === 10 (seed + prod), so
+    // `score ?? registryEntry.defaultPoints` reproduces it identically — while
+    // closing the stamping-drift gap (F6) uniformly across all writers.
+    const stamp = deriveSignalStamp(registryEntry, score)
+
     await prisma.intentSignal.create({
       data: {
         contactId: contact.id,
         companyId: contact.companyId,
         signalTypeId: registryEntry.id,
+        // source/signalType/title/detail/expiresAt are INTENTIONALLY clay-
+        // specific and load-bearing downstream (Intent Feed source filter,
+        // AI prompt, SignalCard, Telegram). They legitimately diverge from
+        // ingestSignal()'s canonical values, so this route is NOT routed
+        // through it — only the stamp derivation is shared.
         source: "clay",
         signalType: enrichment_type || "tech_install",
         title: title || "Clay Enrichment",
         detail: typeof data === "string" ? data : JSON.stringify(data),
-        points: score ?? 10,
         expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-        // Sprint 3a categorical axes — copied from the (placeholder) registry.
-        // clay_legacy_intent has intentCategory=null, so these signals stay
-        // correctly excluded from the A-I Intent score until this route is
-        // rewired to canonical codes (sub-backlog). Stamping it now closes the
-        // "column added, writer not wired" gap uniformly across all writers.
-        intentCategory: registryEntry.intentCategory,
-        signalLevel: registryEntry.signalLevel,
+        points: stamp.points,
+        intentCategory: stamp.intentCategory,
+        signalLevel: stamp.signalLevel,
         metadata: body,
       },
     })

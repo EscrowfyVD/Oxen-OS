@@ -26,6 +26,7 @@
 import { Prisma, type IntentSignal, type MarketSignal } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import type { SignalIngestionPayload } from "@/app/api/signals/_schemas"
+import { deriveSignalStamp } from "@/lib/scoring/derive-signal-stamp"
 
 // ─────────────────────────────────────────────────────────────────────
 // Result types — discriminated union for safe pattern-matching by
@@ -132,16 +133,18 @@ async function resolveRegistryEntry(
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 
 /**
- * Compute (occurredAt, expiresAt, points, metadataInput) from the
- * payload + registry. Pure derivation — no DB touch.
+ * Compute (occurredAt, expiresAt, metadataInput) from the payload +
+ * registry. Pure derivation — no DB touch. NOTE: `points` is no longer
+ * derived here — it is part of the stamp (intentCategory/signalLevel/points)
+ * produced by deriveSignalStamp(), the single source of truth shared with the
+ * clay/n8n/trigify webhooks (closeout #3).
  */
 function deriveLifecycle(
   payload: SignalIngestionPayload,
-  registry: { defaultPoints: number; decayDays: number },
+  registry: { decayDays: number },
 ): {
   occurredAt: Date
   expiresAt: Date
-  points: number
   metadataInput: Prisma.InputJsonValue | typeof Prisma.DbNull
 } {
   const occurredAt = payload.occurredAt
@@ -150,13 +153,12 @@ function deriveLifecycle(
   const expiresAt = new Date(
     occurredAt.getTime() + registry.decayDays * MS_PER_DAY,
   )
-  const points = payload.customPoints ?? registry.defaultPoints
   // metadata is `unknown` post-Zod — narrow to Prisma's input shape.
   const metadataInput =
     payload.metadata === undefined
       ? Prisma.DbNull
       : (payload.metadata as Prisma.InputJsonValue)
-  return { occurredAt, expiresAt, points, metadataInput }
+  return { occurredAt, expiresAt, metadataInput }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -189,11 +191,12 @@ export async function ingestSignal(
   if (!registryResolution.ok) return registryResolution
   const registry = registryResolution.entry
 
-  // Step 2 — derive lifecycle
-  const { occurredAt, expiresAt, points, metadataInput } = deriveLifecycle(
+  // Step 2 — derive lifecycle (time/metadata) + stamp (category/level/points)
+  const { occurredAt, expiresAt, metadataInput } = deriveLifecycle(
     payload,
     registry,
   )
+  const stamp = deriveSignalStamp(registry, payload.customPoints)
 
   // Step 3 — persist (branch by scope)
   try {
@@ -222,19 +225,19 @@ export async function ingestSignal(
           signalType: registry.code,
           title: registry.label,
           detail: payload.notes ?? null,
-          points,
+          // Stamp (intentCategory/signalLevel/points) via deriveSignalStamp —
+          // the shared single source of truth. computeIntentScore filters
+          // `intentCategory != null` ON THE ROW (not via a join), so the
+          // denormalization is load-bearing; centralizing it guarantees every
+          // writer stamps identically (failure mode F6). Placeholders
+          // (registry.intentCategory === null) correctly stay excluded.
+          points: stamp.points,
+          intentCategory: stamp.intentCategory,
+          signalLevel: stamp.signalLevel,
           expiresAt,
           metadata: metadataInput,
           sourceUrl: payload.sourceUrl ?? null,
           notes: payload.notes ?? null,
-          // Sprint 3a categorical axes — denormalized from the registry onto
-          // the row. computeIntentScore filters `intentCategory != null` ON
-          // THE ROW (not via a join to signalTypeRef), so a signal written
-          // without this stays NULL-category and contributes 0 to the Intent
-          // score forever. Placeholders (registry.intentCategory === null)
-          // correctly stay null and remain excluded.
-          intentCategory: registry.intentCategory,
-          signalLevel: registry.signalLevel,
           createdAt: occurredAt, // anchor decay on event time, not insert time
         },
       })
@@ -264,15 +267,15 @@ export async function ingestSignal(
           signalType: registry.code,
           title: registry.label,
           detail: payload.notes ?? null,
-          points,
+          // Stamp via deriveSignalStamp — see the contact branch above for why
+          // this denormalization is load-bearing for computeIntentScore.
+          points: stamp.points,
+          intentCategory: stamp.intentCategory,
+          signalLevel: stamp.signalLevel,
           expiresAt,
           metadata: metadataInput,
           sourceUrl: payload.sourceUrl ?? null,
           notes: payload.notes ?? null,
-          // Sprint 3a categorical axes — see the contact branch above for why
-          // this denormalization is load-bearing for computeIntentScore.
-          intentCategory: registry.intentCategory,
-          signalLevel: registry.signalLevel,
           createdAt: occurredAt,
         },
       })
@@ -280,12 +283,15 @@ export async function ingestSignal(
     }
 
     // payload.scope === "market"
+    // MarketSignal has no intentCategory/signalLevel — only `points`, whose
+    // derivation (`customPoints ?? defaultPoints`) is identical, so we reuse
+    // the shared stamp's points.
     const signal = await prisma.marketSignal.create({
       data: {
         signalTypeId: registry.id,
         country: payload.country,
         vertical: payload.vertical ?? null,
-        points,
+        points: stamp.points,
         metadata: metadataInput,
         sourceUrl: payload.sourceUrl ?? null,
         occurredAt,

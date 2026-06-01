@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
 import { validateBody } from "@/lib/validate"
 import { childLoggerFromRequest, serializeError } from "@/lib/logger"
+import { deriveSignalStamp } from "@/lib/scoring/derive-signal-stamp"
 import { n8nWebhookSchema } from "../_schemas"
 
 export async function POST(request: Request) {
@@ -45,23 +46,29 @@ export async function POST(request: Request) {
           },
           update: {},
         })
+        // Stamp (intentCategory/signalLevel/points) via the shared
+        // deriveSignalStamp helper. Parity with the previous inline
+        // `data?.score ?? 10` is exact: n8n_external_signal.defaultPoints === 10
+        // (seed + prod). Closes the stamping-drift gap (F6) uniformly.
+        const stamp = deriveSignalStamp(registryEntry, data?.score)
         await prisma.intentSignal.create({
           data: {
             contactId: contact.id,
             companyId: contact.companyId,
             signalTypeId: registryEntry.id,
+            // source/signalType/title/detail/expiresAt are INTENTIONALLY n8n-
+            // specific and load-bearing downstream. In particular expiresAt is
+            // NULLABLE here (null = permanent signal) — ingestSignal() always
+            // computes a non-null expiresAt, so this route is NOT routed
+            // through it; only the stamp derivation is shared.
             source: "n8n",
             signalType: data?.signalType || "web_visit",
             title: data?.title || "n8n Signal",
             detail: data?.detail || null,
-            points: data?.score ?? 10,
             expiresAt: data?.expiresAt ? new Date(data.expiresAt) : null,
-            // Sprint 3a categorical axes — copied from the (placeholder)
-            // registry. n8n_external_signal has intentCategory=null, so these
-            // stay correctly excluded from the A-I Intent score until rewired
-            // to canonical codes (sub-backlog).
-            intentCategory: registryEntry.intentCategory,
-            signalLevel: registryEntry.signalLevel,
+            points: stamp.points,
+            intentCategory: stamp.intentCategory,
+            signalLevel: stamp.signalLevel,
             metadata: body,
           },
         })

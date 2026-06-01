@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
 import { validateBody } from "@/lib/validate"
 import { childLoggerFromRequest, serializeError } from "@/lib/logger"
+import { deriveSignalStamp } from "@/lib/scoring/derive-signal-stamp"
 import { trigifyWebhookSchema } from "../_schemas"
 import { matchContact } from "@/lib/trigify-matching"
 import {
@@ -90,10 +91,15 @@ export async function POST(request: Request) {
     const expiresAt = new Date(
       occurredAt.getTime() + registryEntry.decayDays * MS_PER_DAY,
     )
-    const points =
-      payload.intent_score_points ??
-      payload.score ??
-      registryEntry.defaultPoints
+    // Stamp (intentCategory/signalLevel/points) via the shared
+    // deriveSignalStamp helper. Trigify's two-level custom-points fallback is
+    // preserved EXACTLY: pass `intent_score_points ?? score` as customPoints;
+    // the helper applies `?? defaultPoints` last, reproducing the previous
+    // `intent_score_points ?? score ?? defaultPoints`. Closes F6 drift.
+    const stamp = deriveSignalStamp(
+      registryEntry,
+      payload.intent_score_points ?? payload.score,
+    )
 
     // ── Step 3.5: day-level dedup (Trigify rescans last week, every run) ──
     const existing = await findExistingSignal({
@@ -125,22 +131,27 @@ export async function POST(request: Request) {
         contactId: match.contact.id,
         companyId: match.contact.companyId,
         signalTypeId: registryEntry.id,
+        // source/signalType/title/detail/expiresAt are INTENTIONALLY trigify-
+        // specific and load-bearing downstream (Intent Feed source filter, AI
+        // prompt, SignalCard, Telegram BD alerts). They legitimately diverge
+        // from ingestSignal()'s canonical values, so this route is NOT routed
+        // through it — only the stamp derivation is shared.
         source: "trigify",
         signalType: signalCode,
         title: registryEntry.label,
         detail:
           payload.signal_detail ?? payload.detail ?? payload.title ?? null,
-        points,
         expiresAt,
         createdAt: occurredAt,
-        // Allumage GATE (Sprint 3a categorical axes) — copy the registry's
-        // intentCategory + signalLevel ONTO the row. computeIntentScore
-        // filters `intentCategory != null` on the IntentSignal itself, so a
-        // Trigify signal written without this scores 0 → priority level never
-        // moves → no promotion → no BD alert. This is the switch that makes
-        // the reactive loop produce score movement once Trigify is flipped.
-        intentCategory: registryEntry.intentCategory,
-        signalLevel: registryEntry.signalLevel,
+        // Allumage GATE — the stamp (intentCategory/signalLevel/points) comes
+        // from deriveSignalStamp. computeIntentScore filters
+        // `intentCategory != null` on the IntentSignal itself, so a Trigify
+        // signal written without it scores 0 → priority level never moves →
+        // no promotion → no BD alert. This stamp is the switch that makes the
+        // reactive loop produce score movement once Trigify is flipped.
+        points: stamp.points,
+        intentCategory: stamp.intentCategory,
+        signalLevel: stamp.signalLevel,
         sourceUrl: payload.post_url ?? null,
         metadata: {
           signal_detail: payload.signal_detail ?? null,
