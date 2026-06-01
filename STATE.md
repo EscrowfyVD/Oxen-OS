@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-01 (Phase 3 **100% in prod** ; closeout #3 `deriveSignalStamp` merged to main ; **closeout #4 — drop unused `CrmGroup` enum values G7A/G7B via a Postgres migration — PR `closeout-4-crmgroup-enum-drop` open, NOT merged. Last item of the post-Phase-3 cleanup series.**)
+> **Last updated** : 2026-06-01 (Phase 3 **100% in prod** ; post-Phase-3 closeout series **done** — #3 `deriveSignalStamp` + #4 `CrmGroup` enum drop (PR #10 → `3b33693`) both merged & prod-verified. **In flight : reliable recompute trigger — Railway cron PR `ops-railway-recompute-cron` (entrypoint `npm run recompute:cron` + runbook). Finding : the GHA `:17` schedule is confirmed dropping ticks — multi-hour gaps, not hourly.**)
 
 ---
 
@@ -243,7 +243,8 @@ session display + 3 operator actions. Feature-flagged behind
 | Lint baseline 79 errors + 159 warnings | 🟡 LOW | CI job `continue-on-error: true` — non-blocking. Cleanup sprint sized in backlog. |
 | No staging branch → push = prod | 🟠 MED | Hard gate : `npm run build` green AND tests green at every commit. Feature flags for risky new surfaces (ONBOARDING_CONSOLE_ENABLED). |
 | No component test infra | 🟡 LOW | Coverage gap on interactive React components. TS strict mode + visual QA + API-route tests catch most regressions. Backlog item. |
-| 0 IntentSignals in prod DB | 🟠 MED | Trigify "LinkedIn oxen" workflow enabled 2026-06-01 ; awaiting first organic signals (hours/days). Intent score = 0 for every account until they land. Hourly recompute cron (`:17`) already firing green — consumes signals on the next tick once they arrive. Sprint 3b compute lib tested with synthetic data. |
+| 0 IntentSignals in prod DB | 🟠 MED | Trigify "LinkedIn oxen" workflow enabled 2026-06-01 ; awaiting first organic signals (hours/days). Intent score = 0 for every account until they land. The recompute cron consumes signals on the next tick once they arrive (caveat: GHA drops ticks → multi-hour latency — see the cron-reliability row below). Sprint 3b compute lib tested with synthetic data. |
+| GHA recompute cron drops ticks | 🟠 MED | "Score Recompute Hourly" fires + succeeds *when it runs*, but GitHub's best-effort scheduler drops a large fraction of `:17` ticks → multi-hour gaps (5–6h observed overnight ; verified read-only via `ScoreHistory.computedAt`). Scores still apply, but freshness is multi-hour, not hourly. **Fix in flight** : Railway cron PR `ops-railway-recompute-cron` — `npm run recompute:cron` (same idempotent `runScoreRecompute`) + `docs/runbook-railway-recompute-cron.md`. Transition runs GHA + Railway in parallel (idempotent, zero gaps) ; decommission GHA after the Railway cron is proven. |
 | 0 closed_won Deals → Pattern Match noMatch=0 | 🟡 LOW | Graceful fallback documented in Sprint 3b. Real Pattern Match validation awaits the first closed_won. |
 | ~~ICP companySize falls to edge/0 bracket (Finding 2)~~ | ✅ FIXED | `89d4dfb` (2026-06-01) — `compute-icp-score` parses the `companySize` string label into a bracket, edge/0 fallback, formats unit-tested. >500-employee edge=3 caveat parked as an ICP note for Andy (v2 ideal-cap design, not a parser bug). |
 | OCA risk live validation pending | 🟡 LOW | Both staging sessions stuck at TRIAGE with null risk. Colored pill rendering locked by unit tests ; live visual check awaits a risk-assessed session. |
