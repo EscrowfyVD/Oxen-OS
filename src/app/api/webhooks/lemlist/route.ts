@@ -159,6 +159,7 @@ export async function POST(request: Request) {
       emailsClicked: "sequence_active",
       emailsReplied: "replied",
       emailsBounced: "sequence_active",
+      emailsUnsubscribed: "closed_lost",
       contacted: "sequence_active",
       interested: "replied",
       hooked: "replied",
