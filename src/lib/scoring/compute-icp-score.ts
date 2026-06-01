@@ -12,6 +12,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { computePatternMatch } from "./pattern-match"
+import { parseCompanySizeLabel } from "./parse-company-size"
 import type {
   ScoringConfigBlob,
   IntermediaryTypeFactor,
@@ -59,10 +60,16 @@ function computeIntermediaryType(
 // Factor 2 — Company Size
 // ─────────────────────────────────────────────────────────────────────
 //
-// Primary signal = employeeCount (Clay enrichment populates this for
-// most companies). Falls back to revenueRange when employeeCount is
-// missing — string brackets like "1M-5M" parsed to a USD min.
-// Returns 0 points when neither is set.
+// Primary signal = employeeCount (a numeric column). Clay never
+// populated it for the current pool, so two fallbacks kick in, in order:
+//   1. the `companySize` string label ("11-50 employees" → 30 via
+//      parseCompanySizeLabel) run through the SAME bracket matcher, then
+//   2. revenueRange ("1M-5M" → a USD min) as the soft fallback.
+// When none of employeeCount / label / revenue yields a match, an account
+// that HAS a company row still lands in the edge bucket (never 0) — only a
+// missing company row or a real-but-out-of-range employeeCount reports 0.
+// The bracket bounds live in config; the parser only produces a number
+// (Finding 2).
 
 const REVENUE_MIN_USD: Record<string, number> = {
   "<100K": 0,
@@ -101,13 +108,26 @@ function matchBracket(
 }
 
 function computeCompanySize(
-  company: { employeeCount: number | null; revenueRange: string | null } | null,
+  company: {
+    employeeCount: number | null
+    revenueRange: string | null
+    companySize?: string | null
+  } | null,
   factor: CompanySizeFactor,
 ): { points: number; bracket: string } {
   if (!company) {
     return { points: 0, bracket: "unknown" }
   }
-  const employees = company.employeeCount
+
+  // Primary: the numeric employeeCount. When it's absent (the entire
+  // current prospect pool — Clay populated only the string label), derive
+  // a representative count from the `companySize` label and run the SAME
+  // matcher. The parser yields just a number; the bounds stay in config.
+  const hasEmployeeCount =
+    company.employeeCount !== null && company.employeeCount !== undefined
+  const employees = hasEmployeeCount
+    ? company.employeeCount
+    : parseCompanySizeLabel(company.companySize)
   const revenueMin = parseRevenueMin(company.revenueRange)
 
   // Order matters: check ideal first (highest tier wins ties).
@@ -118,6 +138,14 @@ function computeCompanySize(
     return { points: factor.brackets.viable.points, bracket: "viable" }
   }
   if (matchBracket(employees, revenueMin, factor.brackets.edgeCases)) {
+    return { points: factor.brackets.edgeCases.points, bracket: "edgeCases" }
+  }
+
+  // Nothing matched. With a real employeeCount present, preserve the
+  // historical "unknown → 0" behavior (e.g. a 0-employee row). But on the
+  // label-derivation path an empty / unknown / unparsable label must never
+  // score 0 — fall back to the edge bucket (Finding 2 robustness rule).
+  if (!hasEmployeeCount) {
     return { points: factor.brackets.edgeCases.points, bracket: "edgeCases" }
   }
   return { points: 0, bracket: "unknown" }

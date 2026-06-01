@@ -18,7 +18,10 @@ vi.mock("@/lib/prisma", () => ({
 
 import { computeICPScore } from "./compute-icp-score"
 import { prisma } from "@/lib/prisma"
-import { buildScoringConfigV1 } from "../../../scripts/db/seed-scoring-config"
+import {
+  buildScoringConfigV1,
+  buildScoringConfigV2,
+} from "../../../scripts/db/seed-scoring-config"
 
 const config = buildScoringConfigV1()
 
@@ -310,5 +313,140 @@ describe("computeDecisionMakerAccess — long-form titles", () => {
     const result = await computeICPScore("ct-x", config)
     expect(result.breakdown.decisionMakerAccess.level).toBe("direct")
     expect(result.breakdown.decisionMakerAccess.points).toBe(10)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// Company Size — string-label derivation (Finding 2)
+// ─────────────────────────────────────────────────────────────────────
+//
+// Prod reality (recon): employeeCount = NULL and revenueRange = NULL on
+// 100% of Company rows; the only populated size signal is the
+// `companySize` string label. These tests run against the ACTIVE prod
+// config (v2: ideal 20-500 = 10, viable 5-19 = 7, edge catch-all = 3) and
+// assert the label flows through the SAME bracket matcher — and that an
+// unparsable / missing label never scores 0 once a company row exists.
+
+describe("computeICPScore — companySize label derivation (Finding 2, v2 config)", () => {
+  const v2 = buildScoringConfigV2()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(prisma.deal.findMany).mockResolvedValue([] as never)
+  })
+
+  // ─── Observed bucket formats → expected bracket/points ─────────────
+  it("[24] '11-50 employees' (emp+rev null) → ideal 10 (midpoint 30 straddles into ideal)", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { companySize: "11-50 employees", country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    expect(result.breakdown.companySize.bracket).toBe("ideal")
+    expect(result.breakdown.companySize.points).toBe(10)
+  })
+
+  it("[25] '2-10 employees' → viable 7 (midpoint 6 ∈ 5-19)", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { companySize: "2-10 employees", country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    expect(result.breakdown.companySize.bracket).toBe("viable")
+    expect(result.breakdown.companySize.points).toBe(7)
+  })
+
+  it("[26] '51-200 employees' → ideal 10 (midpoint 125)", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { companySize: "51-200 employees", country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    expect(result.breakdown.companySize.bracket).toBe("ideal")
+    expect(result.breakdown.companySize.points).toBe(10)
+  })
+
+  it("[27] '201-500 employees' → ideal 10 (midpoint 350)", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { companySize: "201-500 employees", country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    expect(result.breakdown.companySize.bracket).toBe("ideal")
+    expect(result.breakdown.companySize.points).toBe(10)
+  })
+
+  it("[28] '501-1,000 employees' → edgeCases 3 (midpoint 750 > 500, catch-all tail)", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { companySize: "501-1,000 employees", country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    expect(result.breakdown.companySize.bracket).toBe("edgeCases")
+    expect(result.breakdown.companySize.points).toBe(3)
+  })
+
+  it("[29] '10,001+ employees' → edgeCases 3 (open bucket 10001 > 500)", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { companySize: "10,001+ employees", country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    expect(result.breakdown.companySize.bracket).toBe("edgeCases")
+    expect(result.breakdown.companySize.points).toBe(3)
+  })
+
+  // ─── Robustness: unparsable / missing label → edge 3, never 0 ──────
+  it("[30] 'Self-employed' (non-numeric) → edgeCases 3, never 0", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { companySize: "Self-employed", country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    expect(result.breakdown.companySize.bracket).toBe("edgeCases")
+    expect(result.breakdown.companySize.points).toBe(3)
+  })
+
+  it("[31] null label + emp null + rev null (company present) → edgeCases 3, never 0", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { companySize: null, employeeCount: null, revenueRange: null, country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    expect(result.breakdown.companySize.bracket).toBe("edgeCases")
+    expect(result.breakdown.companySize.points).toBe(3)
+  })
+
+  // ─── employeeCount present → numeric path unchanged, label ignored ─
+  it("[32] employeeCount=100 wins over a 'small' label → ideal 10 (matcher unchanged)", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { employeeCount: 100, companySize: "2-10 employees", country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    // employeeCount=100 ∈ ideal [20,500); the "2-10" label is ignored.
+    expect(result.breakdown.companySize.bracket).toBe("ideal")
+    expect(result.breakdown.companySize.points).toBe(10)
+  })
+
+  // ─── Revenue fallback still precedes the edge catch-all ────────────
+  it("[33] emp null + label null + revenue 5M-20M → ideal via revenue fallback", async () => {
+    mockContact({
+      group: "G1",
+      email: "x@y.com",
+      company: { employeeCount: null, companySize: null, revenueRange: "5M-20M", country: "Cyprus" },
+    })
+    const result = await computeICPScore("ct-x", v2)
+    expect(result.breakdown.companySize.bracket).toBe("ideal")
+    expect(result.breakdown.companySize.points).toBe(10)
   })
 })
