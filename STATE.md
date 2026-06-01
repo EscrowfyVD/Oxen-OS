@@ -5,23 +5,26 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-01 (Sprint 3d merged via PR #9 ; IntentSignal stamping fix + hourly recompute cron ; ScoringConfig v2 reconciled to Andy's doc & deployed ; Finding 1 configVersion fix — Phase 3 **100% in prod**, Trigify "LinkedIn oxen" workflow enabled)
+> **Last updated** : 2026-06-01 (Phase 3 **100% in prod** ; Finding 2 companySize-label fix + lemlist `emailsUnsubscribed` hotfix pushed to main ; **closeout #3 — `deriveSignalStamp` helper centralizes IntentSignal stamping across 5 create sites / 3 webhooks — committed local `15cdaac`, awaiting Vernon's push**)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **678/678** passing (64 files ;
-  was 652 at Sprint 3d local — +26 from ScoringConfig v2 reconcile + Finding 1) ;
-  lint baseline 79 errors + 159 warnings (CI non-blocking, pre-existing debt).
+- **Repo health** : `npm run build` green ; tests **715/715** passing (69 files ;
+  was 678 — +25 Finding 2 companySize parser/integration, +2 lemlist hotfix,
+  +10 closeout #3 `deriveSignalStamp`) ; lint baseline 79 errors + 159 warnings
+  (CI non-blocking, pre-existing debt).
 - **Active workstreams** : (1) **Phase 3 Scoring Engine** — **🎉 100% COMPLETE
   IN PROD** : Sprint 3a (PR #6) + 3b + 3c (PR #7/#8) + 3d (PR #9) all merged ;
   ScoringConfig **v2** reconciled to Andy's doc & deployed ; Finding 1
   (configVersion) fixed. Trigify "LinkedIn oxen" workflow enabled 2026-06-01 —
   awaiting first organic IntentSignals. (2) **SP16 — Onboarding Console** —
   5 SP16 PRs merged, no SP16-006 defined yet (open).
-- **Local branches awaiting push** : none — Sprint 3d (PR #9) + ScoringConfig v2
-  + Finding 1 all merged/pushed to main.
+- **Local commits awaiting push** : **closeout #3** — `15cdaac` (`deriveSignalStamp`
+  refactor) + this STATE.md refresh. Mode B : committed local, awaiting Vernon's
+  review + push. Everything through Finding 1 / Finding 2 / lemlist hotfix is
+  already merged/pushed to main.
 - **Production** : main = `os.oxen.finance` (Railway auto-deploy). No staging
   branch. Push = prod. Onboarding console stays dark behind
   `ONBOARDING_CONSOLE_ENABLED`.
@@ -75,6 +78,9 @@ filter → /api/accounts ILIKE fuzzy match.
 | `7809de3` + `52febd3` | 2026-05-29 | **Hourly recompute cron** — GitHub Actions workflow "Score Recompute Hourly" calls `POST /api/scoring/cron/recompute-scores` (CRON_SECRET) ; moved off top-of-hour to `:17` to dodge GHA's congested `:00` queue. Confirmed firing in prod (≈13 success runs over ~30h ; GHA schedule is best-effort — timestamps drift + some ticks drop, normal). Direct to main. |
 | `7184061` | 2026-06-01 | **ScoringConfig v2 — reconcile to Andy's doc** — `structuredClone(v1)` + deltas : 6-group model (G1-G6), companySize realign, trigger reclassifications, point recalc on registry. v2 active, v1 preserved inactive. Seed/backfill/recompute ran in prod. Direct to main. |
 | `65de6d9` | 2026-06-01 | **Finding 1 — stamp real config version on ScoreHistory** — `persistScore` stamps the active ScoringConfig version (was hardcoded `1`). New accessor `getActiveScoringConfigWithVersion()` returns `{config, version}` from one DB row / cache entry → zero config↔version drift ; `getActiveScoringConfig()` becomes a thin wrapper. `configVersion` threaded as a required param into `score-recompute-runner` + `/api/scoring/recalculate`. Sentinel test (`=2≠1`) locks against re-hardcode. +4 tests. No backfill of the ~10 boundary rows (ScoreHistory append-only ; v1→v2 blip explainable). Direct to main. |
+| `89d4dfb` | 2026-06-01 | **Finding 2 — derive companySize from string label** — `compute-icp-score` now parses the `companySize` string label (finite Clay/Apollo format set) into a size bracket when `employeeCount`/`revenueRange` are NULL, falling back to edge/0. +25 tests (parser + integration). Prod recon : scored pool all ideal(10) ; Self-employed = 0.3% ; >500-employee firms collapse to edge=3 by v2 design (parked ICP note for Andy, not a parser bug). Direct to main. |
+| `63b3ddf` | 2026-06-01 | **lemlist `emailsUnsubscribed` hotfix** — added the missing `stageMap` entry so an unsubscribe flips `lifecycleStage → closed_lost` (was only flipping `lemlistStatus`). +2 tests (the webhook had none). Direct to main. (CRM/Lemlist webhook fix — listed here for chronology.) |
+| `15cdaac` **(LOCAL — awaiting Vernon push)** | 2026-06-01 | **closeout #3 — `deriveSignalStamp` helper** — extract the (intentCategory, signalLevel, points) stamp every IntentSignal writer must denormalize into one pure helper `src/lib/scoring/derive-signal-stamp.ts`, adopted at **5 create sites / 3 webhooks** : `ingestSignal()` contact + company + market branches + the clay / n8n / **trigify** webhooks (Scope A, Vernon-confirmed after recon surfaced trigify as a 5th site). Zero behavior change — hardening against stamping drift (F6 : `computeIntentScore` filters `intentCategory != null` ON THE ROW). Points parity exact (clay/n8n `?? 10` ↔ `defaultPoints === 10` verified read-only in prod ; trigify two-level fallback preserved). Each webhook's `source`/`signalType`/`title`/`detail`/`expiresAt` (incl. n8n's NULLABLE expiresAt) stay intentionally source-specific & load-bearing downstream → NOT routed through `ingestSignal()`, only the stamp is shared. +10 tests ; existing ingestSignal/clay-enrichment/trigify suites green UNMODIFIED (identity proof). |
 
 **Phase 3 = 100% in prod.** All sprints merged + ScoringConfig v2 deployed +
 Finding 1 fixed. The engine runs hourly in prod (recompute cron) and Trigify is
@@ -89,12 +95,12 @@ post-Phase 3 in §Backlog below.
   move on the next tick once they land.
 - 0 closed_won Deals → Pattern Match returns noMatch=0 for every account
   (graceful fallback)
-- **ICP companySize bracket** (Finding 2, deferred) — `compute-icp-score` keys
-  off `employeeCount`/`revenueRange`, both NULL for current prospects, so the
-  size factor falls to the edge/0 bracket. Real fix = parse the `companySize`
-  string label (finite Clay/Apollo format set) into a bracket, fall back to
-  edge/0, unit-test the formats. Deferred until real prospect volume arrives to
-  validate the format set.
+- ~~**ICP companySize bracket** (Finding 2) — size factor fell to edge/0 when
+  `employeeCount`/`revenueRange` NULL~~ → ✅ resolved 2026-06-01 (`89d4dfb`) :
+  `compute-icp-score` parses the `companySize` string label (finite Clay/Apollo
+  format set) into a bracket, edge/0 fallback, formats unit-tested. Caveat
+  parked for Andy : >500-employee firms collapse to edge=3 by v2 ideal-cap
+  design (not a parser bug ; 8 firms today → impact nul).
 - ~~SignalTypeRegistry.intentCategory all NULL until B3 backfill runs in
   prod~~ → ✅ resolved 2026-05-24 (B3 backfill ran ; 11 active codes
   mapped, 3 placeholders deactivated)
@@ -188,8 +194,8 @@ session display + 3 operator actions. Feature-flagged behind
 |---|---|---|---|
 | 1 | **Await first organic IntentSignals** (Trigify "LinkedIn oxen" enabled 2026-06-01) → first promotions → first BD alerts in prod. Watch the webhook + IntentSignal row count, not the cron (already green). | varies (Trigify side ; hours/days) | Trigify enabled — now waiting |
 | 2 | **Coordinate Lemlist templates with `customField1..3` slot contract** — campaigns need `{{customField1}}` placeholders for adapt to actually surface in emails | ~30 min Andy + Vernon | Real Lemlist enrollments |
-| 3 | **Finding 2 — ICP companySize bracket** — parse the `companySize` string label (Clay/Apollo format set) into a size bracket + unit-test the formats ; fixes the size factor falling to 0 when `employeeCount`/`revenueRange` are NULL | ~0.5 day | Real prospect volume to validate the format set |
-| 4 | **Enum #9 — drop unused `CrmGroup` G7A/G7B** (separate PR) | ~15 min | Anytime (low priority) |
+| 3 | ~~**Finding 2 — ICP companySize bracket**~~ → ✅ done 2026-06-01 (`89d4dfb`). | — | done |
+| 4 | **closeout #4 — drop unused `CrmGroup` G7A/G7B enum values** (separate PR ; the remaining post-Phase-3 closeout item) | ~15 min | Anytime (low priority) |
 | 5 | **Optional Sprint 3e** — Intent Feed sort by `priorityScore` (Option A), if BD dogfooding asks for it | ~0.5 day | First real signal volume + BD feedback |
 | 6 | **PRD-005 Apify+n8n** — Cat C/D/E/F/I signal sources beyond Trigify/Clay | TBD | Phase 3 in prod, signal data flowing |
 | 7 | **PRD-006 Apollo switch** | TBD | TBD |
@@ -198,8 +204,8 @@ session display + 3 operator actions. Feature-flagged behind
 
 | # | Item | Effort | Why deferred |
 |---|---|---|---|
-| 1 | Refactor `clay/route.ts` + `n8n/route.ts` webhooks to delegate to `ingestSignal()` (clay-enrichment already does) | ~0.5 day | Out of Sprint 3d scope ; `/api/signals` exists since S1 and works ; webhooks remain as compat shims |
-| 2 | Lemlist webhook hotfix — `emailsUnsubscribed` missing from `stageMap` (line 156-169 of `src/app/api/webhooks/lemlist/route.ts`). `lifecycleStage` does not flip on unsubscribe ; 1-line fix. Side-find from Sprint 3d recon Finding 4. | 15 min | Out of Sprint 3d scope ; safe in standalone commit |
+| 1 | ~~Refactor `clay`/`n8n` webhooks to delegate to `ingestSignal()`~~ → **superseded by closeout #3** (`15cdaac`, local). Recon proved full delegation is NOT behavior-preserving : `ingestSignal()` accepts no `source`/`signalType`/`title`/`detail` inputs and always sets a non-null `expiresAt` (n8n needs NULLABLE) — all load-bearing downstream. Chosen instead : extract ONLY the shared stamp via `deriveSignalStamp`, adopted at clay + n8n + **trigify** (Scope A). Webhooks keep their source-specific fields. | done (local) | — |
+| 2 | ~~Lemlist webhook hotfix — `emailsUnsubscribed` missing from `stageMap`~~ → ✅ done 2026-06-01 (`63b3ddf`, pushed). `lifecycleStage` now flips to `closed_lost` on unsubscribe ; +2 tests (webhook had none). | done | — |
 | 3 | Sprint 3d V2 path — programmatic Lemlist cross-campaign move (2-call enrol+remove with atomicity story) ; AI-rewrite next touch via Claude API ; pg_trgm fuzzy match | weeks (V2 milestone) | Lemlist API public surface limits V1 ; pg_trgm volume not justified |
 
 ### Specced but blocked / awaiting decision
@@ -236,13 +242,13 @@ session display + 3 operator actions. Feature-flagged behind
 | No component test infra | 🟡 LOW | Coverage gap on interactive React components. TS strict mode + visual QA + API-route tests catch most regressions. Backlog item. |
 | 0 IntentSignals in prod DB | 🟠 MED | Trigify "LinkedIn oxen" workflow enabled 2026-06-01 ; awaiting first organic signals (hours/days). Intent score = 0 for every account until they land. Hourly recompute cron (`:17`) already firing green — consumes signals on the next tick once they arrive. Sprint 3b compute lib tested with synthetic data. |
 | 0 closed_won Deals → Pattern Match noMatch=0 | 🟡 LOW | Graceful fallback documented in Sprint 3b. Real Pattern Match validation awaits the first closed_won. |
-| ICP companySize falls to edge/0 bracket (Finding 2) | 🟡 LOW | `compute-icp-score` keys off `employeeCount`/`revenueRange`, both NULL for current prospects → size factor = 0. Fix = parse `companySize` string label into a bracket (backlog Ready-to-start #3). Deferred until real prospect volume validates the format set. |
+| ~~ICP companySize falls to edge/0 bracket (Finding 2)~~ | ✅ FIXED | `89d4dfb` (2026-06-01) — `compute-icp-score` parses the `companySize` string label into a bracket, edge/0 fallback, formats unit-tested. >500-employee edge=3 caveat parked as an ICP note for Andy (v2 ideal-cap design, not a parser bug). |
 | OCA risk live validation pending | 🟡 LOW | Both staging sessions stuck at TRIAGE with null risk. Colored pill rendering locked by unit tests ; live visual check awaits a risk-assessed session. |
 | OCA does not expose session rejection reason | 🟡 LOW | OCA-side ticket queued. SP16-004 NOTES Step 0 documents. |
 | `acquisitionSource` was NULL on 597 contacts | ✅ FIXED | Hotfix R0 (`fe3b40a`) + backfill SQL ran 2026-05-15. |
 | Lemlist webhook doesn't distinguish soft vs hard not-interested | 🟡 LOW | Sprint 3c V1 Option A ignores the distinction. Sprint 3c notes the gap. Upstream Lemlist webhook would need a change. |
 | Lemlist API cannot accelerate a launched lead | 🟠 MED | Confirmed by Sprint 3d recon (no `next_send_at`, no skip post-launch). V1 = adapt content via custom variables + Telegram BD alert for manual move. Programmatic cross-campaign move = V2. |
-| Lemlist webhook `emailsUnsubscribed` missing from `stageMap` | 🟡 LOW | Side-find of Sprint 3d recon — `lifecycleStage` doesn't update on unsubscribe (it's still in `lemlistStatusMap`, just not `stageMap`). Hotfix queued in Sprint 3d sub-backlog. |
+| ~~Lemlist webhook `emailsUnsubscribed` missing from `stageMap`~~ | ✅ FIXED | `63b3ddf` (2026-06-01) — added the `stageMap` entry ; unsubscribe now flips `lifecycleStage → closed_lost`. +2 tests. |
 
 ---
 
