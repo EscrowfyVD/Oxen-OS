@@ -5,15 +5,15 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-01 (Phase 3 **100% in prod** ; Finding 2 companySize-label fix + lemlist `emailsUnsubscribed` hotfix pushed to main ; **closeout #3 — `deriveSignalStamp` helper centralizes IntentSignal stamping across 5 create sites / 3 webhooks — committed local `15cdaac`, awaiting Vernon's push**)
+> **Last updated** : 2026-06-01 (Phase 3 **100% in prod** ; closeout #3 `deriveSignalStamp` merged to main ; **closeout #4 — drop unused `CrmGroup` enum values G7A/G7B via a Postgres migration — PR `closeout-4-crmgroup-enum-drop` open, NOT merged. Last item of the post-Phase-3 cleanup series.**)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **715/715** passing (69 files ;
-  was 678 — +25 Finding 2 companySize parser/integration, +2 lemlist hotfix,
-  +10 closeout #3 `deriveSignalStamp`) ; lint baseline 79 errors + 159 warnings
+- **Repo health** : `npm run build` green ; tests **717/717** passing (70 files ;
+  +10 closeout #3 `deriveSignalStamp`, +2 closeout #4 — CrmGroup sentinel +
+  clay-helpers retired-group regression) ; lint baseline 79 errors + 159 warnings
   (CI non-blocking, pre-existing debt).
 - **Active workstreams** : (1) **Phase 3 Scoring Engine** — **🎉 100% COMPLETE
   IN PROD** : Sprint 3a (PR #6) + 3b + 3c (PR #7/#8) + 3d (PR #9) all merged ;
@@ -21,10 +21,12 @@
   (configVersion) fixed. Trigify "LinkedIn oxen" workflow enabled 2026-06-01 —
   awaiting first organic IntentSignals. (2) **SP16 — Onboarding Console** —
   5 SP16 PRs merged, no SP16-006 defined yet (open).
-- **Local commits awaiting push** : **closeout #3** — `15cdaac` (`deriveSignalStamp`
-  refactor) + this STATE.md refresh. Mode B : committed local, awaiting Vernon's
-  review + push. Everything through Finding 1 / Finding 2 / lemlist hotfix is
-  already merged/pushed to main.
+- **In flight** : **closeout #4** — PR `closeout-4-crmgroup-enum-drop` open. Drops
+  unused `CrmGroup` G7A/G7B via a Postgres enum migration (0-row-safe verified
+  read-only in prod + applied on a local shadow). PR workflow (NOT direct-push) :
+  branch pushed, PR **NOT merged** — Railway runs `prisma migrate deploy` on
+  deploy only AFTER merge. closeout #3 (`deriveSignalStamp`) is merged to main.
+  **This is the last item of the post-Phase-3 cleanup series.**
 - **Production** : main = `os.oxen.finance` (Railway auto-deploy). No staging
   branch. Push = prod. Onboarding console stays dark behind
   `ONBOARDING_CONSOLE_ENABLED`.
@@ -80,7 +82,8 @@ filter → /api/accounts ILIKE fuzzy match.
 | `65de6d9` | 2026-06-01 | **Finding 1 — stamp real config version on ScoreHistory** — `persistScore` stamps the active ScoringConfig version (was hardcoded `1`). New accessor `getActiveScoringConfigWithVersion()` returns `{config, version}` from one DB row / cache entry → zero config↔version drift ; `getActiveScoringConfig()` becomes a thin wrapper. `configVersion` threaded as a required param into `score-recompute-runner` + `/api/scoring/recalculate`. Sentinel test (`=2≠1`) locks against re-hardcode. +4 tests. No backfill of the ~10 boundary rows (ScoreHistory append-only ; v1→v2 blip explainable). Direct to main. |
 | `89d4dfb` | 2026-06-01 | **Finding 2 — derive companySize from string label** — `compute-icp-score` now parses the `companySize` string label (finite Clay/Apollo format set) into a size bracket when `employeeCount`/`revenueRange` are NULL, falling back to edge/0. +25 tests (parser + integration). Prod recon : scored pool all ideal(10) ; Self-employed = 0.3% ; >500-employee firms collapse to edge=3 by v2 design (parked ICP note for Andy, not a parser bug). Direct to main. |
 | `63b3ddf` | 2026-06-01 | **lemlist `emailsUnsubscribed` hotfix** — added the missing `stageMap` entry so an unsubscribe flips `lifecycleStage → closed_lost` (was only flipping `lemlistStatus`). +2 tests (the webhook had none). Direct to main. (CRM/Lemlist webhook fix — listed here for chronology.) |
-| `15cdaac` **(LOCAL — awaiting Vernon push)** | 2026-06-01 | **closeout #3 — `deriveSignalStamp` helper** — extract the (intentCategory, signalLevel, points) stamp every IntentSignal writer must denormalize into one pure helper `src/lib/scoring/derive-signal-stamp.ts`, adopted at **5 create sites / 3 webhooks** : `ingestSignal()` contact + company + market branches + the clay / n8n / **trigify** webhooks (Scope A, Vernon-confirmed after recon surfaced trigify as a 5th site). Zero behavior change — hardening against stamping drift (F6 : `computeIntentScore` filters `intentCategory != null` ON THE ROW). Points parity exact (clay/n8n `?? 10` ↔ `defaultPoints === 10` verified read-only in prod ; trigify two-level fallback preserved). Each webhook's `source`/`signalType`/`title`/`detail`/`expiresAt` (incl. n8n's NULLABLE expiresAt) stay intentionally source-specific & load-bearing downstream → NOT routed through `ingestSignal()`, only the stamp is shared. +10 tests ; existing ingestSignal/clay-enrichment/trigify suites green UNMODIFIED (identity proof). |
+| `15cdaac` (merged to main) | 2026-06-01 | **closeout #3 — `deriveSignalStamp` helper** — extract the (intentCategory, signalLevel, points) stamp every IntentSignal writer must denormalize into one pure helper `src/lib/scoring/derive-signal-stamp.ts`, adopted at **5 create sites / 3 webhooks** : `ingestSignal()` contact + company + market branches + the clay / n8n / **trigify** webhooks (Scope A, Vernon-confirmed after recon surfaced trigify as a 5th site). Zero behavior change — hardening against stamping drift (F6 : `computeIntentScore` filters `intentCategory != null` ON THE ROW). Points parity exact (clay/n8n `?? 10` ↔ `defaultPoints === 10` verified read-only in prod ; trigify two-level fallback preserved). Each webhook's `source`/`signalType`/`title`/`detail`/`expiresAt` (incl. n8n's NULLABLE expiresAt) stay intentionally source-specific & load-bearing downstream → NOT routed through `ingestSignal()`, only the stamp is shared. +10 tests ; existing ingestSignal/clay-enrichment/trigify suites green UNMODIFIED (identity proof). |
+| `c5f2632` + `8b7c0df` **(PR — not merged)** | 2026-06-01 | **closeout #4 — drop unused `CrmGroup` enum values G7A/G7B** — PR `closeout-4-crmgroup-enum-drop`. Postgres enum migration (type recreation: `CrmGroup_new` G1..G6, `col::text::"CrmGroup_new"` cast on both `Company.group` + `CrmContact.group`, rename, drop `_old`). **0-row-safe** — verified read-only in prod (0 G7A/G7B rows; all 1589/597 rows are G1) + applied on a local PG shadow with G1+NULL rows (cast passes, enum → G1..G6). Code/UI/config/doc aligned to G1..G6; new `CrmGroup` sentinel test locks the set. Frozen v1 ScoringConfig JSONB blob intentionally still references G7A/G7B (immutable history, unaffected by an enum type change). +2 tests (717 total). Applies to prod via `prisma migrate deploy` AFTER merge. |
 
 **Phase 3 = 100% in prod.** All sprints merged + ScoringConfig v2 deployed +
 Finding 1 fixed. The engine runs hourly in prod (recompute cron) and Trigify is
@@ -195,7 +198,7 @@ session display + 3 operator actions. Feature-flagged behind
 | 1 | **Await first organic IntentSignals** (Trigify "LinkedIn oxen" enabled 2026-06-01) → first promotions → first BD alerts in prod. Watch the webhook + IntentSignal row count, not the cron (already green). | varies (Trigify side ; hours/days) | Trigify enabled — now waiting |
 | 2 | **Coordinate Lemlist templates with `customField1..3` slot contract** — campaigns need `{{customField1}}` placeholders for adapt to actually surface in emails | ~30 min Andy + Vernon | Real Lemlist enrollments |
 | 3 | ~~**Finding 2 — ICP companySize bracket**~~ → ✅ done 2026-06-01 (`89d4dfb`). | — | done |
-| 4 | **closeout #4 — drop unused `CrmGroup` G7A/G7B enum values** (separate PR ; the remaining post-Phase-3 closeout item) | ~15 min | Anytime (low priority) |
+| 4 | ~~**closeout #4 — drop unused `CrmGroup` G7A/G7B enum values**~~ → **PR `closeout-4-crmgroup-enum-drop` open, NOT merged** (`c5f2632` + `8b7c0df`). Postgres enum migration applies to prod via `migrate deploy` after merge. Closes the post-Phase-3 cleanup series. | — | on PR |
 | 5 | **Optional Sprint 3e** — Intent Feed sort by `priorityScore` (Option A), if BD dogfooding asks for it | ~0.5 day | First real signal volume + BD feedback |
 | 6 | **PRD-005 Apify+n8n** — Cat C/D/E/F/I signal sources beyond Trigify/Clay | TBD | Phase 3 in prod, signal data flowing |
 | 7 | **PRD-006 Apollo switch** | TBD | TBD |
