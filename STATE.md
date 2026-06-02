@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-01 (Phase 3 **100% in prod** ; post-Phase-3 closeout series **done** — #3 `deriveSignalStamp` + #4 `CrmGroup` enum drop (PR #10 → `3b33693`) both merged & prod-verified. **In flight : reliable recompute trigger — Railway cron PR `ops-railway-recompute-cron` (entrypoint `npm run recompute:cron` + runbook). Finding : the GHA `:17` schedule is confirmed dropping ticks — multi-hour gaps, not hourly.**)
+> **Last updated** : 2026-06-01 (Phase 3 **100% in prod** ; post-Phase-3 closeout series **done** — #3 `deriveSignalStamp` + #4 `CrmGroup` enum drop both merged & prod-verified ; recompute-cron entrypoint + Railway runbook merged (PR #11) — Railway cron **service** still to be created by Vernon (GHA `:17` confirmed dropping ticks, multi-hour gaps). **In flight : Trigify reactive layer PR1 — `applyReactiveLayer` wires the dormant `classifyTrigger`+`orchestrateSequence` into the ingestion seam (branch `trigify-reactive-pr1`, local, STOP-before-push). PR2 account-propagation + PR3 Clay-handoff deferred.**)
 
 ---
 
@@ -210,6 +210,7 @@ session display + 3 operator actions. Feature-flagged behind
 | 1 | ~~Refactor `clay`/`n8n` webhooks to delegate to `ingestSignal()`~~ → **superseded by closeout #3** (`15cdaac`, local). Recon proved full delegation is NOT behavior-preserving : `ingestSignal()` accepts no `source`/`signalType`/`title`/`detail` inputs and always sets a non-null `expiresAt` (n8n needs NULLABLE) — all load-bearing downstream. Chosen instead : extract ONLY the shared stamp via `deriveSignalStamp`, adopted at clay + n8n + **trigify** (Scope A). Webhooks keep their source-specific fields. | done (local) | — |
 | 2 | ~~Lemlist webhook hotfix — `emailsUnsubscribed` missing from `stageMap`~~ → ✅ done 2026-06-01 (`63b3ddf`, pushed). `lifecycleStage` now flips to `closed_lost` on unsubscribe ; +2 tests (webhook had none). | done | — |
 | 3 | Sprint 3d V2 path — programmatic Lemlist cross-campaign move (2-call enrol+remove with atomicity story) ; AI-rewrite next touch via Claude API ; pg_trgm fuzzy match | weeks (V2 milestone) | Lemlist API public surface limits V1 ; pg_trgm volume not justified |
+| 4 | **Trigify reactive layer** — PR1 wires the dormant `classifyTrigger`+`orchestrateSequence` (zero callers since Sprint 3d) into the Trigify webhook via shared `applyReactiveLayer` : §4.2 rapid=adapt vars, §4.3 passive=Activity log, §4.1 immediate stays alert-only, never-pause. **PR1 = branch `trigify-reactive-pr1` (local).** Deferred to own PRs : **PR2** account-level propagation (contact signal → account score → all contacts ; needs reflect-rule decision + schema) ; **PR3** intent-sourced → active Clay handoff (needs outbound Clay endpoint). | PR1 done (local) ; PR2/PR3 sized separately | — |
 
 ### Specced but blocked / awaiting decision
 
