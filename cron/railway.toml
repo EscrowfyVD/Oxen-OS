@@ -1,0 +1,24 @@
+# Railway config for the dedicated score-recompute CRON service.
+#
+# The cron service sets its "Config-as-code path" (Railway → Settings) to
+# `cron/railway.toml` so it does NOT inherit the root web config (railway.json),
+# whose buildCommand runs `prisma migrate deploy` (fails at build — DB
+# unreachable, P1001) + `next build`, and whose startCommand is `npm start`
+# (the web server). The cron must do neither.
+#
+#   build : `npx prisma generate` only — generates the Prisma client the runner
+#           needs. `npm ci` runs automatically before buildCommand. NO migrate
+#           deploy (web/CI owns migrations), NO next build (cron serves no HTTP).
+#   deploy: `npm run recompute:cron` → tsx scripts/db/run-recompute.ts (runs the
+#           batch to completion, then exits cleanly).
+#
+# Root Directory stays `/` (the script needs scripts/ + src/ + package.json).
+# cronSchedule (47 * * * *) is set in the Railway dashboard, per-service.
+# Field names + the NIXPACKS builder casing validated against railway.schema.json.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npx prisma generate"
+
+[deploy]
+startCommand = "npm run recompute:cron"
