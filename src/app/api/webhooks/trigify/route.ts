@@ -12,6 +12,7 @@ import {
 } from "@/lib/trigify-signal-mapping"
 import { findExistingSignal } from "@/lib/trigify-dedup"
 import { maybeAlertBDs } from "@/lib/trigify-alerts"
+import { applyReactiveLayer } from "@/lib/scoring/apply-reactive-layer"
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 
@@ -211,6 +212,29 @@ export async function POST(request: Request) {
         "[trigify] some BD alerts failed to deliver",
       )
     }
+
+    // ── Step 7: reactive layer (§4.2 adapt / §4.3 passive) ──
+    // §4.1 immediate already alerted above (maybeAlertBDs). This adapts the
+    // Lemlist sequence variables (immediate/rapid) or logs a passive Activity.
+    // Never pauses; errors are swallowed inside the helper so the webhook
+    // never fails on a reactive hiccup. Awaited so the variable update lands
+    // within the request (real-time "next email" adaptation).
+    const reactive = await applyReactiveLayer({
+      contactId: match.contact.id,
+      signalCode,
+      contextSnippet:
+        payload.signal_detail ?? payload.detail ?? payload.title ?? null,
+    })
+    log.info(
+      {
+        signal_code: signalCode,
+        contact_id: match.contact.id,
+        reactive_trigger: reactive.trigger,
+        reactive_action: reactive.action,
+        reactive_reason: reactive.reason,
+      },
+      "[trigify] reactive layer applied",
+    )
 
     return NextResponse.json({
       ok: true,
