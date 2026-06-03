@@ -161,6 +161,28 @@ describe("generateMeetingBrief", () => {
     expect(res.brief.id).toBe("br-1")
   })
 
+  it("[5] injects caller extraContext into the prompt — even with no matched contact", async () => {
+    vi.mocked(prisma.crmContact.findUnique).mockResolvedValue(null as never)
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValue(null as never)
+    const res = await generateMeetingBrief({
+      meetingDate: "2026-06-10T09:00:00Z",
+      title: "Cold intro",
+      attendees: [],
+      extraContext:
+        "Prospect: Jane Doe — Sosa (jane@sosa.com)\nBooking questions & answers:\n- Company Name: Sosa\n- Banking setup: EMI + crypto",
+    })
+    // No CRM contact → no signal query, but the booking Q&A still reaches Claude
+    expect(prisma.intentSignal.findMany).not.toHaveBeenCalled()
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+    const prompt = vi.mocked(mockCreate).mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain("Booking Details")
+    expect(prompt).toContain("Banking setup: EMI + crypto")
+    expect(prompt).toContain("Sosa")
+    // and it is NOT the empty-context fallback (the Q&A populated CONTEXT)
+    expect(prompt).not.toContain("No CRM data available")
+    expect(res.brief.id).toBe("br-1")
+  })
+
   it("[4] throws when Claude returns no JSON", async () => {
     mockCreate.mockResolvedValue({ content: [{ type: "text", text: "sorry, no json" }] })
     await expect(

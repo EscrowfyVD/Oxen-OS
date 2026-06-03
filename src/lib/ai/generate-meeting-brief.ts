@@ -44,6 +44,14 @@ export interface GenerateMeetingBriefInput {
   meetingDate: string | Date
   title: string
   attendees?: string[]
+  /**
+   * Optional free-text context block injected verbatim into the prompt's
+   * CONTEXT section (e.g. LemCal booking Q&A). It reaches the prompt even when
+   * no contact matched — for a no-match booking these answers are frequently
+   * the ONLY actionable context the brief has. UI callers omit it (the param is
+   * backward-compatible).
+   */
+  extraContext?: string | null
 }
 
 export interface GenerateMeetingBriefResult {
@@ -66,7 +74,7 @@ const CONTACT_INCLUDE = {
 export async function generateMeetingBrief(
   input: GenerateMeetingBriefInput,
 ): Promise<GenerateMeetingBriefResult> {
-  const { eventId, contactId, meetingDate, title, attendees } = input
+  const { eventId, contactId, meetingDate, title, attendees, extraContext } = input
 
   // Gather all context for the brief
   const contextParts: string[] = []
@@ -203,6 +211,14 @@ export async function generateMeetingBrief(
         )
       }
     }
+  }
+
+  // Caller-supplied extra context (e.g. LemCal booking Q&A). Pushed verbatim so
+  // it reaches the prompt even when no contact matched — for a no-match booking
+  // these answers are frequently the only actionable context the BD will have.
+  if (extraContext && extraContext.trim()) {
+    contextParts.push("\n## Booking Details (provided by the prospect at booking time)")
+    contextParts.push(extraContext.trim())
   }
 
   const prompt = `Generate a comprehensive meeting brief for the following meeting. Return ONLY a valid JSON object.
