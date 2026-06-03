@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-03 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings) PR1 — extract session-free `generateMeetingBrief` lib (reusable by the future Cal.com webhook) + add IntentSignal history to the brief context (branch `aira-f2-pr1`, local, STOP-before-push).**)
+> **Last updated** : 2026-06-03 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, provider = LemCal) — PR1 `generateMeetingBrief` lib + IntentSignals (branch `aira-f2-pr1`) ; PR0 `Meeting` model + additive migration (branch `aira-f2-pr0-meeting`, stacked). Both local, STOP-before-push. PR2 = LemCal webhook next.**)
 
 ---
 
@@ -221,15 +221,20 @@ session display + 3 operator actions. Feature-flagged behind
 
 ### Future / ideas (no spec)
 
-- **AIRA F2 — Pre-Meeting Briefings** (Andy spec) : **PR1 done** (local, branch
-  `aira-f2-pr1`) — `generateMeetingBrief` lib extracted from `/api/ai/brief` (now
-  a thin caller, session-free so PR2's webhook reuses it) + recent IntentSignal
-  history added to the brief context. Generation+Telegram already worked (28
-  briefs in prod). **Deferred**: PR2 Cal.com webhook (greenfield trigger), PR3
-  1h-before refresh cron, PR4 Calendar "Meeting card" UI, email-exchange section
-  (F5-gated — prod `Email` empty / Gmail sync-worker not running). Open decision:
-  unified `Meeting` model (Andy's "define upfront") vs reuse `CalendarEvent`+
-  `MeetingBrief`.
+- **AIRA F2 — Pre-Meeting Briefings** (Andy spec ; provider = **LemCal**, not
+  Cal.com) : **PR1 done** (branch `aira-f2-pr1`) — `generateMeetingBrief` lib
+  extracted from `/api/ai/brief` (thin caller, session-free) + IntentSignal
+  history in the brief context (generation+Telegram already worked, 28 briefs in
+  prod). **PR0 done** (branch `aira-f2-pr0-meeting`, stacked on PR1) — `Meeting`
+  model + additive migration; fields frozen from the real LemCal payload
+  (`lemcalBookingId` unique idempotency key, primary/owner emails, FK SET NULL),
+  sentinel locks the field set. Both local, STOP-before-push. **Meeting-model
+  decision resolved** (dedicated model, not `CalendarEvent` reuse). **Next**: PR2
+  LemCal webhook (`/api/webhooks/lemcal` → matchContact → generateMeetingBrief;
+  auth = secret-token-in-URL + API call-back, pending confirmation since LemCal's
+  webhook signature/events are **undocumented**). **Deferred**: PR3 1h-refresh
+  cron (LemCal list-meetings API, 20 req/2s), PR4 Calendar UI, email-exchange
+  (F5-gated — prod `Email` empty / Gmail sync-worker not running).
 
 - **Component test infrastructure** — install `@testing-library/react` + jsdom +
   vitest jsdom env. Currently React components rely on TS + visual QA + smoke
