@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-01 (Phase 3 **100% in prod** ; post-Phase-3 closeout series **done** — #3 `deriveSignalStamp` + #4 `CrmGroup` enum drop both merged & prod-verified ; recompute-cron entrypoint + Railway runbook merged (PR #11) — Railway cron **service** still to be created by Vernon (GHA `:17` confirmed dropping ticks, multi-hour gaps). **In flight : Trigify reactive layer PR1 — `applyReactiveLayer` wires the dormant `classifyTrigger`+`orchestrateSequence` into the ingestion seam (branch `trigify-reactive-pr1`, local, STOP-before-push). PR2 account-propagation + PR3 Clay-handoff deferred.**)
+> **Last updated** : 2026-06-03 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings) PR1 — extract session-free `generateMeetingBrief` lib (reusable by the future Cal.com webhook) + add IntentSignal history to the brief context (branch `aira-f2-pr1`, local, STOP-before-push).**)
 
 ---
 
@@ -220,6 +220,16 @@ session display + 3 operator actions. Feature-flagged behind
 - **SP16-006** — open (candidates listed above). Awaiting Vernon priority.
 
 ### Future / ideas (no spec)
+
+- **AIRA F2 — Pre-Meeting Briefings** (Andy spec) : **PR1 done** (local, branch
+  `aira-f2-pr1`) — `generateMeetingBrief` lib extracted from `/api/ai/brief` (now
+  a thin caller, session-free so PR2's webhook reuses it) + recent IntentSignal
+  history added to the brief context. Generation+Telegram already worked (28
+  briefs in prod). **Deferred**: PR2 Cal.com webhook (greenfield trigger), PR3
+  1h-before refresh cron, PR4 Calendar "Meeting card" UI, email-exchange section
+  (F5-gated — prod `Email` empty / Gmail sync-worker not running). Open decision:
+  unified `Meeting` model (Andy's "define upfront") vs reuse `CalendarEvent`+
+  `MeetingBrief`.
 
 - **Component test infrastructure** — install `@testing-library/react` + jsdom +
   vitest jsdom env. Currently React components rely on TS + visual QA + smoke
