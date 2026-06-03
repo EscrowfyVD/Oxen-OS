@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-03 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, provider = LemCal) — PR1 `generateMeetingBrief` lib + IntentSignals (branch `aira-f2-pr1`) ; PR0 `Meeting` model + additive migration (branch `aira-f2-pr0-meeting`, stacked). Both local, STOP-before-push. PR2 = LemCal webhook next.**)
+> **Last updated** : 2026-06-03 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR1 (#14) + PR0 (#15) merged (Meeting table live in prod) ; PR2 LemCal webhook (`/api/webhooks/lemcal`) done local (branch `aira-f2-pr2-lemcal`, STOP-before-push). PR3 (1h-refresh) next.**)
 
 ---
 
@@ -221,20 +221,27 @@ session display + 3 operator actions. Feature-flagged behind
 
 ### Future / ideas (no spec)
 
-- **AIRA F2 — Pre-Meeting Briefings** (Andy spec ; provider = **LemCal**, not
-  Cal.com) : **PR1 done** (branch `aira-f2-pr1`) — `generateMeetingBrief` lib
-  extracted from `/api/ai/brief` (thin caller, session-free) + IntentSignal
-  history in the brief context (generation+Telegram already worked, 28 briefs in
-  prod). **PR0 done** (branch `aira-f2-pr0-meeting`, stacked on PR1) — `Meeting`
-  model + additive migration; fields frozen from the real LemCal payload
-  (`lemcalBookingId` unique idempotency key, primary/owner emails, FK SET NULL),
-  sentinel locks the field set. Both local, STOP-before-push. **Meeting-model
-  decision resolved** (dedicated model, not `CalendarEvent` reuse). **Next**: PR2
-  LemCal webhook (`/api/webhooks/lemcal` → matchContact → generateMeetingBrief;
-  auth = secret-token-in-URL + API call-back, pending confirmation since LemCal's
-  webhook signature/events are **undocumented**). **Deferred**: PR3 1h-refresh
-  cron (LemCal list-meetings API, 20 req/2s), PR4 Calendar UI, email-exchange
-  (F5-gated — prod `Email` empty / Gmail sync-worker not running).
+- **AIRA F2 — Pre-Meeting Briefings** (Andy spec ; provider = **LemCal**) :
+  **PR1 (#14) + PR0 (#15) merged** — `generateMeetingBrief` lib (session-free) +
+  IntentSignal context ; `Meeting` model + migration (**table live in prod**, 18
+  cols). **PR2 done** (branch `aira-f2-pr2-lemcal`, local) — `POST
+  /api/webhooks/lemcal?token=` : URL token + **call-back verify by `_id`**
+  (anti-forge — LemCal sends no signature) → **match-ONLY** contact by primary
+  email (option a, never create — `matchContact` auto-creates so it's
+  deliberately NOT used) → upsert `Meeting` (idempotent) → `generateMeetingBrief`
+  (subject = prospect, delivery → owner) → link brief. Booking **Q&A injected
+  into the brief** via a new optional `extraContext` param on
+  `generateMeetingBrief` (reaches the prompt even on no-match — often the only
+  context a no-match brief gets ; UI caller ignores it, backward-compatible). The Q&A block is framed as untrusted prospect input
+  (prompt-injection guard — booking form is public). New
+  `src/lib/lemcal.ts` (Basic auth + own 20/2s bucket). 7 webhook tests + brief-lib
+  `extraContext` test. **Ops after merge**: set the LemCal
+  Webhooks URL incl. the token + env `LEMCAL_API_KEY` (user:pass) +
+  `LEMCAL_WEBHOOK_SECRET`. **Confirm on a real delivery**: call-back uses the
+  documented list endpoint + finds `_id` (no by-id endpoint documented) ;
+  `LEMCAL_API_KEY` = full `user:pass`. **Deferred**: PR3 1h-refresh cron (LemCal
+  list API, 20/2s), PR4 Calendar UI, email-exchange (F5-gated — prod `Email`
+  empty / Gmail sync-worker not running).
 
 - **Component test infrastructure** — install `@testing-library/react` + jsdom +
   vitest jsdom env. Currently React components rely on TS + visual QA + smoke
