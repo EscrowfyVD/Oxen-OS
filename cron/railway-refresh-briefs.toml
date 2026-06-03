@@ -1,0 +1,26 @@
+# Railway config for the dedicated meeting-brief-refresh CRON service (AIRA F2 PR3b).
+#
+# A SEPARATE Railway service from the web app AND from the score-recompute cron:
+# one service = one schedule, and this runs */15 (recompute runs 47 * * * *).
+# Set the service's "Config-as-code path" (Railway → Settings) to
+# `cron/railway-refresh-briefs.toml` so it does NOT inherit the root web config
+# (railway.json), whose buildCommand runs `prisma migrate deploy` (fails at
+# build — DB unreachable, P1001) + `next build`, and whose startCommand is the
+# web server. The cron must do neither.
+#
+#   build : `npx prisma generate` only — generates the Prisma client the runner
+#           needs. `npm ci` runs automatically before buildCommand. NO migrate
+#           deploy (web/CI owns migrations), NO next build (cron serves no HTTP).
+#   deploy: `npm run refresh-briefs:cron` → tsx scripts/db/refresh-meeting-briefs.ts
+#           (runs the batch to completion, then exits cleanly).
+#
+# Root Directory stays `/` (the script needs scripts/ + src/ + package.json).
+# cronSchedule (*/15 * * * *) is set in the Railway dashboard, per-service —
+# NOT here (mirrors the recompute cron). DATABASE_URL = prod on the service.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npx prisma generate"
+
+[deploy]
+startCommand = "npm run refresh-briefs:cron"
