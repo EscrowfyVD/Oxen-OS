@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-03 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a migration `Meeting.briefRefreshedAt` done local (branch `aira-f2-pr3a-brief-refreshed-at`, STOP-before-push). PR3b refresh cron next.**)
+> **Last updated** : 2026-06-03 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17) merged (`Meeting.briefRefreshedAt` live) ; PR3b refresh cron done local (branch `aira-f2-pr3b-refresh-cron`, STOP-before-push). Ops after merge: create the Railway cron service (`*/15`).**)
 
 ---
 
@@ -240,16 +240,18 @@ session display + 3 operator actions. Feature-flagged behind
   Webhooks URL incl. the token + env `LEMCAL_API_KEY` (user:pass) +
   `LEMCAL_WEBHOOK_SECRET`. **Confirm on a real delivery**: call-back uses the
   documented list endpoint + finds `_id` (no by-id endpoint documented) ;
-  `LEMCAL_API_KEY` = full `user:pass`. **PR3a done** (branch
-  `aira-f2-pr3a-brief-refreshed-at`, local) — additive migration
-  `Meeting.briefRefreshedAt` (exactly-once refresh marker ; shadow-verified,
-  0-row-safe). **PR3b next** (refresh cron — reads the `Meeting` **DB**, NOT the
-  LemCal API → no `lemcal.ts` dependency) : `*/15` cron, window `(now, now+75min]`
-  `WHERE briefRefreshedAt IS NULL` ; lib `create`→**upsert-by-eventId** (fixes the
-  P2002 on re-gen + hardens PR2) ; dedicated Railway cron service ; reuse
-  `buildBookingContext` (keeps the injection guard) ; safety-net briefs imminent
-  meetings missing one ; optional `createdAt < now-30min` guard vs double-notify ;
-  re-delivers to owner once (~1h out). **Deferred**: PR4 Calendar UI,
+  `LEMCAL_API_KEY` = full `user:pass`. **PR3a(#17) merged** — `Meeting.briefRefreshedAt`
+  live (exactly-once refresh marker ; shadow-verified, 0-row-safe). **PR3b done**
+  (branch `aira-f2-pr3b-refresh-cron`, local) — refresh cron reading the `Meeting`
+  **DB** (NOT the LemCal API → no `lemcal.ts` dep) : `runMeetingBriefRefresh` over
+  `startTime ∈ (now, now+75min] AND briefRefreshedAt IS NULL AND createdAt < now-30min`
+  (guard #5) ; lib `create`→**upsert-by-eventId** (kills P2002 on re-gen + hardens
+  PR2) ; `buildBookingContext` extracted to shared `booking-context.ts` (refreshed
+  brief inherits the injection guard) ; PR2-failure safety-net ; owner re-notified
+  once with a 🔄 marker. Script + npm `refresh-briefs:cron` +
+  `cron/railway-refresh-briefs.toml`. 10 new tests. **Ops after merge**: create the
+  dedicated Railway cron service (config-path = the toml, `cronSchedule */15`,
+  `DATABASE_URL` = prod). **Deferred**: PR4 Calendar UI,
   email-exchange (F5-gated — prod `Email` empty / Gmail sync-worker not running).
 
 - **Component test infrastructure** — install `@testing-library/react` + jsdom +
