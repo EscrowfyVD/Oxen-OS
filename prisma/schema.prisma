@@ -963,6 +963,7 @@ model Meeting {
   contactId        String? // matchContact(primary); nullable = option (a)
   contact          CrmContact? @relation("ContactMeetings", fields: [contactId], references: [id], onDelete: SetNull)
   meetingBriefId   String? // link to the generated MeetingBrief
+  briefRefreshedAt DateTime? // PR3 1h-before refresh marker — set once the brief is regenerated; refresh query dedupes on `IS NULL` (internal, not from payload)
   status           String      @default("booked")
   raw              Json? // full payload (safety net for un-mapped fields)
   createdAt        DateTime    @default(now())
