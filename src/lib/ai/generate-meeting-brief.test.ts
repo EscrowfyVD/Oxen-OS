@@ -18,7 +18,7 @@ vi.mock("@/lib/prisma", () => ({
     crmContact: { findUnique: vi.fn(), findFirst: vi.fn() },
     intentSignal: { findMany: vi.fn() },
     supportTicket: { findMany: vi.fn() },
-    meetingBrief: { create: vi.fn(), update: vi.fn() },
+    meetingBrief: { create: vi.fn(), upsert: vi.fn(), update: vi.fn() },
     employee: { findFirst: vi.fn() },
   },
 }))
@@ -29,7 +29,7 @@ vi.mock("@/lib/telegram", () => ({
 
 import { generateMeetingBrief } from "./generate-meeting-brief"
 import { prisma } from "@/lib/prisma"
-import { sendTelegramMessage } from "@/lib/telegram"
+import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
 
 const BRIEF_JSON = {
   company_context: "ctx",
@@ -82,12 +82,14 @@ describe("generateMeetingBrief", () => {
     vi.mocked(prisma.crmContact.findUnique).mockResolvedValue(mockContact() as never)
     vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([SIGNAL] as never)
     vi.mocked(prisma.supportTicket.findMany).mockResolvedValue([] as never)
-    vi.mocked(prisma.meetingBrief.create).mockResolvedValue({
+    const savedBrief = {
       id: "br-1",
       contactId: "ct-1",
       briefContent: BRIEF_JSON,
       contact: { id: "ct-1", firstName: "Jane", lastName: "Doe", company: { name: "Acme" } },
-    } as never)
+    }
+    vi.mocked(prisma.meetingBrief.create).mockResolvedValue(savedBrief as never)
+    vi.mocked(prisma.meetingBrief.upsert).mockResolvedValue(savedBrief as never)
     vi.mocked(prisma.meetingBrief.update).mockResolvedValue({} as never)
     vi.mocked(prisma.employee.findFirst).mockResolvedValue(null as never)
     vi.mocked(sendTelegramMessage).mockResolvedValue({ ok: true } as never)
@@ -181,6 +183,62 @@ describe("generateMeetingBrief", () => {
     // and it is NOT the empty-context fallback (the Q&A populated CONTEXT)
     expect(prompt).not.toContain("No CRM data available")
     expect(res.brief.id).toBe("br-1")
+  })
+
+  it("[6] eventId set → upserts the brief by eventId (no create; no P2002 on re-gen)", async () => {
+    const res = await generateMeetingBrief({
+      eventId: "mee_123",
+      contactId: "ct-1",
+      meetingDate: "2026-06-10T09:00:00Z",
+      title: "Acme intro",
+      attendees: [],
+    })
+    expect(prisma.meetingBrief.upsert).toHaveBeenCalledTimes(1)
+    expect(prisma.meetingBrief.create).not.toHaveBeenCalled()
+    const up = vi.mocked(prisma.meetingBrief.upsert).mock.calls[0][0] as {
+      where: { eventId: string }
+      create: { eventId: string }
+      update: Record<string, unknown>
+    }
+    expect(up.where.eventId).toBe("mee_123")
+    expect(up.create.eventId).toBe("mee_123")
+    // update regenerates content but preserves identity fields
+    expect(up.update.briefContent).toEqual(BRIEF_JSON)
+    expect(up.update).not.toHaveProperty("eventId")
+    expect(up.update).not.toHaveProperty("createdBy")
+    expect(res.brief.id).toBe("br-1")
+  })
+
+  it("[7] no eventId → create (UI path unchanged; multiple NULLs allowed)", async () => {
+    await generateMeetingBrief({
+      contactId: "ct-1",
+      meetingDate: "2026-06-10T09:00:00Z",
+      title: "UI brief",
+      attendees: [],
+    })
+    expect(prisma.meetingBrief.create).toHaveBeenCalledTimes(1)
+    expect(prisma.meetingBrief.upsert).not.toHaveBeenCalled()
+    const cr = vi.mocked(prisma.meetingBrief.create).mock.calls[0][0] as {
+      data: { eventId: string | null }
+    }
+    expect(cr.data.eventId).toBeNull()
+  })
+
+  it("[8] telegramNote → marker passed through to the Telegram formatter", async () => {
+    vi.mocked(prisma.employee.findFirst).mockResolvedValue({
+      name: "Andy",
+      telegramChatId: "123",
+    } as never)
+    await generateMeetingBrief({
+      eventId: "mee_123",
+      meetingDate: "2026-06-10T09:00:00Z",
+      title: "Acme intro",
+      attendees: ["andy@oxen.finance"],
+      telegramNote: "🔄 Brief actualisé",
+    })
+    expect(formatBriefForTelegram).toHaveBeenCalled()
+    const fmtArg = vi.mocked(formatBriefForTelegram).mock.calls[0][0] as { note?: string }
+    expect(fmtArg.note).toBe("🔄 Brief actualisé")
   })
 
   it("[4] throws when Claude returns no JSON", async () => {

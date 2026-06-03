@@ -122,6 +122,8 @@ export function formatBriefForTelegram(brief: {
   attendees: string[]
   briefContent: Record<string, unknown>
   eventId?: string
+  /** Optional marker rendered under the header (e.g. "🔄 Brief actualisé"). */
+  note?: string
 }): string {
   const bc = brief.briefContent
   const date = new Date(brief.meetingDate)
@@ -154,6 +156,7 @@ export function formatBriefForTelegram(brief: {
   const parts: string[] = []
 
   parts.push(`🏛 <b>Meeting Brief</b>`)
+  if (brief.note) parts.push(`<b>${escHtml(brief.note)}</b>`)
   parts.push(``)
   parts.push(`📅 <b>${escHtml(brief.title)}</b>`)
   parts.push(`🕐 ${escHtml(dateStr)} · ${timeStr}${durationStr ? ` — ${durationStr}` : ""}`)

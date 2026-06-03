@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "encrypt-tokens": "tsx scripts/encrypt-oauth-tokens.ts",
     "recompute:cron": "npx tsx scripts/db/run-recompute.ts",
+    "refresh-briefs:cron": "npx tsx scripts/db/refresh-meeting-briefs.ts",
     "ci:typecheck": "tsc --noEmit",
     "ci:test": "vitest run",
     "ci:lint": "eslint .",

@@ -52,6 +52,12 @@ export interface GenerateMeetingBriefInput {
    * backward-compatible).
    */
   extraContext?: string | null
+  /**
+   * Optional short marker prepended to the Telegram message (e.g. the PR3b
+   * refresh runner passes "🔄 Brief actualisé" so the BD sees this is a refresh,
+   * not a new booking). Webhook/UI omit it → no marker, behaviour unchanged.
+   */
+  telegramNote?: string | null
 }
 
 export interface GenerateMeetingBriefResult {
@@ -74,7 +80,8 @@ const CONTACT_INCLUDE = {
 export async function generateMeetingBrief(
   input: GenerateMeetingBriefInput,
 ): Promise<GenerateMeetingBriefResult> {
-  const { eventId, contactId, meetingDate, title, attendees, extraContext } = input
+  const { eventId, contactId, meetingDate, title, attendees, extraContext, telegramNote } =
+    input
 
   // Gather all context for the brief
   const contextParts: string[] = []
@@ -261,19 +268,49 @@ Be specific, actionable, and reference real data. If no data available for a sec
 
   const briefContent = JSON.parse(jsonMatch[0])
 
-  // Save to DB
-  const brief = await prisma.meetingBrief.create({
-    data: {
-      eventId: eventId || null,
-      contactId: contact?.id || null,
-      title,
-      meetingDate: new Date(meetingDate),
-      attendees: attendees || [],
-      briefContent,
-      createdBy: "ai",
-    },
-    include: BRIEF_INCLUDE,
-  })
+  // Save to DB. When eventId is set (LemCal bookings) the brief is UPSERTED by
+  // the @unique eventId → re-generation (PR3b 1h-before refresh, or a webhook
+  // re-delivery) UPDATES the same row instead of throwing P2002. When eventId is
+  // null (UI path) we create — Postgres allows multiple NULLs on a @unique col,
+  // so the UI behaviour is unchanged.
+  const meetingDateValue = new Date(meetingDate)
+  const attendeesValue = attendees || []
+  const contactIdValue = contact?.id || null
+  const brief = eventId
+    ? await prisma.meetingBrief.upsert({
+        where: { eventId },
+        create: {
+          eventId,
+          contactId: contactIdValue,
+          title,
+          meetingDate: meetingDateValue,
+          attendees: attendeesValue,
+          briefContent,
+          createdBy: "ai",
+        },
+        // Refresh: regenerate content + re-link context; preserve createdAt /
+        // createdBy / status / eventId.
+        update: {
+          contactId: contactIdValue,
+          title,
+          meetingDate: meetingDateValue,
+          attendees: attendeesValue,
+          briefContent,
+        },
+        include: BRIEF_INCLUDE,
+      })
+    : await prisma.meetingBrief.create({
+        data: {
+          eventId: null,
+          contactId: contactIdValue,
+          title,
+          meetingDate: meetingDateValue,
+          attendees: attendeesValue,
+          briefContent,
+          createdBy: "ai",
+        },
+        include: BRIEF_INCLUDE,
+      })
 
   // Auto-send via Telegram to relevant team members
   const telegramSentTo: string[] = []
@@ -296,6 +333,7 @@ Be specific, actionable, and reference real data. If no data available for a sec
         meetingDate: new Date(meetingDate),
         attendees: attendees || [],
         briefContent,
+        note: telegramNote ?? undefined,
       })
       const result = await sendTelegramMessage(employee.telegramChatId, formatted)
       if (result.ok) telegramSentTo.push(employee.name)
