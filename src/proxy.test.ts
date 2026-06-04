@@ -69,12 +69,11 @@ describe("proxy() — whitelist bypass (Sprint S1 batch 2 hotfix)", () => {
     expect(res.status).toBe(200)
   })
 
-  it("/api/webhooks/clay-enrichment → bypass (existing whitelist preserved)", async () => {
+  it("/api/webhooks/lemcal → bypass (existing whitelist preserved)", async () => {
     // Regression check — the hotfix must not break the existing
-    // /api/webhooks/* bypass which clay-enrichment + lemlist + n8n +
-    // trigify rely on.
+    // /api/webhooks/* bypass which lemcal + lemlist + n8n + trigify rely on.
     const res = proxy(
-      makeReq({ pathname: "/api/webhooks/clay-enrichment" }),
+      makeReq({ pathname: "/api/webhooks/lemcal" }),
     )
     expect(res.status).toBe(200)
   })

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react"
 import Papa from "papaparse"
-import { parseClayTableName } from "@/lib/clay-helpers"
+import { parseClayTableName } from "@/lib/enrichment-helpers"
 
 /* ── Design tokens (CSS-variable-backed for light/dark) ── */
 const CARD_BG = "var(--card-bg)"
