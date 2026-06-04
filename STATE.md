@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-04 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19) merged (`apollo` enum + `enrichmentRaw` live in prod) ; PR-Y client `src/lib/apollo.ts` done local (branch `apollo-pr-y-client`, STOP-before-push). PR-Z wiring / PR-X deprecation next.**)
+> **Last updated** : 2026-06-04 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20) merged (enum/columns live + `apollo.ts` client) ; PR-Z wiring (mappers + batch runner + cron) done local (branch `apollo-pr-z-wiring`, STOP-before-push). PR-X Clay deprecation next.**)
 
 ---
 
@@ -259,18 +259,28 @@ session display + 3 operator actions. Feature-flagged behind
   mapping ≈ identity ; `enrichedAt`/`enrichmentSource` credit-marker already lived
   (no marker migration). **PR-W(#19) merged** (live in prod) — `EnrichmentSource`
   +`apollo` (keep `clay`) + `enrichmentRaw Json?` raw stash on Company+CrmContact ;
-  two SPLIT migrations (ADD VALUE isolated) ; shadow-verified ; sentinel. **PR-Y
-  done** (branch `apollo-pr-y-client`, local) — `src/lib/apollo.ts` pure client
-  (`X-Api-Key`, `api.apollo.io/api/v1`, `enrichPerson`/`enrichOrganization`,
-  firmographic-only ; skip-if-no-key / never-throw / 429-aware ; exports
-  `ApolloPerson`/`ApolloOrg` ; `APOLLO_API_KEY` env ; 8 tests). **Decisions**: batch
-  cron (not sync — credits/burst) ; keep+rebrand the CSV wizard ; raw-stash over
-  speculative columns. **Next**: PR-Z batch enrich runner (`WHERE enrichedAt IS NULL`
-  capped + dedicated cron ; maps Apollo→Company/CrmContact, sets
-  `enrichmentSource=apollo`+`enrichedAt`+`enrichmentRaw`) ; PR-X deprecate Clay
-  (remove both webhooks + `CLAY_WEBHOOK_SECRET` ; rename
-  `clay-helpers`→`enrichment-helpers` ; ops: cut the Clay sender + confirm zero
-  traffic first). Trigify PR3 Clay outbound = never built (nothing to remove).
+  two SPLIT migrations (ADD VALUE isolated) ; shadow-verified ; sentinel. **PR-Y(#20)
+  merged** — `src/lib/apollo.ts` pure client (`X-Api-Key`, `api.apollo.io/api/v1`,
+  `enrichPerson`/`enrichOrganization`, firmographic-only ; skip-if-no-key /
+  never-throw / 429-aware ; exports `ApolloPerson`/`ApolloOrg` ; `APOLLO_API_KEY`).
+  **PR-Z done** (branch `apollo-pr-z-wiring`, local) — mappers `apollo-enrichment.ts`
+  (reworked from clay-enrichment.ts ; idempotent company upsert / contact update by
+  id ; preserves dealOwner+acquisitionSource ; **linked Company enriched FREE from
+  `person.organization`** — no extra org credit) + `runApolloEnrichment` (2 passes:
+  contacts then **truly contact-less** companies (`contacts: none` → never pays an
+  org credit for a company that has/will-have a contact) ; `WHERE enrichedAt IS NULL`
+  capped@40 ; null leaves marker for retry ; error-isolated) + script + npm + dedicated
+  `cron/railway-apollo-enrichment.toml` ; 13 tests. **Decisions**: batch cron (not
+  sync — credits/burst) ; keep+rebrand the CSV wizard ; raw-stash over speculative
+  columns. **Ops after merge**: create the Railway cron service + set `APOLLO_API_KEY`
+  (Railway-only ; without it the runner no-ops). **Next**: PR-X deprecate Clay (remove
+  both webhooks + `CLAY_WEBHOOK_SECRET` ; rename `clay-helpers`→`enrichment-helpers` ;
+  ops: cut the Clay sender + confirm zero traffic first). Trigify PR3 Clay outbound =
+  never built (nothing to remove). **v1.1 reserve** (not now): the real fix for
+  companies whose only contact never matches Apollo is a contact enrichment-FAILURE
+  marker (attempted+failed → its company becomes org/enrich-eligible) — rescues the
+  non-matchables without paying for the merely in-queue ones. Pass-2 `contacts: none`
+  is the deliberately-tight v1 (reversible; widen later if coverage gaps show).
 
 - **Component test infrastructure** — install `@testing-library/react` + jsdom +
   vitest jsdom env. Currently React components rely on TS + visual QA + smoke
