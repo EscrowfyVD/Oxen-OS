@@ -1,0 +1,27 @@
+# Railway config for the dedicated Apollo enrichment CRON service (Apollo PR-Z).
+#
+# A SEPARATE Railway service from the web app AND from the other crons (recompute
+# 47 * * * *, refresh-briefs */15): one service = one schedule. Set the service's
+# "Config-as-code path" (Railway → Settings) to `cron/railway-apollo-enrichment.toml`
+# so it does NOT inherit the root web config (railway.json), whose buildCommand
+# runs `prisma migrate deploy` (fails at build — DB unreachable, P1001) + `next
+# build`, and whose startCommand is the web server. The cron must do neither.
+#
+#   build : `npx prisma generate` only — generates the Prisma client the runner
+#           needs. `npm ci` runs automatically before buildCommand. NO migrate
+#           deploy (web/CI owns migrations), NO next build (cron serves no HTTP).
+#   deploy: `npm run apollo-enrichment:cron` → tsx scripts/db/run-apollo-enrichment.ts
+#           (runs the batch to completion, then exits cleanly).
+#
+# Root Directory stays `/` (the script needs scripts/ + src/ + package.json).
+# cronSchedule (hourly or */30 — enrichment is NOT time-sensitive) is set in the
+# Railway dashboard, per-service — NOT here (mirrors the other crons).
+# Service env: DATABASE_URL = prod + APOLLO_API_KEY (the credit-bearing secret;
+# without it the runner no-ops cleanly).
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npx prisma generate"
+
+[deploy]
+startCommand = "npm run apollo-enrichment:cron"
