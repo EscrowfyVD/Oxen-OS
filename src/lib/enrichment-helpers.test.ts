@@ -7,7 +7,7 @@ import {
   extractClayTableSegment,
   extractCountryFromLocation,
   parseClayTableName,
-} from "./clay-helpers"
+} from "./enrichment-helpers"
 
 // ─────────────────────────────────────────────────────────────────────
 describe("classifyPersona", () => {

@@ -6,13 +6,12 @@
 //
 // Imports Prisma at top-level — DO NOT import from any "use client" component.
 // Reuses the vendor-agnostic pure helpers (classifyPersona,
-// extractCountryFromLocation) from their CURRENT location (clay-helpers.ts);
-// the rename → enrichment-helpers.ts is PR-X's job.
+// extractCountryFromLocation) from enrichment-helpers.ts.
 
 import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
-import { classifyPersona, extractCountryFromLocation } from "@/lib/clay-helpers"
+import { classifyPersona, extractCountryFromLocation } from "@/lib/enrichment-helpers"
 import type { ApolloOrg, ApolloPerson } from "@/lib/apollo"
 
 const log = logger.child({ component: "apollo-enrichment" })

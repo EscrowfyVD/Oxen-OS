@@ -19,7 +19,7 @@ import {
   classifyPersona,
   extractClayTableSegment,
   extractCountryFromLocation,
-} from "@/lib/clay-helpers"
+} from "@/lib/enrichment-helpers"
 import type { ClayEnrichmentPayload } from "@/app/api/webhooks/_schemas"
 
 // Re-export client-safe helpers for back-compat with existing server-side
@@ -31,8 +31,8 @@ export {
   extractClayTableSegment,
   extractCountryFromLocation,
   parseClayTableName,
-} from "@/lib/clay-helpers"
-export type { ParsedClayTableName } from "@/lib/clay-helpers"
+} from "@/lib/enrichment-helpers"
+export type { ParsedClayTableName } from "@/lib/enrichment-helpers"
 
 /**
  * Random 50/50 BD assignment for new contacts created via Clay enrichment.
