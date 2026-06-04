@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-03 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17) merged (`Meeting.briefRefreshedAt` live) ; PR3b refresh cron done local (branch `aira-f2-pr3b-refresh-cron`, STOP-before-push). Ops after merge: create the Railway cron service (`*/15`).**)
+> **Last updated** : 2026-06-03 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W (`EnrichmentSource` +apollo, `enrichmentRaw` stash) done local (branch `apollo-pr-w-enrichment-fields`, STOP-before-push). PR-X deprecation / PR-Y client / PR-Z wiring next.**)
 
 ---
 
@@ -253,6 +253,22 @@ session display + 3 operator actions. Feature-flagged behind
   dedicated Railway cron service (config-path = the toml, `cronSchedule */15`,
   `DATABASE_URL` = prod). **Deferred**: PR4 Calendar UI,
   email-exchange (F5-gated — prod `Email` empty / Gmail sync-worker not running).
+
+- **Apollo enrichment (replaces Clay)** — Clay deprecated → Apollo.io API direct
+  (Oxen OS only). Clay was already an Apollo passthrough → DB fields Apollo-shaped,
+  mapping ≈ identity ; `enrichedAt`/`enrichmentSource` credit-marker already lived
+  (no marker migration). **PR-W done** (branch `apollo-pr-w-enrichment-fields`,
+  local) — `EnrichmentSource` +`apollo` (keep `clay`) + `enrichmentRaw Json?` raw
+  stash on Company+CrmContact (preserve un-mapped fields, no re-pay) ; two SPLIT
+  migrations (ADD VALUE isolated) ; shadow-verified ; sentinel. **Decisions**: batch
+  cron (not sync — credits/burst) ; keep+rebrand the CSV wizard ; raw-stash over
+  speculative columns. **Next**: PR-X deprecate Clay (remove both webhooks +
+  `CLAY_WEBHOOK_SECRET` ; rename `clay-helpers`→`enrichment-helpers` ; ops: cut the
+  Clay sender + confirm zero traffic first) ; PR-Y `src/lib/apollo.ts`
+  (`X-Api-Key`, `api.apollo.io/api/v1`, people/match + organizations/enrich,
+  firmographic-only, 429/credit-aware, `APOLLO_API_KEY`) ; PR-Z batch enrich runner
+  (`WHERE enrichedAt IS NULL` capped + dedicated cron). Trigify PR3 Clay outbound =
+  never built (nothing to remove).
 
 - **Component test infrastructure** — install `@testing-library/react` + jsdom +
   vitest jsdom env. Currently React components rely on TS + visual QA + smoke
