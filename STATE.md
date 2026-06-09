@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-04 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20) merged (enum/columns live + `apollo.ts` client) ; PR-Z wiring (mappers + batch runner + cron) done local (branch `apollo-pr-z-wiring`, STOP-before-push). PR-X Clay deprecation next.**)
+> **Last updated** : 2026-06-04 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1 webhook MVP done local (branch `apify-pr1-webhook`, STOP-before-push) ; PR2/PR3 pipeline next.**)
 
 ---
 
@@ -281,6 +281,25 @@ session display + 3 operator actions. Feature-flagged behind
   marker (attempted+failed → its company becomes org/enrich-eligible) — rescues the
   non-matchables without paying for the merely in-queue ones. Pass-2 `contacts: none`
   is the deliberately-tight v1 (reversible; widen later if coverage gaps show).
+
+- **Apify scraped-signals → CRM / scoring** (Andy PRD) — rides existing infra, NOT
+  a silo. Recon verdict: signal model (`IntentSignal`+`ingestSignal`+`deriveSignalStamp`)
+  REUSE+EXTEND (add `apify_*` SignalTypeRegistry codes) ; scoring/decay/thresholds/
+  alert-on-promotion/orchestrate-sequence REUSE 100% (scores on the recompute cron,
+  not inline) ; async = the existing `Job` queue + AI/Sync workers REUSE (no new
+  queue) ; no-match leads = create `CrmContact enrichedAt=null` → Apollo runner
+  auto-enriches REUSE ; account fuzzy = existing `/api/accounts` ILIKE+JS-tiered
+  (pg_trgm NOT installed → optional V2). **PR1 done** (branch `apify-pr1-webhook`,
+  local) — `POST /api/webhooks/apify/[category]?token=` : URL-token auth
+  (`APIFY_WEBHOOK_SECRET`) → parse Apify DEFAULT body (`resource.defaultDatasetId`
+  + `actId`; NOT `eventData.*` — PRD shape wrong) → persist a `Job`
+  (`apify:process-dataset`) → fast 200 ; fail-closed never-500 ; `[category]` suffix
+  keys multi-category actors ; no migration (Job exists) ; 7 tests. **Next**: PR2
+  D2 fuzzy account-match (reuse/extend `/api/accounts`) ; PR3 pipeline (worker/cron:
+  fetch dataset via `APIFY_API_TOKEN` → dedup `processed_signals` → match → `ingestSignal`
+  ‖ create-unenriched ; migration `processed_signals` [+ `page_snapshots`?]) ;
+  market-signal DRAFT-campaign approval (BUILD, deferred — no approval gate exists).
+  D4 registry-of-actors = SEPARATE Apify-side workstream (not OS backend).
 
 - **Component test infrastructure** — install `@testing-library/react` + jsdom +
   vitest jsdom env. Currently React components rely on TS + visual QA + smoke
