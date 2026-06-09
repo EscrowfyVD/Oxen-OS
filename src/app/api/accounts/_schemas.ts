@@ -30,3 +30,29 @@ export interface AccountSearchHit {
   jurisdiction?: string | null
   email?: string | null
 }
+
+/**
+ * Query schema for the `?name=` D2 mode (Apify PR2) — normalized fuzzy
+ * company-name match for the scraped-signals pipeline. Distinct from `?q=`
+ * (the union picker) so the existing UI search is untouched.
+ */
+export const accountsMatchQuery = z.object({
+  name: z.string().min(1).max(200),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(25),
+})
+
+export type AccountsMatchParsed = z.infer<typeof accountsMatchQuery>
+
+/**
+ * `?name=` D2 hit. `confidence` is 0-1 (exact 1.0 / starts-with 0.9 /
+ * contains 0.7). The route returns EVERYTHING matched, sorted by confidence
+ * desc — the caller (pipeline) applies its own threshold (0.85), so no
+ * hard-filtering here. `priorityScore` = the account's hottest contact score.
+ */
+export interface AccountMatchHit {
+  accountId: string
+  name: string
+  confidence: number
+  group: string | null
+  priorityScore: number | null
+}

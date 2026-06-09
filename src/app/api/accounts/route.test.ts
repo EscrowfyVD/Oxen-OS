@@ -164,4 +164,68 @@ describe("GET /api/accounts", () => {
     expect(body.results[0]).toMatchObject({ kind: "company", score: 90 })
     expect(body.results[1]).toMatchObject({ kind: "contact", score: 70 })
   })
+
+  // ─── ?name= D2 mode (Apify PR2) — normalized fuzzy company match ───
+
+  it("[6] messy input (suffix+punct+case) → matches; ILIKE uses the normalized token; priorityScore = hottest contact", async () => {
+    vi.mocked(prisma.company.findMany).mockResolvedValue([
+      {
+        id: "co-1",
+        name: "Mercury Technologies",
+        group: "G2",
+        contacts: [{ priorityScore: 60 }, { priorityScore: 80 }],
+      },
+    ] as never)
+
+    const res = await GET(makeReq(`name=${encodeURIComponent("Mercury, Inc.")}`))
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.results).toEqual([
+      { accountId: "co-1", name: "Mercury Technologies", confidence: 0.9, group: "G2", priorityScore: 80 },
+    ])
+    // ILIKE pre-filter ran on the NORMALIZED first token ("mercury"), not the raw input
+    const whereArg = vi.mocked(prisma.company.findMany).mock.calls[0][0]!
+    expect(whereArg.where).toEqual({ name: { contains: "mercury", mode: "insensitive" } })
+  })
+
+  it("[7] exact → confidence 1.0", async () => {
+    vi.mocked(prisma.company.findMany).mockResolvedValue([
+      { id: "co-1", name: "Acme", group: null, contacts: [] },
+    ] as never)
+    const res = await GET(makeReq("name=Acme"))
+    const body = await res.json()
+    expect(body.results[0]).toMatchObject({ accountId: "co-1", confidence: 1.0, priorityScore: null })
+  })
+
+  it("[8] contains is below threshold (0.7) but STILL returned (caller decides) + sorted by confidence desc", async () => {
+    vi.mocked(prisma.company.findMany).mockResolvedValue([
+      { id: "co-contains", name: "Big Acme Holdings", group: null, contacts: [] }, // 0.7
+      { id: "co-starts", name: "Acme Capital", group: null, contacts: [] }, // 0.9
+      { id: "co-exact", name: "Acme", group: null, contacts: [] }, // 1.0
+    ] as never)
+    const res = await GET(makeReq("name=Acme"))
+    const body = await res.json()
+    expect(body.results.map((r: { accountId: string }) => r.accountId)).toEqual([
+      "co-exact",
+      "co-starts",
+      "co-contains",
+    ])
+    expect(body.results.map((r: { confidence: number }) => r.confidence)).toEqual([1.0, 0.9, 0.7])
+  })
+
+  it("[9] no-match → empty array (a fetched candidate that doesn't actually match is dropped in JS)", async () => {
+    vi.mocked(prisma.company.findMany).mockResolvedValue([
+      { id: "co-x", name: "Acme Holdings", group: null, contacts: [] }, // unrelated to the search term
+    ] as never)
+    const res = await GET(makeReq("name=Zynacorp"))
+    const body = await res.json()
+    expect(body.results).toEqual([])
+  })
+
+  it("[10] suffix-only input → empty (no DB call needed)", async () => {
+    const res = await GET(makeReq("name=Ltd"))
+    const body = await res.json()
+    expect(body.results).toEqual([])
+    expect(prisma.company.findMany).not.toHaveBeenCalled()
+  })
 })

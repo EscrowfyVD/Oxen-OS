@@ -39,7 +39,13 @@ import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import { validateSearchParams } from "@/lib/validate"
 import { childLoggerFromRequest, serializeError } from "@/lib/logger"
-import { accountsSearchQuery, type AccountSearchHit } from "./_schemas"
+import {
+  accountsSearchQuery,
+  accountsMatchQuery,
+  type AccountSearchHit,
+  type AccountMatchHit,
+} from "./_schemas"
+import { normalizeCompanyName, matchConfidence } from "@/lib/account-match"
 
 // Pulled from a deeper DB sample than `limit` so tier-promoted hits
 // further down the contains-list can still beat a high contains hit
@@ -84,8 +90,16 @@ export async function GET(request: Request) {
     if (sessionErr) return sessionErr
   }
 
-  // ── Validate query ────────────────────────────────────────────────
   const { searchParams } = new URL(request.url)
+
+  // ── D2 mode (Apify PR2): ?name= → normalized fuzzy company match ───
+  // Distinct param + shape from ?q= (the union picker) so the existing UI
+  // search is untouched.
+  if (searchParams.has("name")) {
+    return matchAccountsByName(searchParams, log)
+  }
+
+  // ── Validate query (?q= union mode) ───────────────────────────────
   const v = validateSearchParams(searchParams, accountsSearchQuery)
   if ("error" in v) return v.error
   const { q, limit } = v.data
@@ -160,6 +174,71 @@ export async function GET(request: Request) {
       { error: "Search failed" },
       { status: 500 },
     )
+  }
+}
+
+// ─── D2 (?name=) normalized fuzzy company match (Apify PR2) ──────────
+
+const D2_CANDIDATE_FETCH = 200
+
+async function matchAccountsByName(
+  searchParams: URLSearchParams,
+  log: ReturnType<typeof childLoggerFromRequest>,
+): Promise<NextResponse> {
+  const v = validateSearchParams(searchParams, accountsMatchQuery)
+  if ("error" in v) return v.error
+  const { name, limit } = v.data
+
+  const normInput = normalizeCompanyName(name)
+  if (!normInput) return NextResponse.json({ results: [] })
+  const firstToken = normInput.split(" ")[0]
+
+  try {
+    // Reuse the ILIKE pre-filter, but on the first NORMALIZED token so a messy
+    // input ("Mercury, Inc.") still fetches the right rows; then normalize +
+    // tier in JS (the part ILIKE-on-raw can't do).
+    const candidates = await prisma.company.findMany({
+      where: { name: { contains: firstToken, mode: "insensitive" } },
+      select: {
+        id: true,
+        name: true,
+        group: true,
+        contacts: { select: { priorityScore: true } },
+      },
+      take: D2_CANDIDATE_FETCH,
+    })
+
+    const matches: AccountMatchHit[] = []
+    for (const c of candidates) {
+      const confidence = matchConfidence(normInput, normalizeCompanyName(c.name))
+      if (confidence <= 0) continue
+      // Account "hotness" = its hottest contact's priorityScore (Company has no
+      // own score column; scoring is contact-level).
+      const priorityScore = c.contacts.reduce<number | null>((max, ct) => {
+        const ps = ct.priorityScore
+        if (typeof ps !== "number") return max
+        return max === null ? ps : Math.max(max, ps)
+      }, null)
+      matches.push({
+        accountId: c.id,
+        name: c.name,
+        confidence,
+        group: c.group ?? null,
+        priorityScore,
+      })
+    }
+
+    // Return EVERYTHING matched (no 0.85 hard-filter — the caller decides).
+    // Sort by confidence desc, tiebreak by the account's hottest contact.
+    matches.sort(
+      (a, b) =>
+        b.confidence - a.confidence ||
+        (b.priorityScore ?? -1) - (a.priorityScore ?? -1),
+    )
+    return NextResponse.json({ results: matches.slice(0, limit) })
+  } catch (err) {
+    log.error({ err: serializeError(err) }, "accounts name-match failed")
+    return NextResponse.json({ error: "Match failed" }, { status: 500 })
   }
 }
 
