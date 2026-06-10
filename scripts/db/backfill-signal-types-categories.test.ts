@@ -33,12 +33,12 @@ describe("backfillSignalTypesCategories", () => {
     vi.clearAllMocks()
   })
 
-  // ─── [1] All 14 updates (11 mapped + 3 deactivated) ───────────────
-  it("[1] applies 11 mapping updates + 3 placeholder deactivations (14 total)", async () => {
+  // ─── [1] All 16 updates (13 mapped + 3 deactivated) ───────────────
+  it("[1] applies 13 mapping updates + 3 placeholder deactivations (16 total)", async () => {
     const { client, updateMock } = makeMockClient()
     const result = await backfillSignalTypesCategories(client)
-    expect(updateMock).toHaveBeenCalledTimes(14)
-    expect(result).toEqual({ appliedCount: 11, deactivatedCount: 3 })
+    expect(updateMock).toHaveBeenCalledTimes(16)
+    expect(result).toEqual({ appliedCount: 13, deactivatedCount: 3 })
   })
 
   // ─── [2] Cat A on the 3 trigify_oxen_engagement codes ─────────────
@@ -114,15 +114,17 @@ describe("backfillSignalTypesCategories", () => {
     expect(u1.mock.calls).toEqual(u2.mock.calls)
   })
 
-  // ─── [7] Cat G stays empty in V1 (Vernon decision pinned) ─────────
-  it("[7] no code lands in Cat G (V1 reserved for future sources)", async () => {
+  // ─── [7] Cat G now holds exactly apify_g (Apify PR3b populates it) ─
+  it("[7] exactly apify_g lands in Cat G (Apify PR3b populates the reserved category)", async () => {
     const { client, updateMock } = makeMockClient()
     await backfillSignalTypesCategories(client)
 
     const catG = updateMock.mock.calls.filter(
       (c) => (c[0] as Call).data.intentCategory === "G",
     )
-    expect(catG).toHaveLength(0)
+    expect(catG).toHaveLength(1)
+    expect((catG[0][0] as Call).where.code).toBe("apify_g")
+    expect((catG[0][0] as Call).data.signalLevel).toBe("account")
   })
 
   // ─── Sprint 3d — ScoringConfig v2 reconciliation ──────────────────
@@ -178,5 +180,37 @@ describe("backfillSignalTypesCategories", () => {
     expect(competitor).toBeDefined()
     expect((competitor![0] as Call).data.triggerType).toBe("rapid")
     expect((competitor![0] as Call).data.defaultPoints).toBeUndefined()
+  })
+
+  // ─── [12] apify_f → Cat F account, points from seed (no override) ──
+  it("[12] maps apify_f to Cat F account-level with no points override", async () => {
+    const { client, updateMock } = makeMockClient()
+    await backfillSignalTypesCategories(client)
+
+    const apifyF = updateMock.mock.calls.find(
+      (c) => (c[0] as Call).where.code === "apify_f",
+    )
+    expect(apifyF).toBeDefined()
+    expect((apifyF![0] as Call).data.intentCategory).toBe("F")
+    expect((apifyF![0] as Call).data.signalLevel).toBe("account")
+    expect((apifyF![0] as Call).data.triggerType).toBe("rapid")
+    // Points live in the seed (8, mirroring linkedin_post_funding); the
+    // backfill must NOT override them.
+    expect((apifyF![0] as Call).data.defaultPoints).toBeUndefined()
+  })
+
+  // ─── [13] apify_g → Cat G account, points from seed (no override) ──
+  it("[13] maps apify_g to Cat G account-level with no points override", async () => {
+    const { client, updateMock } = makeMockClient()
+    await backfillSignalTypesCategories(client)
+
+    const apifyG = updateMock.mock.calls.find(
+      (c) => (c[0] as Call).where.code === "apify_g",
+    )
+    expect(apifyG).toBeDefined()
+    expect((apifyG![0] as Call).data.intentCategory).toBe("G")
+    expect((apifyG![0] as Call).data.signalLevel).toBe("account")
+    expect((apifyG![0] as Call).data.triggerType).toBe("passive")
+    expect((apifyG![0] as Call).data.defaultPoints).toBeUndefined()
   })
 })

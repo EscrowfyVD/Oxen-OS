@@ -1,5 +1,6 @@
 // Backfill SignalTypeRegistry intentCategory / signalLevel / triggerType
-// for the 14 codes seeded across Sprint S1 + Sprint Trigify Phase 2A.
+// for the codes seeded across Sprint S1 + Sprint Trigify Phase 2A + Apify
+// PR3b (apify_f → Cat F, apify_g → Cat G).
 //
 // Sprint 3a B3 (Phase 3 Scoring). Deferred from Sprint 3a Phase A
 // (commit 8ad6274) pending Andy's per-code A-I mapping validation —
@@ -50,19 +51,20 @@
 //   - trigify_oxen_engagement_* → Cat A — the TARGET is Oxen (not the
 //     LinkedIn platform). Cat H is for engagement with a competitor /
 //     third-party post, Cat A is for engagement with an Oxen-owned post.
-//   - trigify_role_change → Cat H (NOT Cat G). Cat G is reserved for
+//   - trigify_role_change → Cat H (NOT Cat G). Cat G is for
 //     compliance/finance infrastructure hiring (e.g. "hired a Head of
-//     KYC") which we don't yet detect — a future PredictLeads/Apify
-//     source. A bare role change is treated as a LinkedIn engagement
-//     signal (Cat H, contact-level).
+//     KYC") — detected since Apify PR3b via the Job Board actor (apify_g).
+//     A bare LinkedIn role change is still a Cat H contact-level
+//     engagement signal, distinct from a Cat G hiring posting.
 //   - clay_director_change → Cat H account-level. Leadership transition
 //     IS an account-level event (the director is the company's), not
 //     infrastructure build. Distinct from Cat G hiring signals.
 //   - Cat H is now mixed-level (most codes contact-level, but
 //     clay_director_change is account-level) — explicitly carried in
 //     SignalTypeRegistry.signalLevel.
-//   - Cat G remains empty in V1 — Vernon's call. Tests assert this
-//     (no row should land in Cat G).
+//   - Cat G was reserved-empty in V1 — populated since Apify PR3b by
+//     apify_g (the "future PredictLeads/Apify source" foreseen above).
+//     Tests assert Cat G holds exactly apify_g.
 //
 // Idempotency: re-running this script is safe. Every code is updated
 // to its canonical mapping each run — values don't drift on re-runs
@@ -143,6 +145,28 @@ export const MAPPING: SignalCategoryMapping[] = [
     // recalibrations now — see header (linkedin_post_funding=8,
     // clay_director_change=6 are the other two).
     defaultPoints: 4,
+  },
+  {
+    code: "apify_f",
+    intentCategory: "F",
+    signalLevel: "account",
+    // Apify PR3b — Crunchbase funding, same class as linkedin_post_funding.
+    // Account-level + score-only in PR3b (no follow-up bucket yet →
+    // trigger-drift SCORE_ONLY_EXEMPT). Points from the seed (8); no override.
+    triggerType: "rapid",
+  },
+
+  // ─── Cat G — Recruitment / infra hiring (1 code, account-level) ───
+  // Cat G was reserved-empty in V1 for "a future PredictLeads/Apify source"
+  // (see header) — Apify PR3b IS that source. apify_g (job-board
+  // compliance/finance hire) is the first Cat G code. Score-only (no
+  // follow-up bucket → trigger-drift SCORE_ONLY_EXEMPT); points from the
+  // seed (6, provisional, anchored to clay_director_change).
+  {
+    code: "apify_g",
+    intentCategory: "G",
+    signalLevel: "account",
+    triggerType: "passive",
   },
 
   // ─── Cat H — LinkedIn signals, mixed-level (5 codes) ──────────────

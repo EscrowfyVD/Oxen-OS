@@ -36,11 +36,17 @@ import { buildScoringConfigV2 } from "./seed-scoring-config"
 //   - clay_business_loss: account-level Cat F, score-only.
 //   - market_country_regulation_change: MARKET → MarketSignal, excluded
 //     from individual scoring by construction (signal-ingestion guard).
+//   - apify_f / apify_g: Apify PR3b account-level codes (Crunchbase
+//     funding / job-board hiring) — score-only, no follow-up wiring yet
+//     (PR3b does no orchestrateSequence; a future PR may bucket them).
 // A code that lands in MAPPING without a config bucket and isn't here will
 // fail the detector, forcing a conscious "is this score-only?" decision.
 const SCORE_ONLY_EXEMPT = new Set<string>([
   "clay_business_loss",
   "market_country_regulation_change",
+  // Apify PR3b — see the block comment above (account-level, score-only).
+  "apify_f",
+  "apify_g",
 ])
 
 const triggerTypeOf = (code: string): string => {

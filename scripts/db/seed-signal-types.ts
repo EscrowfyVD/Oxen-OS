@@ -14,9 +14,10 @@
 // seeded defaults on re-run. Operators can edit registry rows directly
 // in DB; reseeding will not undo their changes.
 //
-// 14 seeds:
+// 16 seeds:
 //   - 4 canonical signal types (Vernon Sprint S1 spec)
 //   - 7 Trigify signal types (Sprint Trigify Phase 2A spec)
+//   - 2 Apify structured-actor types (Apify PR3b — Crunchbase F + Job Board G)
 //   - 2 placeholder entries used by the legacy clay/n8n webhooks
 //     until those routes are rewired to use the canonical codes
 //   - 1 deprecated entry (trigify_intent_signal) kept active=false so
@@ -163,6 +164,50 @@ const TRIGIFY_SEEDS: SeedEntry[] = [
 ]
 
 // ─────────────────────────────────────────────────────────────────────
+// Apify structured-actor signal types (Apify PR3b — routing pipeline)
+// ─────────────────────────────────────────────────────────────────────
+// Account-level INTENT codes for the 2 Apify actors that expose a clean
+// PROSPECT company field and are auto-routed in PR3b: Crunchbase (funding,
+// Cat F) + Job Board (compliance/finance hiring, Cat G). The other Apify
+// actors (Trustpilot competitor / Reddit+News NLP / Website-Crawler diff)
+// are NOT routed yet (deferred) → no codes here.
+//
+// Points/decay are pinned to the v2-CALIBRATED registry weight, NOT the
+// stale ScoringConfig blob (computeIntentScore reads the registry, not the
+// blob's intentCategories):
+//   - apify_f mirrors linkedin_post_funding (same funding-announcement
+//     class): 8 pts / 30d / EXPONENTIAL. The blob still lists 25 for
+//     funding, but v2 recalibrated the registry 30→8 — we match 8, not 25.
+//   - apify_g has NO Cat-G precedent (Cat G was reserved-empty in V1 for
+//     exactly this Apify hiring source). Anchored to clay_director_change
+//     (nearest account-level personnel event): 6 pts / 60d / LINEAR.
+//     PROVISIONAL — pending Andy/Vernon ratification.
+// Both are account-level + score-only in PR3b (no Lemlist follow-up wiring
+// yet → carried in trigger-drift's SCORE_ONLY_EXEMPT).
+const APIFY_SEEDS: SeedEntry[] = [
+  {
+    code: "apify_f",
+    label: "Apify — Crunchbase funding round",
+    description:
+      "Crunchbase-scraped funding announcement for a prospect company. Account-level financial event; same signal class as linkedin_post_funding (treasury allocation, new hires, geo expansion). Window closes fast → exponential decay.",
+    defaultPoints: 8,
+    decayDays: 30,
+    decayCurve: "EXPONENTIAL",
+    category: "INTENT",
+  },
+  {
+    code: "apify_g",
+    label: "Apify — Job board compliance/finance hire",
+    description:
+      "Job-board-scraped posting signaling compliance/finance infrastructure hiring (e.g. a Head of KYC). Account-level recruitment event — Cat G, reserved for this source since V1. Points provisional, anchored to clay_director_change.",
+    defaultPoints: 6,
+    decayDays: 60,
+    decayCurve: "LINEAR",
+    category: "INTENT",
+  },
+]
+
+// ─────────────────────────────────────────────────────────────────────
 // Webhook back-compat placeholders (Sprint S1 batch 1)
 // ─────────────────────────────────────────────────────────────────────
 // These 2 entries exist solely so the legacy IntentSignal-creating
@@ -226,6 +271,7 @@ const DEPRECATED_SEEDS: SeedEntry[] = [
 const ACTIVE_SEEDS: SeedEntry[] = [
   ...CANONICAL_SEEDS,
   ...TRIGIFY_SEEDS,
+  ...APIFY_SEEDS,
   ...PLACEHOLDER_SEEDS,
 ]
 
@@ -259,7 +305,7 @@ export async function seedSignalTypes(
 async function main() {
   console.log("\n=== SignalTypeRegistry seed ===\n")
   console.log(
-    `Active: ${ACTIVE_SEEDS.length} (canonical + Trigify + placeholders)`,
+    `Active: ${ACTIVE_SEEDS.length} (canonical + Trigify + Apify + placeholders)`,
   )
   console.log(`Deprecated: ${DEPRECATED_SEEDS.length} (forced isActive=false)`)
   const result = await seedSignalTypes(prisma)
