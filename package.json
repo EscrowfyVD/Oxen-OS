@@ -20,6 +20,7 @@
     "recompute:cron": "npx tsx scripts/db/run-recompute.ts",
     "refresh-briefs:cron": "npx tsx scripts/db/refresh-meeting-briefs.ts",
     "apollo-enrichment:cron": "npx tsx scripts/db/run-apollo-enrichment.ts",
+    "apify-ingestion:cron": "npx tsx scripts/db/run-apify-ingestion.ts",
     "ci:typecheck": "tsc --noEmit",
     "ci:test": "vitest run",
     "ci:lint": "eslint .",
