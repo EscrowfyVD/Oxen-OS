@@ -311,7 +311,10 @@ session display + 3 operator actions. Feature-flagged behind
   query param, never logged) + `src/lib/apify-ingestion-runner.ts` (`runApifyIngestion`
   : claims `apify:process-dataset` Jobs via FOR UPDATE SKIP LOCKED, per item
   dedup-inserts `ProcessedSignal` on `sourceUrl` = url ?? link ?? sha256(item), per-item
-  + per-job isolation, cap-bounded). **Decision realized** — a dedicated **cron-runner**
+  + per-job isolation, cap-bounded ; **hard token guard at the very top — no
+  `APIFY_API_TOKEN` → short-circuit BEFORE any claim (returns `skipped:true`), pending
+  Jobs left 'pending' to drain once the token is posted, never consumed-to-empty against
+  a one-shot actor whose dataset is never recreated**). **Decision realized** — a dedicated **cron-runner**
   (mirrors recompute/refresh/apollo, imports `apify.ts` directly), NOT the sync-worker
   (standalone package, can't import `src/lib` ; carries the time-sensitive LemCal F2
   briefings). INVARIANT confirmed: sync-worker (`sync:email|sync:calendar`) + ai-worker
@@ -320,8 +323,8 @@ session display + 3 operator actions. Feature-flagged behind
   `cron/railway-apify-ingestion.toml` (clean 5-field `*/10`). +12 tests (client +
   runner). NO keyword/recency filters, NO account match, NO `ingestSignal`, NO scoring —
   all PR3b. **Ops after merge**: set `APIFY_API_TOKEN` (Railway-only ; without it the
-  runner no-ops — jobs complete with 0 items) + create the `*/10` apify-ingestion cron
-  service. The `apify_*` SignalTypeRegistry **SEED is deferred to PR3b** (consumed by
+  runner short-circuits before any claim — pending Jobs stay safe, drained on the first
+  run once it is posted) + create the `*/10` apify-ingestion cron service. The `apify_*` SignalTypeRegistry **SEED is deferred to PR3b** (consumed by
   `ingestSignal` there ; needs Andy's actor→category→points table). **PR3b** routing: dedup → match
   (D2) → `ingestSignal` (account → `scope:"company"`) ‖ create-unenriched ; reconsider
   5xx-on-infra-only. market-signal DRAFT-campaign approval (BUILD, deferred). D4
