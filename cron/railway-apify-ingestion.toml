@@ -1,0 +1,27 @@
+# Railway config for the dedicated Apify ingestion CRON service (Apify PR3a-wiring).
+#
+# A SEPARATE Railway service from the web app, the workers, AND the other crons
+# (recompute 47, refresh-briefs */15, apollo-enrichment). Deliberately a cron,
+# NOT the sync-worker: it isolates the heavy Apify dataset fetch from the
+# sync-worker that carries the time-sensitive LemCal F2 briefings. Set the
+# service's "Config-as-code path" (Railway → Settings) to
+# `cron/railway-apify-ingestion.toml` so it does NOT inherit the root web config
+# (railway.json), whose buildCommand runs `prisma migrate deploy` (fails at
+# build — DB unreachable, P1001) + `next build`, and whose startCommand is the
+# web server. The cron must do neither.
+#
+#   build : `npx prisma generate` only (the runner needs the Prisma client).
+#           NO migrate deploy (web/CI owns migrations), NO next build.
+#   deploy: `npm run apify-ingestion:cron` → tsx scripts/db/run-apify-ingestion.ts.
+#
+# Root Directory stays `/`. cronSchedule (`*/10 * * * *` — a CLEAN 5-field cron,
+# no trailing space, no 6th field) is set in the Railway dashboard, per-service.
+# Service env: DATABASE_URL = prod + APIFY_API_TOKEN (without it the runner
+# no-ops: jobs complete with fetched 0, zero rows).
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npx prisma generate"
+
+[deploy]
+startCommand = "npm run apify-ingestion:cron"
