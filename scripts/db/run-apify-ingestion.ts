@@ -10,10 +10,11 @@
 //   - Railway cron service          :  startCommand `npm run apify-ingestion:cron`
 //     (cron/railway-apify-ingestion.toml; cronSchedule */10 in the dashboard)
 //
-// Needs APIFY_API_TOKEN on the service — without it the client skips fetches and
-// the runner no-ops cleanly (jobs complete with fetched 0).
+// Needs APIFY_API_TOKEN on the service — without it the runner short-circuits
+// BEFORE claiming any Job (returns { skipped: true }); pending Jobs are left
+// untouched and drain on the first run after the token is set.
 //
-// Output: JSON of runApifyIngestion() — { jobs, fetched, inserted, duplicates, errors, durationMs }.
+// Output: JSON of runApifyIngestion() — { skipped, jobs, fetched, inserted, duplicates, errors, durationMs }.
 
 import { PrismaClient } from "@prisma/client"
 import { runApifyIngestion } from "../../src/lib/apify-ingestion-runner"

@@ -24,6 +24,7 @@ const WORKER_ID = `apify-ingestion-cron-${process.pid}`
 export const DEFAULT_APIFY_INGEST_CAP = 20
 
 export interface ApifyIngestionResult {
+  skipped: boolean // true = run short-circuited before any claim (no APIFY_API_TOKEN)
   jobs: number // Jobs processed this run
   fetched: number // dataset items fetched across jobs
   inserted: number // new ProcessedSignal rows
@@ -85,12 +86,25 @@ export async function runApifyIngestion(
 ): Promise<ApifyIngestionResult> {
   const wallStart = Date.now()
   const result: ApifyIngestionResult = {
+    skipped: false,
     jobs: 0,
     fetched: 0,
     inserted: 0,
     duplicates: 0,
     errors: 0,
     durationMs: 0,
+  }
+
+  // Hard guard, BEFORE any Job claim. Without APIFY_API_TOKEN the client would
+  // skip every fetch and we'd mark each claimed Job completed-at-0 — but a
+  // one-shot actor's dataset is never recreated, so that signal would be lost
+  // FOREVER. So we touch zero Jobs: they stay 'pending' and drain on the first
+  // run after the token is set. (The client's own skip-no-key stays, defensive.)
+  if (!process.env.APIFY_API_TOKEN) {
+    log.warn("APIFY_API_TOKEN not set — skipping Apify ingestion run (0 Jobs claimed; pending Jobs preserved)")
+    result.skipped = true
+    result.durationMs = Date.now() - wallStart
+    return result
   }
 
   while (result.jobs < cap) {

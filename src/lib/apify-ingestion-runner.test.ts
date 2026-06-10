@@ -4,7 +4,7 @@
  * REAL Prisma namespace so the P2002 dedup path is exercised with a real error.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { Prisma } from "@prisma/client"
 
 vi.mock("@/lib/prisma", () => ({
@@ -34,14 +34,21 @@ function queueJobs(ids: string[]) {
     i < ids.length ? [{ id: ids[i++] }] : []) as never)
 }
 
+const ORIG_TOKEN = process.env.APIFY_API_TOKEN
+
 describe("runApifyIngestion", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.APIFY_API_TOKEN = "test-token" // token present → runner does NOT short-circuit
     vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never) // default: no jobs
     vi.mocked(prisma.job.findUnique).mockResolvedValue(JOB as never)
     vi.mocked(prisma.job.update).mockResolvedValue({} as never)
     vi.mocked(prisma.processedSignal.create).mockResolvedValue({} as never)
     vi.mocked(fetchDatasetItems).mockResolvedValue([] as never)
+  })
+  afterEach(() => {
+    if (ORIG_TOKEN === undefined) delete process.env.APIFY_API_TOKEN
+    else process.env.APIFY_API_TOKEN = ORIG_TOKEN
   })
 
   it("[1] pending Job → fetch → ProcessedSignal rows w/ rawPayload; Job completed", async () => {
@@ -54,7 +61,7 @@ describe("runApifyIngestion", () => {
     const data0 = vi.mocked(prisma.processedSignal.create).mock.calls[0][0].data as Record<string, unknown>
     expect(data0).toMatchObject({ sourceUrl: "http://a", sourceActor: "act_1", signalCategory: "reddit-c" })
     expect(data0.rawPayload).toEqual({ url: "http://a", x: 1 })
-    expect(res).toMatchObject({ jobs: 1, fetched: 2, inserted: 2, duplicates: 0, errors: 0 })
+    expect(res).toMatchObject({ skipped: false, jobs: 1, fetched: 2, inserted: 2, duplicates: 0, errors: 0 })
 
     const completed = vi
       .mocked(prisma.job.update)
@@ -81,17 +88,17 @@ describe("runApifyIngestion", () => {
     expect(res).toMatchObject({ inserted: 0, duplicates: 2, errors: 0 })
   })
 
-  it("[3] no-key → client returns [] → runner no-ops clean (job completed, 0 items)", async () => {
-    queueJobs(["job-1"])
-    vi.mocked(fetchDatasetItems).mockResolvedValue([] as never)
+  it("[3] no-key → guard short-circuits BEFORE the claim: 0 Job claimed, pending Jobs untouched (NOT completed)", async () => {
+    delete process.env.APIFY_API_TOKEN // no token → must skip before touching any Job
+    queueJobs(["job-1"]) // a pending Job IS available — it must be left strictly alone
 
     const res = await runApifyIngestion()
+
+    expect(res).toMatchObject({ skipped: true, jobs: 0, fetched: 0, inserted: 0, duplicates: 0, errors: 0 })
+    expect(prisma.$queryRaw).not.toHaveBeenCalled() // never even attempted the claim
+    expect(fetchDatasetItems).not.toHaveBeenCalled()
     expect(prisma.processedSignal.create).not.toHaveBeenCalled()
-    expect(res).toMatchObject({ jobs: 1, fetched: 0, inserted: 0 })
-    const completed = vi
-      .mocked(prisma.job.update)
-      .mock.calls.find((c) => (c[0].data as { status?: string }).status === "completed")
-    expect(completed).toBeTruthy()
+    expect(prisma.job.update).not.toHaveBeenCalled() // no Job marked completed/failed → stays 'pending'
   })
 
   it("[4] per-item error isolation — one bad insert (non-P2002) recorded, the rest persist", async () => {
