@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24) merged ; PR2.5 account-signal reflection (`apify-pr25-account-reflection`) done local ; PR3 pipeline next.**)
+> **Last updated** : 2026-06-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25) merged ; PR3a-migration (`ProcessedSignal` dedup ledger) done local (branch `apify-pr3a-migration`) ; PR3a-wiring (client+handler) + PR3b routing next.**)
 
 ---
 
@@ -297,18 +297,23 @@ session display + 3 operator actions. Feature-flagged behind
   ; no migration. **PR2(#24) merged** — D2: `/api/accounts` `?name=` mode (normalize
   input+candidates → strip legal suffixes/punct so messy scraped names match) ;
   tier→confidence exact 1.0 / starts-with 0.9 / contains 0.7 ; returns ALL sorted
-  (caller applies 0.85) ; pure `account-match.ts` helpers ; `?q=` untouched. **PR2.5
-  done** (branch `apify-pr25-account-reflection`, local) — account-signal **read-time
-  reflection**: `computeIntentScore` (contact) ORs in the company's account-level
-  signals (`{companyId, contactId:null}` guard → no double-count) so account-level
-  signals finally score (no migration, no duplication) ; resolves Trigify-PR2's
-  parked reflect-rule ; side-effect: one account signal lifts ALL the account's
-  contacts (N alerts — dedupe = future company-level score). **Next**: PR3 pipeline
-  (worker/cron: fetch dataset via `APIFY_API_TOKEN` → dedup `processed_signals` →
-  match (D2) → `ingestSignal` ‖ create-unenriched ; migration `processed_signals`
-  [+ `page_snapshots`?] ; reconsider 5xx-on-infra-only ; attach the `apify:*` worker
-  handler — sync-worker live) ; market-signal DRAFT-campaign approval (BUILD,
-  deferred). D4 registry-of-actors = SEPARATE Apify-side workstream (not OS backend).
+  (caller applies 0.85) ; pure `account-match.ts` helpers ; `?q=` untouched.
+  **PR2.5(#25) merged** — account-signal **read-time reflection**: `computeIntentScore`
+  (contact) ORs in the company's account-level signals (`{companyId, contactId:null}`
+  guard → no double-count) so account-level signals finally score ; resolves
+  Trigify-PR2's parked reflect-rule ; side-effect: one account signal lifts ALL the
+  account's contacts (N alerts — dedupe = future company-level score). **PR3a-migration
+  done** (branch `apify-pr3a-migration`, local) — `ProcessedSignal` dedup/audit table
+  (`sourceUrl` @unique), shadow-verified, sentinel ; PR0-style, 0-row-safe. **Next**:
+  **PR3a-wiring** — `src/lib/apify.ts` client (fetch dataset via `APIFY_API_TOKEN`) +
+  the `apify:process-dataset` consumer. ⚠️ Workers are standalone packages (can't
+  import `src/lib`) → recommend a **cron-runner** (mirrors recompute/refresh/apollo,
+  imports `apify.ts` directly, no duplication) over extending the sync-worker. The
+  `apify_*` SignalTypeRegistry **SEED is deferred to PR3b** (consumed by `ingestSignal`
+  there ; needs Andy's actor→category→points table). **PR3b** routing: dedup → match
+  (D2) → `ingestSignal` (account → `scope:"company"`) ‖ create-unenriched ; reconsider
+  5xx-on-infra-only. market-signal DRAFT-campaign approval (BUILD, deferred). D4
+  registry-of-actors = SEPARATE Apify-side workstream (not OS backend).
 
 - **Component test infrastructure** — install `@testing-library/react` + jsdom +
   vitest jsdom env. Currently React components rely on TS + visual QA + smoke

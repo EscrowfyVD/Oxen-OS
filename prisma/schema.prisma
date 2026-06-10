@@ -1205,6 +1205,23 @@ model IntentSignal {
   @@index([companyId, intentCategory, createdAt])
 }
 
+// Apify PR3a — dedup / audit ledger for processed scraped items. One row per
+// unique sourceUrl (the dedup key): the pipeline skips an item whose URL is
+// already here, else inserts a row. This is NOT a signal store — signals go to
+// IntentSignal via ingestSignal (PR3b). accountId/rawPayload are populated by
+// the pipeline; accountId stays null until PR3b resolves the account.
+model ProcessedSignal {
+  id             String   @id @default(cuid())
+  sourceUrl      String   @unique // dedup key — the scraped item's URL
+  sourceActor    String? // Apify actId
+  signalCategory String? // the [category] suffix (reddit-c, news-d, …)
+  accountId      String? // resolved Company/Contact id (PR3b); null in PR3a
+  rawPayload     Json? // the raw scraped item (safety net)
+  processedAt    DateTime @default(now())
+
+  @@index([processedAt])
+}
+
 // MarketSignal — a country / vertical-scoped signal that doesn't (yet)
 // point at a specific contact or company. Examples: regulatory change
 // in a jurisdiction, macro funding trend in a vertical, Google search
