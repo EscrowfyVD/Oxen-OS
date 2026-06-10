@@ -194,4 +194,45 @@ describe("computeIntentScore", () => {
     expect(result.breakdown.byCategory.H).toBe(18)
     expect(result.score).toBe(18)
   })
+
+  // ─── PR2.5 — account-signal read-time reflection (5th-arg companyId) ──
+
+  it("[16] contact + companyId → OR query with the disjointness guard (companyId branch REQUIRES contactId:null — the no-double-count invariant)", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
+    await computeIntentScore("ct-x", "contact", config, NOW, "co-1")
+    const where = vi.mocked(prisma.intentSignal.findMany).mock.calls[0][0]!.where as {
+      OR: Array<Record<string, unknown>>
+    }
+    expect(where.OR).toEqual([
+      { contactId: "ct-x" },
+      { companyId: "co-1", contactId: null },
+    ])
+  })
+
+  it("[17] contact own signals + an account-only company signal → score includes BOTH", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 6, intentCategory: "H", ageDays: 1 }), // the contact's own
+      sig({ points: 20, intentCategory: "D", ageDays: 1 }), // account-only (companyId, contactId null)
+    ] as never)
+    const result = await computeIntentScore("ct-x", "contact", config, NOW, "co-1")
+    expect(result.score).toBe(26)
+    expect(result.breakdown.byCategory).toEqual({ H: 6, D: 20 })
+  })
+
+  it("[18] contact with ZERO own signals but an account-only company signal → now scores (was 0)", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      sig({ points: 15, intentCategory: "E", ageDays: 1 }), // only the account-only signal
+    ] as never)
+    const result = await computeIntentScore("ct-empty", "contact", config, NOW, "co-1")
+    expect(result.score).toBe(15)
+    expect(result.signalCount).toBe(1)
+  })
+
+  it("[19] companyId null → {contactId} only, no OR (edge: no regression — same as pre-PR2.5)", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
+    await computeIntentScore("ct-x", "contact", config, NOW, null)
+    const where = vi.mocked(prisma.intentSignal.findMany).mock.calls[0][0]!.where
+    expect(where).toMatchObject({ contactId: "ct-x" })
+    expect(where).not.toHaveProperty("OR")
+  })
 })
