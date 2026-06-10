@@ -5,7 +5,7 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25) merged ; PR3a-migration (`ProcessedSignal` dedup ledger) done local (branch `apify-pr3a-migration`) ; PR3a-wiring (client+handler) + PR3b routing next.**)
+> **Last updated** : 2026-06-10 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring (client + cron-runner consumer) done local (branch `apify-pr3a-wiring`) ; PR3b routing next.**)
 
 ---
 
@@ -303,14 +303,26 @@ session display + 3 operator actions. Feature-flagged behind
   guard → no double-count) so account-level signals finally score ; resolves
   Trigify-PR2's parked reflect-rule ; side-effect: one account signal lifts ALL the
   account's contacts (N alerts — dedupe = future company-level score). **PR3a-migration
-  done** (branch `apify-pr3a-migration`, local) — `ProcessedSignal` dedup/audit table
-  (`sourceUrl` @unique), shadow-verified, sentinel ; PR0-style, 0-row-safe. **Next**:
-  **PR3a-wiring** — `src/lib/apify.ts` client (fetch dataset via `APIFY_API_TOKEN`) +
-  the `apify:process-dataset` consumer. ⚠️ Workers are standalone packages (can't
-  import `src/lib`) → recommend a **cron-runner** (mirrors recompute/refresh/apollo,
-  imports `apify.ts` directly, no duplication) over extending the sync-worker. The
-  `apify_*` SignalTypeRegistry **SEED is deferred to PR3b** (consumed by `ingestSignal`
-  there ; needs Andy's actor→category→points table). **PR3b** routing: dedup → match
+  (#26) merged** — `ProcessedSignal` dedup/audit table (`sourceUrl` @unique),
+  shadow-verified, sentinel ; PR0-style, 0-row-safe ; **live in prod** (applied
+  2026-06-10 06:26:31Z). **PR3a-wiring done** (branch `apify-pr3a-wiring`, local) —
+  `src/lib/apify.ts` client (`fetchDatasetItems` : GET `/v2/datasets/{id}/items` via
+  `APIFY_API_TOKEN` ; skip-if-no-key → no HTTP / never-throw / 429-aware ; token in the
+  query param, never logged) + `src/lib/apify-ingestion-runner.ts` (`runApifyIngestion`
+  : claims `apify:process-dataset` Jobs via FOR UPDATE SKIP LOCKED, per item
+  dedup-inserts `ProcessedSignal` on `sourceUrl` = url ?? link ?? sha256(item), per-item
+  + per-job isolation, cap-bounded). **Decision realized** — a dedicated **cron-runner**
+  (mirrors recompute/refresh/apollo, imports `apify.ts` directly), NOT the sync-worker
+  (standalone package, can't import `src/lib` ; carries the time-sensitive LemCal F2
+  briefings). INVARIANT confirmed: sync-worker (`sync:email|sync:calendar`) + ai-worker
+  (`ai:*`) do NOT claim `apify:*` → this runner is the sole consumer. OPS:
+  `scripts/db/run-apify-ingestion.ts` + npm `apify-ingestion:cron` +
+  `cron/railway-apify-ingestion.toml` (clean 5-field `*/10`). +12 tests (client +
+  runner). NO keyword/recency filters, NO account match, NO `ingestSignal`, NO scoring —
+  all PR3b. **Ops after merge**: set `APIFY_API_TOKEN` (Railway-only ; without it the
+  runner no-ops — jobs complete with 0 items) + create the `*/10` apify-ingestion cron
+  service. The `apify_*` SignalTypeRegistry **SEED is deferred to PR3b** (consumed by
+  `ingestSignal` there ; needs Andy's actor→category→points table). **PR3b** routing: dedup → match
   (D2) → `ingestSignal` (account → `scope:"company"`) ‖ create-unenriched ; reconsider
   5xx-on-infra-only. market-signal DRAFT-campaign approval (BUILD, deferred). D4
   registry-of-actors = SEPARATE Apify-side workstream (not OS backend).
