@@ -46,10 +46,14 @@ export async function computePriorityScore(
   accountType: "contact" | "company",
   config: ScoringConfigBlob,
   now: Date = new Date(),
+  // PR2.5 — threaded to computeIntentScore so a CONTACT's score also reflects
+  // its company's account-level signals. Optional → callers without it behave
+  // exactly as before.
+  contactCompanyId?: string | null,
 ): Promise<PriorityScoreResult> {
   const [icp, intent] = await Promise.all([
     computeICPScore(accountId, config),
-    computeIntentScore(accountId, accountType, config, now),
+    computeIntentScore(accountId, accountType, config, now, contactCompanyId),
   ])
 
   return {

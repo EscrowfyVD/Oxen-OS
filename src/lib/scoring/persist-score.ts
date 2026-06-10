@@ -98,6 +98,7 @@ export async function persistScore(
     where: { id: accountId },
     select: {
       id: true,
+      companyId: true, // PR2.5 — for account-signal read-time reflection
       lemlistStatus: true,
       doNotContact: true,
       excludedFrom: true,
@@ -112,7 +113,13 @@ export async function persistScore(
   // 2. Compute the score via Sprint 3b. Reads the contact + company
   //    + intent signals + closed-won deals internally — no need to
   //    pre-fetch here.
-  const score = await computePriorityScore(accountId, accountType, config, now)
+  const score = await computePriorityScore(
+    accountId,
+    accountType,
+    config,
+    now,
+    contact.companyId,
+  )
 
   // 3. Apply negative signals. Reads CrmContact direct fields (Option
   //    A V1 — no negative-IntentSignal layer).

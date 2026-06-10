@@ -49,13 +49,29 @@ export async function computeIntentScore(
   accountType: "contact" | "company",
   config: ScoringConfigBlob,
   now: Date = new Date(),
+  // PR2.5 — account-signal read-time reflection. When scoring a CONTACT and its
+  // companyId is supplied, ALSO count the company's ACCOUNT-LEVEL signals
+  // (companyId set, contactId NULL) so an account event lifts every contact at
+  // the account. The `contactId: null` guard is the whole correctness of this:
+  // contact-scoped signals denormalize companyId (they have BOTH ids), so
+  // without the guard they'd be counted twice (via {contactId} AND {companyId}).
+  // The guard keeps the two OR branches DISJOINT. companyId null → no branch →
+  // identical to the pre-PR2.5 behaviour (no regression).
+  contactCompanyId?: string | null,
 ): Promise<IntentScoreResult> {
   const lookbackDays = getLookbackDays(config)
   const since = new Date(now.getTime() - lookbackDays * MS_PER_DAY)
 
   const where =
     accountType === "contact"
-      ? { contactId: accountId }
+      ? contactCompanyId
+        ? {
+            OR: [
+              { contactId: accountId },
+              { companyId: contactCompanyId, contactId: null },
+            ],
+          }
+        : { contactId: accountId }
       : { companyId: accountId }
 
   const signals = await prisma.intentSignal.findMany({
