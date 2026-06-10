@@ -3,8 +3,8 @@
  * (Sprint S1 batch 1 + Sprint Trigify Phase 2A).
  *
  * Exercises seedSignalTypes() against a mocked PrismaClient — verifies:
- *   - All 14 expected codes are upserted
- *     (4 canonical + 7 Trigify + 2 placeholder + 1 deprecated)
+ *   - All 16 expected codes are upserted
+ *     (4 canonical + 7 Trigify + 2 Apify + 2 placeholder + 1 deprecated)
  *   - Idempotency: running twice produces the same calls per run
  *   - The generated upsert args have the correct shape:
  *     * Active entries: create with isActive:true + empty update
@@ -31,11 +31,11 @@ function makeMockedPrisma(): PrismaClient {
 }
 
 describe("seedSignalTypes (Sprint S1 + Trigify Phase 2A)", () => {
-  it("upserts exactly 14 entries (4 canonical + 7 Trigify + 2 placeholder + 1 deprecated)", async () => {
+  it("upserts exactly 16 entries (4 canonical + 7 Trigify + 2 Apify + 2 placeholder + 1 deprecated)", async () => {
     const client = makeMockedPrisma()
     const result = await seedSignalTypes(client)
-    expect(result.upserted).toBe(14)
-    expect(result.codes).toHaveLength(14)
+    expect(result.upserted).toBe(16)
+    expect(result.codes).toHaveLength(16)
   })
 
   it("includes all 4 canonical codes from Vernon's Sprint S1 spec", async () => {
@@ -76,7 +76,7 @@ describe("seedSignalTypes (Sprint S1 + Trigify Phase 2A)", () => {
     const client = makeMockedPrisma()
     await seedSignalTypes(client)
     const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
-    expect(calls).toHaveLength(14)
+    expect(calls).toHaveLength(16)
     for (const call of calls) {
       const arg = call[0] as {
         where: { code: string }
@@ -95,7 +95,7 @@ describe("seedSignalTypes (Sprint S1 + Trigify Phase 2A)", () => {
       const arg = c[0] as { where: { code: string } }
       return arg.where.code !== "trigify_intent_signal"
     })
-    expect(activeCalls).toHaveLength(13)
+    expect(activeCalls).toHaveLength(15)
     for (const call of activeCalls) {
       const arg = call[0] as { update: Record<string, unknown> }
       expect(arg.update).toEqual({})
@@ -245,18 +245,78 @@ describe("seedSignalTypes (Sprint S1 + Trigify Phase 2A)", () => {
     }
   })
 
-  it("idempotent: running twice produces 28 total upsert calls (14 per run)", async () => {
+  it("includes the 2 Apify structured-actor codes, all INTENT category", async () => {
+    const client = makeMockedPrisma()
+    const result = await seedSignalTypes(client)
+    expect(result.codes).toContain("apify_f")
+    expect(result.codes).toContain("apify_g")
+    const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
+    const apifyCalls = calls.filter((c) =>
+      (c[0] as { where: { code: string } }).where.code.startsWith("apify_"),
+    )
+    expect(apifyCalls).toHaveLength(2)
+    for (const call of apifyCalls) {
+      const arg = call[0] as { create: { category: string } }
+      expect(arg.create.category).toBe("INTENT")
+    }
+  })
+
+  it("apify_f mirrors the Cat-F funding contract (8pt, 30d, EXPONENTIAL)", async () => {
+    const client = makeMockedPrisma()
+    await seedSignalTypes(client)
+    const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
+    const found = calls.find(
+      (c) => (c[0] as { where: { code: string } }).where.code === "apify_f",
+    )
+    expect(found).toBeDefined()
+    const arg = found![0] as {
+      create: {
+        defaultPoints: number
+        decayDays: number
+        decayCurve: string
+        category: string
+      }
+    }
+    expect(arg.create.defaultPoints).toBe(8)
+    expect(arg.create.decayDays).toBe(30)
+    expect(arg.create.decayCurve).toBe("EXPONENTIAL")
+    expect(arg.create.category).toBe("INTENT")
+  })
+
+  it("apify_g carries the provisional Cat-G hiring contract (6pt, 60d, LINEAR)", async () => {
+    const client = makeMockedPrisma()
+    await seedSignalTypes(client)
+    const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
+    const found = calls.find(
+      (c) => (c[0] as { where: { code: string } }).where.code === "apify_g",
+    )
+    expect(found).toBeDefined()
+    const arg = found![0] as {
+      create: {
+        defaultPoints: number
+        decayDays: number
+        decayCurve: string
+        category: string
+      }
+    }
+    expect(arg.create.defaultPoints).toBe(6)
+    expect(arg.create.decayDays).toBe(60)
+    expect(arg.create.decayCurve).toBe("LINEAR")
+    expect(arg.create.category).toBe("INTENT")
+  })
+
+  it("idempotent: running twice produces 32 total upsert calls (16 per run)", async () => {
     const client = makeMockedPrisma()
     await seedSignalTypes(client)
     await seedSignalTypes(client)
     const calls = vi.mocked(client.signalTypeRegistry.upsert).mock.calls
-    expect(calls).toHaveLength(28)
+    expect(calls).toHaveLength(32)
     // Each run hits each code exactly once — no duplicates within a run
     const firstRunCodes = calls
-      .slice(0, 14)
+      .slice(0, 16)
       .map((c) => (c[0] as { where: { code: string } }).where.code)
     const secondRunCodes = calls
-      .slice(14, 28)
+      .slice(16, 32)
       .map((c) => (c[0] as { where: { code: string } }).where.code)
     expect(firstRunCodes).toEqual(secondRunCodes)
   })
