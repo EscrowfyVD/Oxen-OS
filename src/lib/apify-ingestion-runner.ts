@@ -39,6 +39,7 @@ import {
   MATCH_THRESHOLD,
 } from "@/lib/apify-account-match"
 import { matchesIndustryKeyword } from "@/lib/apify-keywords"
+import { normalizeCompanyName } from "@/lib/account-match"
 import { recomputeCompanyContacts } from "@/lib/scoring/recompute-company-contacts"
 import { recomputeCompanyScore, COMPANY_ENRICH_THRESHOLD } from "@/lib/scoring/recompute-company-score"
 import { getActiveScoringConfigWithVersion } from "@/lib/scoring/config-loader"
@@ -106,6 +107,19 @@ interface RouteConfig {
   // Company (never onto an existing one):
   linkedinUrlField?: string // company LinkedIn page URL
   locationField?: string // human-readable location
+  // Dedup-key hotfix — STABLE per-entity identity for sourceUrl (the
+  // ProcessedSignal @unique dedup key). Derived ONLY from identity fields,
+  // never volatile metrics: sha256(full JSON) re-keys on every re-scrape
+  // (Monthly Visits / Trend Score / scraped_at drift) → the same entity
+  // re-enters as "new" and re-routes every cycle (score inflation, false
+  // T-crossings, wasted future Apollo credits). First present field wins.
+  dedupKeyFields?: string[]
+  // Optional EVENT qualifier appended to the identity key. Crunchbase keys on
+  // the company identity — without a qualifier a NEW funding round 12 months
+  // later would dedup against the old one and be silently swallowed. "Last
+  // Funding Date" only changes when a new round happens (it is event-identity,
+  // not volatility) → key = once per REAL funding round, the doctrine.
+  dedupEventField?: string
 }
 const ROUTABLE_ACTORS: Record<string, RouteConfig> = {
   // Crunchbase actor — Title-Case-with-spaces keys (138 keys, Probe A).
@@ -118,6 +132,11 @@ const ROUTABLE_ACTORS: Record<string, RouteConfig> = {
     textFields: ["Description", "Full Description", "Industries", "Industry Groups"],
     linkedinUrlField: "LinkedIn",
     locationField: "Headquarters Location",
+    // Identity: LinkedIn URL when present, else the 23/23-populated
+    // "Organization Name" (normalized). Event qualifier: a re-scrape of the
+    // same profile dedups; a NEW round (new "Last Funding Date") routes.
+    dedupKeyFields: ["LinkedIn", "Organization Name"],
+    dedupEventField: "Last Funding Date",
   },
   // Job Board actor — lowercase snake keys (12 keys, Probe A). Deliberately
   // NOT in textFields: search_term / matched_search_term — they echo the
@@ -132,6 +151,11 @@ const ROUTABLE_ACTORS: Record<string, RouteConfig> = {
     textFields: ["title"],
     linkedinUrlField: "company_url", // cycle-1 probe: a LinkedIn company page
     locationField: "location",
+    // Identity: job_url is per-POSTING stable — distinct roles are distinct
+    // signals (correct: 2 openings = 2 apify_g). No event qualifier needed.
+    // (Cycle-1 rows were hash-keyed — item has job_url, not url/link — and
+    // scraped_at drift re-keyed every re-scrape: same latent bug, same fix.)
+    dedupKeyFields: ["job_url"],
   },
 }
 
@@ -139,11 +163,50 @@ const ROUTABLE_ACTORS: Record<string, RouteConfig> = {
 // (vs attached to a pre-existing one).
 type RouteOutcome = "skipped" | "no-match" | "routed" | "routed-created" | "error"
 
+// Canonical URL form for identity comparison — verbatim actor URLs are
+// scheme/trailing-slash-stable in practice, this is belt-and-braces.
+function canonicalizeUrl(url: string): string {
+  return url.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "")
+}
+
 /**
- * Dedup key for an item — item.url ?? item.link, else a stable content hash so
- * re-ingesting the same item still dedups.
+ * Dedup key for an item (ProcessedSignal.sourceUrl @unique).
+ *
+ * Per-actor STABLE identity first (dedup-key hotfix): derived ONLY from the
+ * actor's declared identity fields — never the full payload, whose volatile
+ * metrics (Monthly Visits, Trend Score, scraped_at…) re-key every re-scrape
+ * and re-route the same entity each cycle.
+ *   - identity value is a URL → used verbatim as sourceUrl (jobboard job_url;
+ *     a real URL also flows into the signal's sourceUrl)… unless an EVENT
+ *     qualifier is declared, in which case the key is the namespaced
+ *     composite `apify-id:<letter>:<identity>[:<event>]` (crunchbase:
+ *     LinkedIn/name + "Last Funding Date" → once per REAL funding round).
+ *   - identity value is a name → normalizeCompanyName (raw lowercase if it
+ *     normalizes empty), namespaced by actor letter.
+ * Actors with no declared identity (or items missing all identity fields)
+ * fall back to the legacy url ?? link, then sha256(full JSON) — last resort
+ * only.
+ *
+ * LEDGER NOTE: pre-hotfix rows carry old hash keys; they are NOT rewritten
+ * (forward-only). The first post-deploy scrape of those entities won't dedup
+ * against the old scheme → they route ONCE cleanly, then stay stable.
  */
-export function extractSourceUrl(item: ApifyDatasetItem): string {
+export function extractSourceUrl(item: ApifyDatasetItem, route?: RouteConfig): string {
+  if (route?.dedupKeyFields) {
+    for (const field of route.dedupKeyFields) {
+      const value = extractStringField(item, field)
+      if (!value) continue
+      const isUrl = /^https?:\/\//i.test(value)
+      const event = route.dedupEventField
+        ? extractStringField(item, route.dedupEventField)
+        : null
+      if (isUrl && !event) return value.trim()
+      const identity = isUrl
+        ? canonicalizeUrl(value)
+        : normalizeCompanyName(value) || value.trim().toLowerCase()
+      return `apify-id:${route.letter}:${identity}${event ? `:${event}` : ""}`
+    }
+  }
   const candidate = item.url ?? item.link
   if (typeof candidate === "string" && candidate.trim().length > 0) {
     return candidate.trim()
@@ -403,7 +466,7 @@ export async function runApifyIngestion(
         const items = await fetchDatasetItems(datasetId)
         fetched = items.length
         for (const item of items) {
-          const sourceUrl = extractSourceUrl(item)
+          const sourceUrl = extractSourceUrl(item, route)
           let created: { id: string } | null = null
           try {
             created = await prisma.processedSignal.create({

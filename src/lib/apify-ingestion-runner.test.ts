@@ -226,8 +226,10 @@ describe("runApifyIngestion", () => {
       scope: "company",
       companyId: "co-1",
       signalTypeCode: "apify_f",
-      sourceUrl: "http://cb/acme",
     })
+    // Dedup-key hotfix: crunchbase keys on identity (`apify-id:…`, not a URL)
+    // → the signal carries no sourceUrl metadata (it's optional on ingest).
+    expect(payload.sourceUrl).toBeUndefined()
     expect(payload.occurredAt).toBe(funded)
     expect(prisma.processedSignal.update).toHaveBeenCalledWith({
       where: { id: "ps-9" },
@@ -525,5 +527,90 @@ describe("runApifyIngestion", () => {
     const res = await runApifyIngestion()
     expect(matchCompanyByName).toHaveBeenCalledWith("Acme Capital")
     expect(res).toMatchObject({ routed: 1 })
+  })
+
+  // ─── Dedup-key hotfix — stable per-actor sourceUrl ─────────────────
+
+  it("[22] CORE: same crunchbase profile, volatile fields changed → SAME sourceUrl → deduped, ONE ingest", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob(CB_CATEGORY) as never)
+    const funded = isoDaysAgo(30)
+    const profile = (monthlyVisits: number) => ({
+      "Organization Name": "Wirex",
+      LinkedIn: "https://linkedin.com/company/wirex",
+      Description: "crypto payments fintech",
+      "Last Funding Date": funded,
+      "Monthly Visits": monthlyVisits, // volatile — the old sha256(full JSON) re-keyed on this
+      "Trend Score (7 Days)": monthlyVisits * 2,
+    })
+    vi.mocked(fetchDatasetItems).mockResolvedValue([profile(1000), profile(2000)] as never)
+    const p2002 = new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "5.22.0" })
+    vi.mocked(prisma.processedSignal.create)
+      .mockResolvedValueOnce({ id: "ps-w1" } as never)
+      .mockRejectedValueOnce(p2002 as never)
+
+    const res = await runApifyIngestion()
+
+    const keys = vi.mocked(prisma.processedSignal.create).mock.calls.map(
+      (c) => (c[0].data as { sourceUrl: string }).sourceUrl,
+    )
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toBe(keys[1]) // volatile-only change NEVER produces a new key
+    expect(keys[0]).not.toMatch(/^sha256:/) // identity-derived, not the payload hash
+    expect(ingestSignal).toHaveBeenCalledTimes(1) // routed ONCE, not per scrape
+    expect(res).toMatchObject({ inserted: 1, duplicates: 1, routed: 1 })
+  })
+
+  it("[23] key derivation — LinkedIn/name identity + funding-round qualifier (once per ROUND, not per company-ever)", () => {
+    const CB_ROUTE = {
+      letter: "f",
+      companyField: "Organization Name",
+      recencyField: "Last Funding Date",
+      recencyDays: 90,
+      textFields: ["Description"],
+      dedupKeyFields: ["LinkedIn", "Organization Name"],
+      dedupEventField: "Last Funding Date",
+    } as Parameters<typeof extractSourceUrl>[1]
+
+    const withLinkedin = {
+      "Organization Name": "Wirex",
+      LinkedIn: "https://LinkedIn.com/company/Wirex/",
+      "Last Funding Date": "2026-06-18",
+      "Monthly Visits": 999,
+    }
+    const k1 = extractSourceUrl(withLinkedin, CB_ROUTE)
+    expect(k1).toBe("apify-id:f:linkedin.com/company/wirex:2026-06-18")
+
+    // volatile drift → identical key
+    expect(extractSourceUrl({ ...withLinkedin, "Monthly Visits": 12345 }, CB_ROUTE)).toBe(k1)
+
+    // NEW round → NEW key (a Series B a year later must ingest, not dedup)
+    expect(
+      extractSourceUrl({ ...withLinkedin, "Last Funding Date": "2027-07-01" }, CB_ROUTE),
+    ).not.toBe(k1)
+
+    // LinkedIn absent → normalized Organization Name identity
+    expect(
+      extractSourceUrl(
+        { "Organization Name": "Wirex Limited", "Last Funding Date": "2026-06-18" },
+        CB_ROUTE,
+      ),
+    ).toBe("apify-id:f:wirex:2026-06-18")
+  })
+
+  it("[24] jobboard keys on job_url verbatim (not the hash) — distinct postings stay distinct signals", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob("jobboard-g") as never)
+    vi.mocked(fetchDatasetItems).mockResolvedValue([
+      { company: "Mercuryo", title: "Compliance Officer", job_url: "https://jobs.x/mlro-1", date_posted: isoDaysAgo(1), scraped_at: isoDaysAgo(0) },
+      { company: "Mercuryo", title: "MLRO", job_url: "https://jobs.x/mlro-2", date_posted: isoDaysAgo(1), scraped_at: isoDaysAgo(0) },
+    ] as never)
+
+    const res = await runApifyIngestion()
+    const keys = vi.mocked(prisma.processedSignal.create).mock.calls.map(
+      (c) => (c[0].data as { sourceUrl: string }).sourceUrl,
+    )
+    expect(keys).toEqual(["https://jobs.x/mlro-1", "https://jobs.x/mlro-2"]) // verbatim, scraped_at drift irrelevant
+    expect(res).toMatchObject({ inserted: 2, routed: 2 }) // 2 roles = 2 apify_g, correct
   })
 })
