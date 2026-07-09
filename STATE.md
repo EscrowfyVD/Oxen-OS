@@ -5,13 +5,13 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-06-11 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged ; PR3b-pipeline (routing crunchbase-f + jobboard-g) done local ; PR3c (Apollo enrich-create for no-match) next.**)
+> **Last updated** : 2026-07-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged **+ seed RUN in prod (apify_f/apify_g confirmed in registry)** ; PR3b-pipeline(#29) merged ; **cycle-1 ran** (33 items stored, 0 routed — Crunchbase Title-Case field-bug + 9 net-new Job Board ICP prospects, all legit-no-match) ; PR3c-a (no-match capture, create-only) done local ; PR3c-b (Apollo enrich + contact-seed) + Crunchbase field hotfix next.**)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **841/841** passing (89 files,
+- **Repo health** : `npm run build` green ; tests **849/849** passing (89 files,
   TZ=UTC/CI) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
   pre-existing debt). Known flake: `signals/route.test.ts [15]` (expiresAt) reds
   only under a DST-observing local TZ — the test uses local-calendar setDate vs
@@ -329,19 +329,40 @@ session display + 3 operator actions. Feature-flagged behind
   merged (#28)** — `apify_f` (Crunchbase → Cat F, 8pt, mirrors the v2-calibrated
   linkedin_post_funding) + `apify_g` (Job Board → Cat G, 6pt PROVISIONAL — Cat G was
   reserved-empty in V1 for exactly this Apify source) ; account-level + score-only ;
-  points on the v2-calibrated registry NOT the stale blob (funding 8 ≠ 25). ⚠️ the seed
-  SCRIPTS are merged but must be RUN in prod (`seed-signal-types` + `backfill-…`) before
-  PR3b-pipeline deploys, else `ingestSignal` rejects apify_f/apify_g. **PR3b-pipeline
-  done** (branch `apify-pr3b-pipeline`, local) — routing in the runner's per-item path
-  (AFTER dedup-insert, on-new-insert-only): for crunchbase-f / jobboard-g ONLY (map keys
-  = allowlist, competitor-safety) → keyword + recency(>7d) + company-extract → server
-  matcher (`apify-account-match.ts`, reuses account-match, ≥0.85) → `ingestSignal`
-  scope:company `apify_<letter>` (scores via PR2.5) → set `ProcessedSignal.accountId` →
-  targeted recompute (loop `persistScore` over the company's contacts — decision #3, NOT
-  the full-scan). no-match → accountId null (flagged). +23 tests. **PR3c** next: Apollo
-  enrich-create for no-match leads. **PR3d** market-signal/DRAFT-campaign (Trustpilot/
-  News) ; **PR3e** Website-Crawler diff ; Reddit/News NLP = Phase 2. D4 registry-of-actors
-  = SEPARATE Apify-side workstream (not OS backend).
+  points on the v2-calibrated registry NOT the stale blob (funding 8 ≠ 25) ; **seed RUN
+  in prod 2026-06-11** (read-back: apify_f F/account/rapid 8pt, apify_g G/account/passive
+  6pt, 13 active codes). **PR3b-pipeline merged (#29)** — routing in the runner's
+  per-item path (AFTER dedup-insert, on-new-insert-only): for crunchbase-f / jobboard-g
+  ONLY (map keys = allowlist, competitor-safety) → keyword + recency(>7d) →
+  company-extract → server matcher (`apify-account-match.ts`, reuses account-match,
+  ≥0.85) → `ingestSignal` scope:company `apify_<letter>` (scores via PR2.5) → set
+  `ProcessedSignal.accountId` → targeted recompute (loop `persistScore` over the
+  company's contacts — decision #3, NOT the full-scan). **Cycle-1 (2026-07-07/08, cron
+  live)**: 33 items fetched+stored, 0 errors, **0 routed** — (a) 🐛 Crunchbase emits
+  Title-Case keys (`Organization Name`/`Last Funding Date`/`Description`), runner reads
+  lowercase → all 23 keyword-dropped ; ALSO its `Last Funding Date` runs 21-349d (profile
+  export, not fresh-round feed) → 7d window unfit, **recency policy = Andy decision** ;
+  (b) Job Board mechanics OK — 6/10 reached the matcher, **9 unique net-new ICP
+  prospects** (Wirex, Coinbase, Revolut, Mercuryo, payabl., Capital.com, SkillOnNet,
+  Pentasia, Eurobank — probe: zero in CRM, matcher defect ruled out), `company_url` =
+  LinkedIn page (NOT a domain → PR3c-b needs name/linkedin→org resolution ; org-enrich
+  is domain-only today). **PR3c-a done** (branch `apify-pr3c-a`, local) — no-match
+  capture, create-only: REAL no-match (reached matcher, <0.85) → fuzzy-guarded
+  find-or-create (`matchOrCreateCompanyByName` : ≥0.85 → attach-not-create ;
+  `findOrCreateCompanyByName` exported from trigify-matching, +`{id,created}` +
+  `extraCreate.location`, P2002 race-safe) → company from payload (name + linkedinUrl +
+  location, domain=null) → signal attaches (INERT, scores 0 until a contact — PR2.5) →
+  accountId set → zero-contact recompute no-ops. Gate-dropped items create NOTHING ; the
+  33-row backlog NOT batch-processed (conflates real no-match with the Crunchbase bug
+  drops). NO source column on Company (acquisitionSource = contact/deal-only) → trail =
+  ProcessedSignal linkage ; 1-line `Company.acquisitionSource` migration flagged for
+  Andy. +8 tests. **Next**: **PR3c-b** Apollo enrich + contact-seed (needs new client
+  methods: organizations/search by name/linkedin + people/search decision-maker ;
+  credit-gated, Andy budget) ; **Crunchbase field hotfix** (map Title-Case keys + recency
+  decision) ; funnel instrumentation (per-step drop counters — Andy's quality view).
+  **PR3d** market-signal/DRAFT-campaign (Trustpilot/News) ; **PR3e** Website-Crawler
+  diff ; Reddit/News NLP = Phase 2. D4 registry-of-actors = SEPARATE Apify-side
+  workstream (not OS backend).
 
 - **Component test infrastructure** — install `@testing-library/react` + jsdom +
   vitest jsdom env. Currently React components rely on TS + visual QA + smoke

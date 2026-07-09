@@ -16,16 +16,28 @@
 // the company's contacts. Storage always happens; routing is the added gate.
 // ON-NEW-INSERT-ONLY: a duplicate item is never re-routed.
 //
-// NOT in scope (deferred): Apollo enrich-create for no-match (PR3c);
-// market-signal / DRAFT-campaign (PR3d); Website-Crawler diff (PR3e); Reddit/
-// News NLP (Phase 2). Those actors' items stay in ProcessedSignal, unrouted.
+// PR3c-a scope (this file): a REAL no-match (reached the matcher, <0.85) no
+// longer falls into the void — the company is CAPTURED from the payload
+// (fuzzy-guarded find-or-create: name + LinkedIn URL + location, domain=null)
+// and the signal attaches to it. Create-only: NO Apollo, NO enrichment, NO
+// contact — the signal is inert (scores 0) until PR3c-b seeds a contact.
+// Gate-dropped items (keyword/recency/no-company) still create NOTHING.
+//
+// NOT in scope (deferred): Apollo enrich + contact-seed for captured accounts
+// (PR3c-b, credit-gated); market-signal / DRAFT-campaign (PR3d);
+// Website-Crawler diff (PR3e); Reddit/News NLP (Phase 2). Non-allowlisted
+// actors' items stay in ProcessedSignal, unrouted.
 
 import { Prisma } from "@prisma/client"
 import { createHash } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { fetchDatasetItems, type ApifyDatasetItem } from "@/lib/apify"
 import { ingestSignal } from "@/lib/signal-ingestion"
-import { matchCompanyByName } from "@/lib/apify-account-match"
+import {
+  matchCompanyByName,
+  matchOrCreateCompanyByName,
+  MATCH_THRESHOLD,
+} from "@/lib/apify-account-match"
 import { matchesIndustryKeyword } from "@/lib/apify-keywords"
 import { recomputeCompanyContacts } from "@/lib/scoring/recompute-company-contacts"
 import { getActiveScoringConfigWithVersion } from "@/lib/scoring/config-loader"
@@ -38,10 +50,9 @@ const WORKER_ID = `apify-ingestion-cron-${process.pid}`
 // Jobs processed per run; the rest wait for the next cron tick.
 export const DEFAULT_APIFY_INGEST_CAP = 20
 
-// Caller-side match cutoff (account-match.ts returns all matches; the route's
-// documented 0.85 contract is applied here).
-const MATCH_THRESHOLD = 0.85
 // Only act on fresh signals — funding/postings older than this are dropped.
+// (MATCH_THRESHOLD — the 0.85 caller-side cutoff — now lives in
+// apify-account-match.ts, single source shared with the PR3c-a capture.)
 const RECENCY_MAX_MS = 7 * 24 * 60 * 60 * 1000
 
 export interface ApifyIngestionResult {
@@ -51,8 +62,9 @@ export interface ApifyIngestionResult {
   inserted: number // new ProcessedSignal rows
   duplicates: number // items skipped (sourceUrl already seen)
   errors: number // per-item + per-job + routing errors
-  routed: number // matched items → company-scoped IntentSignal ingested + accountId set
-  unmatched: number // routable items that passed gates but matched no account >=0.85
+  routed: number // items → company-scoped IntentSignal ingested + accountId set
+  created: number // subset of routed whose Company was CREATED by the PR3c-a capture
+  unmatched: number // passed gates but unroutable (unmatchable name — no create possible)
   durationMs: number
 }
 
@@ -71,13 +83,27 @@ interface RouteConfig {
   letter: string // intentCategory letter → signal code apify_<letter>
   companyField: string // item field holding the prospect company name
   recencyField: string // item field holding the actor's timestamp
+  // PR3c-a no-match capture — optional payload fields copied onto a CREATED
+  // Company (never onto an existing one):
+  linkedinUrlField?: string // company LinkedIn page URL
+  locationField?: string // human-readable location
 }
 const ROUTABLE_ACTORS: Record<string, RouteConfig> = {
+  // crunchbase-f: no capture fields yet — its payload keys are Title-Case
+  // (field-mapping hotfix pending), so items never reach the matcher today.
   "crunchbase-f": { letter: "f", companyField: "name", recencyField: "lastFundingDate" },
-  "jobboard-g": { letter: "g", companyField: "company", recencyField: "date_posted" },
+  "jobboard-g": {
+    letter: "g",
+    companyField: "company",
+    recencyField: "date_posted",
+    linkedinUrlField: "company_url", // cycle-1 probe: a LinkedIn company page
+    locationField: "location",
+  },
 }
 
-type RouteOutcome = "skipped" | "no-match" | "routed" | "error"
+// "routed-created" = routed AND the account was created by the PR3c-a capture
+// (vs attached to a pre-existing one).
+type RouteOutcome = "skipped" | "no-match" | "routed" | "routed-created" | "error"
 
 /**
  * Dedup key for an item — item.url ?? item.link, else a stable content hash so
@@ -119,7 +145,7 @@ function parseItemDate(value: unknown): Date | null {
   return null
 }
 
-function extractCompanyName(item: ApifyDatasetItem, field: string): string | null {
+function extractStringField(item: ApifyDatasetItem, field: string): string | null {
   const v = item[field]
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : null
 }
@@ -173,19 +199,39 @@ async function routeNewItem(
   if (now.getTime() - itemDate.getTime() > RECENCY_MAX_MS) return "skipped"
 
   // (e) extract prospect company name.
-  const companyName = extractCompanyName(item, route.companyField)
+  const companyName = extractStringField(item, route.companyField)
   if (!companyName) return "skipped"
 
   // match via the server matcher; caller applies the >=0.85 cutoff.
   const match = await matchCompanyByName(companyName)
-  if (!match || match.confidence < MATCH_THRESHOLD) return "no-match"
+  let companyId: string
+  let createdNew = false
+  if (match && match.confidence >= MATCH_THRESHOLD) {
+    companyId = match.companyId
+  } else {
+    // PR3c-a — REAL no-match (reached the matcher, <0.85): capture the
+    // prospect instead of dropping it into the void. Create-only, from the
+    // payload (name + LinkedIn URL + location, domain=null) — NO Apollo, NO
+    // contact (both PR3c-b). The fuzzy guard inside the capture attaches to
+    // an existing account when one fuzzy-matches (never dup "Wirex" vs
+    // "Wirex Limited"); create is exact-match + P2002 race-safe.
+    // The signal attached to a brand-new 0-contact company is INERT (scores
+    // 0 until a contact exists — PR2.5 reflects onto contacts) — expected v1.
+    const captured = await matchOrCreateCompanyByName(companyName, {
+      linkedinUrl: route.linkedinUrlField ? extractStringField(item, route.linkedinUrlField) : null,
+      location: route.locationField ? extractStringField(item, route.locationField) : null,
+    })
+    if (!captured) return "no-match" // unmatchable name — nothing to attach to
+    companyId = captured.companyId
+    createdNew = captured.created
+  }
 
   // route → company-scoped IntentSignal (scores via PR2.5). Only pass a real
   // http(s) sourceUrl (a sha256: dedup key is not a URL).
   const realUrl = sourceUrl.startsWith("http") ? sourceUrl : undefined
   const res = await ingestSignal({
     scope: "company" as const,
-    companyId: match.companyId,
+    companyId,
     signalTypeCode: `apify_${route.letter}`,
     occurredAt: itemDate.toISOString(),
     sourceUrl: realUrl,
@@ -194,7 +240,7 @@ async function routeNewItem(
     // e.g. UNKNOWN_SIGNAL_TYPE if the prod seed hasn't run yet — log + count,
     // leave accountId null, no recompute.
     log.error(
-      { processedSignalId, code: res.code, companyId: match.companyId },
+      { processedSignalId, code: res.code, companyId },
       "apify ingestSignal rejected — accountId left null",
     )
     return "error"
@@ -203,15 +249,17 @@ async function routeNewItem(
   // stamp the ProcessedSignal as routed to this account.
   await prisma.processedSignal.update({
     where: { id: processedSignalId },
-    data: { accountId: match.companyId },
+    data: { accountId: companyId },
   })
 
   // targeted recompute (decision #3) — loop persistScore over the company's
-  // contacts; NOT the full-scan. Config fetched once per run (lazy).
+  // contacts; NOT the full-scan. Config fetched once per run (lazy). On a
+  // just-created company this is a clean no-op (0 contacts → 0 persistScore
+  // calls — covered by recompute-company-contacts test [4]).
   const { config, version } = await loadScoring()
-  await recomputeCompanyContacts(match.companyId, config, version, now)
+  await recomputeCompanyContacts(companyId, config, version, now)
 
-  return "routed"
+  return createdNew ? "routed-created" : "routed"
 }
 
 export async function runApifyIngestion(
@@ -227,6 +275,7 @@ export async function runApifyIngestion(
     duplicates: 0,
     errors: 0,
     routed: 0,
+    created: 0,
     unmatched: 0,
     durationMs: 0,
   }
@@ -273,6 +322,7 @@ export async function runApifyIngestion(
       let duplicates = 0
       let itemErrors = 0
       let routed = 0
+      let createdAccounts = 0
       let unmatched = 0
 
       if (!datasetId) {
@@ -307,8 +357,10 @@ export async function runApifyIngestion(
           if (created?.id && route) {
             try {
               const outcome = await routeNewItem(item, route, created.id, sourceUrl, now, loadScoring)
-              if (outcome === "routed") routed += 1
-              else if (outcome === "no-match") unmatched += 1
+              if (outcome === "routed" || outcome === "routed-created") {
+                routed += 1
+                if (outcome === "routed-created") createdAccounts += 1
+              } else if (outcome === "no-match") unmatched += 1
               else if (outcome === "error") itemErrors += 1
             } catch (err) {
               itemErrors += 1
@@ -323,6 +375,7 @@ export async function runApifyIngestion(
       result.duplicates += duplicates
       result.errors += itemErrors
       result.routed += routed
+      result.created += createdAccounts
       result.unmatched += unmatched
 
       await prisma.job.update({
@@ -336,12 +389,13 @@ export async function runApifyIngestion(
             dup: duplicates,
             errors: itemErrors,
             routed,
+            created: createdAccounts,
             unmatched,
           } as Prisma.InputJsonValue,
         },
       })
       log.info(
-        { jobId: claimed.id, datasetId, fetched, new: inserted, dup: duplicates, errors: itemErrors, routed, unmatched },
+        { jobId: claimed.id, datasetId, fetched, new: inserted, dup: duplicates, errors: itemErrors, routed, created: createdAccounts, unmatched },
         "apify dataset job processed",
       )
     } catch (err) {
@@ -370,6 +424,7 @@ export async function runApifyIngestion(
       duplicates: result.duplicates,
       errors: result.errors,
       routed: result.routed,
+      created: result.created,
       unmatched: result.unmatched,
     },
     "apify ingestion batch complete",
