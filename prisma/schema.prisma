@@ -347,6 +347,17 @@ model Company {
   enrichmentSource EnrichmentSource?
   enrichedAt      DateTime?
   enrichmentRaw   Json?    // raw Apollo /organizations/enrich response — preserves un-mapped fields (founded_year, funding_stage…) so columns can be backfilled later without re-paying credits
+  // PR3c-b — company-level intent score. Decay-adjusted sum of the company's
+  // ACCOUNT-LEVEL signals ONLY ({companyId, contactId: null} — the PR2.5
+  // reflection set; the level-partition invariant keeps it disjoint from
+  // contact scores). Written by the company-score recompute (PR3c-b-score);
+  // consumed by the Apollo enrichment trigger sweep (PR3c-b-enrich pass-3:
+  // intentScore >= T AND enrichedAt IS NULL AND domain IS NULL, T=10).
+  // NULL = never scored (distinct from 0.0) — mirrors CrmContact unscored.
+  // ⚠️ Deliberately NO index here yet: the sweep's partial index ships WITH
+  // its consumer in PR3c-b-enrich (do not forget it there).
+  intentScore     Float?
+  lastScoredAt    DateTime?
   // Computed
   contactsCount   Int      @default(0)
   activeDealsCount Int     @default(0)
