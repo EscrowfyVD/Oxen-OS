@@ -26,9 +26,16 @@ import { computeIntentScore } from "./compute-intent-score"
 import type { ScoringConfigBlob } from "./config-types"
 
 /**
- * T — the enrichment-trigger threshold (Vernon doctrine, 2026-07-09).
- * ~ "2 fresh hiring posts" (apify_g 6+6) or "funding + anything". Consumed by
- * the PR3c-b-enrich sweep; here it only parameterizes `crossedThreshold`.
+ * FALLBACK for the enrichment-trigger threshold T (Vernon doctrine).
+ * ~ "2 fresh hiring posts" (apify_g 6+6) or "funding + anything".
+ *
+ * The LIVE value is `config.enrichment.gate1Threshold` (PR3c-b slice 2 —
+ * runtime-editable by Andy, ≤60s config-loader TTL, no redeploy). This const
+ * is read ONLY when the active config predates v3 and carries no enrichment
+ * block (the deploy→seed window, or any pre-v3 row): using it keeps the
+ * crossing BYTE-IDENTICAL to the pre-slice-2 behaviour. 10 = the exact old
+ * hardcoded value. (The runner still imports + logs this as the default
+ * label — left untouched this slice.)
  */
 export const COMPANY_ENRICH_THRESHOLD = 10
 
@@ -48,6 +55,12 @@ export interface RecomputeCompanyScoreResult {
    * PR3c-b-enrich sweep (which is additionally enrichedAt-idempotent).
    */
   crossedThreshold: boolean
+  /**
+   * The threshold T actually used this call: `config.enrichment.gate1Threshold`
+   * when present, else the COMPANY_ENRICH_THRESHOLD fallback. Exposed so the
+   * live wire is observable (tests + slice-4 logging of the real T).
+   */
+  threshold: number
 }
 
 export async function recomputeCompanyScore(
@@ -71,9 +84,14 @@ export async function recomputeCompanyScore(
 
   const previousScore = company.intentScore
   const newScore = intent.score
+  // Live threshold: config.enrichment.gate1Threshold when present, else the
+  // pre-v3 fallback (= the old const → byte-identical on default). config is
+  // the already-loaded blob (from getActiveScoringConfigWithVersion), so this
+  // is the same value the rest of scoring reads — no extra accessor call, and
+  // it NEVER throws on a missing block (optional key + ?? fallback).
+  const threshold = config.enrichment?.gate1Threshold ?? COMPANY_ENRICH_THRESHOLD
   const crossedThreshold =
-    (previousScore ?? 0) < COMPANY_ENRICH_THRESHOLD &&
-    newScore >= COMPANY_ENRICH_THRESHOLD
+    (previousScore ?? 0) < threshold && newScore >= threshold
 
   // Atomic pair: last-write-wins on Company + append-only ScoreHistory audit
   // row (accountType "company" — the table was company-ready from day one:
@@ -110,5 +128,6 @@ export async function recomputeCompanyScore(
     newScore,
     signalCount: intent.signalCount,
     crossedThreshold,
+    threshold,
   }
 }

@@ -389,6 +389,62 @@ export function buildScoringConfigV2(): ScoringConfigBlob {
   return blob
 }
 
+/**
+ * Build the canonical v3 config blob — v2 + the Apify PR3c-b `enrichment`
+ * block (the enrichment-sweep params, runtime-editable by Andy in ≤60s).
+ *
+ * v3 = `structuredClone(v2)` + the single additive `enrichment` key, so the
+ * diff reads as exactly "v2 plus enrichment" and nothing in the ~260
+ * untouched lines drifts. v2 stays frozen + reproducible; seedScoringConfigV3
+ * preserves v1 + v2 as inactive rows (audit history).
+ *
+ * IMPORTANT — byte-identical scoring: gate1Threshold: 10 is the EXACT old
+ * `COMPANY_ENRICH_THRESHOLD` const (recompute-company-score, #32). Seeding
+ * v3 changes NO scoring behaviour — the company crossing still fires at 10.
+ * gate1MinSignals / caps / titles are seeded but have no consumer until the
+ * pass-3 sweep (slice 4). Andy edits any of these in the DB row; the ≤60s
+ * config-loader TTL picks it up with no redeploy.
+ */
+export function buildScoringConfigV3(): ScoringConfigBlob {
+  const blob = structuredClone(buildScoringConfigV2())
+
+  blob.enrichment = {
+    // = the old COMPANY_ENRICH_THRESHOLD const → NOOP on default (byte-identical).
+    gate1Threshold: 10,
+    gate1MinSignals: 2,
+    // Safety breaker, not a budget: recon showed real volume ~4-8/mo → ~40-75x headroom.
+    baseEnrichmentCap: 300,
+    // RESERVED — phone is a later slice; param only, not wired.
+    phoneRevealCap: 100,
+    // Compliance/finance-hiring oriented (the apify_g Job Board signal). Andy
+    // tunes per-vertical later; editable without redeploy.
+    titles: {
+      decisionMaker: [
+        "Chief Compliance Officer",
+        "Head of Compliance",
+        "MLRO",
+        "Money Laundering Reporting Officer",
+        "Chief Risk Officer",
+        "General Counsel",
+        "Head of Legal",
+        "Chief Financial Officer",
+        "Head of Finance",
+      ],
+      operational: [
+        "Compliance Officer",
+        "Compliance Manager",
+        "AML Officer",
+        "AML Analyst",
+        "KYC Analyst",
+        "Compliance Analyst",
+        "Risk Analyst",
+      ],
+    },
+  }
+
+  return blob
+}
+
 export interface SeedResult {
   version: number
   action: "created" | "updated" | "no-op"
@@ -518,15 +574,76 @@ export async function seedScoringConfigV2(
   return { version: 2, action: "created" }
 }
 
+/**
+ * Insert (or refresh) ScoringConfig v3 and make it the active config.
+ * Mirrors seedScoringConfigV2's invariant handling (validate → deactivate
+ * every other version → upsert v3 active). v1 + v2 preserved as inactive
+ * rows (audit history). v3 = v2 + the enrichment block (Apify PR3c-b).
+ */
+export async function seedScoringConfigV3(
+  client: PrismaClient = prisma,
+): Promise<SeedResult> {
+  const blob = buildScoringConfigV3()
+
+  const validation = validateScoringConfig(blob)
+  if (!validation.ok) {
+    throw new Error(
+      `buildScoringConfigV3 produced an invalid blob: ${validation.error}\n` +
+        `Details: ${JSON.stringify(validation.details, null, 2)}`,
+    )
+  }
+
+  const configJson = blob as unknown as Parameters<
+    typeof client.scoringConfig.upsert
+  >[0]["create"]["config"]
+
+  const existing = await client.scoringConfig.findUnique({
+    where: { version: 3 },
+    select: { id: true, isActive: true },
+  })
+
+  // Deactivate every other version (v1 + v2 + any experimental rows) so the
+  // "exactly one active" invariant holds with v3 as the active config.
+  await client.scoringConfig.updateMany({
+    where: { isActive: true, version: { not: 3 } },
+    data: { isActive: false },
+  })
+
+  if (existing) {
+    await client.scoringConfig.update({
+      where: { version: 3 },
+      data: { config: configJson, isActive: true },
+    })
+    return { version: 3, action: existing.isActive ? "no-op" : "updated" }
+  }
+
+  await client.scoringConfig.create({
+    data: {
+      version: 3,
+      isActive: true,
+      config: configJson,
+      notes:
+        "v3 = v2 + Apify PR3c-b enrichment block (gate1Threshold 10 = the " +
+        "old COMPANY_ENRICH_THRESHOLD const, NOOP on default; gate1MinSignals " +
+        "2, baseEnrichmentCap 300, phoneRevealCap 100 reserved, compliance " +
+        "title lists). Runtime-editable by Andy (<=60s TTL, no redeploy).",
+      createdBy: "seed-script",
+    },
+  })
+  return { version: 3, action: "created" }
+}
+
 async function main() {
-  // Seed v1 first (idempotent — guarantees the preserved history row
-  // exists even on a fresh environment), then v2 which becomes the
-  // active config and deactivates v1. End state: exactly one active = v2.
+  // Seed v1, then v2, then v3 — each deactivates the others, so the committed
+  // end state is exactly one active = v3 (the enrichment-block config). v1 + v2
+  // are preserved as inactive audit-history rows.
   console.log("\n=== Seed ScoringConfig (Phase 3) ===\n")
   const v1 = await seedScoringConfigV1(prisma)
   console.log(`Result: v${v1.version} ${v1.action}`)
   const v2 = await seedScoringConfigV2(prisma)
-  console.log(`Result: v${v2.version} ${v2.action} (now active)\n`)
+  console.log(`Result: v${v2.version} ${v2.action}`)
+  const v3 = await seedScoringConfigV3(prisma)
+  console.log(`Result: v${v3.version} ${v3.action} (now active)\n`)
 }
 
 // Run main() only when invoked directly (mirrors seed-signal-types.ts).

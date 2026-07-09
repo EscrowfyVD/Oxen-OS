@@ -21,9 +21,12 @@ import {
   COMPANY_ENRICH_THRESHOLD,
 } from "./recompute-company-score"
 import { prisma } from "@/lib/prisma"
-import { buildScoringConfigV1 } from "../../../scripts/db/seed-scoring-config"
+import {
+  buildScoringConfigV1,
+  buildScoringConfigV3,
+} from "../../../scripts/db/seed-scoring-config"
 
-const config = buildScoringConfigV1()
+const config = buildScoringConfigV1() // no enrichment block (pre-v3 shape)
 const NOW = new Date("2026-07-09T12:00:00Z")
 
 function accountSig(points: number, category: string, ageDays: number) {
@@ -166,5 +169,54 @@ describe("recomputeCompanyScore (PR3c-b-score)", () => {
     await expect(recomputeCompanyScore("co-x", config, 2, NOW)).rejects.toThrow(
       "company co-x not found",
     )
+  })
+
+  // ─── Slice 2 — the T re-wire onto config.enrichment.gate1Threshold ──
+
+  it("[8] NOOP-on-default — no enrichment block AND v3 (gate1Threshold 10) both use T=10, byte-identical", async () => {
+    // 6 (below T) → 12 (2 fresh posts): crosses at 10.
+    setCompany(6)
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      accountSig(6, "G", 0),
+      accountSig(6, "G", 1),
+    ] as never)
+
+    // (a) pre-v3 config (no enrichment key) → the 10 fallback const.
+    const noBlock = await recomputeCompanyScore("co-1", config, 2, NOW)
+    expect(noBlock.threshold).toBe(10)
+    expect(noBlock.newScore).toBe(12)
+    expect(noBlock.crossedThreshold).toBe(true) // 6 < 10 && 12 >= 10 — same as pre-slice-2
+
+    // (b) v3 config (enrichment present, gate1Threshold 10) → identical.
+    // Seeding v3 changes NOTHING: the default value == the old const.
+    setCompany(6)
+    const v3 = await recomputeCompanyScore("co-1", buildScoringConfigV3(), 2, NOW)
+    expect(v3.threshold).toBe(10)
+    expect(v3.crossedThreshold).toBe(noBlock.crossedThreshold)
+  })
+
+  it("[9] the wire is LIVE — config.enrichment.gate1Threshold = 15 moves the crossing (12 no longer crosses)", async () => {
+    const v3 = buildScoringConfigV3()
+    const configT15 = { ...v3, enrichment: { ...v3.enrichment!, gate1Threshold: 15 } }
+    setCompany(6)
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([
+      accountSig(6, "G", 0),
+      accountSig(6, "G", 1),
+    ] as never)
+
+    const r = await recomputeCompanyScore("co-1", configT15, 2, NOW)
+    expect(r.threshold).toBe(15) // reads the config, NOT the const
+    expect(r.newScore).toBe(12)
+    expect(r.crossedThreshold).toBe(false) // 12 < 15 → NOT crossed (proves the wire, not the const)
+  })
+
+  it("[10] pre-v3 active row (missing enrichment block) never throws → falls back to 10", async () => {
+    // The live path must not crash on a config that predates v3. `config` is
+    // v1-shaped (no enrichment) — the deploy->seed window case.
+    setCompany(null)
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([accountSig(6, "G", 0)] as never)
+    const r = await recomputeCompanyScore("co-1", config, 2, NOW)
+    expect(r.threshold).toBe(10)
+    expect(r.crossedThreshold).toBe(false) // 0 < 10 but new 6 < 10
   })
 })

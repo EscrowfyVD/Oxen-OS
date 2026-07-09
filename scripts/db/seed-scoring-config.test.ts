@@ -13,8 +13,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import {
   buildScoringConfigV1,
   buildScoringConfigV2,
+  buildScoringConfigV3,
   seedScoringConfigV1,
   seedScoringConfigV2,
+  seedScoringConfigV3,
 } from "./seed-scoring-config"
 import { validateScoringConfig } from "../../src/lib/scoring/config-validation"
 
@@ -254,5 +256,113 @@ describe("seedScoringConfigV2", () => {
     expect(result).toEqual({ version: 2, action: "no-op" })
     expect(client.scoringConfig.create).not.toHaveBeenCalled()
     expect(client.scoringConfig.update).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ─── v3 — the enrichment block (Apify PR3c-b slice 2) ────────────────
+
+describe("buildScoringConfigV3", () => {
+  it("[V3-1] produces a blob that passes Zod validation", () => {
+    expect(validateScoringConfig(buildScoringConfigV3()).ok).toBe(true)
+  })
+
+  it("[V3-2] carries the enrichment block with NOOP defaults (gate1Threshold 10 = the old const)", () => {
+    const e = buildScoringConfigV3().enrichment!
+    expect(e.gate1Threshold).toBe(10) // == COMPANY_ENRICH_THRESHOLD → byte-identical scoring
+    expect(e.gate1MinSignals).toBe(2)
+    expect(e.baseEnrichmentCap).toBe(300)
+    expect(e.phoneRevealCap).toBe(100)
+    expect(e.titles.decisionMaker.length).toBeGreaterThan(0)
+    expect(e.titles.operational.length).toBeGreaterThan(0)
+  })
+
+  it("[V3-3] is v2 + enrichment ONLY — strip enrichment and it deep-equals v2 (no other drift)", () => {
+    const v3 = buildScoringConfigV3()
+    const { enrichment, ...rest } = v3
+    expect(enrichment).toBeDefined()
+    expect(rest).toEqual(buildScoringConfigV2())
+  })
+
+  it("[V3-4] does NOT mutate v2 (structuredClone isolation)", () => {
+    buildScoringConfigV3()
+    expect(buildScoringConfigV2().enrichment).toBeUndefined()
+  })
+
+  it("[V3-5] is deterministic — two calls produce identical output", () => {
+    expect(JSON.stringify(buildScoringConfigV3())).toBe(
+      JSON.stringify(buildScoringConfigV3()),
+    )
+  })
+})
+
+describe("seedScoringConfigV3", () => {
+  let client: MockClient
+
+  beforeEach(() => {
+    client = makeMockClient()
+  })
+
+  it("[V3-6] creates v3 active when no existing row found", async () => {
+    client.scoringConfig.findUnique.mockResolvedValue(null)
+    client.scoringConfig.updateMany.mockResolvedValue({ count: 1 })
+    client.scoringConfig.create.mockResolvedValue({ id: "cfg-3" })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await seedScoringConfigV3(client as any)
+    expect(result).toEqual({ version: 3, action: "created" })
+    const createArg = client.scoringConfig.create.mock.calls[0][0]
+    expect(createArg.data.version).toBe(3)
+    expect(createArg.data.isActive).toBe(true)
+    expect(createArg.data.notes).toMatch(/enrichment block/)
+  })
+
+  it("[V3-7] deactivates v1+v2 (every other version) before activating v3", async () => {
+    client.scoringConfig.findUnique.mockResolvedValue(null)
+    client.scoringConfig.updateMany.mockResolvedValue({ count: 2 })
+    client.scoringConfig.create.mockResolvedValue({ id: "cfg-3" })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await seedScoringConfigV3(client as any)
+    const updateManyArg = client.scoringConfig.updateMany.mock.calls[0][0]
+    expect(updateManyArg.where).toMatchObject({ isActive: true, version: { not: 3 } })
+    expect(updateManyArg.data).toEqual({ isActive: false })
+  })
+
+  it("[V3-8] is idempotent — second run on active v3 returns no-op", async () => {
+    client.scoringConfig.findUnique.mockResolvedValue({ id: "cfg-3", isActive: true })
+    client.scoringConfig.updateMany.mockResolvedValue({ count: 0 })
+    client.scoringConfig.update.mockResolvedValue({ id: "cfg-3" })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await seedScoringConfigV3(client as any)
+    expect(result).toEqual({ version: 3, action: "no-op" })
+    expect(client.scoringConfig.create).not.toHaveBeenCalled()
+  })
+})
+
+describe("enrichment config validation (.strict discipline)", () => {
+  it("[V3-9] accepts the enrichment block (present + well-formed)", () => {
+    expect(validateScoringConfig(buildScoringConfigV3()).ok).toBe(true)
+  })
+
+  it("[V3-10] a pre-v3 config with NO enrichment block still validates (optional key — the deploy→seed window)", () => {
+    // v2 has no enrichment → the loader must NOT throw on it, else all scoring
+    // breaks between deploy and the v3 seed run.
+    expect(validateScoringConfig(buildScoringConfigV2()).ok).toBe(true)
+  })
+
+  it("[V3-11] a mistyped key INSIDE enrichment fails loudly (.strict — no silent bad value)", () => {
+    const v3 = buildScoringConfigV3()
+    const typo = {
+      ...v3,
+      enrichment: { ...v3.enrichment!, gate1Threshld: 15 }, // typo — extra key
+    }
+    const r = validateScoringConfig(typo)
+    expect(r.ok).toBe(false)
+  })
+
+  it("[V3-12] an unknown TOP-LEVEL key still fails (.strict at the root, unchanged)", () => {
+    const bad = { ...buildScoringConfigV3(), bogusTopLevel: 1 }
+    expect(validateScoringConfig(bad).ok).toBe(false)
   })
 })
