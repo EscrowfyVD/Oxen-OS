@@ -5,13 +5,13 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-07-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged **+ seed RUN in prod (apify_f/apify_g confirmed in registry)** ; PR3b-pipeline(#29) merged ; **cycle-1 ran** (33 items stored, 0 routed — Crunchbase Title-Case field-bug + 9 net-new Job Board ICP prospects, all legit-no-match) ; **PR3c-a(#30) merged** (no-match capture live — first CRM-writing slice ; post-merge baseline clean) ; PR3c-b-migration(#31) merged (**columns live in prod** — information_schema + migrate-deploy ledger clean) ; **PR3c-b-score (company recompute + dormant-branch fix + 2 write sites) done local** ; PR3c-b-enrich (T=10 sweep, Apollo pass-3) + Crunchbase field hotfix next.**)
+> **Last updated** : 2026-07-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged **+ seed RUN in prod (apify_f/apify_g confirmed in registry)** ; PR3b-pipeline(#29) merged ; **cycle-1 ran** (33 items stored, 0 routed — Crunchbase Title-Case field-bug + 9 net-new Job Board ICP prospects, all legit-no-match) ; **PR3c-a(#30) merged** (no-match capture live — first CRM-writing slice ; post-merge baseline clean) ; PR3c-b-migration(#31) merged (**columns live in prod** — information_schema + migrate-deploy ledger clean) ; PR3c-b-score(#32) merged (company score live — writer sans lecteur, inert until the sweep) ; **Crunchbase hotfix (Title-Case mapping + 90d recency + robust relevanceText) done local** ; PR3c-b-enrich (T=10 sweep, Apollo pass-3) next.**)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **866/866** passing (91 files,
+- **Repo health** : `npm run build` green ; tests **869/869** passing (91 files,
   TZ=UTC/CI) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
   pre-existing debt). Known flake: `signals/route.test.ts [15]` (expiresAt) reds
   only under a DST-observing local TZ — the test uses local-calendar setDate vs
@@ -367,8 +367,8 @@ session display + 3 operator actions. Feature-flagged behind
   never mixed with contact scores) → Apollo enrichment as the REWARD for a hot score —
   trigger = sweep `intentScore >= 10 AND enrichedAt IS NULL AND domain IS NULL`
   (fire-once via enrichedAt ; pass-2 already domain-guarded) in the Apollo cron ; sweep
-  partial index ships with PR3c-b-enrich. **PR3c-b-score done** (branch
-  `apify-pr3c-b-score`, local) — (1) dormant company branch of computeIntentScore FIXED
+  partial index ships with PR3c-b-enrich. **PR3c-b-score merged (#32)** — (1) dormant
+  company branch of computeIntentScore FIXED
   ({companyId} → {companyId, contactId:null} ; zero callers, contact path
   byte-identical) + bidirectional partition sentinels ; (2) `recomputeCompanyScore`
   (mirror of persistScore: reuses computeIntentScore company mode — same decay, not
@@ -381,10 +381,22 @@ session display + 3 operator actions. Feature-flagged behind
   company DECAY pass in the hourly recompute cron (sweeps intentScore > 0 ; cooled-to-0
   rows leave the sweep — no ScoreHistory spam ; result gains companiesProcessed/
   companiesCrossed). NO Apollo import anywhere (asserted). +15 tests.
+  **Crunchbase hotfix done** (branch `apify-crunchbase-hotfix`, local) — resolves the
+  cycle-1 🐛: extraction is now a per-actor DECLARED table (companyField / recencyField
+  (+fallback) / recencyDays / textFields, derived from Probe A real payloads, never
+  guessed) with case-insensitive key lookup. crunchbase-f: "Organization Name" /
+  "Last Funding Date" ("Announced Date" empty — unused) / Description + Full
+  Description + Industries + Industry Groups / **90d window** (Vernon decision —
+  profile export, "raised this quarter" actionable) / capture fields LinkedIn +
+  "Headquarters Location". jobboard-g: textFields=["title"] (search_term excluded —
+  echoes the scrape query, would make the keyword gate a tautology) / **date_posted ??
+  scraped_at fallback** (rescues cycle-1's 3/10) / 7d kept. Downstream pipeline
+  byte-identical. +3 tests (90d keeps a 60d funding ; fallback rescue + fail-closed ;
+  lowercase-drift + Industries-only keyword hit).
   **Next**: PR3c-b-enrich (Apollo pass-3 + NEW client methods organizations/search by
   name/linkedin + people/search decision-maker ; credit-gated, Andy budget ; + the
-  sweep's partial index) ; **Crunchbase field hotfix** (map Title-Case keys + recency
-  decision) ; funnel instrumentation (per-step drop counters — Andy's quality view).
+  sweep's partial index) ; funnel instrumentation (per-step drop counters — Andy's
+  quality view).
   **PR3d** market-signal/DRAFT-campaign (Trustpilot/News) ; **PR3e** Website-Crawler
   diff ; Reddit/News NLP = Phase 2. D4 registry-of-actors = SEPARATE Apify-side
   workstream (not OS backend).
