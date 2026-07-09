@@ -200,8 +200,14 @@ describe("runApifyIngestion", () => {
     queueJobs(["job-1"])
     vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob(CB_CATEGORY) as never)
     const funded = isoDaysAgo(1)
+    // REAL Crunchbase shape (cycle-1 Probe A): Title-Case-with-spaces keys.
     vi.mocked(fetchDatasetItems).mockResolvedValue([
-      { name: "Acme Capital", url: "http://cb/acme", description: "a fintech treasury startup", lastFundingDate: funded },
+      {
+        "Organization Name": "Acme Capital",
+        url: "http://cb/acme",
+        Description: "a fintech treasury startup",
+        "Last Funding Date": funded,
+      },
     ] as never)
     vi.mocked(prisma.processedSignal.create).mockResolvedValue({ id: "ps-9" } as never)
 
@@ -242,7 +248,12 @@ describe("runApifyIngestion", () => {
     queueJobs(["job-1"])
     vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob(CB_CATEGORY) as never)
     vi.mocked(fetchDatasetItems).mockResolvedValue([
-      { name: "Sunshine Bakery", url: "http://cb/bake", description: "artisan sourdough", lastFundingDate: isoDaysAgo(0) },
+      {
+        "Organization Name": "Sunshine Bakery",
+        url: "http://cb/bake",
+        Description: "artisan sourdough",
+        "Last Funding Date": isoDaysAgo(0),
+      },
     ] as never)
 
     const res = await runApifyIngestion()
@@ -253,11 +264,16 @@ describe("runApifyIngestion", () => {
     expect(res).toMatchObject({ routed: 0, created: 0, unmatched: 0 })
   })
 
-  it("[10] stale item (>7d) → no route", async () => {
+  it("[10] stale item (crunchbase >90d) → no route", async () => {
     queueJobs(["job-1"])
     vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob(CB_CATEGORY) as never)
     vi.mocked(fetchDatasetItems).mockResolvedValue([
-      { name: "Acme Capital", url: "http://cb/acme", description: "fintech treasury", lastFundingDate: isoDaysAgo(10) },
+      {
+        "Organization Name": "Acme Capital",
+        url: "http://cb/acme",
+        Description: "fintech treasury",
+        "Last Funding Date": isoDaysAgo(120), // beyond the 90d crunchbase window
+      },
     ] as never)
 
     const res = await runApifyIngestion()
@@ -375,7 +391,12 @@ describe("runApifyIngestion", () => {
     queueJobs(["job-1"])
     vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob(CB_CATEGORY) as never)
     vi.mocked(fetchDatasetItems).mockResolvedValue([
-      { name: "Acme Capital", url: "http://cb/acme", description: "fintech treasury", lastFundingDate: isoDaysAgo(0) },
+      {
+        "Organization Name": "Acme Capital",
+        url: "http://cb/acme",
+        Description: "fintech treasury",
+        "Last Funding Date": isoDaysAgo(0),
+      },
     ] as never)
     const p2002 = new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "5.22.0" })
     vi.mocked(prisma.processedSignal.create).mockRejectedValue(p2002 as never)
@@ -390,7 +411,12 @@ describe("runApifyIngestion", () => {
     queueJobs(["job-1"])
     vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob(CB_CATEGORY) as never)
     vi.mocked(fetchDatasetItems).mockResolvedValue([
-      { name: "Acme Capital", url: "http://cb/acme", description: "fintech treasury", lastFundingDate: isoDaysAgo(0) },
+      {
+        "Organization Name": "Acme Capital",
+        url: "http://cb/acme",
+        Description: "fintech treasury",
+        "Last Funding Date": isoDaysAgo(0),
+      },
     ] as never)
     vi.mocked(ingestSignal).mockResolvedValue({ ok: false, status: 400, code: "UNKNOWN_SIGNAL_TYPE", error: "x" } as never)
 
@@ -436,5 +462,68 @@ describe("runApifyIngestion", () => {
     expect(prisma.processedSignal.update).not.toHaveBeenCalled()
     expect(recomputeCompanyContacts).not.toHaveBeenCalled()
     expect(res).toMatchObject({ routed: 0, created: 0, unmatched: 1 })
+  })
+
+  // ─── Crunchbase hotfix — real field mapping + per-actor recency ────
+
+  it("[19] crunchbase 90d window — a 60d-old funding is KEPT (was dropped under the old 7d)", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob(CB_CATEGORY) as never)
+    const funded = isoDaysAgo(60)
+    vi.mocked(fetchDatasetItems).mockResolvedValue([
+      {
+        "Organization Name": "FinBursa",
+        url: "http://cb/finbursa",
+        Description: "institutional AI-native deal infrastructure for private markets",
+        Industries: "FinTech",
+        "Last Funding Date": funded,
+      },
+    ] as never)
+
+    const res = await runApifyIngestion()
+    expect(matchCompanyByName).toHaveBeenCalledWith("FinBursa")
+    const payload = vi.mocked(ingestSignal).mock.calls[0][0] as { signalTypeCode: string; occurredAt?: string }
+    expect(payload.signalTypeCode).toBe("apify_f")
+    expect(payload.occurredAt).toBe(new Date(funded).toISOString())
+    expect(res).toMatchObject({ routed: 1 })
+  })
+
+  it("[20] jobboard recency fallback — date_posted absent → scraped_at rescues; neither → fail closed", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob("jobboard-g") as never)
+    const scraped = isoDaysAgo(2)
+    vi.mocked(fetchDatasetItems).mockResolvedValue([
+      // cycle-1 real case: 3/10 items had no date_posted but scraped_at 10/10
+      { company: "Mercuryo", title: "Compliance Officer", url: "http://jb/m1", scraped_at: scraped },
+      // neither timestamp → recency cannot be confirmed → no route
+      { company: "Wirex", title: "Compliance & AML Officer", url: "http://jb/w1" },
+    ] as never)
+
+    const res = await runApifyIngestion()
+    expect(matchCompanyByName).toHaveBeenCalledTimes(1) // only the rescued item reached the matcher
+    expect(matchCompanyByName).toHaveBeenCalledWith("Mercuryo")
+    const payload = vi.mocked(ingestSignal).mock.calls[0][0] as { occurredAt?: string }
+    expect(payload.occurredAt).toBe(new Date(scraped).toISOString())
+    expect(res).toMatchObject({ routed: 1 })
+  })
+
+  it("[21] extraction is key-case-insensitive AND keyword scans all declared text fields (Industries alone hits)", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob(CB_CATEGORY) as never)
+    vi.mocked(fetchDatasetItems).mockResolvedValue([
+      {
+        // lowercase drift of the canonical Title-Case keys → still extracted
+        "organization name": "Acme Capital",
+        url: "http://cb/drift",
+        // Description carries NO keyword — "industries" alone must pass the gate
+        description: "a business doing business things",
+        industries: "FinTech",
+        "last funding date": isoDaysAgo(3),
+      },
+    ] as never)
+
+    const res = await runApifyIngestion()
+    expect(matchCompanyByName).toHaveBeenCalledWith("Acme Capital")
+    expect(res).toMatchObject({ routed: 1 })
   })
 })

@@ -51,10 +51,12 @@ const WORKER_ID = `apify-ingestion-cron-${process.pid}`
 // Jobs processed per run; the rest wait for the next cron tick.
 export const DEFAULT_APIFY_INGEST_CAP = 20
 
-// Only act on fresh signals — funding/postings older than this are dropped.
-// (MATCH_THRESHOLD — the 0.85 caller-side cutoff — now lives in
-// apify-account-match.ts, single source shared with the PR3c-a capture.)
-const RECENCY_MAX_MS = 7 * 24 * 60 * 60 * 1000
+// (MATCH_THRESHOLD — the 0.85 caller-side cutoff — lives in
+// apify-account-match.ts, single source shared with the PR3c-a capture.
+// The recency window is PER-ACTOR since the Crunchbase hotfix — a property of
+// ROUTABLE_ACTORS, not a shared const: the cycle-1 lesson is that a profile
+// export and a fresh-postings feed cannot share one freshness window.)
+const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 export interface ApifyIngestionResult {
   skipped: boolean // true = run short-circuited before any claim (no APIFY_API_TOKEN)
@@ -80,23 +82,54 @@ interface ApifyJobPayload {
 // stored by PR3a but NEVER routed (Trustpilot competitor name / Reddit+News
 // NLP / Website-Crawler diff all stay unrouted). Keys MUST match the #23
 // webhook category suffixes (convention `<actor>-<letter>`).
+// Every extraction detail is declared HERE, per actor, derived from REAL
+// payloads (cycle-1 Probe A) — never guessed in code. The cycle-1 bug was
+// exactly that: the runner read guessed lowercase keys while Crunchbase emits
+// Title-Case-with-spaces → 0/23 items extracted. A future 3rd actor = add an
+// entry to this table, not re-guess field names in the pipeline.
 interface RouteConfig {
   letter: string // intentCategory letter → signal code apify_<letter>
   companyField: string // item field holding the prospect company name
   recencyField: string // item field holding the actor's timestamp
+  // Weaker timestamp used when recencyField is absent (e.g. jobboard's
+  // scraped_at = scrape time, not post time — present 10/10 in cycle-1).
+  // Both absent/unparseable → fail closed (no route).
+  recencyFallbackField?: string
+  // Per-actor freshness window, in days. Crunchbase exports company PROFILES
+  // ("Last Funding Date" runs 20-350d) → 90d keeps "raised this quarter"
+  // actionable (Vernon decision); Job Board is a fresh-postings feed → 7d.
+  recencyDays: number
+  // Fields concatenated into the keyword-relevance text. Looked up
+  // case-insensitively (belt-and-braces against actor key-casing drift).
+  textFields: string[]
   // PR3c-a no-match capture — optional payload fields copied onto a CREATED
   // Company (never onto an existing one):
   linkedinUrlField?: string // company LinkedIn page URL
   locationField?: string // human-readable location
 }
 const ROUTABLE_ACTORS: Record<string, RouteConfig> = {
-  // crunchbase-f: no capture fields yet — its payload keys are Title-Case
-  // (field-mapping hotfix pending), so items never reach the matcher today.
-  "crunchbase-f": { letter: "f", companyField: "name", recencyField: "lastFundingDate" },
+  // Crunchbase actor — Title-Case-with-spaces keys (138 keys, Probe A).
+  // "Announced Date" is EMPTY in real payloads — do NOT use it for recency.
+  "crunchbase-f": {
+    letter: "f",
+    companyField: "Organization Name",
+    recencyField: "Last Funding Date",
+    recencyDays: 90,
+    textFields: ["Description", "Full Description", "Industries", "Industry Groups"],
+    linkedinUrlField: "LinkedIn",
+    locationField: "Headquarters Location",
+  },
+  // Job Board actor — lowercase snake keys (12 keys, Probe A). Deliberately
+  // NOT in textFields: search_term / matched_search_term — they echo the
+  // scrape query ("Compliance"), so including them would make the keyword
+  // gate a tautology.
   "jobboard-g": {
     letter: "g",
     companyField: "company",
-    recencyField: "date_posted",
+    recencyField: "date_posted", // present 7/10 in cycle-1
+    recencyFallbackField: "scraped_at",
+    recencyDays: 7,
+    textFields: ["title"],
     linkedinUrlField: "company_url", // cycle-1 probe: a LinkedIn company page
     locationField: "location",
   },
@@ -119,13 +152,32 @@ export function extractSourceUrl(item: ApifyDatasetItem): string {
   return `sha256:${hash}`
 }
 
-// Relevance text for the keyword gate: title + body/description (+ common
-// aliases). Only string fields are concatenated.
-function relevanceText(item: ApifyDatasetItem): string {
+// Raw field lookup, case-insensitive on the KEY (exact key first, then a
+// case-insensitive scan). Actor exports drift in key casing — the table
+// declares the canonical key, this tolerates the drift.
+function getRawField(item: ApifyDatasetItem, field: string): unknown {
+  if (item[field] !== undefined && item[field] !== null) return item[field]
+  const lower = field.toLowerCase()
+  for (const k of Object.keys(item)) {
+    if (k.toLowerCase() === lower && item[k] !== undefined && item[k] !== null) {
+      return item[k]
+    }
+  }
+  return null
+}
+
+function extractStringField(item: ApifyDatasetItem, field: string): string | null {
+  const v = getRawField(item, field)
+  return typeof v === "string" && v.trim().length > 0 ? v.trim() : null
+}
+
+// Relevance text for the keyword gate — the ACTOR-DECLARED text fields
+// (route.textFields, from real payloads), concatenated. No guessed keys.
+function relevanceText(item: ApifyDatasetItem, route: RouteConfig): string {
   const parts: string[] = []
-  for (const key of ["title", "description", "body", "text", "headline", "snippet"]) {
-    const v = item[key]
-    if (typeof v === "string") parts.push(v)
+  for (const key of route.textFields) {
+    const v = extractStringField(item, key)
+    if (v) parts.push(v)
   }
   return parts.join(" ")
 }
@@ -144,11 +196,6 @@ function parseItemDate(value: unknown): Date | null {
     return isNaN(d.getTime()) ? null : d
   }
   return null
-}
-
-function extractStringField(item: ApifyDatasetItem, field: string): string | null {
-  const v = item[field]
-  return typeof v === "string" && v.trim().length > 0 ? v.trim() : null
 }
 
 function isUniqueViolation(e: unknown): boolean {
@@ -191,13 +238,19 @@ async function routeNewItem(
   now: Date,
   loadScoring: () => Promise<{ config: ScoringConfigBlob; version: number }>,
 ): Promise<RouteOutcome> {
-  // (c) keyword relevance — title + body/description must mention >=1 keyword.
-  if (!matchesIndustryKeyword(relevanceText(item))) return "skipped"
+  // (c) keyword relevance — the actor-declared text fields must mention >=1
+  // industry keyword.
+  if (!matchesIndustryKeyword(relevanceText(item, route))) return "skipped"
 
-  // (d) recency — drop items older than 7d (or with no usable timestamp).
-  const itemDate = parseItemDate(item[route.recencyField])
+  // (d) recency — per-actor window on the actor's timestamp (primary field,
+  // else the declared weaker fallback). No usable timestamp → fail closed.
+  const itemDate =
+    parseItemDate(getRawField(item, route.recencyField)) ??
+    (route.recencyFallbackField
+      ? parseItemDate(getRawField(item, route.recencyFallbackField))
+      : null)
   if (!itemDate) return "skipped"
-  if (now.getTime() - itemDate.getTime() > RECENCY_MAX_MS) return "skipped"
+  if (now.getTime() - itemDate.getTime() > route.recencyDays * MS_PER_DAY) return "skipped"
 
   // (e) extract prospect company name.
   const companyName = extractStringField(item, route.companyField)
