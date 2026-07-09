@@ -23,6 +23,7 @@
 import { prisma } from "@/lib/prisma"
 import { getActiveScoringConfigWithVersion } from "./config-loader"
 import { persistScore } from "./persist-score"
+import { recomputeCompanyScore } from "./recompute-company-score"
 import { alertBDsOnPromotion } from "./alert-on-promotion"
 import { logger, serializeError } from "@/lib/logger"
 
@@ -33,8 +34,16 @@ export interface ScoreRecomputeRunnerResult {
   processed: number
   /** Count of accounts whose newLevel ranked strictly higher than previous. */
   promoted: number
+  /** PR3c-b-score — companies re-scored by the DECAY pass (intentScore > 0). */
+  companiesProcessed: number
+  /** PR3c-b-score — upward T-crossings seen in the company pass. Decay can
+   *  never cross upward, so this is only ever non-zero when a signal landed
+   *  without its event-driven write (e.g. that write failed) — logged, never
+   *  acted on here (the PR3c-b-enrich sweep owns enrichment). */
+  companiesCrossed: number
   /** Per-account errors (the runner continues on failure ; the array
-   *  is the audit trail for ops triage). */
+   *  is the audit trail for ops triage). Company-pass failures land here
+   *  too (accountId = the companyId). */
   errors: Array<{ accountId: string; error: string }>
   /** Optional total wall clock for the run — set by the cron route. */
   durationMs?: number
@@ -132,5 +141,42 @@ export async function runScoreRecompute(
     }
   }
 
-  return { processed, promoted, errors }
+  // ── PR3c-b-score — company DECAY pass ────────────────────────────
+  // A company that stops posting must cool (6 → 4.5 → 3 → 0) without a new
+  // event, else it sits artificially above the enrichment threshold forever.
+  // Sweep predicate `intentScore > 0`:
+  //   - null  = never scored → not swept (entry into scoring is the
+  //     event-driven write at Apify routing, not the cron);
+  //   - 0     = fully cooled → leaves the sweep (nothing left to decay; no
+  //     hourly ScoreHistory spam for dead companies). A new signal re-enters
+  //     it via the event site.
+  // Decay makes scores FALL — crossedThreshold is structurally false here
+  // (upward-only); counted defensively, never acted on.
+  const companies = await prisma.company.findMany({
+    where: { intentScore: { gt: 0 } },
+    select: { id: true },
+  })
+
+  let companiesProcessed = 0
+  let companiesCrossed = 0
+  for (const co of companies) {
+    try {
+      const r = await recomputeCompanyScore(co.id, config, configVersion, now)
+      companiesProcessed++
+      if (r.crossedThreshold) {
+        companiesCrossed++
+        log.warn(
+          { companyId: co.id, previousScore: r.previousScore, newScore: r.newScore },
+          "company crossed T in the DECAY pass — its event-driven write was likely missed",
+        )
+      }
+    } catch (err) {
+      errors.push({
+        accountId: co.id,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  return { processed, promoted, companiesProcessed, companiesCrossed, errors }
 }

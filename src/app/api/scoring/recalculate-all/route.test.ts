@@ -47,6 +47,8 @@ describe("POST /api/scoring/recalculate-all", () => {
     vi.mocked(runScoreRecompute).mockResolvedValue({
       processed: 10,
       promoted: 1,
+      companiesProcessed: 0,
+      companiesCrossed: 0,
       errors: [],
     })
     const res = await POST(makeReq())

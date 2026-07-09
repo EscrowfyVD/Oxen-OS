@@ -40,6 +40,7 @@ import {
 } from "@/lib/apify-account-match"
 import { matchesIndustryKeyword } from "@/lib/apify-keywords"
 import { recomputeCompanyContacts } from "@/lib/scoring/recompute-company-contacts"
+import { recomputeCompanyScore, COMPANY_ENRICH_THRESHOLD } from "@/lib/scoring/recompute-company-score"
 import { getActiveScoringConfigWithVersion } from "@/lib/scoring/config-loader"
 import type { ScoringConfigBlob } from "@/lib/scoring/config-types"
 import { logger, serializeError } from "@/lib/logger"
@@ -258,6 +259,24 @@ async function routeNewItem(
   // calls — covered by recompute-company-contacts test [4]).
   const { config, version } = await loadScoring()
   await recomputeCompanyContacts(companyId, config, version, now)
+
+  // PR3c-b-score — event-driven company-score write: the score updates the
+  // instant a signal lands, on BOTH the matched path and the PR3c-a capture
+  // path (a captured company gets its first signal → first score). The
+  // crossing is LOGGED only — enrichment is the PR3c-b-enrich sweep's job
+  // (fire-once via enrichedAt); nothing is spent here.
+  const companyScore = await recomputeCompanyScore(companyId, config, version, now)
+  if (companyScore.crossedThreshold) {
+    log.info(
+      {
+        companyId,
+        previousScore: companyScore.previousScore,
+        newScore: companyScore.newScore,
+        threshold: COMPANY_ENRICH_THRESHOLD,
+      },
+      "company crossed the enrichment threshold — sweep (PR3c-b-enrich) will pick it up",
+    )
+  }
 
   return createdNew ? "routed-created" : "routed"
 }

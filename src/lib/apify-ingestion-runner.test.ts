@@ -26,6 +26,10 @@ vi.mock("@/lib/apify-account-match", () => ({
 vi.mock("@/lib/scoring/recompute-company-contacts", () => ({
   recomputeCompanyContacts: vi.fn(),
 }))
+vi.mock("@/lib/scoring/recompute-company-score", () => ({
+  recomputeCompanyScore: vi.fn(),
+  COMPANY_ENRICH_THRESHOLD: 10, // the runner imports T for the crossing log
+}))
 vi.mock("@/lib/scoring/config-loader", () => ({
   getActiveScoringConfigWithVersion: vi.fn(),
 }))
@@ -44,6 +48,7 @@ import { fetchDatasetItems } from "@/lib/apify"
 import { ingestSignal } from "@/lib/signal-ingestion"
 import { matchCompanyByName, matchOrCreateCompanyByName } from "@/lib/apify-account-match"
 import { recomputeCompanyContacts } from "@/lib/scoring/recompute-company-contacts"
+import { recomputeCompanyScore } from "@/lib/scoring/recompute-company-score"
 import { getActiveScoringConfigWithVersion } from "@/lib/scoring/config-loader"
 import { enrichPerson, enrichOrganization } from "@/lib/apollo"
 
@@ -89,6 +94,10 @@ describe("runApifyIngestion", () => {
     vi.mocked(getActiveScoringConfigWithVersion).mockResolvedValue({ config: {}, version: 2 } as never)
     // PR3c-a capture default (only reached on a sub-0.85 match):
     vi.mocked(matchOrCreateCompanyByName).mockResolvedValue({ companyId: "co-new", created: true, confidence: null } as never)
+    // PR3c-b-score default — event-driven company-score write:
+    vi.mocked(recomputeCompanyScore).mockResolvedValue({
+      companyId: "co-1", previousScore: null, newScore: 6, signalCount: 1, crossedThreshold: false,
+    } as never)
   })
   afterEach(() => {
     if (ORIG_TOKEN === undefined) delete process.env.APIFY_API_TOKEN
@@ -220,6 +229,10 @@ describe("runApifyIngestion", () => {
     })
     expect(recomputeCompanyContacts).toHaveBeenCalledTimes(1)
     expect(vi.mocked(recomputeCompanyContacts).mock.calls[0][0]).toBe("co-1")
+    // PR3c-b-score: the matched path ALSO writes the company score (event-
+    // driven site) — contact-side recompute still fires (both, not either).
+    expect(recomputeCompanyScore).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(recomputeCompanyScore).mock.calls[0][0]).toBe("co-1")
     // PR3c-a: the matched path is UNCHANGED — no capture, no create.
     expect(matchOrCreateCompanyByName).not.toHaveBeenCalled()
     expect(res).toMatchObject({ routed: 1, created: 0, unmatched: 0 })
@@ -310,10 +323,33 @@ describe("runApifyIngestion", () => {
     // targeted recompute ran on the new company and no-op'd cleanly
     expect(recomputeCompanyContacts).toHaveBeenCalledTimes(1)
     expect(vi.mocked(recomputeCompanyContacts).mock.calls[0][0]).toBe("co-new")
-    // NO Apollo call anywhere on the capture path (PR3c-a invariant)
+    // PR3c-b-score: the captured company gets its FIRST score at ingest —
+    // and even a T-crossing here is LOG-ONLY (computed, exposed, never acted
+    // on: Apollo stays untouched — enrichment is the PR3c-b-enrich sweep).
+    expect(recomputeCompanyScore).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(recomputeCompanyScore).mock.calls[0][0]).toBe("co-new")
+    // NO Apollo call anywhere on the capture path (PR3c-a + PR3c-b invariant)
     expect(enrichPerson).not.toHaveBeenCalled()
     expect(enrichOrganization).not.toHaveBeenCalled()
     expect(res).toMatchObject({ routed: 1, created: 1, unmatched: 0, errors: 0 })
+  })
+
+  it("[18] PR3c-b: T-crossing at ingest is computed but NEVER acted on (no Apollo, still routed)", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob("jobboard-g") as never)
+    vi.mocked(fetchDatasetItems).mockResolvedValue([
+      { company: "Mercuryo", title: "MLRO — Money Laundering Reporting Officer", url: "http://jb/x", date_posted: isoDaysAgo(0) },
+    ] as never)
+    vi.mocked(matchCompanyByName).mockResolvedValue({ companyId: "co-m", name: "Mercuryo", confidence: 1.0 } as never)
+    vi.mocked(recomputeCompanyScore).mockResolvedValue({
+      companyId: "co-m", previousScore: 6, newScore: 12, signalCount: 2, crossedThreshold: true,
+    } as never)
+
+    const res = await runApifyIngestion()
+    expect(recomputeCompanyScore).toHaveBeenCalledTimes(1)
+    expect(enrichPerson).not.toHaveBeenCalled()
+    expect(enrichOrganization).not.toHaveBeenCalled()
+    expect(res).toMatchObject({ routed: 1, errors: 0 })
   })
 
   it("[13] jobboard match → ingestSignal code apify_g + accountId set", async () => {
