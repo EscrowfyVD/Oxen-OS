@@ -18,21 +18,34 @@ vi.mock("@/lib/apify", () => ({ fetchDatasetItems: vi.fn() }))
 // PR3b routing deps — mocked. The keyword matcher stays REAL (pure), so test
 // items must carry a genuine industry keyword in title/description to pass.
 vi.mock("@/lib/signal-ingestion", () => ({ ingestSignal: vi.fn() }))
-vi.mock("@/lib/apify-account-match", () => ({ matchCompanyByName: vi.fn() }))
+vi.mock("@/lib/apify-account-match", () => ({
+  matchCompanyByName: vi.fn(),
+  matchOrCreateCompanyByName: vi.fn(),
+  MATCH_THRESHOLD: 0.85, // the runner imports the shared threshold from here
+}))
 vi.mock("@/lib/scoring/recompute-company-contacts", () => ({
   recomputeCompanyContacts: vi.fn(),
 }))
 vi.mock("@/lib/scoring/config-loader", () => ({
   getActiveScoringConfigWithVersion: vi.fn(),
 }))
+// PR3c-a invariant: NO Apollo anywhere on the capture path. The runner does
+// not even import @/lib/apollo — this mock + the not-called asserts guard a
+// future accidental wiring.
+vi.mock("@/lib/apollo", () => ({
+  enrichPerson: vi.fn(),
+  enrichOrganization: vi.fn(),
+  isApolloConfigured: vi.fn(),
+}))
 
 import { runApifyIngestion, extractSourceUrl } from "./apify-ingestion-runner"
 import { prisma } from "@/lib/prisma"
 import { fetchDatasetItems } from "@/lib/apify"
 import { ingestSignal } from "@/lib/signal-ingestion"
-import { matchCompanyByName } from "@/lib/apify-account-match"
+import { matchCompanyByName, matchOrCreateCompanyByName } from "@/lib/apify-account-match"
 import { recomputeCompanyContacts } from "@/lib/scoring/recompute-company-contacts"
 import { getActiveScoringConfigWithVersion } from "@/lib/scoring/config-loader"
+import { enrichPerson, enrichOrganization } from "@/lib/apollo"
 
 // A routable Job (crunchbase-f) + a "good" fresh, keyword-bearing, named item.
 const CB_CATEGORY = "crunchbase-f"
@@ -74,6 +87,8 @@ describe("runApifyIngestion", () => {
     vi.mocked(ingestSignal).mockResolvedValue({ ok: true, scope: "company", signal: {} } as never)
     vi.mocked(recomputeCompanyContacts).mockResolvedValue({ contacts: 2, recomputed: 2, errors: 0 } as never)
     vi.mocked(getActiveScoringConfigWithVersion).mockResolvedValue({ config: {}, version: 2 } as never)
+    // PR3c-a capture default (only reached on a sub-0.85 match):
+    vi.mocked(matchOrCreateCompanyByName).mockResolvedValue({ companyId: "co-new", created: true, confidence: null } as never)
   })
   afterEach(() => {
     if (ORIG_TOKEN === undefined) delete process.env.APIFY_API_TOKEN
@@ -205,7 +220,9 @@ describe("runApifyIngestion", () => {
     })
     expect(recomputeCompanyContacts).toHaveBeenCalledTimes(1)
     expect(vi.mocked(recomputeCompanyContacts).mock.calls[0][0]).toBe("co-1")
-    expect(res).toMatchObject({ routed: 1, unmatched: 0 })
+    // PR3c-a: the matched path is UNCHANGED — no capture, no create.
+    expect(matchOrCreateCompanyByName).not.toHaveBeenCalled()
+    expect(res).toMatchObject({ routed: 1, created: 0, unmatched: 0 })
   })
 
   it("[9] keyword miss → no route (stored only; matcher + ingest untouched)", async () => {
@@ -218,8 +235,9 @@ describe("runApifyIngestion", () => {
     const res = await runApifyIngestion()
     expect(prisma.processedSignal.create).toHaveBeenCalledTimes(1)
     expect(matchCompanyByName).not.toHaveBeenCalled()
+    expect(matchOrCreateCompanyByName).not.toHaveBeenCalled() // gate-dropped → NEVER creates
     expect(ingestSignal).not.toHaveBeenCalled()
-    expect(res).toMatchObject({ routed: 0, unmatched: 0 })
+    expect(res).toMatchObject({ routed: 0, created: 0, unmatched: 0 })
   })
 
   it("[10] stale item (>7d) → no route", async () => {
@@ -231,8 +249,9 @@ describe("runApifyIngestion", () => {
 
     const res = await runApifyIngestion()
     expect(matchCompanyByName).not.toHaveBeenCalled()
+    expect(matchOrCreateCompanyByName).not.toHaveBeenCalled() // gate-dropped → NEVER creates
     expect(ingestSignal).not.toHaveBeenCalled()
-    expect(res).toMatchObject({ routed: 0 })
+    expect(res).toMatchObject({ routed: 0, created: 0 })
   })
 
   it("[11] null company field → no route (jobboard item missing `company`)", async () => {
@@ -244,24 +263,57 @@ describe("runApifyIngestion", () => {
 
     const res = await runApifyIngestion()
     expect(matchCompanyByName).not.toHaveBeenCalled()
+    expect(matchOrCreateCompanyByName).not.toHaveBeenCalled() // gate-dropped → NEVER creates
     expect(ingestSignal).not.toHaveBeenCalled()
-    expect(res).toMatchObject({ routed: 0 })
+    expect(res).toMatchObject({ routed: 0, created: 0 })
   })
 
-  it("[12] match below 0.85 → no signal, accountId stays null, unmatched++", async () => {
+  it("[12] PR3c-a: real no-match (<0.85) → company CAPTURED + signal attached + accountId set + zero-contact recompute + NO Apollo", async () => {
     queueJobs(["job-1"])
     vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob("jobboard-g") as never)
+    const posted = isoDaysAgo(0)
     vi.mocked(fetchDatasetItems).mockResolvedValue([
-      { company: "Acme Capital", title: "Head of Compliance", url: "http://jb/2", date_posted: isoDaysAgo(0) },
+      {
+        company: "payabl.",
+        title: "Head of Compliance",
+        url: "http://jb/2",
+        date_posted: posted,
+        company_url: "https://uk.linkedin.com/company/payabl-eu",
+        location: "Limassol, Cyprus",
+      },
     ] as never)
-    vi.mocked(matchCompanyByName).mockResolvedValue({ companyId: "co-x", name: "Acme", confidence: 0.7 } as never)
+    vi.mocked(matchCompanyByName).mockResolvedValue({ companyId: "co-x", name: "Paya", confidence: 0.7 } as never)
+    vi.mocked(prisma.processedSignal.create).mockResolvedValue({ id: "ps-cap" } as never)
+    // brand-new company → zero-contact recompute is a clean no-op (no error)
+    vi.mocked(recomputeCompanyContacts).mockResolvedValue({ contacts: 0, recomputed: 0, errors: 0 } as never)
 
     const res = await runApifyIngestion()
-    expect(matchCompanyByName).toHaveBeenCalledWith("Acme Capital")
-    expect(ingestSignal).not.toHaveBeenCalled()
-    expect(prisma.processedSignal.update).not.toHaveBeenCalled()
-    expect(recomputeCompanyContacts).not.toHaveBeenCalled()
-    expect(res).toMatchObject({ routed: 0, unmatched: 1 })
+
+    // capture called with the payload create-fields (linkedinUrl + location)
+    expect(matchOrCreateCompanyByName).toHaveBeenCalledWith("payabl.", {
+      linkedinUrl: "https://uk.linkedin.com/company/payabl-eu",
+      location: "Limassol, Cyprus",
+    })
+    // signal attached to the CREATED account
+    const payload = vi.mocked(ingestSignal).mock.calls[0][0] as {
+      scope: string
+      companyId: string
+      signalTypeCode: string
+      occurredAt?: string
+    }
+    expect(payload).toMatchObject({ scope: "company", companyId: "co-new", signalTypeCode: "apify_g" })
+    expect(payload.occurredAt).toBe(posted)
+    expect(prisma.processedSignal.update).toHaveBeenCalledWith({
+      where: { id: "ps-cap" },
+      data: { accountId: "co-new" },
+    })
+    // targeted recompute ran on the new company and no-op'd cleanly
+    expect(recomputeCompanyContacts).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(recomputeCompanyContacts).mock.calls[0][0]).toBe("co-new")
+    // NO Apollo call anywhere on the capture path (PR3c-a invariant)
+    expect(enrichPerson).not.toHaveBeenCalled()
+    expect(enrichOrganization).not.toHaveBeenCalled()
+    expect(res).toMatchObject({ routed: 1, created: 1, unmatched: 0, errors: 0 })
   })
 
   it("[13] jobboard match → ingestSignal code apify_g + accountId set", async () => {
@@ -311,5 +363,42 @@ describe("runApifyIngestion", () => {
     expect(prisma.processedSignal.update).not.toHaveBeenCalled()
     expect(recomputeCompanyContacts).not.toHaveBeenCalled()
     expect(res).toMatchObject({ routed: 0, errors: 1 })
+  })
+
+  it("[16] PR3c-a: capture fuzzy-attaches to an existing account → routed, NOT duplicated (created 0)", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob("jobboard-g") as never)
+    vi.mocked(fetchDatasetItems).mockResolvedValue([
+      { company: "Wirex", title: "Compliance & AML Officer", url: "http://jb/9", date_posted: isoDaysAgo(0) },
+    ] as never)
+    vi.mocked(matchCompanyByName).mockResolvedValue(null as never) // routing saw nothing…
+    // …but the capture's fuzzy guard found "Wirex Limited" (race / suffix case)
+    vi.mocked(matchOrCreateCompanyByName).mockResolvedValue({ companyId: "co-wirex", created: false, confidence: 1.0 } as never)
+    vi.mocked(prisma.processedSignal.create).mockResolvedValue({ id: "ps-w" } as never)
+
+    const res = await runApifyIngestion()
+    const payload = vi.mocked(ingestSignal).mock.calls[0][0] as { companyId: string }
+    expect(payload.companyId).toBe("co-wirex")
+    expect(prisma.processedSignal.update).toHaveBeenCalledWith({
+      where: { id: "ps-w" },
+      data: { accountId: "co-wirex" },
+    })
+    expect(res).toMatchObject({ routed: 1, created: 0, unmatched: 0 })
+  })
+
+  it("[17] PR3c-a: unmatchable name (capture → null) → no signal, accountId stays null, unmatched++", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob("jobboard-g") as never)
+    vi.mocked(fetchDatasetItems).mockResolvedValue([
+      { company: "Ltd", title: "Head of Compliance", url: "http://jb/10", date_posted: isoDaysAgo(0) },
+    ] as never)
+    vi.mocked(matchCompanyByName).mockResolvedValue(null as never)
+    vi.mocked(matchOrCreateCompanyByName).mockResolvedValue(null as never)
+
+    const res = await runApifyIngestion()
+    expect(ingestSignal).not.toHaveBeenCalled()
+    expect(prisma.processedSignal.update).not.toHaveBeenCalled()
+    expect(recomputeCompanyContacts).not.toHaveBeenCalled()
+    expect(res).toMatchObject({ routed: 0, created: 0, unmatched: 1 })
   })
 })

@@ -111,11 +111,23 @@ function synthesizePlaceholderEmail(payload: TrigifyWebhookPayload): string {
  * does not provide a domain in the liker payload so we cannot use the
  * canonical domain-based upsert from clay-enrichment — accept the risk
  * of occasional name-cased duplicates (manual cleanup later).
+ *
+ * EXPORTED since Apify PR3c-a (was module-private): the Apify no-match
+ * capture reuses it via matchOrCreateCompanyByName (apify-account-match.ts),
+ * which adds a FUZZY dedup guard in front of this exact-match one. Returns
+ * `{ id, created }` so callers can count real creates; `extraCreate` fields
+ * are applied on CREATE only (an existing row is never touched).
  */
-async function findOrCreateCompanyByName(
+export interface FindOrCreateCompanyResult {
+  id: string
+  created: boolean
+}
+
+export async function findOrCreateCompanyByName(
   name: string,
   linkedinUrl?: string | null,
-): Promise<string | null> {
+  extraCreate?: { location?: string | null },
+): Promise<FindOrCreateCompanyResult | null> {
   const trimmed = name.trim()
   if (!trimmed) return null
 
@@ -123,17 +135,18 @@ async function findOrCreateCompanyByName(
     where: { name: { equals: trimmed, mode: "insensitive" } },
     select: { id: true },
   })
-  if (existing) return existing.id
+  if (existing) return { id: existing.id, created: false }
 
   try {
     const created = await prisma.company.create({
       data: {
         name: trimmed,
         linkedinUrl: linkedinUrl ?? null,
+        ...(extraCreate?.location ? { location: extraCreate.location } : {}),
       },
       select: { id: true },
     })
-    return created.id
+    return { id: created.id, created: true }
   } catch (err) {
     // Race: another concurrent webhook may have created the same name.
     // Re-fetch and return whatever exists now.
@@ -145,7 +158,7 @@ async function findOrCreateCompanyByName(
         where: { name: { equals: trimmed, mode: "insensitive" } },
         select: { id: true },
       })
-      if (racedExisting) return racedExisting.id
+      if (racedExisting) return { id: racedExisting.id, created: false }
     }
     throw err
   }
@@ -230,10 +243,11 @@ export async function matchContact(
 
   let companyId: string | null = null
   if (companySource) {
-    companyId = await findOrCreateCompanyByName(
+    const company = await findOrCreateCompanyByName(
       companySource,
       payload.company_linkedin_url ?? null,
     )
+    companyId = company?.id ?? null
   }
 
   const email = payload.email ?? synthesizePlaceholderEmail(payload)
