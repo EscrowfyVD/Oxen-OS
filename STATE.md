@@ -5,13 +5,13 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-07-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged **+ seed RUN in prod (apify_f/apify_g confirmed in registry)** ; PR3b-pipeline(#29) merged ; **cycle-1 ran** (33 items stored, 0 routed — Crunchbase Title-Case field-bug + 9 net-new Job Board ICP prospects, all legit-no-match) ; **PR3c-a(#30) merged** (no-match capture live — first CRM-writing slice ; post-merge baseline clean) ; PR3c-b-migration(#31) merged (**columns live in prod** — information_schema + migrate-deploy ledger clean) ; PR3c-b-score(#32) merged (company score live — writer sans lecteur, inert until the sweep) ; **Crunchbase hotfix (Title-Case mapping + 90d recency + robust relevanceText + stable dedup key) done local** ; PR3c-b-enrich (T=10 sweep, Apollo pass-3) next.**)
+> **Last updated** : 2026-07-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged **+ seed RUN in prod (apify_f/apify_g confirmed in registry)** ; PR3b-pipeline(#29) merged ; **cycle-1 ran** (33 items stored, 0 routed — Crunchbase Title-Case field-bug + 9 net-new Job Board ICP prospects, all legit-no-match) ; **PR3c-a(#30) merged** (no-match capture live — first CRM-writing slice ; post-merge baseline clean) ; PR3c-b-migration(#31) merged (**columns live in prod** — information_schema + migrate-deploy ledger clean) ; PR3c-b-score(#32) merged (company score live — writer sans lecteur, inert until the sweep) ; **Crunchbase hotfix (Title-Case mapping + 90d recency + robust relevanceText + stable dedup key) done local** ; **funnel instrumentation (per-step counters in Job.result) done local** ; PR3c-b-enrich (T=10 sweep, Apollo pass-3) next.**)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **872/872** passing (91 files,
+- **Repo health** : `npm run build` green ; tests **874/874** passing (91 files,
   TZ=UTC/CI) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
   pre-existing debt). Known flake: `signals/route.test.ts [15]` (expiresAt) reds
   only under a DST-observing local TZ — the test uses local-calendar setDate vs
@@ -405,10 +405,19 @@ session display + 3 operator actions. Feature-flagged behind
   post-deploy scrape of those entities routes ONCE (no dedup across key schemes), then
   stable. Crunchbase signals no longer carry sourceUrl metadata (identity ≠ URL). +3
   tests (volatile-drift → same key, ONE ingest ; round qualifier ; job_url verbatim).
+  **Funnel instrumentation done** (branch `apify-funnel-instrumentation`, local) —
+  per-run per-step counters written to `Job.result.funnel` + run-level
+  `funnels[category]` (crunchbase-f vs jobboard-g séparés) : fetched / new / dup /
+  keywordKept+Dropped / recencyKept+Dropped / companyExtracted+Null / matched / noMatch
+  / capturedNew / capturedAttached / unmatchable / ingested / errors. Incremented
+  inline at the existing gates ; **resolves the drop-reason gap** (accountId=null
+  conflated the 4 no-route reasons — Andy's "how many survived the keyword filter" is
+  now answerable from the DB, no more rawPayload probes). Coarse Job.result fields
+  unchanged (additive) ; non-routable categories carry no funnel ; conservation
+  identities documented + tested. No migration. +2 tests.
   **Next**: PR3c-b-enrich (Apollo pass-3 + NEW client methods organizations/search by
   name/linkedin + people/search decision-maker ; credit-gated, Andy budget ; + the
-  sweep's partial index) ; funnel instrumentation (per-step drop counters — Andy's
-  quality view).
+  sweep's partial index).
   **PR3d** market-signal/DRAFT-campaign (Trustpilot/News) ; **PR3e** Website-Crawler
   diff ; Reddit/News NLP = Phase 2. D4 registry-of-actors = SEPARATE Apify-side
   workstream (not OS backend).

@@ -69,7 +69,65 @@ export interface ApifyIngestionResult {
   routed: number // items → company-scoped IntentSignal ingested + accountId set
   created: number // subset of routed whose Company was CREATED by the PR3c-a capture
   unmatched: number // passed gates but unroutable (unmatchable name — no create possible)
+  // Funnel instrumentation — per-CATEGORY per-step counters, summed across the
+  // run's Jobs (each Job also carries its own funnel in Job.result). Only
+  // routable categories appear (gates don't run for the others).
+  funnels: Record<string, FunnelCounters>
   durationMs: number
+}
+
+// Per-run per-step funnel (Andy's quality view — the table cycle-1/2 were
+// hand-rebuilt from rawPayload probes). Written into Job.result.funnel, so the
+// funnel is readable per run WITHOUT a probe. Resolves the drop-reason gap:
+// accountId=null conflates keyword-drop / recency-drop / no-company /
+// no-match — these counters split all four.
+//
+// Conservation (clean runs, no errors): new = keywordKept + keywordDropped ;
+// keywordKept = recencyKept + recencyDropped ; recencyKept = companyExtracted
+// + companyNull ; companyExtracted = matched + noMatch ; noMatch =
+// capturedNew + capturedAttached + unmatchable ; ingested = matched +
+// capturedNew + capturedAttached. Only NEW inserts walk the gates (dups are
+// never re-routed), so the funnel starts at `new`, not `fetched`. On an error
+// mid-path the step counter keeps where the item GOT before dying (errors are
+// the terminal bucket, sums stay honest).
+export interface FunnelCounters {
+  fetched: number // dataset items fetched for this category
+  new: number // stored (new ProcessedSignal rows) — the gate-walking population
+  dup: number // dedup'd (already seen) — never walked
+  keywordKept: number
+  keywordDropped: number
+  recencyKept: number
+  recencyDropped: number
+  companyExtracted: number // reached the matcher
+  companyNull: number
+  matched: number // >=0.85 at the routing matcher → existing account
+  noMatch: number // sub-threshold → sent to the PR3c-a capture
+  capturedNew: number // capture created a NEW company
+  capturedAttached: number // capture fuzzy-attached to an existing one
+  unmatchable: number // capture declined (unmatchable name) — accountId stays null
+  ingested: number // IntentSignals actually written
+  errors: number
+}
+
+function emptyFunnel(): FunnelCounters {
+  return {
+    fetched: 0,
+    new: 0,
+    dup: 0,
+    keywordKept: 0,
+    keywordDropped: 0,
+    recencyKept: 0,
+    recencyDropped: 0,
+    companyExtracted: 0,
+    companyNull: 0,
+    matched: 0,
+    noMatch: 0,
+    capturedNew: 0,
+    capturedAttached: 0,
+    unmatchable: 0,
+    ingested: 0,
+    errors: 0,
+  }
 }
 
 interface ApifyJobPayload {
@@ -300,10 +358,18 @@ async function routeNewItem(
   sourceUrl: string,
   now: Date,
   loadScoring: () => Promise<{ config: ScoringConfigBlob; version: number }>,
+  // Funnel instrumentation — incremented INLINE at each gate decision, so the
+  // per-step drop reasons are persisted (the drop-reason gap: accountId=null
+  // alone can't say WHICH gate killed an item).
+  funnel: FunnelCounters,
 ): Promise<RouteOutcome> {
   // (c) keyword relevance — the actor-declared text fields must mention >=1
   // industry keyword.
-  if (!matchesIndustryKeyword(relevanceText(item, route))) return "skipped"
+  if (!matchesIndustryKeyword(relevanceText(item, route))) {
+    funnel.keywordDropped += 1
+    return "skipped"
+  }
+  funnel.keywordKept += 1
 
   // (d) recency — per-actor window on the actor's timestamp (primary field,
   // else the declared weaker fallback). No usable timestamp → fail closed.
@@ -312,20 +378,29 @@ async function routeNewItem(
     (route.recencyFallbackField
       ? parseItemDate(getRawField(item, route.recencyFallbackField))
       : null)
-  if (!itemDate) return "skipped"
-  if (now.getTime() - itemDate.getTime() > route.recencyDays * MS_PER_DAY) return "skipped"
+  if (!itemDate || now.getTime() - itemDate.getTime() > route.recencyDays * MS_PER_DAY) {
+    funnel.recencyDropped += 1
+    return "skipped"
+  }
+  funnel.recencyKept += 1
 
   // (e) extract prospect company name.
   const companyName = extractStringField(item, route.companyField)
-  if (!companyName) return "skipped"
+  if (!companyName) {
+    funnel.companyNull += 1
+    return "skipped"
+  }
+  funnel.companyExtracted += 1
 
   // match via the server matcher; caller applies the >=0.85 cutoff.
   const match = await matchCompanyByName(companyName)
   let companyId: string
   let createdNew = false
   if (match && match.confidence >= MATCH_THRESHOLD) {
+    funnel.matched += 1
     companyId = match.companyId
   } else {
+    funnel.noMatch += 1
     // PR3c-a — REAL no-match (reached the matcher, <0.85): capture the
     // prospect instead of dropping it into the void. Create-only, from the
     // payload (name + LinkedIn URL + location, domain=null) — NO Apollo, NO
@@ -338,7 +413,12 @@ async function routeNewItem(
       linkedinUrl: route.linkedinUrlField ? extractStringField(item, route.linkedinUrlField) : null,
       location: route.locationField ? extractStringField(item, route.locationField) : null,
     })
-    if (!captured) return "no-match" // unmatchable name — nothing to attach to
+    if (!captured) {
+      funnel.unmatchable += 1
+      return "no-match" // unmatchable name — nothing to attach to
+    }
+    if (captured.created) funnel.capturedNew += 1
+    else funnel.capturedAttached += 1
     companyId = captured.companyId
     createdNew = captured.created
   }
@@ -362,6 +442,7 @@ async function routeNewItem(
     )
     return "error"
   }
+  funnel.ingested += 1
 
   // stamp the ProcessedSignal as routed to this account.
   await prisma.processedSignal.update({
@@ -412,6 +493,7 @@ export async function runApifyIngestion(
     routed: 0,
     created: 0,
     unmatched: 0,
+    funnels: {},
     durationMs: 0,
   }
 
@@ -451,6 +533,8 @@ export async function runApifyIngestion(
 
       // PR3b — is this actor routable? (undefined → store only, never route.)
       const route = category ? ROUTABLE_ACTORS[category] : undefined
+      // Funnel only exists where gates run (routable categories).
+      const funnel = route ? emptyFunnel() : null
 
       let fetched = 0
       let inserted = 0
@@ -465,6 +549,7 @@ export async function runApifyIngestion(
       } else {
         const items = await fetchDatasetItems(datasetId)
         fetched = items.length
+        if (funnel) funnel.fetched = items.length
         for (const item of items) {
           const sourceUrl = extractSourceUrl(item, route)
           let created: { id: string } | null = null
@@ -478,27 +563,34 @@ export async function runApifyIngestion(
               },
             })
             inserted += 1
+            if (funnel) funnel.new += 1
           } catch (e) {
             if (isUniqueViolation(e)) {
               duplicates += 1 // already seen — dedup holds (sourceUrl @unique)
+              if (funnel) funnel.dup += 1
             } else {
               itemErrors += 1
+              if (funnel) funnel.errors += 1
               log.error({ jobId: claimed.id, err: serializeError(e) }, "apify item insert failed")
             }
           }
 
           // ROUTING — on-new-insert-only (created), routable actor only. A dup
           // (created === null) is never re-routed.
-          if (created?.id && route) {
+          if (created?.id && route && funnel) {
             try {
-              const outcome = await routeNewItem(item, route, created.id, sourceUrl, now, loadScoring)
+              const outcome = await routeNewItem(item, route, created.id, sourceUrl, now, loadScoring, funnel)
               if (outcome === "routed" || outcome === "routed-created") {
                 routed += 1
                 if (outcome === "routed-created") createdAccounts += 1
               } else if (outcome === "no-match") unmatched += 1
-              else if (outcome === "error") itemErrors += 1
+              else if (outcome === "error") {
+                itemErrors += 1
+                funnel.errors += 1
+              }
             } catch (err) {
               itemErrors += 1
+              funnel.errors += 1
               log.error({ jobId: claimed.id, err: serializeError(err) }, "apify item routing failed")
             }
           }
@@ -512,6 +604,14 @@ export async function runApifyIngestion(
       result.routed += routed
       result.created += createdAccounts
       result.unmatched += unmatched
+      if (funnel && category) {
+        // Sum into the run-level per-category funnel (several Jobs of the same
+        // category in one run accumulate into one bucket).
+        const agg = (result.funnels[category] ??= emptyFunnel())
+        for (const key of Object.keys(funnel) as Array<keyof FunnelCounters>) {
+          agg[key] += funnel[key]
+        }
+      }
 
       await prisma.job.update({
         where: { id: claimed.id },
@@ -526,11 +626,14 @@ export async function runApifyIngestion(
             routed,
             created: createdAccounts,
             unmatched,
-          } as Prisma.InputJsonValue,
+            // Per-step funnel (Andy's quality view) — additive, coarse fields
+            // above unchanged. Absent for non-routable categories.
+            ...(funnel ? { funnel } : {}),
+          } as unknown as Prisma.InputJsonValue,
         },
       })
       log.info(
-        { jobId: claimed.id, datasetId, fetched, new: inserted, dup: duplicates, errors: itemErrors, routed, created: createdAccounts, unmatched },
+        { jobId: claimed.id, datasetId, fetched, new: inserted, dup: duplicates, errors: itemErrors, routed, created: createdAccounts, unmatched, funnel },
         "apify dataset job processed",
       )
     } catch (err) {

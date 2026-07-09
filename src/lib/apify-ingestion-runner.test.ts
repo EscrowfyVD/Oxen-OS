@@ -613,4 +613,93 @@ describe("runApifyIngestion", () => {
     expect(keys).toEqual(["https://jobs.x/mlro-1", "https://jobs.x/mlro-2"]) // verbatim, scraped_at drift irrelevant
     expect(res).toMatchObject({ inserted: 2, routed: 2 }) // 2 roles = 2 apify_g, correct
   })
+
+  // ─── Funnel instrumentation — per-run per-step counters ────────────
+
+  it("[25] mixed batch → funnel counters split ALL drop reasons + conserve step-to-step", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob("jobboard-g") as never)
+    const fresh = isoDaysAgo(1)
+    vi.mocked(fetchDatasetItems).mockResolvedValue([
+      { company: "DupCo", title: "Compliance Officer", job_url: "https://jobs.x/dup", date_posted: fresh }, // [0] dup
+      { company: "Latte Ltd", title: "barista latte artist", job_url: "https://jobs.x/1", date_posted: fresh }, // [1] keyword-drop
+      { company: "OldCo", title: "Compliance Officer", job_url: "https://jobs.x/2", date_posted: isoDaysAgo(30) }, // [2] recency-drop
+      { title: "Head of KYC", job_url: "https://jobs.x/3", date_posted: fresh }, // [3] no-company
+      { company: "payabl.", title: "Head of Compliance", job_url: "https://jobs.x/4", date_posted: fresh }, // [4] no-match → captured
+      { company: "Acme", title: "MLRO", job_url: "https://jobs.x/5", date_posted: fresh }, // [5] matched
+      { company: "Ltd", title: "Compliance Officer", job_url: "https://jobs.x/6", date_posted: fresh }, // [6] unmatchable
+    ] as never)
+    const p2002 = new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "5.22.0" })
+    vi.mocked(prisma.processedSignal.create).mockRejectedValueOnce(p2002 as never) // item [0] only
+    vi.mocked(matchCompanyByName)
+      .mockResolvedValueOnce({ companyId: "co-x", name: "Paya", confidence: 0.7 } as never) // [4]
+      .mockResolvedValueOnce({ companyId: "co-1", name: "Acme", confidence: 0.95 } as never) // [5]
+      .mockResolvedValueOnce(null as never) // [6]
+    vi.mocked(matchOrCreateCompanyByName)
+      .mockResolvedValueOnce({ companyId: "co-new", created: true, confidence: null } as never) // [4]
+      .mockResolvedValueOnce(null as never) // [6]
+
+    const res = await runApifyIngestion()
+
+    const f = res.funnels["jobboard-g"]
+    expect(f).toEqual({
+      fetched: 7,
+      new: 6,
+      dup: 1,
+      keywordKept: 5,
+      keywordDropped: 1,
+      recencyKept: 4,
+      recencyDropped: 1,
+      companyExtracted: 3,
+      companyNull: 1,
+      matched: 1,
+      noMatch: 2,
+      capturedNew: 1,
+      capturedAttached: 0,
+      unmatchable: 1,
+      ingested: 2,
+      errors: 0,
+    })
+    // Conservation: each step's kept+dropped = the prior step's kept (the
+    // whole point — the 4 no-route reasons are now distinguishable).
+    expect(f.new).toBe(f.keywordKept + f.keywordDropped)
+    expect(f.keywordKept).toBe(f.recencyKept + f.recencyDropped)
+    expect(f.recencyKept).toBe(f.companyExtracted + f.companyNull)
+    expect(f.companyExtracted).toBe(f.matched + f.noMatch)
+    expect(f.noMatch).toBe(f.capturedNew + f.capturedAttached + f.unmatchable)
+    expect(f.ingested).toBe(f.matched + f.capturedNew + f.capturedAttached)
+
+    // Job.result: coarse fields STILL present (additive) + the funnel persisted.
+    const completed = vi
+      .mocked(prisma.job.update)
+      .mock.calls.find((c) => (c[0].data as { status?: string }).status === "completed")!
+    const jobResult = (completed[0].data as { result: Record<string, unknown> }).result
+    expect(jobResult).toMatchObject({ fetched: 7, new: 6, dup: 1, errors: 0, routed: 2, created: 1, unmatched: 1 })
+    expect(jobResult.funnel).toEqual(f)
+    expect(res).toMatchObject({ routed: 2, created: 1, unmatched: 1, errors: 0 })
+  })
+
+  it("[26] per-category breakdown — separate funnels per source; non-routable jobs carry none", async () => {
+    queueJobs(["j-reddit", "j-jobboard"])
+    vi.mocked(prisma.job.findUnique).mockImplementation((async (args: { where: { id: string } }) =>
+      args.where.id === "j-reddit"
+        ? { id: "j-reddit", payload: { datasetId: "ds_r", category: "reddit-c", actId: "a" }, attempts: 1, maxAttempts: 3 }
+        : { id: "j-jobboard", payload: { datasetId: "ds_j", category: "jobboard-g", actId: "b" }, attempts: 1, maxAttempts: 3 }) as never)
+    vi.mocked(fetchDatasetItems).mockImplementation((async (dsId: string) =>
+      dsId === "ds_r"
+        ? [{ title: "some reddit post about fintech", url: "http://r/1" }]
+        : [{ company: "Acme", title: "MLRO", job_url: "https://jobs.x/9", date_posted: isoDaysAgo(0) }]) as never)
+
+    const res = await runApifyIngestion()
+
+    expect(Object.keys(res.funnels)).toEqual(["jobboard-g"]) // reddit-c: gates never ran → no funnel
+    expect(res.funnels["jobboard-g"]).toMatchObject({ fetched: 1, new: 1, matched: 1, ingested: 1 })
+
+    const redditUpdate = vi
+      .mocked(prisma.job.update)
+      .mock.calls.find((c) => (c[0].where as { id: string }).id === "j-reddit")!
+    const redditResult = (redditUpdate[0].data as { result: Record<string, unknown> }).result
+    expect(redditResult).toMatchObject({ fetched: 1, new: 1 })
+    expect(redditResult.funnel).toBeUndefined()
+  })
 })
