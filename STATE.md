@@ -5,13 +5,13 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-07-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged **+ seed RUN in prod (apify_f/apify_g confirmed in registry)** ; PR3b-pipeline(#29) merged ; **cycle-1 ran** (33 items stored, 0 routed — Crunchbase Title-Case field-bug + 9 net-new Job Board ICP prospects, all legit-no-match) ; **PR3c-a(#30) merged** (no-match capture live — first CRM-writing slice ; post-merge baseline clean) ; **PR3c-b-migration (Company.intentScore/lastScoredAt columns) done local** ; PR3c-b-score + PR3c-b-enrich (T=10) + Crunchbase field hotfix next.**)
+> **Last updated** : 2026-07-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged **+ seed RUN in prod (apify_f/apify_g confirmed in registry)** ; PR3b-pipeline(#29) merged ; **cycle-1 ran** (33 items stored, 0 routed — Crunchbase Title-Case field-bug + 9 net-new Job Board ICP prospects, all legit-no-match) ; **PR3c-a(#30) merged** (no-match capture live — first CRM-writing slice ; post-merge baseline clean) ; PR3c-b-migration(#31) merged (**columns live in prod** — information_schema + migrate-deploy ledger clean) ; **PR3c-b-score (company recompute + dormant-branch fix + 2 write sites) done local** ; PR3c-b-enrich (T=10 sweep, Apollo pass-3) + Crunchbase field hotfix next.**)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **851/851** passing (90 files,
+- **Repo health** : `npm run build` green ; tests **866/866** passing (91 files,
   TZ=UTC/CI) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
   pre-existing debt). Known flake: `signals/route.test.ts [15]` (expiresAt) reds
   only under a DST-observing local TZ — the test uses local-calendar setDate vs
@@ -358,20 +358,32 @@ session display + 3 operator actions. Feature-flagged behind
   ProcessedSignal linkage ; 1-line `Company.acquisitionSource` migration flagged for
   Andy. +8 tests. First CRM-writing slice — post-merge baseline clean (deploy alone
   wrote nothing) ; full create-path verification gated on the next actor cycle.
-  **PR3c-b-migration done local** (branch `apify-pr3c-b-migration`) —
-  `Company.intentScore Float?` + `lastScoredAt DateTime?` (additive nullable, zero
-  backfill, shadow-verified drift-clean, sentinel ; **deploy-ahead**: columns merge
-  BEFORE their writer). Doctrine PR3c-b (recon 2026-07-09, Vernon T=10): company-level
-  score = decay-adjusted sum of ACCOUNT-LEVEL signals only ({companyId, contactId:null}
-  — the PR2.5 set ; level-partition invariant, never mixed with contact scores) →
-  Apollo enrichment as the REWARD for a hot score — trigger = sweep `intentScore >= 10
-  AND enrichedAt IS NULL AND domain IS NULL` (fire-once via enrichedAt ; pass-2 already
-  domain-guarded) in the Apollo cron ; sweep partial index ships with PR3c-b-enrich.
-  **Next**: PR3c-b-score (company recompute + fix the dormant company branch of
-  computeIntentScore — missing the contactId:null guard, zero callers today) →
-  PR3c-b-enrich (Apollo pass-3 + NEW client methods organizations/search by
-  name/linkedin + people/search decision-maker ; credit-gated, Andy budget) ;
-  **Crunchbase field hotfix** (map Title-Case keys + recency
+  **PR3c-b-migration merged (#31)** — `Company.intentScore Float?` + `lastScoredAt
+  DateTime?` (additive nullable, zero backfill, shadow-verified, sentinel) ; **columns
+  LIVE in prod** (information_schema confirmed ; `_prisma_migrations` ledger clean —
+  applied 2026-07-09 10:21:56, 40s post-merge, logs NULL). Doctrine PR3c-b (recon
+  2026-07-09, Vernon T=10): company-level score = decay-adjusted sum of ACCOUNT-LEVEL
+  signals only ({companyId, contactId:null} — the PR2.5 set ; level-partition invariant,
+  never mixed with contact scores) → Apollo enrichment as the REWARD for a hot score —
+  trigger = sweep `intentScore >= 10 AND enrichedAt IS NULL AND domain IS NULL`
+  (fire-once via enrichedAt ; pass-2 already domain-guarded) in the Apollo cron ; sweep
+  partial index ships with PR3c-b-enrich. **PR3c-b-score done** (branch
+  `apify-pr3c-b-score`, local) — (1) dormant company branch of computeIntentScore FIXED
+  ({companyId} → {companyId, contactId:null} ; zero callers, contact path
+  byte-identical) + bidirectional partition sentinels ; (2) `recomputeCompanyScore`
+  (mirror of persistScore: reuses computeIntentScore company mode — same decay, not
+  forked ; atomic Company.intentScore+lastScoredAt + ScoreHistory accountType"company",
+  priorityLevel "Company" audit label ; returns {previousScore,newScore,signalCount,
+  crossedThreshold} ; `COMPANY_ENRICH_THRESHOLD = 10` ; crossing = UPWARD-only —
+  the DECAY TRAP is locked: a falling/flat recompute can never fire it ; null = never
+  scored, 0 = scored-and-empty) ; (3) two write sites — event-driven in the Apify
+  runner (matched + capture paths, first score at ingest, crossing LOGGED only) + a
+  company DECAY pass in the hourly recompute cron (sweeps intentScore > 0 ; cooled-to-0
+  rows leave the sweep — no ScoreHistory spam ; result gains companiesProcessed/
+  companiesCrossed). NO Apollo import anywhere (asserted). +15 tests.
+  **Next**: PR3c-b-enrich (Apollo pass-3 + NEW client methods organizations/search by
+  name/linkedin + people/search decision-maker ; credit-gated, Andy budget ; + the
+  sweep's partial index) ; **Crunchbase field hotfix** (map Title-Case keys + recency
   decision) ; funnel instrumentation (per-step drop counters — Andy's quality view).
   **PR3d** market-signal/DRAFT-campaign (Trustpilot/News) ; **PR3e** Website-Crawler
   diff ; Reddit/News NLP = Phase 2. D4 registry-of-actors = SEPARATE Apify-side

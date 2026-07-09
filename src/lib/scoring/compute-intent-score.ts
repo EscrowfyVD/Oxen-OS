@@ -72,7 +72,13 @@ export async function computeIntentScore(
             ],
           }
         : { contactId: accountId }
-      : { companyId: accountId }
+      : // PR3c-b-score — company mode aggregates the ACCOUNT-LEVEL partition
+        // ONLY. The `contactId: null` guard is load-bearing (same guard as the
+        // PR2.5 OR branch above): contact-scoped signals denormalize companyId
+        // (they carry BOTH ids), so without it a company score would re-sum
+        // every contact's activity — the level-partition invariant would break.
+        // (This branch had zero callers before PR3c-b — fixed while dormant.)
+        { companyId: accountId, contactId: null }
 
   const signals = await prisma.intentSignal.findMany({
     where: {

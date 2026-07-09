@@ -149,12 +149,66 @@ describe("computeIntentScore", () => {
     expect(callArg.where).not.toHaveProperty("companyId")
   })
 
-  it("[11] accountType='company' → filters by companyId only", async () => {
+  it("[11] accountType='company' → account-level partition ONLY ({companyId, contactId:null} — PR3c-b guard)", async () => {
+    // PR3c-b-score fixed the dormant company branch: contact signals
+    // denormalize companyId (they carry BOTH ids), so WITHOUT contactId:null
+    // the company aggregate would re-sum all contact activity — the PR2.5
+    // double-count, company side. Lock the exact where.
     vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
     await computeIntentScore("co-y", "company", config, NOW)
     const callArg = vi.mocked(prisma.intentSignal.findMany).mock.calls[0][0]!
-    expect(callArg.where).toMatchObject({ companyId: "co-y" })
-    expect(callArg.where).not.toHaveProperty("contactId")
+    expect(callArg.where).toMatchObject({ companyId: "co-y", contactId: null })
+    expect(callArg.where).not.toHaveProperty("OR")
+  })
+
+  // ─── PR3c-b-score — the level-partition invariant, BOTH directions ──
+  // The same account signal appears once in each view (contact via the PR2.5
+  // reflection, company via the guarded aggregate); a contact signal appears
+  // in the contact view ONLY. The two scores never feed the same consumer.
+
+  it("[11b] partition sentinel — company where excludes contact-level signals by construction", async () => {
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
+    await computeIntentScore("co-y", "company", config, NOW)
+    const where = vi.mocked(prisma.intentSignal.findMany).mock.calls[0][0]!.where as Record<string, unknown>
+    // contactId is PINNED to null — a contact-scoped signal (contactId set,
+    // companyId denormalized) can never satisfy this predicate.
+    expect(where.contactId).toBeNull()
+    expect(where.companyId).toBe("co-y")
+  })
+
+  it("[11c] partition sentinel — company mode is signals-only (never reads Company.intentScore or any score)", async () => {
+    // The prisma mock exposes ONLY intentSignal.findMany. If the company
+    // compute touched prisma.company / crmContact / a stored score, it would
+    // throw on the missing surface. One call, one model — locked.
+    vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
+    await computeIntentScore("co-y", "company", config, NOW)
+    expect(prisma.intentSignal.findMany).toHaveBeenCalledTimes(1)
+  })
+
+  it("[11d] partition sentinel — same account signal counts ONCE in each view, never twice in one", async () => {
+    // Simulate the DB answering each predicate faithfully for one account
+    // signal (contactId null, companyId co-y) + one contact signal
+    // (contactId ct-x, companyId co-y denormalized).
+    const accountSig = { ...sig({ points: 6, intentCategory: "G" }), contactId: null, companyId: "co-y" }
+    const contactSig = { ...sig({ points: 10, intentCategory: "A" }), contactId: "ct-x", companyId: "co-y" }
+    const matches = (w: Record<string, unknown>, s: { contactId: string | null; companyId: string }): boolean => {
+      if ("OR" in w) return (w.OR as Array<Record<string, unknown>>).some((b) => matches(b, s))
+      if ("contactId" in w && w.contactId !== s.contactId) return false
+      if ("companyId" in w && w.companyId !== s.companyId) return false
+      return true
+    }
+    vi.mocked(prisma.intentSignal.findMany).mockImplementation((async (args: { where: Record<string, unknown> }) =>
+      [accountSig, contactSig].filter((s) => matches(args.where, s))) as never)
+
+    // company view: the account signal ONLY → 6 (contact signal excluded)
+    const companyView = await computeIntentScore("co-y", "company", config, NOW)
+    expect(companyView.score).toBe(6)
+    expect(companyView.breakdown.byCategory).toEqual({ G: 6 })
+
+    // contact view (PR2.5 reflection): own signal + the account signal, each once → 16
+    const contactView = await computeIntentScore("ct-x", "contact", config, NOW, "co-y")
+    expect(contactView.score).toBe(16)
+    expect(contactView.breakdown.byCategory).toEqual({ A: 10, G: 6 })
   })
 
   it("[12] DB query excludes intentCategory NULL placeholders", async () => {

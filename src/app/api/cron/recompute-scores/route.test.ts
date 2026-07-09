@@ -73,6 +73,8 @@ describe("POST /api/cron/recompute-scores", () => {
     vi.mocked(runScoreRecompute).mockResolvedValue({
       processed: 10,
       promoted: 2,
+      companiesProcessed: 0,
+      companiesCrossed: 0,
       errors: [],
     })
     const res = await POST(makeReq())
