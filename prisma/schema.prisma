@@ -354,10 +354,20 @@ model Company {
   // consumed by the Apollo enrichment trigger sweep (PR3c-b-enrich pass-3:
   // intentScore >= T AND enrichedAt IS NULL AND domain IS NULL, T=10).
   // NULL = never scored (distinct from 0.0) — mirrors CrmContact unscored.
-  // ⚠️ Deliberately NO index here yet: the sweep's partial index ships WITH
-  // its consumer in PR3c-b-enrich (do not forget it there).
   intentScore     Float?
   lastScoredAt    DateTime?
+  // PR3c-b-enrich slice 1 — attempt tracking for the enrichment sweep.
+  // enrichedAt = SUCCESS only (existing semantics, untouched);
+  // enrichmentAttemptedAt/-Attempts = tried (give-up after 3 → a
+  // never-resolvable company can't loop the sweep forever; a transient
+  // failure gets 2 retries). The monthly cap counts enrichedAt only.
+  // ⚠️ The sweep's PARTIAL index exists in the migration SQL ONLY
+  // (20260709120000_add_company_enrichment_attempts) — Prisma PSL cannot
+  // express `WHERE` predicates on indexes:
+  //   Company_enrichment_sweep_idx ON ("intentScore" DESC)
+  //   WHERE enrichedAt IS NULL AND domain IS NULL AND intentScore IS NOT NULL
+  enrichmentAttemptedAt DateTime?
+  enrichmentAttempts    Int       @default(0)
   // Computed
   contactsCount   Int      @default(0)
   activeDealsCount Int     @default(0)
