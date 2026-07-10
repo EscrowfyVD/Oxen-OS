@@ -22,9 +22,13 @@
 // casing Apollo expects does not matter). Single secret APOLLO_API_KEY.
 
 import { logger, serializeError } from "./logger"
+import { normalizeCompanyName, matchConfidence } from "./account-match"
 
 const BASE_URL = "https://api.apollo.io/api/v1"
 const MAX_RETRIES = 2 // → up to 3 attempts total on 429
+// Confident org-name-match cutoff for disambiguation (mirrors the routing
+// matcher's 0.85). LinkedIn match is preferred; name match is the fallback.
+const ORG_NAME_MATCH_THRESHOLD = 0.85
 
 const log = logger.child({ component: "apollo" })
 
@@ -193,4 +197,115 @@ export async function enrichOrganization(input: { domain: string }): Promise<Apo
   )
   const org = data?.organization
   return org && typeof org === "object" ? (org as ApolloOrg) : null
+}
+
+// ─── Search (Apify PR3c-b slice 3) ──────────────────────────────────
+// The search endpoints return the same loose org/person shape as enrich, so
+// slice 4 gets typed inputs without new interfaces.
+export type ApolloOrgSearchResult = ApolloOrg
+export type ApolloPersonSearchResult = ApolloPerson
+
+// Strip scheme / www / trailing slash for URL identity comparison.
+function canonicalUrl(url: string): string {
+  return url.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "")
+}
+
+/**
+ * Organization Search — POST /mixed_companies/search (q_organization_name).
+ * Resolves a scraped company (name [+ the LinkedIn URL captured in PR3c-a], NO
+ * domain) to an Apollo org carrying primary_domain + firmographics, so slice 4
+ * can then enrichOrganization({domain}).
+ *
+ * Disambiguation: prefer the candidate whose linkedin_url matches ours — the
+ * confident match; else the best normalized-name match at ≥ 0.85. Returns the
+ * matched org (whatever fields Apollo gave — the CALLER checks primary_domain)
+ * or null (no confident match / error / bad body).
+ *
+ * Does NOT consume email credits (search is rate-limited only; the credit step
+ * is the people/match reveal in slice 4). Guards mirror the rest of the client:
+ * skip-no-key → null (no HTTP), never-throw, 429-aware.
+ */
+export async function searchOrganizations(input: {
+  name: string
+  linkedinUrl?: string | null
+}): Promise<ApolloOrgSearchResult | null> {
+  if (!isApolloConfigured()) {
+    log.warn("APOLLO_API_KEY not set — skipping searchOrganizations (no HTTP)")
+    return null
+  }
+  const data = await apolloFetch(
+    `${BASE_URL}/mixed_companies/search`,
+    {
+      method: "POST",
+      headers: apolloHeaders(),
+      body: JSON.stringify({ q_organization_name: input.name, page: 1, per_page: 10 }),
+    },
+    "mixed_companies/search",
+  )
+  if (!data) return null // error / 429-exhausted / non-2xx
+  const orgs = data.organizations
+  if (!Array.isArray(orgs)) return null // bad body
+  const candidates = orgs.filter((o): o is ApolloOrg => o != null && typeof o === "object")
+  if (candidates.length === 0) return null
+
+  // 1. LinkedIn disambiguation — the confident match.
+  if (input.linkedinUrl) {
+    const target = canonicalUrl(input.linkedinUrl)
+    const byLinkedin = candidates.find(
+      (o) => typeof o.linkedin_url === "string" && canonicalUrl(o.linkedin_url) === target,
+    )
+    if (byLinkedin) return byLinkedin
+  }
+
+  // 2. Normalized-name best match (≥ threshold).
+  const normTarget = normalizeCompanyName(input.name)
+  if (!normTarget) return null
+  let best: { org: ApolloOrg; conf: number } | null = null
+  for (const o of candidates) {
+    if (typeof o.name !== "string") continue
+    const conf = matchConfidence(normTarget, normalizeCompanyName(o.name))
+    if (conf <= 0) continue
+    if (!best || conf > best.conf) best = { org: o, conf }
+  }
+  return best && best.conf >= ORG_NAME_MATCH_THRESHOLD ? best.org : null
+}
+
+/**
+ * People Search — POST /mixed_people/search (organization_ids + person_titles +
+ * person_seniorities). Level-agnostic: slice 4 calls it TWICE (decision-maker
+ * titles/seniorities, then operational). Returns the people list WITHOUT
+ * unlocked email (email is a separate people/match reveal — the credit step,
+ * done in slice 4, not here) so slice 4 can pick + reveal.
+ *
+ * Empty result → [] (a valid "no people matched"); null → error / bad body.
+ * Guards mirror the rest of the client (skip-no-key → null, never-throw, 429).
+ */
+export async function searchPeople(input: {
+  organizationId: string
+  titles: string[]
+  seniorities: string[]
+}): Promise<ApolloPersonSearchResult[] | null> {
+  if (!isApolloConfigured()) {
+    log.warn("APOLLO_API_KEY not set — skipping searchPeople (no HTTP)")
+    return null
+  }
+  const data = await apolloFetch(
+    `${BASE_URL}/mixed_people/search`,
+    {
+      method: "POST",
+      headers: apolloHeaders(),
+      body: JSON.stringify({
+        organization_ids: [input.organizationId],
+        person_titles: input.titles,
+        person_seniorities: input.seniorities,
+        page: 1,
+        per_page: 25,
+      }),
+    },
+    "mixed_people/search",
+  )
+  if (!data) return null // error / 429-exhausted / non-2xx
+  const people = data.people
+  if (!Array.isArray(people)) return null // bad body (a 2xx with no people[] key)
+  return people.filter((p): p is ApolloPerson => p != null && typeof p === "object")
 }
