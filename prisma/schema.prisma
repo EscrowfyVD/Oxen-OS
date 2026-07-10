@@ -340,6 +340,12 @@ model Company {
   socialProfiles  Json?
   // Clay segment tag (D3 — extracted from source_table name)
   clayTableSegment String? // ex: "Active Business Loss"
+  // Capture-source marker (Apify PR3c-b) — how this Company entered the CRM.
+  // Values: 'apify-jobboard', 'apify-crunchbase' (extensible: 'trigify',
+  // 'manual', …). NULL = pre-pipeline / non-captured. Mirrors the existing
+  // CrmContact/Deal.acquisitionSource (plain nullable String → TEXT). No index —
+  // a source filter on a ~1.6k-row table needs none (add if the UI grows).
+  acquisitionSource String?
   // PRD-001 scoring
   group           CrmGroup?
   painTier        CrmPainTier?
