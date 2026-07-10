@@ -320,10 +320,11 @@ describe("runApifyIngestion", () => {
 
     const res = await runApifyIngestion()
 
-    // capture called with the payload create-fields (linkedinUrl + location)
+    // capture called with the payload create-fields + the jobboard-g source marker
     expect(matchOrCreateCompanyByName).toHaveBeenCalledWith("payabl.", {
       linkedinUrl: "https://uk.linkedin.com/company/payabl-eu",
       location: "Limassol, Cyprus",
+      acquisitionSource: "apify-jobboard", // declared per-actor (jobboard-g)
     })
     // signal attached to the CREATED account
     const payload = vi.mocked(ingestSignal).mock.calls[0][0] as {
@@ -350,6 +351,29 @@ describe("runApifyIngestion", () => {
     expect(enrichPerson).not.toHaveBeenCalled()
     expect(enrichOrganization).not.toHaveBeenCalled()
     expect(res).toMatchObject({ routed: 1, created: 1, unmatched: 0, errors: 0 })
+  })
+
+  it("[12b] PR3c-a crunchbase-f capture → acquisitionSource 'apify-crunchbase' (per-actor declared)", async () => {
+    queueJobs(["job-1"])
+    vi.mocked(prisma.job.findUnique).mockResolvedValue(routableJob(CB_CATEGORY) as never)
+    vi.mocked(fetchDatasetItems).mockResolvedValue([
+      {
+        "Organization Name": "FinBursa",
+        LinkedIn: "https://www.linkedin.com/company/finbursa",
+        "Headquarters Location": "Dubai, United Arab Emirates",
+        Description: "institutional AI-native deal infrastructure for private markets",
+        Industries: "FinTech",
+        "Last Funding Date": isoDaysAgo(20),
+      },
+    ] as never)
+    vi.mocked(matchCompanyByName).mockResolvedValue({ companyId: "co-x", name: "Fin", confidence: 0.7 } as never) // sub-0.85 → capture
+
+    await runApifyIngestion()
+    expect(matchOrCreateCompanyByName).toHaveBeenCalledWith("FinBursa", {
+      linkedinUrl: "https://www.linkedin.com/company/finbursa",
+      location: "Dubai, United Arab Emirates",
+      acquisitionSource: "apify-crunchbase", // declared per-actor (crunchbase-f)
+    })
   })
 
   it("[18] PR3c-b: T-crossing at ingest is computed but NEVER acted on (no Apollo, still routed)", async () => {

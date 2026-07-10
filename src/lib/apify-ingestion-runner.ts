@@ -178,12 +178,17 @@ interface RouteConfig {
   // Funding Date" only changes when a new round happens (it is event-identity,
   // not volatility) → key = once per REAL funding round, the doctrine.
   dedupEventField?: string
+  // PR3c-b — capture-source marker stamped onto a CREATED Company (never an
+  // existing one). Declared per-actor here, NOT re-parsed from the category
+  // string — same declared-table discipline as every other field above.
+  acquisitionSource: string
 }
 const ROUTABLE_ACTORS: Record<string, RouteConfig> = {
   // Crunchbase actor — Title-Case-with-spaces keys (138 keys, Probe A).
   // "Announced Date" is EMPTY in real payloads — do NOT use it for recency.
   "crunchbase-f": {
     letter: "f",
+    acquisitionSource: "apify-crunchbase",
     companyField: "Organization Name",
     recencyField: "Last Funding Date",
     recencyDays: 90,
@@ -202,6 +207,7 @@ const ROUTABLE_ACTORS: Record<string, RouteConfig> = {
   // gate a tautology.
   "jobboard-g": {
     letter: "g",
+    acquisitionSource: "apify-jobboard",
     companyField: "company",
     recencyField: "date_posted", // present 7/10 in cycle-1
     recencyFallbackField: "scraped_at",
@@ -412,6 +418,7 @@ async function routeNewItem(
     const captured = await matchOrCreateCompanyByName(companyName, {
       linkedinUrl: route.linkedinUrlField ? extractStringField(item, route.linkedinUrlField) : null,
       location: route.locationField ? extractStringField(item, route.locationField) : null,
+      acquisitionSource: route.acquisitionSource, // declared per-actor; stamped only on CREATE
     })
     if (!captured) {
       funnel.unmatchable += 1

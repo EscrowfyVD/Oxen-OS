@@ -79,17 +79,34 @@ describe("matchOrCreateCompanyByName (PR3c-a no-match capture)", () => {
     expect(findOrCreateCompanyByName).not.toHaveBeenCalled()
   })
 
-  it("[C2] no candidate at all → CREATE with name + linkedinUrl + location", async () => {
+  it("[C2] no candidate at all → CREATE with name + linkedinUrl + location + source", async () => {
     const r = await matchOrCreateCompanyByName("payabl.", {
       linkedinUrl: "https://uk.linkedin.com/company/payabl-eu",
       location: "Limassol, Cyprus",
+      acquisitionSource: "apify-jobboard",
     })
     expect(findOrCreateCompanyByName).toHaveBeenCalledWith(
       "payabl.",
       "https://uk.linkedin.com/company/payabl-eu",
-      { location: "Limassol, Cyprus" },
+      { location: "Limassol, Cyprus", acquisitionSource: "apify-jobboard" },
     )
     expect(r).toEqual({ companyId: "co-new", created: true, confidence: null })
+  })
+
+  it("[C6] acquisitionSource threads to CREATE; a fuzzy-MATCH never sets it (no overwrite)", async () => {
+    // create path → source flows into extraCreate
+    await matchOrCreateCompanyByName("FinBursa", { acquisitionSource: "apify-crunchbase" })
+    expect(findOrCreateCompanyByName).toHaveBeenCalledWith(
+      "FinBursa",
+      null,
+      { location: null, acquisitionSource: "apify-crunchbase" },
+    )
+    // matched path → findOrCreate NOT called → existing company's source untouched
+    vi.clearAllMocks()
+    vi.mocked(prisma.company.findMany).mockResolvedValue([{ id: "c-fin", name: "FinBursa" }] as never)
+    const r = await matchOrCreateCompanyByName("FinBursa", { acquisitionSource: "apify-crunchbase" })
+    expect(r).toEqual({ companyId: "c-fin", created: false, confidence: 1.0 })
+    expect(findOrCreateCompanyByName).not.toHaveBeenCalled()
   })
 
   it("[C3] only a sub-0.85 candidate (different company) → still creates, confidence passthrough", async () => {

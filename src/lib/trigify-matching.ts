@@ -126,7 +126,7 @@ export interface FindOrCreateCompanyResult {
 export async function findOrCreateCompanyByName(
   name: string,
   linkedinUrl?: string | null,
-  extraCreate?: { location?: string | null },
+  extraCreate?: { location?: string | null; acquisitionSource?: string | null },
 ): Promise<FindOrCreateCompanyResult | null> {
   const trimmed = name.trim()
   if (!trimmed) return null
@@ -143,6 +143,9 @@ export async function findOrCreateCompanyByName(
         name: trimmed,
         linkedinUrl: linkedinUrl ?? null,
         ...(extraCreate?.location ? { location: extraCreate.location } : {}),
+        // acquisitionSource is set ONLY here (on CREATE) — the existing/raced
+        // paths above return created:false and never touch an existing source.
+        ...(extraCreate?.acquisitionSource ? { acquisitionSource: extraCreate.acquisitionSource } : {}),
       },
       select: { id: true },
     })

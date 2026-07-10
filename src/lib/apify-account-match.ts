@@ -81,17 +81,19 @@ export interface CompanyCapture {
  */
 export async function matchOrCreateCompanyByName(
   rawName: string,
-  opts: { linkedinUrl?: string | null; location?: string | null } = {},
+  opts: { linkedinUrl?: string | null; location?: string | null; acquisitionSource?: string | null } = {},
 ): Promise<CompanyCapture | null> {
   if (!normalizeCompanyName(rawName)) return null
 
   const match = await matchCompanyByName(rawName)
   if (match && match.confidence >= MATCH_THRESHOLD) {
+    // fuzzy-attach to an existing account — never touch its acquisitionSource.
     return { companyId: match.companyId, created: false, confidence: match.confidence }
   }
 
   const company = await findOrCreateCompanyByName(rawName, opts.linkedinUrl ?? null, {
     location: opts.location ?? null,
+    acquisitionSource: opts.acquisitionSource ?? null,
   })
   if (!company) return null
   return { companyId: company.id, created: company.created, confidence: match?.confidence ?? null }
