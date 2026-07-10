@@ -13,9 +13,11 @@
 
 - **Repo health** : `npm run build` green ; tests **923/923** passing (92 files,
   TZ=UTC/CI) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
-  pre-existing debt). Known flake: `signals/route.test.ts [15]` (expiresAt) reds
-  only under a DST-observing local TZ — the test uses local-calendar setDate vs
-  the code's absolute-ms; green in UTC/CI. Pre-existing, fix queued separately.
+  pre-existing debt). **DST flake [15] FIXED** (branch `fix-dst-flake-signals-test`):
+  `signals/route.test.ts [15]` (expiresAt) now mirrors `deriveLifecycle`'s
+  absolute-ms math (was local-calendar `setDate(+90)` → ±1h drift across a DST
+  boundary); green in UTC AND under a DST TZ (verified `TZ=Europe/Paris`, full
+  suite 923/923). Code untouched — it was correct.
 - **Active workstreams** : (1) **Phase 3 Scoring Engine** — **🎉 100% COMPLETE
   IN PROD** : Sprint 3a (PR #6) + 3b + 3c (PR #7/#8) + 3d (PR #9) all merged ;
   ScoringConfig **v2** reconciled to Andy's doc & deployed ; Finding 1
