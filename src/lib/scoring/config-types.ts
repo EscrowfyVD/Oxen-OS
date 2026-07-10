@@ -227,6 +227,34 @@ export interface PainTierConfig {
   bdOverrideEnabled: boolean
 }
 
+// ─── Enrichment sweep (Apify PR3c-b) ─────────────────────────────────
+
+export interface EnrichmentTitles {
+  /** Decision-maker titles (CCO / Head of Compliance / MLRO …) — the
+   *  senior contact of the 2-contact multi-thread. */
+  decisionMaker: string[]
+  /** Operational titles (Compliance Officer / AML Analyst …) — the
+   *  hands-on contact of the 2-contact multi-thread. */
+  operational: string[]
+}
+
+export interface EnrichmentConfig {
+  /** Gate-1 spend threshold: enrich when the company intentScore ≥ this.
+   *  Also the crossing-log threshold in recompute-company-score. */
+  gate1Threshold: number
+  /** Gate-1 distinct-signal floor. Seeded + read by the pass-3 sweep
+   *  (slice 4); NO consumer in slice 2. */
+  gate1MinSignals: number
+  /** Monthly enrichment cap (companies/month) — a safety breaker, not a
+   *  budget constraint. Seeded, wired in slice 4. */
+  baseEnrichmentCap: number
+  /** Monthly phone-reveal cap — RESERVED, not wired (phone = a later
+   *  slice). Param only. */
+  phoneRevealCap: number
+  /** Title lists for the 2-contact multi-threading (Apollo people/search). */
+  titles: EnrichmentTitles
+}
+
 // ─── Top-level blob ──────────────────────────────────────────────────
 
 export interface ScoringConfigBlob {
@@ -238,4 +266,12 @@ export interface ScoringConfigBlob {
   negativeSignals: NegativeSignalsConfig
   followUpTriggers: FollowUpTriggersConfig
   painTier: PainTierConfig
+  /**
+   * Apify PR3c-b enrichment-sweep params. OPTIONAL — pre-v3 configs
+   * (e.g. the currently-active v2, and any row seeded before v3) lack
+   * this key. Readers MUST fall back to code defaults so the live
+   * scoring path never throws on the missing block. Present-and-typo'd
+   * still fails Zod (.strict) loudly, same discipline as every other key.
+   */
+  enrichment?: EnrichmentConfig
 }

@@ -212,6 +212,29 @@ const painTierConfig = z
   })
   .strict()
 
+// ─── Enrichment sweep (Apify PR3c-b) ─────────────────────────────────
+// `.strict()` INTERNALLY (a mistyped sub-key by Andy fails loudly). The
+// top-level field is `.optional()` (below): a pre-v3 active row has no
+// `enrichment` key and MUST still validate, else the loader would throw
+// and break ALL scoring during the deploy→seed window.
+
+const enrichmentTitles = z
+  .object({
+    decisionMaker: z.array(z.string().min(1)).min(1),
+    operational: z.array(z.string().min(1)).min(1),
+  })
+  .strict()
+
+const enrichmentConfig = z
+  .object({
+    gate1Threshold: z.number().min(0),
+    gate1MinSignals: z.number().int().min(0),
+    baseEnrichmentCap: z.number().int().min(0),
+    phoneRevealCap: z.number().int().min(0),
+    titles: enrichmentTitles,
+  })
+  .strict()
+
 // ─── Top-level ───────────────────────────────────────────────────────
 
 export const scoringConfigSchema = z
@@ -242,6 +265,9 @@ export const scoringConfigSchema = z
     negativeSignals: negativeSignalsConfig,
     followUpTriggers: followUpTriggersConfig,
     painTier: painTierConfig,
+    // OPTIONAL — see the enrichment section above. Absent on pre-v3 rows;
+    // strict-validated when present.
+    enrichment: enrichmentConfig.optional(),
   })
   .strict()
 

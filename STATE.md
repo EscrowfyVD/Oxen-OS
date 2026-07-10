@@ -5,13 +5,13 @@
 > Read order: skim §TL;DR → look at §Active workstreams for what's moving →
 > §Backlog for what's queued → everything else as needed.
 >
-> **Last updated** : 2026-07-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged **+ seed RUN in prod (apify_f/apify_g confirmed in registry)** ; PR3b-pipeline(#29) merged ; **cycle-1 ran** (33 items stored, 0 routed — Crunchbase Title-Case field-bug + 9 net-new Job Board ICP prospects, all legit-no-match) ; **PR3c-a(#30) merged** (no-match capture live — first CRM-writing slice ; post-merge baseline clean) ; PR3c-b-migration(#31) merged (**columns live in prod** — information_schema + migrate-deploy ledger clean) ; PR3c-b-score(#32) merged (company score live — writer sans lecteur, inert until the sweep) ; Crunchbase hotfix(#33) merged (Title-Case mapping + 90d recency + stable dedup key) ; funnel instrumentation(#34) merged (per-step counters in Job.result) ; **PR3c-b-enrich slice 1/4 (attempt-tracking columns + sweep partial index) done local** ; slices 2-4 (config / client / pass-3 sweep) next.**)
+> **Last updated** : 2026-07-09 (Phase 3 **100% in prod** ; post-Phase-3 closeout done ; Trigify reactive layer (PR #12) + recompute-cron dedicated config (PR #13) merged — Railway cron **service** live on `47 * * * *` (runtime `DATABASE_URL` = prod still to confirm on first run). **In flight : AIRA F2 (Pre-Meeting Briefings, LemCal) — PR0(#15)+PR1(#14)+PR2(#16) merged (webhook `/api/webhooks/lemcal` live in prod, INERT until LemCal env+URL set) ; PR3a(#17)+PR3b(#18) merged (refresh cron — Railway `*/15` service to create). **Apollo enrichment (replaces Clay) — PR-W(#19)+PR-Y(#20)+PR-Z(#21) merged (full engine live: enum/columns + `apollo.ts` client + mappers + batch runner + cron) ; PR-Xa(#22, Clay-webhook removal + helper rename) in review. NEW: Apify scraped-signals → CRM/scoring — PR1(#23)+PR2(#24)+PR2.5(#25)+PR3a-migration(#26) merged (`ProcessedSignal` dedup ledger **live in prod**) ; PR3a-wiring(#27) merged ; PR3b-seed(#28) merged **+ seed RUN in prod (apify_f/apify_g confirmed in registry)** ; PR3b-pipeline(#29) merged ; **cycle-1 ran** (33 items stored, 0 routed — Crunchbase Title-Case field-bug + 9 net-new Job Board ICP prospects, all legit-no-match) ; **PR3c-a(#30) merged** (no-match capture live — first CRM-writing slice ; post-merge baseline clean) ; PR3c-b-migration(#31) merged (**columns live in prod** — information_schema + migrate-deploy ledger clean) ; PR3c-b-score(#32) merged (company score live — writer sans lecteur, inert until the sweep) ; Crunchbase hotfix(#33) merged (Title-Case mapping + 90d recency + stable dedup key) ; funnel instrumentation(#34) merged (per-step counters in Job.result) ; PR3c-b-enrich slice 1/4(#35) merged (attempt-tracking columns + sweep partial index live in prod) ; **slice 2/4 (enrichment config block + T re-wire, adversarial-reviewed clean) done local** ; slices 3-4 (Apollo client / pass-3 sweep) next.**)
 
 ---
 
 ## TL;DR
 
-- **Repo health** : `npm run build` green ; tests **876/876** passing (92 files,
+- **Repo health** : `npm run build` green ; tests **891/891** passing (92 files,
   TZ=UTC/CI) ; lint baseline 79 errors + 159 warnings (CI non-blocking,
   pre-existing debt). Known flake: `signals/route.test.ts [15]` (expiresAt) reds
   only under a DST-observing local TZ — the test uses local-calendar setDate vs
@@ -415,8 +415,8 @@ session display + 3 operator actions. Feature-flagged behind
   now answerable from the DB, no more rawPayload probes). Coarse Job.result fields
   unchanged (additive) ; non-routable categories carry no funnel ; conservation
   identities documented + tested. No migration. +2 tests.
-  **PR3c-b-enrich — recon done (2026-07-09) + slice 1/4 done local** (branch
-  `apify-pr3c-b-enrich-migration`) : `Company.enrichmentAttemptedAt DateTime?` +
+  **PR3c-b-enrich — recon done (2026-07-09) + slices 1-2/4 landing.** Slice 1/4
+  **merged (#35)** : `Company.enrichmentAttemptedAt DateTime?` +
   `enrichmentAttempts Int @default(0)` (TRIED ≠ enrichedAt=SUCCESS ; give-up après 3 ;
   le cap mensuel ne compte que les succès ; NOT NULL DEFAULT 0 = fast-default PG11+,
   prouvé `atthasmissing=t` sur le shadow — zéro rewrite) + **l'index PARTIEL du sweep**
@@ -425,9 +425,19 @@ session display + 3 operator actions. Feature-flagged behind
   ne sait pas exprimer un WHERE ; drift-check vérifié CLEAN, le schema engine ignore
   les index partiels) ; `>= T` et `attempts < 3` volontairement HORS prédicat (T
   configurable ; compteur mutant → pas de churn d'index). Shadow-verified complet.
-  Sentinel. **Slices next** : 2 = bloc config `enrichment` (Zod strict → schéma+seed
-  v3 ; T/minSignals/baseCap 300/phoneCap 100 réservé/titles — éditables sans deploy,
-  TTL 60s ; re-câbler COMPANY_ENRICH_THRESHOLD dessus) ; 3 = client
+  Sentinel. **Slice 2/4 done local** (branch `apify-pr3c-b-enrich-config`) : bloc
+  `enrichment` sur ScoringConfig (config-types + config-validation) — `.strict()`
+  INTERNE mais clé top-level `.optional()` (LOAD-BEARING : le code déploie AVANT le
+  seed v3 → durant la fenêtre la config active est v2 sans clé enrichment ; une clé
+  requise ferait throw le loader → casse TOUT le scoring. Optional → v2 valide, les
+  lecteurs fallback) ; `buildScoringConfigV3` = v2 + le bloc, `seedScoringConfigV3`
+  (v3 active, v1+v2 inactifs préservés) ; **T re-wire** : le crossing de
+  `recompute-company-score` lit `config.enrichment?.gate1Threshold ??
+  COMPANY_ENRICH_THRESHOLD` (gate1Threshold:10 = l'ancien const → **byte-identical** sur
+  défaut) + le résultat expose `threshold` (fil observable). MinSignals/caps/titles
+  seedés+lisibles mais SANS consommateur (slice 4). apollo.ts + runner intouchés.
+  **Revue adversariale 4-lentilles du diff (NOOP / deploy-safety / type-sync / scope)
+  = clean.** +15 tests. Sans migration (data dans le blob). Slices next : 3 = client
   (`searchOrganizations` mixed_companies/search + match linkedin ;
   `searchPeople` titles/seniorities — ~2-3 crédits réels/company vs modèle 4,
   à valider premiers appels) ; 4 = pass-3 sweep (Gate 1 config, intentScore DESC,
