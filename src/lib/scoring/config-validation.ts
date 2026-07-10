@@ -232,6 +232,9 @@ const enrichmentConfig = z
     baseEnrichmentCap: z.number().int().min(0),
     phoneRevealCap: z.number().int().min(0),
     titles: enrichmentTitles,
+    // Optional delivery gate (slice 4): absent → reads TRUE (no-spend) at
+    // runtime. Strict-validated when present; unknown keys still fail loudly.
+    dryRun: z.boolean().optional(),
   })
   .strict()
 

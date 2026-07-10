@@ -69,6 +69,15 @@ describe("apollo client", () => {
     expect(sent).not.toHaveProperty("email")
   })
 
+  it("[2b] enrichPerson revealEmail:true → reveal_personal_emails TRUE (the slice-4 credit step); phone stays false", async () => {
+    fetchMock.mockResolvedValue(okJson({ person: { id: "p2b", email: "jane@acme.com" } }))
+    const p = await enrichPerson({ name: "Jane Doe", domain: "acme.com" }, { revealEmail: true })
+    expect(p?.email).toBe("jane@acme.com")
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(sent.reveal_personal_emails).toBe(true)
+    expect(sent.reveal_phone_number).toBe(false) // phone reserved — never revealed here
+  })
+
   it("[3] enrichOrganization success → returns the org; GET /organizations/enrich?domain=", async () => {
     fetchMock.mockResolvedValue(okJson({ organization: { id: "o1", name: "Acme", industry: "fintech" } }))
     const o = await enrichOrganization({ domain: "acme.com" })
