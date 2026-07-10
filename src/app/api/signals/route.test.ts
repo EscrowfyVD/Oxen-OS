@@ -384,8 +384,12 @@ describe("POST /api/signals (Sprint S1 batch 2)", () => {
     } as never)
 
     const occurredAt = "2026-01-01T00:00:00Z"
-    const expectedExpiry = new Date("2026-01-01T00:00:00Z")
-    expectedExpiry.setDate(expectedExpiry.getDate() + 90)
+    // Mirror deriveLifecycle EXACTLY: occurredAt.getTime() + decayDays * MS_PER_DAY
+    // (absolute ms). NOT calendar-local setDate(+90) — that keeps the same wall-clock
+    // time and so drifts ±1h across a DST boundary (Jan→Apr), which made this red on a
+    // DST-observing local TZ and green only in CI's UTC. decayDays = 90 (INTENT_REGISTRY).
+    const MS_PER_DAY = 1000 * 60 * 60 * 24
+    const expectedExpiry = new Date(new Date(occurredAt).getTime() + 90 * MS_PER_DAY)
 
     await POST(
       makeReq({
