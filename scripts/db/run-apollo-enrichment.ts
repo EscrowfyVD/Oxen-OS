@@ -14,10 +14,8 @@
 //
 // Output: JSON of runApolloEnrichment() — { processed, enriched, skipped, errors, durationMs }.
 
-import { PrismaClient } from "@prisma/client"
+import { prisma } from "../../src/lib/prisma"
 import { runApolloEnrichment } from "../../src/lib/apollo-enrichment-runner"
-
-const prisma = new PrismaClient()
 
 async function main() {
   console.log("\n=== runApolloEnrichment (batch) ===\n")
@@ -25,9 +23,29 @@ async function main() {
   console.log(JSON.stringify(result, null, 2))
 }
 
-main()
-  .catch((err) => {
+// Cron-exit contract: run the task, then close ALL open handles and exit
+// explicitly on BOTH paths. `finally` disconnects the SHARED @/lib/prisma
+// singleton the runner queries through (NOT a throwaway `new PrismaClient()`,
+// whose disconnect would leave the runner's real pool open) and always exits —
+// 0 on success, 1 on failure. An undisconnected pool with no explicit exit keeps
+// the event loop alive → the Railway deployment lingers "Active" → the next cron
+// tick is SKIPPED. The disconnect is itself guarded so a rare teardown error
+// still can't prevent termination.
+async function run() {
+  let code = 0
+  try {
+    await main()
+  } catch (err) {
     console.error(err)
-    process.exit(1)
-  })
-  .finally(() => prisma.$disconnect())
+    code = 1
+  } finally {
+    try {
+      await prisma.$disconnect()
+    } catch (err) {
+      console.error(err)
+    }
+    process.exit(code)
+  }
+}
+
+void run()
