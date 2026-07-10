@@ -416,6 +416,13 @@ export function buildScoringConfigV3(): ScoringConfigBlob {
     baseEnrichmentCap: 300,
     // RESERVED — phone is a later slice; param only, not wired.
     phoneRevealCap: 100,
+    // DELIVERY GATE — seeded TRUE so slice-4 ships NO-SPEND. The pass-3 sweep
+    // runs the gate/cap/ordering and LOGS what it would do, but makes zero
+    // Apollo calls and zero writes. Going live = a DELIBERATE, SEPARATE edit:
+    // set enrichment.dryRun=false on the active ScoringConfig (re-seed with this
+    // flipped, or edit the DB row) AFTER reading a dry-run report on real
+    // captures. The ≤60s config-loader TTL picks it up with no redeploy.
+    dryRun: true,
     // Compliance/finance-hiring oriented (the apify_g Job Board signal). Andy
     // tunes per-vertical later; editable without redeploy.
     titles: {

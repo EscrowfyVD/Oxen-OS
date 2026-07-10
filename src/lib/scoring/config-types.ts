@@ -253,6 +253,12 @@ export interface EnrichmentConfig {
   phoneRevealCap: number
   /** Title lists for the 2-contact multi-threading (Apollo people/search). */
   titles: EnrichmentTitles
+  /** DELIVERY GATE for the pass-3 sweep (slice 4). OPTIONAL — absent reads as
+   *  TRUE (no-spend) so a config missing the key never spends. Dry-run = run the
+   *  gate + cap + ordering and LOG what would happen, but zero Apollo calls and
+   *  zero writes. Flip to live = a deliberate, separate config edit (set false)
+   *  by Vernon AFTER reading a dry-run report on real captures. */
+  dryRun?: boolean
 }
 
 // ─── Top-level blob ──────────────────────────────────────────────────

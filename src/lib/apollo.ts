@@ -148,17 +148,27 @@ async function apolloFetch(
 
 /**
  * People Enrichment — POST /people/match. Identify by email (preferred) or
- * name+domain. Firmographic only (no reveal/waterfall credits). Returns the
- * parsed person object, or null on no-match / error / no key.
+ * name+domain. Returns the parsed person object, or null on no-match / error /
+ * no key.
+ *
+ * `opts.revealEmail` (default FALSE) is THE credit lever: firmographic-only
+ * (false) burns no reveal credit — used by pass-1/2 where we already have the
+ * email; the pass-3 sweep (slice 4) sets it TRUE to unlock a searched person's
+ * email (the one paid step in the enrichment chain). Phone is never revealed
+ * here (a reserved later slice).
  */
-export async function enrichPerson(input: EnrichPersonInput): Promise<ApolloPerson | null> {
+export async function enrichPerson(
+  input: EnrichPersonInput,
+  opts: { revealEmail?: boolean } = {},
+): Promise<ApolloPerson | null> {
   if (!isApolloConfigured()) {
     log.warn("APOLLO_API_KEY not set — skipping enrichPerson (no credit burn)")
     return null
   }
   const body: Record<string, unknown> = {
-    // explicit: avoid the pricier reveal credits (we already have the email)
-    reveal_personal_emails: false,
+    // opt-in reveal: false = firmographic-only (no credit); true = unlock the
+    // personal email (the slice-4 credit step). phone reserved → always false.
+    reveal_personal_emails: opts.revealEmail === true,
     reveal_phone_number: false,
     // run_waterfall_* intentionally OMITTED (default off → no waterfall credits)
   }

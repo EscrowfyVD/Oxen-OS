@@ -131,24 +131,35 @@ export async function upsertCompanyFromApollo(
 }
 
 /**
- * Enrich an EXISTING CrmContact (by id) from an Apollo person object.
- * Updates only the mapped fields + the enrichment marker + raw stash —
- * dealOwner / acquisitionSource are left untouched (preserved). If
- * person.organization carries firmographics, the linked Company is upserted
- * from it for FREE (no extra org/enrich credit).
+ * Map/upsert a CrmContact from an Apollo person object. Two modes:
  *
- * NB: the v1 runner enriches existing contacts, so this UPDATES by contactId
- * (no create path — assignRandomBD is kept for a future create path).
+ *  - `{ contactId }` (pass-1) — UPDATE that existing contact. The linked Company
+ *    is derived FROM person.organization (free firmographics). dealOwner /
+ *    acquisitionSource are left untouched (preserved).
+ *  - `{ companyId }` (pass-3 sweep, slice 4) — CREATE-or-LINK a contact keyed by
+ *    the person's REVEALED email, linked to the caller's company. Does NOT
+ *    re-derive the company from person.organization (the sweep already resolved
+ *    it). Requires a non-empty email (CrmContact.email is @unique + non-null) —
+ *    returns { ok:false } if the reveal produced none. Upsert-by-email so a
+ *    reveal that collides with an existing contact links it instead of throwing.
  */
 export async function upsertPersonFromApollo(
   person: ApolloPerson,
-  opts: { contactId: string },
+  opts: { contactId: string } | { companyId: string },
 ): Promise<ApolloUpsertResult> {
-  // 1) Linked company from person.organization (free firmographics).
-  let companyId: string | null = null
-  if (person.organization) {
-    const r = await upsertCompanyFromApollo(person.organization)
-    if (r.ok) companyId = r.companyId ?? null
+  // 1) Linked company:
+  //    - contactId mode: derive from person.organization (free firmographics).
+  //    - companyId mode: the caller's company — do NOT re-derive (avoids
+  //      creating a second company row from the person's org).
+  let companyId: string | null
+  if ("companyId" in opts) {
+    companyId = opts.companyId
+  } else {
+    companyId = null
+    if (person.organization) {
+      const r = await upsertCompanyFromApollo(person.organization)
+      if (r.ok) companyId = r.companyId ?? null
+    }
   }
 
   // 2) Contact country: explicit → parse location → inherit from the company.
@@ -163,29 +174,89 @@ export async function upsertPersonFromApollo(
     })
     if (co?.country) {
       country = co.country
-      log.info({ companyId, contactId: opts.contactId }, "apollo: inherited contact country from company")
+      log.info({ companyId }, "apollo: inherited contact country from company")
     }
   }
 
-  // 3) Update the contact. companyId / firstName / lastName use `?? undefined`
-  //    so we never null an existing company link or overwrite names with blanks.
-  await prisma.crmContact.update({
-    where: { id: opts.contactId },
+  // 3) The mapped fields (shared by both modes). companyId / firstName /
+  //    lastName use `?? undefined` so we never null an existing company link or
+  //    overwrite names with blanks.
+  const mapped = {
+    firstName: person.first_name || undefined,
+    lastName: person.last_name || undefined,
+    jobTitle: person.title ?? null,
+    linkedinUrl: person.linkedin_url ?? null,
+    city: person.city ?? null,
+    country: country ?? null,
+    location: locationString(person.city, person.state, person.country),
+    persona: classifyPersona(person.title),
+    companyId: companyId ?? undefined,
+    enrichmentSource: "apollo" as const,
+    enrichedAt: new Date(),
+    enrichmentRaw: person as unknown as Prisma.InputJsonValue,
+  }
+
+  if ("contactId" in opts) {
+    await prisma.crmContact.update({ where: { id: opts.contactId }, data: mapped })
+    return { ok: true, action: "updated", contactId: opts.contactId, companyId }
+  }
+
+  // CREATE-or-LINK by revealed email (slice-4 sweep). Conservative on purpose:
+  //  - match case-INSENSITIVELY: the email @unique index is case-sensitive, but
+  //    existing rows may be mixed-case (e.g. the CSV import stores email verbatim),
+  //    so a lowercased-only findUnique would miss them and CREATE a duplicate.
+  //  - never HIJACK a contact that already belongs to a DIFFERENT company → skip.
+  //  - never NULL an existing contact's populated fields → fill-only (`|| undefined`).
+  const email = (person.email ?? "").trim().toLowerCase()
+  if (!email) {
+    return { ok: false, error: "apollo person has no revealed email — cannot create contact" }
+  }
+  const existing = await prisma.crmContact.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
+    select: { id: true, companyId: true },
+  })
+  if (existing) {
+    if (existing.companyId && existing.companyId !== opts.companyId) {
+      // belongs to another company — do not move or overwrite it.
+      return { ok: true, action: "skipped", contactId: existing.id, companyId: existing.companyId }
+    }
+    await prisma.crmContact.update({
+      where: { id: existing.id },
+      data: {
+        firstName: person.first_name || undefined,
+        lastName: person.last_name || undefined,
+        jobTitle: person.title || undefined,
+        linkedinUrl: person.linkedin_url || undefined,
+        city: person.city || undefined,
+        country: country || undefined,
+        location: locationString(person.city, person.state, person.country) || undefined,
+        persona: classifyPersona(person.title) || undefined,
+        companyId: opts.companyId,
+        enrichmentSource: "apollo",
+        enrichedAt: new Date(),
+        enrichmentRaw: person as unknown as Prisma.InputJsonValue,
+      },
+    })
+    return { ok: true, action: "updated", contactId: existing.id, companyId: opts.companyId }
+  }
+  // CREATE requires the non-null keys (email + firstName + lastName) and the
+  // scalar companyId FK; the rest reuse the shared `mapped` values.
+  const created = await prisma.crmContact.create({
     data: {
-      firstName: person.first_name || undefined,
-      lastName: person.last_name || undefined,
-      jobTitle: person.title ?? null,
-      linkedinUrl: person.linkedin_url ?? null,
-      city: person.city ?? null,
-      country: country ?? null,
-      location: locationString(person.city, person.state, person.country),
-      persona: classifyPersona(person.title),
-      companyId: companyId ?? undefined,
+      email,
+      firstName: person.first_name ?? "",
+      lastName: person.last_name ?? "",
+      companyId: opts.companyId,
+      jobTitle: mapped.jobTitle,
+      linkedinUrl: mapped.linkedinUrl,
+      city: mapped.city,
+      country: mapped.country,
+      location: mapped.location,
+      persona: mapped.persona,
       enrichmentSource: "apollo",
-      enrichedAt: new Date(),
-      enrichmentRaw: person as unknown as Prisma.InputJsonValue,
+      enrichedAt: mapped.enrichedAt,
+      enrichmentRaw: mapped.enrichmentRaw,
     },
   })
-
-  return { ok: true, action: "updated", contactId: opts.contactId, companyId }
+  return { ok: true, action: "created", contactId: created.id, companyId }
 }

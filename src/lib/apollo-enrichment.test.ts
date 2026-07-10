@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     company: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
-    crmContact: { update: vi.fn() },
+    crmContact: { update: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
     employee: { findMany: vi.fn(), findUnique: vi.fn() },
   },
 }))
@@ -41,6 +41,8 @@ describe("apollo-enrichment mappers", () => {
     vi.mocked(prisma.company.create).mockResolvedValue({ id: "co-new" } as never)
     vi.mocked(prisma.company.update).mockResolvedValue({} as never)
     vi.mocked(prisma.crmContact.update).mockResolvedValue({} as never)
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValue(null as never)
+    vi.mocked(prisma.crmContact.create).mockResolvedValue({ id: "ct-new" } as never)
   })
 
   it("[1] upsertCompanyFromApollo new domain → create with mapped firmographics + apollo marker + raw", async () => {
@@ -139,5 +141,57 @@ describe("apollo-enrichment mappers", () => {
     expect(data.companyId).toBeUndefined() // never nulls an existing link
     expect(prisma.company.create).not.toHaveBeenCalled()
     expect(prisma.company.update).not.toHaveBeenCalled()
+  })
+
+  // ─── {companyId} CREATE-or-LINK path (slice-4 sweep) ───
+  it("[9] {companyId} + revealed email → CREATES a contact linked to the caller's company (no re-derive)", async () => {
+    const person: ApolloPerson = {
+      id: "p9",
+      first_name: "Ann",
+      last_name: "Lee",
+      title: "CFO",
+      email: "Ann@Wirex.com",
+      organization: { id: "o-other", primary_domain: "other.com" }, // MUST be ignored on this path
+    }
+    const r = await upsertPersonFromApollo(person, { companyId: "co-1" })
+    expect(r).toMatchObject({ ok: true, action: "created", contactId: "ct-new", companyId: "co-1" })
+    // did NOT re-derive/create a company from person.organization
+    expect(prisma.company.create).not.toHaveBeenCalled()
+    const data = vi.mocked(prisma.crmContact.create).mock.calls[0][0].data as Record<string, unknown>
+    expect(data.email).toBe("ann@wirex.com") // normalized lower-case
+    expect(data.companyId).toBe("co-1")
+    expect(data.firstName).toBe("Ann")
+    expect(data.enrichmentSource).toBe("apollo")
+    expect(data.enrichedAt).toBeInstanceOf(Date)
+  })
+
+  it("[10] {companyId} + email already exists (unlinked) → LINKS (updates), no create; lookup is case-INSENSITIVE", async () => {
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValueOnce({ id: "ct-existing", companyId: null } as never)
+    const person: ApolloPerson = { id: "p10", first_name: "Bo", email: "Bo@Wirex.com" }
+    const r = await upsertPersonFromApollo(person, { companyId: "co-1" })
+    expect(r).toMatchObject({ ok: true, action: "updated", contactId: "ct-existing", companyId: "co-1" })
+    expect(prisma.crmContact.create).not.toHaveBeenCalled()
+    // case-insensitive match against the case-sensitive @unique index → no duplicate
+    expect(prisma.crmContact.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { email: { equals: "bo@wirex.com", mode: "insensitive" } } }),
+    )
+    expect(prisma.crmContact.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "ct-existing" } }))
+  })
+
+  it("[11] {companyId} + NO revealed email → {ok:false}, nothing written", async () => {
+    const person: ApolloPerson = { id: "p11", first_name: "No", last_name: "Email" }
+    const r = await upsertPersonFromApollo(person, { companyId: "co-1" })
+    expect(r).toEqual({ ok: false, error: expect.stringContaining("no revealed email") })
+    expect(prisma.crmContact.create).not.toHaveBeenCalled()
+    expect(prisma.crmContact.update).not.toHaveBeenCalled()
+  })
+
+  it("[12] {companyId} + email belongs to a DIFFERENT company → SKIP (no hijack, no overwrite)", async () => {
+    vi.mocked(prisma.crmContact.findFirst).mockResolvedValueOnce({ id: "ct-x", companyId: "other-co" } as never)
+    const person: ApolloPerson = { id: "p12", first_name: "Bob", email: "bob@acme.com" }
+    const r = await upsertPersonFromApollo(person, { companyId: "co-1" })
+    expect(r).toMatchObject({ ok: true, action: "skipped", contactId: "ct-x", companyId: "other-co" })
+    expect(prisma.crmContact.update).not.toHaveBeenCalled() // not moved, not nulled
+    expect(prisma.crmContact.create).not.toHaveBeenCalled()
   })
 })
