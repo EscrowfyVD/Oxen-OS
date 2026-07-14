@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
@@ -16,7 +17,7 @@ interface SimulationResult {
 
 async function simulateGeoTest(promptText: string): Promise<SimulationResult> {
   const message = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 2048,
     messages: [
       {

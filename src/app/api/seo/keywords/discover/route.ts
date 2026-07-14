@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
@@ -42,7 +43,7 @@ For each suggestion provide:
 Return ONLY a valid JSON array of objects with these fields. No markdown, no code fences, just the JSON array.`
 
   const msg = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 1024,
     messages: [{ role: "user", content: prompt }],
   })

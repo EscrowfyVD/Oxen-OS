@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -59,7 +60,7 @@ export async function generateCallNotes(params: {
 - Additional context: ${params.context || "None"}`
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 16000,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessage }],
