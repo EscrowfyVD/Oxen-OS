@@ -83,14 +83,16 @@ describe("computePriorityScore", () => {
     expect(result.total).toBe(46)
   })
 
-  it("[3] ICP 0 + Intent 0 → total 0", async () => {
+  it("[3] ICP 0 + Intent 0 → total 0 (unclassified group = no ICP credit)", async () => {
     mockMinIcpContact()
     vi.mocked(prisma.intentSignal.findMany).mockResolvedValue([] as never)
     const result = await computePriorityScore("ct-x", "contact", config, NOW)
-    // peripheral group (5) + everything else 0 = 5 (not 0, because group null still scores peripheral)
-    expect(result.icp).toBe(5)
+    // group=null (never classified — every captured company) now scores 0 on
+    // factor 1, not the old peripheral 5. Unclassified = no free ICP credit, so
+    // an unknown/competitor company can't reach a prospect-grade score.
+    expect(result.icp).toBe(0)
     expect(result.intent).toBe(0)
-    expect(result.total).toBe(5)
+    expect(result.total).toBe(0)
   })
 
   it("[4] ICP 50 + Intent 50 → total 100 (full max with strong Pattern Match)", async () => {

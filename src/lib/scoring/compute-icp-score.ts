@@ -40,15 +40,25 @@ export interface ICPScoreResult {
 //
 // Andy's primary tier = "in CrmGroup whitelist". Under the active v2
 // config the whitelist is G1-G6 — the full enum after closeout #4 dropped
-// G7A/G7B — so any non-null group hits primary. secondary/peripheral are
-// placeholders for future groups beyond the canonical set.
-
+// G7A/G7B — so any non-null group hits primary. `secondary` (10) is the
+// classified-but-outside-the-whitelist tier; `peripheral` (5) is reserved for
+// a future classified-but-fringe group and is not routed to today.
+//
+// UNKNOWN vs PERIPHERAL (the split): a NULL group means "never classified" —
+// which is the state of EVERY pipeline-captured company (the Apify PR3c-a
+// capture sets name/linkedin/location/source, never a group). Granting an
+// unclassified company the peripheral tier's 5 points let it earn free ICP
+// credit and score, on Size/DM/Geo, like a real prospect — so a COMPETITOR the
+// pipeline scraped could reach a prospect-grade score, and (once the enrichment
+// sweep is live) get enriched + sequenced. Null is NOT a low-but-valid tier; it
+// is the absence of a verdict → ZERO points. `peripheral` keeps meaning "we
+// classified it and it landed on the fringe", distinct from "we never looked".
 function computeIntermediaryType(
   group: string | null,
   factor: IntermediaryTypeFactor,
 ): { points: number; tier: string } {
   if (group === null) {
-    return { points: factor.tiers.peripheral.points, tier: "peripheral" }
+    return { points: 0, tier: "unknown" } // unclassified → no ICP credit
   }
   if (factor.tiers.primary.groups.includes(group)) {
     return { points: factor.tiers.primary.points, tier: "primary" }
