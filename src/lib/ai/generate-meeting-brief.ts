@@ -14,6 +14,7 @@
 // and the brief context gains the Intent Signals section.
 
 import type { Prisma } from "@prisma/client"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
 import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
@@ -251,7 +252,7 @@ Return JSON with this exact structure:
 Be specific, actionable, and reference real data. If no data available for a section, provide strategic recommendations based on the meeting context.`
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 2048,
     messages: [{ role: "user", content: prompt }],
   })

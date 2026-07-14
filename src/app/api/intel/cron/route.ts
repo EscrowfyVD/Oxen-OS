@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
@@ -86,7 +87,7 @@ export async function POST() {
   for (const research of dueResearches) {
     try {
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: CLAUDE_MODEL,
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: research.query || `Research: ${research.category} / ${research.subcategory}` }],

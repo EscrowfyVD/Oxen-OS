@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import Anthropic from "@anthropic-ai/sdk"
@@ -118,7 +119,7 @@ Check against all applicable regulations for the specified jurisdictions and ret
 
     // Call Claude API
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 4000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],

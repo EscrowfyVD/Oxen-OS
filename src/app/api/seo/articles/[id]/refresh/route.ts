@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
@@ -28,7 +29,7 @@ export async function POST(
 
   try {
     const message = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 8000,
       system:
         "Rewrite and update this article with the latest information. Keep the same structure and optimization. Return the same JSON format.",

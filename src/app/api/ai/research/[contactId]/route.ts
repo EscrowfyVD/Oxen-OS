@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
@@ -56,7 +57,7 @@ Return this JSON structure:
 Be as specific and accurate as possible. If you don't have information, indicate that clearly rather than guessing.`
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 2048,
       messages: [{ role: "user", content: prompt }],
     })

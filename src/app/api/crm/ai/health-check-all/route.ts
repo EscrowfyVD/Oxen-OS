@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
@@ -52,7 +53,7 @@ Last 30d: ${emailCount} emails, ${meetingCount} meetings, ${recentActivities.len
 Pending tasks: ${deal.tasks.filter((t) => t.status === "pending").length}`
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 512,
       messages: [{ role: "user", content: prompt }],
     })

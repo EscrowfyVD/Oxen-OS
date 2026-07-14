@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
@@ -90,7 +91,7 @@ Return ONLY a valid JSON array with objects like:
 Return the top 10 most important insights, ordered by severity. Be specific and actionable.`
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 2048,
       messages: [{ role: "user", content: prompt }],
     })

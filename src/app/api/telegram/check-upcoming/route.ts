@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
 import Anthropic from "@anthropic-ai/sdk"
@@ -216,7 +217,7 @@ Return JSON with these fields (all strings, talking_points/risks/opportunities a
 }`
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 1500,
     messages: [{ role: "user", content: prompt }],
   })

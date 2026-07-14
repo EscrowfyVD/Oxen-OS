@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
@@ -62,7 +63,7 @@ Score on 5 criteria:
 Return ONLY valid JSON: {"vertical_match":<0-30>,"geographic_fit":<0-20>,"company_size":<0-20>,"engagement":<0-15>,"revenue_potential":<0-15>,"total":<0-100>,"reasoning":"<brief>"}`
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 512,
       messages: [{ role: "user", content: prompt }],
     })

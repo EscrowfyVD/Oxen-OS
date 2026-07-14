@@ -7,7 +7,7 @@
 - Next.js 16+ App Router with server/client components
 - Prisma ORM with PostgreSQL
 - NVM required: run `source ~/.zshrc` before any npm/npx commands
-- Claude API via `@anthropic-ai/sdk` — model: `claude-sonnet-4-20250514`
+- Claude API via `@anthropic-ai/sdk` — model: `claude-sonnet-4-6`. NEVER hardcode the model string at call sites; import the single constant `CLAUDE_MODEL` from `@/lib/ai/model` (app) or `./model` (ai-worker). Model snapshots get retired and return `404 not_found_error` with no fallback — centralizing keeps the next bump a one-line change.
 
 ## Design System
 - Glassmorphism dark UI: CARD_BG="rgba(15,17,24,0.6)", border="rgba(255,255,255,0.06)"

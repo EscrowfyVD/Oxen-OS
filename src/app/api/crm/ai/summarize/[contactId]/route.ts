@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
@@ -47,7 +48,7 @@ ${contact.deals.map((d) => `- ${d.dealName} | ${d.stage} | Value: ${d.dealValue 
 Return ONLY the summary text, no quotes, no JSON, no explanation. Max 150 characters.`
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 256,
       messages: [{ role: "user", content: prompt }],
     })

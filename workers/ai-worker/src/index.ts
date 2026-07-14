@@ -6,6 +6,7 @@
  */
 
 import * as Sentry from "@sentry/node"
+import { CLAUDE_MODEL } from "./model"
 import { PrismaClient } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 import { logger, serializeError } from "./lib/logger"
@@ -166,7 +167,7 @@ Return ONLY valid JSON with this exact structure:
 }`
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 1024,
     messages: [{ role: "user", content: prompt }],
   })
@@ -327,7 +328,7 @@ Return ONLY valid JSON:
 }`
 
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 8000,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: parts.join("\n") }],
@@ -478,7 +479,7 @@ Snippet: ${snippet?.substring(0, 500) || "No snippet available"}`
 
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 1024,
       messages: [{ role: "user", content: prompt }],
     })

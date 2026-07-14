@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
@@ -396,7 +397,7 @@ Format as plain text (no markdown, no HTML) with:
 Keep it under 2000 characters. Be concise and actionable.`
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 1000,
       messages: [{ role: "user", content: prompt }],
     })
@@ -717,7 +718,7 @@ Return JSON:
 Be specific and extract all actionable items.`
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: CLAUDE_MODEL,
       max_tokens: 1024,
       messages: [{ role: "user", content: prompt }],
     })
