@@ -191,11 +191,27 @@ describe("computeICPScore", () => {
     expect(result.breakdown.decisionMakerAccess.points).toBe(10)
   })
 
-  it("[15] contact.group=null → peripheral (5pt)", async () => {
+  it("[15] contact.group=null (never classified) → unknown, 0pt (no free ICP credit)", async () => {
     mockContact({ group: null, email: "x@y.com", company: { country: "Cyprus" } })
     const result = await computeICPScore("ct-x", config)
-    expect(result.breakdown.intermediaryType.tier).toBe("peripheral")
-    expect(result.breakdown.intermediaryType.points).toBe(5)
+    // Null = we never classified it (every captured company is null) → 0, NOT the
+    // peripheral tier's points. Stops an unclassified/competitor company earning
+    // prospect-grade ICP on Size/DM/Geo.
+    expect(result.breakdown.intermediaryType.tier).toBe("unknown")
+    expect(result.breakdown.intermediaryType.points).toBe(0)
+  })
+
+  it("[15b] classified group OUTSIDE the whitelist → secondary (still credited, not zeroed)", async () => {
+    // The fix zeroes only NULL (unclassified). A company we DID classify but that
+    // landed outside the primary whitelist keeps its secondary credit — the split
+    // between "never looked" (0) and "looked, fringe" (>0).
+    mockContact({ group: "G_OUTSIDE_WHITELIST", email: "x@y.com", company: { country: "Cyprus" } })
+    const result = await computeICPScore("ct-x", config)
+    expect(result.breakdown.intermediaryType.tier).toBe("secondary")
+    expect(result.breakdown.intermediaryType.points).toBe(
+      config.icpFactors.intermediaryType.tiers.secondary.points,
+    )
+    expect(result.breakdown.intermediaryType.points).toBeGreaterThan(0)
   })
 
   it("[16] missing contact → throws", async () => {
