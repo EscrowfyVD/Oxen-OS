@@ -9,12 +9,14 @@
  * Callers MUST let the throw fail the request/job (visible + retryable) instead of
  * persisting a fabricated row.
  *
- * The parse-failure branch (model responded but not parseable JSON) is a separate
- * fragile-parser concern (explicitly out of scope for the hardening) and still
- * returns score 0 — noted, not fixed here.
+ * Phase 0 (parse-hardening): unusable OUTPUT — no JSON object, malformed JSON, or a
+ * missing numeric score — THROWS (LlmOutputError / SyntaxError), never a fabricated
+ * score:0/irrelevant. Callers must let it fail the run (visible + retryable), the same
+ * way a failed CALL does. "not evaluated" must never be recorded as "evaluated irrelevant".
  */
 import type Anthropic from "@anthropic-ai/sdk"
 import { CLAUDE_MODEL } from "@/lib/ai/model"
+import { LlmOutputError } from "@/lib/ai/llm-alert"
 
 export interface NewsScore {
   score: number
@@ -41,14 +43,17 @@ export async function scoreNewsArticle(
 
   const text = msg.content[0]?.type === "text" ? msg.content[0].text : ""
   const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (jsonMatch) {
-    const parsed = JSON.parse(jsonMatch[0])
-    return {
-      score: parsed.score || 0,
-      verticals: parsed.verticals || [],
-      reasoning: parsed.reasoning || "",
-    }
+  if (!jsonMatch) {
+    // No JSON at all — NOT evaluated. Fail loudly; never fabricate score:0/irrelevant.
+    throw new LlmOutputError("news scoring output had no JSON object")
   }
-  // Parser fragility (out of scope): model responded but no JSON object found.
-  return { score: 0, verticals: [], reasoning: "Failed to parse response" }
+  const parsed = JSON.parse(jsonMatch[0]) // malformed JSON throws SyntaxError → also a loud failure
+  if (typeof parsed.score !== "number") {
+    throw new LlmOutputError("news scoring output missing a numeric score")
+  }
+  return {
+    score: parsed.score,
+    verticals: parsed.verticals || [],
+    reasoning: parsed.reasoning || "",
+  }
 }

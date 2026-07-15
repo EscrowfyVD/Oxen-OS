@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 import { VERTICALS, GEO_ZONES } from "@/lib/crm-config"
-import { notifyLlmFailure } from "@/lib/ai/llm-alert"
+import { notifyLlmFailure, isLlmFailure, LlmOutputError } from "@/lib/ai/llm-alert"
 
 const anthropic = new Anthropic()
 
@@ -80,13 +80,13 @@ Return ONLY valid JSON: {"vertical_match":<0-30>,"geographic_fit":<0-20>,"compan
       reasoning: string
     }
 
-    const total = scores.total ?? (
-      (scores.vertical_match ?? 0) +
-      (scores.geographic_fit ?? 0) +
-      (scores.company_size ?? 0) +
-      (scores.engagement ?? 0) +
-      (scores.revenue_potential ?? 0)
-    )
+    // Phase 0: NO `?? 0` fabrication. A missing/non-numeric total is unusable output —
+    // fail (write no icpScore/icpFit, do NOT bump lastScoredAt) so the 7-day sweep re-tries,
+    // instead of stamping a real tier-1 lead as a fabricated 0/tier_3 "success".
+    if (typeof scores.total !== "number" || Number.isNaN(scores.total)) {
+      throw new LlmOutputError("ICP scoring returned no numeric total — refusing to fabricate 0/tier_3")
+    }
+    const total = scores.total
 
     let icpFit: string
     if (total >= 70) icpFit = "tier_1"
@@ -113,8 +113,8 @@ Return ONLY valid JSON: {"vertical_match":<0-30>,"geographic_fit":<0-20>,"compan
     return { success: true }
   } catch (err) {
     console.error(`[Score All] Failed for contact ${contact.id}:`, err)
-    // errors++ is nobody's dashboard — surface an LLM failure.
-    if (err instanceof Anthropic.APIError) {
+    // errors++ is nobody's dashboard — surface an LLM CALL or OUTPUT(parse) failure.
+    if (isLlmFailure(err)) {
       await notifyLlmFailure({ source: "crm/ai/score-all", error: err })
     }
     return { success: false, error: String(err) }

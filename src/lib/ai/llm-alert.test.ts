@@ -7,8 +7,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 vi.mock("@/lib/telegram", () => ({ notifyEmployee: vi.fn().mockResolvedValue(true) }))
 
+import Anthropic from "@anthropic-ai/sdk"
 import { notifyEmployee } from "@/lib/telegram"
-import { notifyLlmFailure, __resetLlmAlertThrottle } from "./llm-alert"
+import { notifyLlmFailure, __resetLlmAlertThrottle, isLlmFailure, LlmOutputError } from "./llm-alert"
 
 const mockedNotify = vi.mocked(notifyEmployee)
 
@@ -51,5 +52,25 @@ describe("notifyLlmFailure", () => {
     delete process.env.CRM_BD_EMAILS
     await expect(notifyLlmFailure({ source: "norecip", error: new Error("boom") })).resolves.toBeUndefined()
     expect(mockedNotify).not.toHaveBeenCalled()
+  })
+})
+
+describe("isLlmFailure (the widen: parse failures now alert, not just APIError)", () => {
+  it("true for an Anthropic APIError (call failure)", () => {
+    const e = new Anthropic.APIError(404, { type: "error", error: { type: "not_found_error" } }, "x", undefined)
+    expect(isLlmFailure(e)).toBe(true)
+  })
+  it("true for a SyntaxError (JSON.parse failure — the previously-invisible half)", () => {
+    let syn: unknown
+    try { JSON.parse("{not json") } catch (e) { syn = e }
+    expect(syn).toBeInstanceOf(SyntaxError)
+    expect(isLlmFailure(syn)).toBe(true)
+  })
+  it("true for an LlmOutputError (valid-but-incomplete output)", () => {
+    expect(isLlmFailure(new LlmOutputError("missing total"))).toBe(true)
+  })
+  it("false for an unrelated error (a DB error must NOT over-alert)", () => {
+    expect(isLlmFailure(new Error("db connection lost"))).toBe(false)
+    expect(isLlmFailure(new TypeError("x is undefined"))).toBe(false)
   })
 })

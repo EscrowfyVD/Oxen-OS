@@ -15,10 +15,39 @@
  * Fire-and-forget: this NEVER throws — an alert failure must not mask or replace
  * the underlying error the caller is about to surface (fail-the-job / 5xx).
  */
+import Anthropic from "@anthropic-ai/sdk"
 import { notifyEmployee } from "@/lib/telegram"
 import { logger } from "@/lib/logger"
 
 const log = logger.child({ component: "llm-alert" })
+
+/**
+ * Thrown when an LLM CALL succeeded but its OUTPUT is unusable — no parseable JSON,
+ * or valid-but-incomplete (a required field missing). Distinct from a fabricated
+ * default: the whole point of Phase 0 is that unusable output fails LOUDLY instead
+ * of becoming a fake business result (score 0, medium/50, empty findings).
+ */
+export class LlmOutputError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "LlmOutputError"
+  }
+}
+
+/**
+ * Is this an LLM CALL or OUTPUT failure worth alerting on? Widened past the #44
+ * `instanceof Anthropic.APIError` (call-side) to ALSO cover parse failures: a bad
+ * JSON.parse throws a native SyntaxError, and an incomplete verdict throws
+ * LlmOutputError — both were invisible before. A plain DB/other error is NOT an
+ * LLM failure and is intentionally excluded (no over-alerting).
+ */
+export function isLlmFailure(err: unknown): boolean {
+  return (
+    err instanceof Anthropic.APIError ||
+    err instanceof SyntaxError ||
+    err instanceof LlmOutputError
+  )
+}
 
 // Default 6h between alerts per source: the FIRST alert is the signal the incident
 // never got; reminders every 6h during an active outage are useful, not spammy.

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
 import { STAGE_LABELS } from "@/lib/crm-config"
 import { sendTelegramNotificationByEmail } from "@/lib/telegram"
-import { notifyLlmFailure } from "@/lib/ai/llm-alert"
+import { notifyLlmFailure, isLlmFailure } from "@/lib/ai/llm-alert"
 
 const anthropic = new Anthropic()
 
@@ -259,8 +259,8 @@ RESPOND ONLY WITH VALID JSON, no markdown.`
         `Follow-up generation failed for deal ${deal.id}:`,
         err,
       )
-      // An LLM failure hidden inside skipped++ is invisible — surface it.
-      if (err instanceof Anthropic.APIError) {
+      // An LLM CALL or OUTPUT(parse) failure hidden inside skipped++ is invisible — surface it.
+      if (isLlmFailure(err)) {
         await notifyLlmFailure({ source: "crm/ai/check-followups", error: err })
       }
       skipped++

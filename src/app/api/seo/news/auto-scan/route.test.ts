@@ -19,7 +19,10 @@ vi.mock("@anthropic-ai/sdk", async (importOriginal) => {
   return { default: MockAnthropic }
 })
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }))
-vi.mock("@/lib/ai/llm-alert", () => ({ notifyLlmFailure: vi.fn() }))
+vi.mock("@/lib/ai/llm-alert", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/llm-alert")>()
+  return { ...actual, notifyLlmFailure: vi.fn() } // keep isLlmFailure/LlmOutputError real
+})
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     newsSource: { findMany: vi.fn(), update: vi.fn().mockResolvedValue({}) },
