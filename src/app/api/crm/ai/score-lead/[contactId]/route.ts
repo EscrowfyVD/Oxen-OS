@@ -7,14 +7,9 @@ import { VERTICALS, GEO_ZONES } from "@/lib/crm-config"
 import { ENABLE_WORKERS, JOB_TYPES } from "@/lib/worker-config"
 import { createJob } from "@/lib/job-queue"
 import { notifyLlmFailure, isLlmFailure, LlmOutputError } from "@/lib/ai/llm-alert"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const anthropic = new Anthropic()
-
-function parseJsonFromText(text: string): Record<string, unknown> {
-  // Strip markdown code fences if present
-  const cleaned = text.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim()
-  return JSON.parse(cleaned)
-}
 
 export async function POST(
   _request: Request,
@@ -100,8 +95,7 @@ Return ONLY valid JSON with this exact structure:
       messages: [{ role: "user", content: prompt }],
     })
 
-    const text = response.content[0].type === "text" ? response.content[0].text : ""
-    const scores = parseJsonFromText(text) as {
+    const scores = parseLlmJson<{
       vertical_match: number
       geographic_fit: number
       company_size: number
@@ -109,7 +103,7 @@ Return ONLY valid JSON with this exact structure:
       revenue_potential: number
       total: number
       reasoning: string
-    }
+    }>(response)
 
     // Phase 0: NO `?? 0` fabrication. A missing/non-numeric total is unusable output —
     // surface the failure (500), write no icpScore/icpFit, do NOT bump lastScoredAt, so

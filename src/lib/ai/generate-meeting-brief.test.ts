@@ -6,6 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { LlmOutputError } from "./llm-alert"
 
 const { mockCreate } = vi.hoisted(() => ({ mockCreate: vi.fn() }))
 vi.mock("@anthropic-ai/sdk", () => ({
@@ -241,10 +242,10 @@ describe("generateMeetingBrief", () => {
     expect(fmtArg.note).toBe("🔄 Brief actualisé")
   })
 
-  it("[4] throws when Claude returns no JSON", async () => {
+  it("[4] throws (LlmOutputError) when Claude returns no JSON — never a fabricated brief", async () => {
     mockCreate.mockResolvedValue({ content: [{ type: "text", text: "sorry, no json" }] })
     await expect(
       generateMeetingBrief({ meetingDate: "2026-06-10", title: "x", attendees: [] }),
-    ).rejects.toThrow("Failed to parse brief content")
+    ).rejects.toThrow(LlmOutputError)
   })
 })

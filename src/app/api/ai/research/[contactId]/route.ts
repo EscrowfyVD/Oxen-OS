@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server"
+import { Prisma } from "@prisma/client"
 import { CLAUDE_MODEL } from "@/lib/ai/model"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
 
 const anthropic = new Anthropic()
+
+interface ResearchResult {
+  description?: string
+  industry?: string
+  employeeCount?: string
+  revenue?: string
+  headquarters?: string
+  keyPeople?: Prisma.InputJsonValue
+  recentNews?: Prisma.InputJsonValue
+  ownership?: Prisma.InputJsonValue
+}
 
 export async function POST(
   request: Request,
@@ -58,21 +71,11 @@ Be as specific and accurate as possible. If you don't have information, indicate
 
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
     })
 
-    const responseText = response.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b.type === "text" ? b.text : ""))
-      .join("")
-
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return NextResponse.json({ error: "Failed to parse research" }, { status: 500 })
-    }
-
-    const research = JSON.parse(jsonMatch[0])
+    const research = parseLlmJson<ResearchResult>(response)
 
     // Upsert CompanyIntel
     const existing = await prisma.companyIntel.findFirst({ where: { contactId } })
@@ -89,9 +92,9 @@ Be as specific and accurate as possible. If you don't have information, indicate
           employeeCount: research.employeeCount || null,
           revenue: research.revenue || null,
           headquarters: research.headquarters || null,
-          keyPeople: research.keyPeople || null,
-          recentNews: research.recentNews || null,
-          ownership: research.ownership || null,
+          keyPeople: research.keyPeople || Prisma.DbNull,
+          recentNews: research.recentNews || Prisma.DbNull,
+          ownership: research.ownership || Prisma.DbNull,
           lastResearched: new Date(),
           dataSource: "claude",
         },
@@ -107,9 +110,9 @@ Be as specific and accurate as possible. If you don't have information, indicate
           employeeCount: research.employeeCount || null,
           revenue: research.revenue || null,
           headquarters: research.headquarters || null,
-          keyPeople: research.keyPeople || null,
-          recentNews: research.recentNews || null,
-          ownership: research.ownership || null,
+          keyPeople: research.keyPeople || Prisma.DbNull,
+          recentNews: research.recentNews || Prisma.DbNull,
+          ownership: research.ownership || Prisma.DbNull,
           lastResearched: new Date(),
           dataSource: "claude",
         },

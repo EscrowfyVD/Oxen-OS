@@ -3,6 +3,7 @@ import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const client = new Anthropic()
 
@@ -41,22 +42,16 @@ export async function POST(
       ],
     })
 
-    const textBlock = message.content.find((block) => block.type === "text")
-    if (!textBlock || textBlock.type !== "text") {
-      return NextResponse.json(
-        { error: "Failed to refresh article" },
-        { status: 500 }
-      )
-    }
-
-    // Parse JSON response
-    let jsonText = textBlock.text.trim()
-    const jsonMatch = jsonText.match(/```(?:json)?\n?([\s\S]*?)```/)
-    if (jsonMatch) {
-      jsonText = jsonMatch[1].trim()
-    }
-
-    const refreshed = JSON.parse(jsonText)
+    // Shared robust parser (truncation-aware; throws on unusable output → outer catch 500).
+    const refreshed = parseLlmJson<{
+      title?: string
+      content: string
+      metaDescription?: string
+      primaryKeyword?: string
+      secondaryKeywords?: string[]
+      faqSchema?: Array<{ question: string; answer: string }>
+      socialPost?: string
+    }>(message)
     const wordCount = countWords(refreshed.content)
 
     const article = await prisma.article.update({

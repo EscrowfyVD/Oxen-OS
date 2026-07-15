@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { CLAUDE_MODEL } from "@/lib/ai/model"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
@@ -44,18 +45,30 @@ Return ONLY a valid JSON array of objects with these fields. No markdown, no cod
 
   const msg = await client.messages.create({
     model: CLAUDE_MODEL,
-    max_tokens: 1024,
+    max_tokens: 4096, // Phase 2: raised from 1024 — a ~20-object keyword array truncates
     messages: [{ role: "user", content: prompt }],
   })
 
-  const text = msg.content[0].type === "text" ? msg.content[0].text : ""
-
-  let suggestions = []
+  let suggestions: Array<{
+    keyword: string
+    searchVolume: number
+    difficulty: number
+    vertical: string
+    reason: string
+  }> = []
   try {
-    suggestions = JSON.parse(text)
+    // Shared robust parser: throws on unusable output (truncation / malformed / no JSON)
+    // instead of silently 500-ing on the fragile content[0] index.
+    suggestions = parseLlmJson<Array<{
+      keyword: string
+      searchVolume: number
+      difficulty: number
+      vertical: string
+      reason: string
+    }>>(msg)
   } catch {
     return NextResponse.json(
-      { error: "Failed to parse AI response", raw: text },
+      { error: "Failed to parse AI response" },
       { status: 500 }
     )
   }

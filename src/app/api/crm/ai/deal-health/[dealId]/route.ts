@@ -3,13 +3,9 @@ import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const anthropic = new Anthropic()
-
-function parseJsonFromText(text: string): Record<string, unknown> {
-  const cleaned = text.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim()
-  return JSON.parse(cleaned)
-}
 
 export async function POST(
   _request: Request,
@@ -111,13 +107,12 @@ Return ONLY valid JSON:
       messages: [{ role: "user", content: prompt }],
     })
 
-    const text = response.content[0].type === "text" ? response.content[0].text : ""
-    const result = parseJsonFromText(text) as {
+    const result = parseLlmJson<{
       health: string
       confidence: number
       reason: string
       suggestedAction: string
-    }
+    }>(response)
 
     await prisma.deal.update({
       where: { id: dealId },
