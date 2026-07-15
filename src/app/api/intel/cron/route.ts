@@ -3,6 +3,7 @@ import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
+import { notifyLlmFailure } from "@/lib/ai/llm-alert"
 
 const anthropic = new Anthropic()
 
@@ -134,6 +135,10 @@ export async function POST() {
       executed++
     } catch (e) {
       errors.push(`${research.id}: ${(e as Error).message}`)
+      // The errors[] array is never read by a human — surface LLM failures.
+      if (e instanceof Anthropic.APIError) {
+        await notifyLlmFailure({ source: "intel/cron", error: e })
+      }
     }
   }
 

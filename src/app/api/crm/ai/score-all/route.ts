@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 import { VERTICALS, GEO_ZONES } from "@/lib/crm-config"
+import { notifyLlmFailure } from "@/lib/ai/llm-alert"
 
 const anthropic = new Anthropic()
 
@@ -112,6 +113,10 @@ Return ONLY valid JSON: {"vertical_match":<0-30>,"geographic_fit":<0-20>,"compan
     return { success: true }
   } catch (err) {
     console.error(`[Score All] Failed for contact ${contact.id}:`, err)
+    // errors++ is nobody's dashboard — surface an LLM failure.
+    if (err instanceof Anthropic.APIError) {
+      await notifyLlmFailure({ source: "crm/ai/score-all", error: err })
+    }
     return { success: false, error: String(err) }
   }
 }
