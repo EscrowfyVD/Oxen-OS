@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
 import { sendTelegramNotification } from "@/lib/telegram"
 import { logActivity } from "@/lib/activity"
+import { notifyLlmFailure, isLlmFailure } from "@/lib/ai/llm-alert"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const anthropic = new Anthropic()
 
@@ -92,24 +94,15 @@ Return the top 10 most important insights, ordered by severity. Be specific and 
 
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096, // Phase 2: raised from 2048 — a variable-length insight array truncates
       messages: [{ role: "user", content: prompt }],
     })
 
-    const responseText = response.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b.type === "text" ? b.text : ""))
-      .join("")
-
-    // Parse JSON from response
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/)
-    if (!jsonMatch) {
-      return NextResponse.json({ insights: [], message: "Could not parse AI response" })
-    }
-
-    const insightData = JSON.parse(jsonMatch[0]) as Array<{
+    // Shared robust parser: throws on unusable output (was a SILENT 200 + empty array,
+    // indistinguishable from "no insights"). The throw now surfaces (500) + alerts below.
+    const insightData = parseLlmJson<Array<{
       type: string; title: string; summary: string; contactName?: string; severity: string
-    }>
+    }>>(response)
 
     // Save insights to DB
     const savedInsights = []
@@ -195,6 +188,10 @@ Return the top 10 most important insights, ordered by severity. Be specific and 
     return NextResponse.json({ insights: savedInsights })
   } catch (error) {
     console.error("Auto-insights error:", error)
+    // A parse failure here was previously a silent 200 + empty array — now it surfaces + alerts.
+    if (isLlmFailure(error)) {
+      await notifyLlmFailure({ source: "ai/auto-insights", error })
+    }
     return NextResponse.json({ error: "Failed to generate insights" }, { status: 500 })
   }
 }

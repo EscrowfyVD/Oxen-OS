@@ -18,6 +18,7 @@ import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
 import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const anthropic = new Anthropic()
 
@@ -253,21 +254,13 @@ Be specific, actionable, and reference real data. If no data available for a sec
 
   const response = await anthropic.messages.create({
     model: CLAUDE_MODEL,
-    max_tokens: 2048,
+    max_tokens: 4096, // Phase 2: raised from 2048 — 8-field brief with talking_points/risks/opportunities arrays truncates
     messages: [{ role: "user", content: prompt }],
   })
 
-  const responseText = response.content
-    .filter((b) => b.type === "text")
-    .map((b) => (b.type === "text" ? b.text : ""))
-    .join("")
-
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    throw new Error("Failed to parse brief content")
-  }
-
-  const briefContent = JSON.parse(jsonMatch[0])
+  // Shared robust parser (truncation-aware; throws on unusable output). Stored verbatim
+  // to the MeetingBrief.briefContent Json column, so typed as InputJsonValue.
+  const briefContent = parseLlmJson<Prisma.InputJsonValue>(response)
 
   // Save to DB. When eventId is set (LemCal bookings) the brief is UPSERTED by
   // the @unique eventId → re-generation (PR3b 1h-before refresh, or a webhook
@@ -333,7 +326,7 @@ Be specific, actionable, and reference real data. If no data available for a sec
         title,
         meetingDate: new Date(meetingDate),
         attendees: attendees || [],
-        briefContent,
+        briefContent: briefContent as unknown as Record<string, unknown>,
         note: telegramNote ?? undefined,
       })
       const result = await sendTelegramMessage(employee.telegramChatId, formatted)

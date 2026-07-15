@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
 import { ENABLE_WORKERS, JOB_TYPES } from "@/lib/worker-config"
 import { createJob } from "@/lib/job-queue"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const client = new Anthropic()
 
@@ -199,22 +200,17 @@ export async function POST(request: Request) {
       messages: [{ role: "user", content: userMessage }],
     })
 
-    const textBlock = message.content.find((block) => block.type === "text")
-    if (!textBlock || textBlock.type !== "text") {
-      return NextResponse.json(
-        { error: "Failed to generate article" },
-        { status: 500 }
-      )
-    }
-
-    // Parse JSON response — handle potential code block wrapping
-    let jsonText = textBlock.text.trim()
-    const jsonMatch = jsonText.match(/```(?:json)?\n?([\s\S]*?)```/)
-    if (jsonMatch) {
-      jsonText = jsonMatch[1].trim()
-    }
-
-    const generated = JSON.parse(jsonText)
+    // Shared robust parser (truncation-aware; throws on unusable output → outer catch 500).
+    const generated = parseLlmJson<{
+      title: string
+      slug: string
+      metaDescription?: string
+      content: string
+      primaryKeyword?: string
+      secondaryKeywords?: string[]
+      faqSchema?: Array<{ question: string; answer: string }>
+      socialPost?: string
+    }>(message)
 
     const wordCount = countWords(generated.content)
     const verticalArray = targetVertical ? [targetVertical] : []

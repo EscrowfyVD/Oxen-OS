@@ -6,6 +6,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { STAGE_LABELS } from "@/lib/crm-config"
 import { sendTelegramNotificationByEmail } from "@/lib/telegram"
 import { notifyLlmFailure, isLlmFailure } from "@/lib/ai/llm-alert"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const anthropic = new Anthropic()
 
@@ -197,18 +198,12 @@ RESPOND ONLY WITH VALID JSON, no markdown.`
         messages: [{ role: "user", content: prompt }],
       })
 
-      const text =
-        response.content[0].type === "text" ? response.content[0].text : ""
-      const jsonStr = text
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim()
-      const parsed = JSON.parse(jsonStr) as {
+      const parsed = parseLlmJson<{
         subject?: string
         body?: string
         suggestedAction?: string
         reason?: string
-      }
+      }>(response)
 
       const draftMessage = JSON.stringify({
         subject: parsed.subject || "Follow-up",

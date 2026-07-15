@@ -12,6 +12,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { logger, serializeError } from "./lib/logger"
 import { sentryBeforeSend } from "./lib/sentry"
 import { notifyLlmFailure, isLlmFailure, LlmOutputError } from "./lib/llm-alert"
+import { parseLlmJson } from "./lib/parse-llm-json"
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -93,11 +94,6 @@ async function failJob(jobId: string, error: string) {
 
 // ─── Job Handlers ───
 
-function parseJsonFromText(text: string): Record<string, unknown> {
-  const cleaned = text.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim()
-  return JSON.parse(cleaned)
-}
-
 async function handleScoreLead(payload: Record<string, unknown>) {
   const contactId = payload.contactId as string
 
@@ -173,8 +169,7 @@ Return ONLY valid JSON with this exact structure:
     messages: [{ role: "user", content: prompt }],
   })
 
-  const text = response.content[0].type === "text" ? response.content[0].text : ""
-  const scores = parseJsonFromText(text) as {
+  const scores = parseLlmJson<{
     vertical_match: number
     geographic_fit: number
     company_size: number
@@ -182,7 +177,7 @@ Return ONLY valid JSON with this exact structure:
     revenue_potential: number
     total: number
     reasoning: string
-  }
+  }>(response)
 
   // Phase 0: NO `?? 0` fabrication. A missing/non-numeric total is unusable output —
   // throw so the job fails (visible + retryable) and no icpScore/icpFit is persisted,
@@ -335,14 +330,16 @@ Return ONLY valid JSON:
     messages: [{ role: "user", content: parts.join("\n") }],
   })
 
-  const textBlock = message.content.find((block) => block.type === "text")
-  if (!textBlock || textBlock.type !== "text") throw new Error("Failed to generate article")
-
-  let jsonText = textBlock.text.trim()
-  const jsonMatch = jsonText.match(/```(?:json)?\n?([\s\S]*?)```/)
-  if (jsonMatch) jsonText = jsonMatch[1].trim()
-
-  const generated = JSON.parse(jsonText)
+  const generated = parseLlmJson<{
+    title: string
+    slug: string
+    metaDescription?: string
+    content: string
+    primaryKeyword?: string
+    secondaryKeywords?: string[]
+    faqSchema?: Array<{ question: string; answer: string }>
+    socialPost?: string
+  }>(message)
   const wordCount = generated.content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().split(" ").length
   const verticalArray = targetVertical ? [targetVertical] : []
 
@@ -356,7 +353,7 @@ Return ONLY valid JSON:
       author: { "@type": "Organization", name: "Oxen Finance" },
       publisher: { "@type": "Organization", name: "Oxen Finance" },
     },
-    ...(generated.faqSchema?.length > 0 ? [{
+    ...(generated.faqSchema && generated.faqSchema.length > 0 ? [{
       "@context": "https://schema.org",
       "@type": "FAQPage",
       mainEntity: generated.faqSchema.map((faq: { question: string; answer: string }) => ({
@@ -489,13 +486,9 @@ Snippet: ${snippet?.substring(0, 500) || "No snippet available"}`
     messages: [{ role: "user", content: prompt }],
   })
 
-  const text = msg.content[0].type === "text" ? msg.content[0].text : ""
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    // Phase 0: NOT evaluated. Fail loudly; never fabricate score:0/irrelevant.
-    throw new LlmOutputError("news scoring output had no JSON object")
-  }
-  const parsed = JSON.parse(jsonMatch[0]) // malformed JSON throws SyntaxError → also a loud failure
+  // Shared robust parser (truncation-aware, throws on unusable output). The Phase 0
+  // score guard stays: "not evaluated" != "evaluated irrelevant".
+  const parsed = parseLlmJson<{ score?: number; verticals?: string[]; reasoning?: string }>(msg)
   if (typeof parsed.score !== "number") {
     throw new LlmOutputError("news scoring output missing a numeric score")
   }

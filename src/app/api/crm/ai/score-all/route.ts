@@ -6,13 +6,9 @@ import { Prisma } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 import { VERTICALS, GEO_ZONES } from "@/lib/crm-config"
 import { notifyLlmFailure, isLlmFailure, LlmOutputError } from "@/lib/ai/llm-alert"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const anthropic = new Anthropic()
-
-function parseJsonFromText(text: string): Record<string, unknown> {
-  const cleaned = text.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim()
-  return JSON.parse(cleaned)
-}
 
 async function scoreContact(contact: {
   id: string
@@ -65,12 +61,11 @@ Return ONLY valid JSON: {"vertical_match":<0-30>,"geographic_fit":<0-20>,"compan
 
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 512,
+      max_tokens: 1024, // Phase 2: raised from 512 — too low for 5 scores + total + reasoning (truncation)
       messages: [{ role: "user", content: prompt }],
     })
 
-    const text = response.content[0].type === "text" ? response.content[0].text : ""
-    const scores = parseJsonFromText(text) as {
+    const scores = parseLlmJson<{
       vertical_match: number
       geographic_fit: number
       company_size: number
@@ -78,7 +73,7 @@ Return ONLY valid JSON: {"vertical_match":<0-30>,"geographic_fit":<0-20>,"compan
       revenue_potential: number
       total: number
       reasoning: string
-    }
+    }>(response)
 
     // Phase 0: NO `?? 0` fabrication. A missing/non-numeric total is unusable output —
     // fail (write no icpScore/icpFit, do NOT bump lastScoredAt) so the 7-day sweep re-tries,

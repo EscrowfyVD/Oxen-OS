@@ -30,6 +30,14 @@ export class LlmOutputError extends Error {
   }
 }
 
+/** LlmOutputError for a CUT-OFF response (stop_reason "max_tokens"). Mirrors the app. */
+export class LlmTruncationError extends LlmOutputError {
+  constructor(message: string) {
+    super(message)
+    this.name = "LlmTruncationError"
+  }
+}
+
 /** LLM call OR output failure worth alerting on (APIError + parse SyntaxError + LlmOutputError). */
 export function isLlmFailure(err: unknown): boolean {
   return (

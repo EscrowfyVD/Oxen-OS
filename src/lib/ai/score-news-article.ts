@@ -17,6 +17,7 @@
 import type Anthropic from "@anthropic-ai/sdk"
 import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { LlmOutputError } from "@/lib/ai/llm-alert"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 export interface NewsScore {
   score: number
@@ -41,13 +42,9 @@ export async function scoreNewsArticle(
     messages: [{ role: "user", content: prompt }],
   })
 
-  const text = msg.content[0]?.type === "text" ? msg.content[0].text : ""
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    // No JSON at all — NOT evaluated. Fail loudly; never fabricate score:0/irrelevant.
-    throw new LlmOutputError("news scoring output had no JSON object")
-  }
-  const parsed = JSON.parse(jsonMatch[0]) // malformed JSON throws SyntaxError → also a loud failure
+  // Shared robust parser: truncation-aware, balanced extraction, throws on failure
+  // (never fabricates). The score guard stays: "not evaluated" != "evaluated irrelevant".
+  const parsed = parseLlmJson<{ score?: number; verticals?: string[]; reasoning?: string }>(msg)
   if (typeof parsed.score !== "number") {
     throw new LlmOutputError("news scoring output missing a numeric score")
   }

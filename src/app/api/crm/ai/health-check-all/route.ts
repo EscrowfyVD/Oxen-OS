@@ -5,13 +5,9 @@ import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 import { notifyLlmFailure, isLlmFailure } from "@/lib/ai/llm-alert"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const anthropic = new Anthropic()
-
-function parseJsonFromText(text: string): Record<string, unknown> {
-  const cleaned = text.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim()
-  return JSON.parse(cleaned)
-}
 
 async function checkDealHealth(deal: {
   id: string
@@ -55,16 +51,15 @@ Pending tasks: ${deal.tasks.filter((t) => t.status === "pending").length}`
 
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 512,
+      max_tokens: 1024, // Phase 2: raised from 512 — health + reason + suggestedAction strings truncate
       messages: [{ role: "user", content: prompt }],
     })
 
-    const text = response.content[0].type === "text" ? response.content[0].text : ""
-    const result = parseJsonFromText(text) as {
+    const result = parseLlmJson<{
       health: string
       reason: string
       suggestedAction: string
-    }
+    }>(response)
 
     await prisma.deal.update({
       where: { id: deal.id },

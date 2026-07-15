@@ -3,6 +3,7 @@ import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import Anthropic from "@anthropic-ai/sdk"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const anthropic = new Anthropic()
 
@@ -53,12 +54,14 @@ RESPOND ONLY WITH VALID JSON, no markdown.`
   try {
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 500,
+      max_tokens: 1024, // Phase 2: raised from 500 — too tight for the 6-field verdict (truncation)
       messages: [{ role: "user", content: prompt }],
     })
 
-    const text = response.content[0].type === "text" ? response.content[0].text : ""
-    const scores = JSON.parse(text)
+    const scores = parseLlmJson<{
+      icpScore?: number; intentScore?: number; priorityScore?: number
+      icpFit?: string; contactType?: string; vertical?: string
+    }>(response)
 
     await prisma.crmContact.update({
       where: { id: contactId },

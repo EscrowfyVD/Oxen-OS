@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 export async function POST(request: Request) {
   const session = await auth()
@@ -90,15 +91,8 @@ ${trimmedHtml}`,
       ],
     })
 
-    const text = msg.content[0]?.type === "text" ? msg.content[0].text : ""
-
-    // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return NextResponse.json({ error: "Could not extract data" }, { status: 422 })
-    }
-
-    const extracted = JSON.parse(jsonMatch[0])
+    // Shared robust parser (truncation-aware; throws on unusable output → outer catch 500).
+    const extracted = parseLlmJson(msg)
     return NextResponse.json({ extracted })
   } catch (error) {
     console.error("Auto-fill error:", error)

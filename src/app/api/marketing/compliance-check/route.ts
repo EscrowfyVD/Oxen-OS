@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import Anthropic from "@anthropic-ai/sdk"
 import { notifyLlmFailure, LlmOutputError } from "@/lib/ai/llm-alert"
+import { parseLlmJson } from "@/lib/ai/parse-llm-json"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -126,19 +127,14 @@ Check against all applicable regulations for the specified jurisdictions and ret
       messages: [{ role: "user", content: userMessage }],
     })
 
-    const textBlock = response.content.find((block) => block.type === "text")
-    const resultText = textBlock?.text ?? ""
-
-    // Parse the JSON verdict. Phase 0 RULE: an unusable verdict (unparseable OR
+    // Parse the JSON verdict with the shared robust parser (truncation-aware; throws
+    // on unusable output). Phase 0 RULE unchanged: an unusable verdict (unparseable OR
     // valid-but-incomplete) must NEVER be recorded as a real regulatory audit — no
-    // fabricated medium/50/[]. Record an explicit 'error' state (clearly NOT a passed
-    // or medium audit) and alert, so a reviewer can never mistake it for a verdict.
+    // fabricated medium/50/[]. The explicit 'error' state below is untouched.
     let result: { overallRisk?: string; score?: number; summary?: string; findings?: unknown[] } | null = null
     let parseError: unknown = null
     try {
-      // Extract JSON from possible markdown code blocks
-      const jsonMatch = resultText.match(/\{[\s\S]*\}/)
-      result = JSON.parse(jsonMatch?.[0] || resultText)
+      result = parseLlmJson<{ overallRisk?: string; score?: number; summary?: string; findings?: unknown[] }>(response)
     } catch (e) {
       parseError = e
     }

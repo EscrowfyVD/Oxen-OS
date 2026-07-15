@@ -35,6 +35,19 @@ export class LlmOutputError extends Error {
 }
 
 /**
+ * A more specific LlmOutputError: the model output was CUT OFF (stop_reason ===
+ * "max_tokens"). Distinct from malformed JSON so the alert can say "raise max_tokens"
+ * — truncation (not a bad prompt) is the usual root cause of a parse failure.
+ * Subclass of LlmOutputError, so isLlmFailure() catches it too.
+ */
+export class LlmTruncationError extends LlmOutputError {
+  constructor(message: string) {
+    super(message)
+    this.name = "LlmTruncationError"
+  }
+}
+
+/**
  * Is this an LLM CALL or OUTPUT failure worth alerting on? Widened past the #44
  * `instanceof Anthropic.APIError` (call-side) to ALSO cover parse failures: a bad
  * JSON.parse throws a native SyntaxError, and an incomplete verdict throws
