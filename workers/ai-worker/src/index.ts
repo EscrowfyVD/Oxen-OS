@@ -11,6 +11,7 @@ import { PrismaClient } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 import { logger, serializeError } from "./lib/logger"
 import { sentryBeforeSend } from "./lib/sentry"
+import { notifyLlmFailure } from "./lib/llm-alert"
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -446,7 +447,10 @@ async function handleNewsScan(payload: Record<string, unknown>) {
         where: { id: source.id },
         data: { lastScanned: new Date() },
       })
-    } catch {
+    } catch (e) {
+      // An LLM/API failure must NOT be swallowed into a "green" scan — let it fail
+      // the job (visible + retryable). Only RSS/fetch errors are skipped.
+      if (e instanceof Anthropic.APIError) throw e
       continue
     }
   }
@@ -477,23 +481,22 @@ async function scoreArticle(title: string, snippet: string) {
 Title: ${title}
 Snippet: ${snippet?.substring(0, 500) || "No snippet available"}`
 
-  try {
-    const msg = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    })
+  // NO try/catch around the API call — a retired/broken model MUST fail the job,
+  // never be swallowed into a fake score:0 (2026-06 incident post-mortem).
+  const msg = await anthropic.messages.create({
+    model: CLAUDE_MODEL,
+    max_tokens: 1024,
+    messages: [{ role: "user", content: prompt }],
+  })
 
-    const text = msg.content[0].type === "text" ? msg.content[0].text : ""
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0])
-      return { score: parsed.score || 0, verticals: parsed.verticals || [], reasoning: parsed.reasoning || "" }
-    }
-    return { score: 0, verticals: [], reasoning: "Failed to parse" }
-  } catch {
-    return { score: 0, verticals: [], reasoning: "API call failed" }
+  const text = msg.content[0].type === "text" ? msg.content[0].text : ""
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (jsonMatch) {
+    const parsed = JSON.parse(jsonMatch[0])
+    return { score: parsed.score || 0, verticals: parsed.verticals || [], reasoning: parsed.reasoning || "" }
   }
+  // Parser fragility (out of scope) — model responded but no JSON found.
+  return { score: 0, verticals: [], reasoning: "Failed to parse" }
 }
 
 // ─── Main Loop ───
@@ -543,6 +546,10 @@ async function poll() {
           const errorMessage = err instanceof Error ? err.message : String(err)
           log.error({ jobId: job.id, errorMessage }, "failed job")
           await failJob(job.id, errorMessage)
+          // An LLM/API failure that failed a job must ping a human, not just log.
+          if (err instanceof Anthropic.APIError) {
+            await notifyLlmFailure(prisma, { source: job.type, error: err })
+          }
         }
       }
     } catch (err) {
@@ -564,8 +571,34 @@ process.on("SIGTERM", () => {
   running = false
 })
 
+// Boot canary — one real call to the ACTUAL model so a retired/broken model fails
+// LOUDLY at startup, instead of every job silently failing later. Non-fatal: the
+// worker still starts and polls (jobs will fail visibly + alert) even if it fails.
+async function bootCanary() {
+  try {
+    await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 1,
+      messages: [{ role: "user", content: "ping" }],
+    })
+    log.info({ model: CLAUDE_MODEL }, "llm canary OK at boot")
+  } catch (err) {
+    log.error(
+      { err: serializeError(err), model: CLAUDE_MODEL },
+      "🔴 LLM CANARY FAILED at boot — model/API broken",
+    )
+    await notifyLlmFailure(prisma, {
+      source: "worker-boot-canary",
+      error: err,
+      detail: `Boot canary to model "${CLAUDE_MODEL}" failed — AI jobs will fail.`,
+    })
+  }
+}
+
 log.info({ pollInterval: POLL_INTERVAL }, "starting ai worker")
-poll().then(() => {
-  log.info("worker stopped")
-  prisma.$disconnect()
+bootCanary().finally(() => {
+  poll().then(() => {
+    log.info("worker stopped")
+    prisma.$disconnect()
+  })
 })

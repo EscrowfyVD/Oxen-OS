@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
-import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
 import { ENABLE_WORKERS, JOB_TYPES } from "@/lib/worker-config"
 import { createJob } from "@/lib/job-queue"
+import { scoreNewsArticle } from "@/lib/ai/score-news-article"
+import { notifyLlmFailure } from "@/lib/ai/llm-alert"
 
 const client = new Anthropic()
 
@@ -26,31 +27,6 @@ function extractItems(xml: string) {
   }
 
   return items
-}
-
-async function scoreArticle(title: string, snippet: string): Promise<{ score: number; verticals: string[]; reasoning: string }> {
-  const prompt = `Score this news article 0-100 on relevance to Oxen Finance's business. Oxen provides financial services to: crypto companies, family offices, CSPs/fiduciaries, luxury asset brokers, iGaming operators, yacht brokers, import/export companies. Score based on: does this news relate to banking, payments, financial services, regulation, or any of these verticals? Which verticals does it match? Return JSON only: {"score": number, "verticals": string[], "reasoning": string}
-
-Title: ${title}
-Snippet: ${snippet?.substring(0, 500) || "No snippet available"}`
-
-  try {
-    const msg = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    })
-
-    const text = msg.content[0].type === "text" ? msg.content[0].text : ""
-    // Extract JSON from potential markdown fences
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0])
-    }
-    return { score: 0, verticals: [], reasoning: "Failed to parse response" }
-  } catch {
-    return { score: 0, verticals: [], reasoning: "API call failed" }
-  }
 }
 
 export async function POST(req: Request) {
@@ -82,56 +58,69 @@ export async function POST(req: Request) {
   let scoredCount = 0
   const MAX_SCORED = 10
 
-  for (const source of sources) {
-    if (!source.rssUrl) continue
+  try {
+    for (const source of sources) {
+      if (!source.rssUrl) continue
 
-    try {
-      const res = await fetch(source.rssUrl)
-      if (!res.ok) continue
+      try {
+        const res = await fetch(source.rssUrl)
+        if (!res.ok) continue
 
-      const xml = await res.text()
-      const feedItems = extractItems(xml)
+        const xml = await res.text()
+        const feedItems = extractItems(xml)
 
-      for (const item of feedItems) {
-        if (scoredCount >= MAX_SCORED) break
+        for (const item of feedItems) {
+          if (scoredCount >= MAX_SCORED) break
 
-        // Check if URL already exists
-        const exists = await prisma.newsItem.findUnique({
-          where: { url: item.link },
+          // Check if URL already exists
+          const exists = await prisma.newsItem.findUnique({
+            where: { url: item.link },
+          })
+          if (exists) continue
+
+          // scoreNewsArticle THROWS on an LLM/API failure — never a fake score:0.
+          const { score, verticals } = await scoreNewsArticle(client, item.title, item.description)
+          scoredCount++
+
+          const status = score >= 60 ? "queued" : "irrelevant"
+          if (score >= 60) relevantCount++
+
+          await prisma.newsItem.create({
+            data: {
+              title: item.title,
+              url: item.link,
+              sourceId: source.id,
+              snippet: item.description?.substring(0, 1000) || null,
+              publishedAt: item.pubDate ? new Date(item.pubDate) : null,
+              relevanceScore: score,
+              vertical: verticals,
+              status,
+            },
+          })
+          newItemsCount++
+        }
+
+        // Update lastScanned on source
+        await prisma.newsSource.update({
+          where: { id: source.id },
+          data: { lastScanned: new Date() },
         })
-        if (exists) continue
-
-        // Score with Claude
-        const { score, verticals, reasoning } = await scoreArticle(item.title, item.description)
-        scoredCount++
-
-        const status = score >= 60 ? "queued" : "irrelevant"
-        if (score >= 60) relevantCount++
-
-        await prisma.newsItem.create({
-          data: {
-            title: item.title,
-            url: item.link,
-            sourceId: source.id,
-            snippet: item.description?.substring(0, 1000) || null,
-            publishedAt: item.pubDate ? new Date(item.pubDate) : null,
-            relevanceScore: score,
-            vertical: verticals,
-            status,
-          },
-        })
-        newItemsCount++
+      } catch (e) {
+        // Only RSS/fetch errors are skipped. An LLM/API error must NOT be swallowed
+        // into a "green" scan of fake score:0 rows — rethrow so the run fails visibly.
+        if (e instanceof Anthropic.APIError) throw e
+        continue
       }
-
-      // Update lastScanned on source
-      await prisma.newsSource.update({
-        where: { id: source.id },
-        data: { lastScanned: new Date() },
-      })
-    } catch {
-      // Skip sources that fail to fetch
-      continue
     }
+  } catch (e) {
+    if (e instanceof Anthropic.APIError) {
+      await notifyLlmFailure({ source: "news-scan", error: e })
+      return NextResponse.json(
+        { error: "News scoring unavailable — LLM call failed", scored: scoredCount },
+        { status: 503 },
+      )
+    }
+    throw e
   }
 
   return NextResponse.json({

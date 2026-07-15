@@ -3,6 +3,7 @@ import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
 import Anthropic from "@anthropic-ai/sdk"
+import { notifyLlmFailure } from "@/lib/ai/llm-alert"
 
 const anthropic = new Anthropic()
 
@@ -108,6 +109,10 @@ async function checkUpcoming() {
           results.push({ event: event.title, action: "brief_generated" })
         } catch (err) {
           console.error(`[check-upcoming] Brief generation failed for ${event.title}:`, err)
+          // The per-attendee fallback isn't an OPS signal — also ping BD/ops.
+          if (err instanceof Anthropic.APIError) {
+            await notifyLlmFailure({ source: "telegram/check-upcoming", error: err })
+          }
 
           // Fallback: send basic notification
           const fallbackSent = await sendFallbackNotification(event)
