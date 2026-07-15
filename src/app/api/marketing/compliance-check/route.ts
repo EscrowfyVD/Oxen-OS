@@ -3,6 +3,7 @@ import { CLAUDE_MODEL } from "@/lib/ai/model"
 import { prisma } from "@/lib/prisma"
 import { requirePageAccess } from "@/lib/admin"
 import Anthropic from "@anthropic-ai/sdk"
+import { notifyLlmFailure, LlmOutputError } from "@/lib/ai/llm-alert"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -128,19 +129,49 @@ Check against all applicable regulations for the specified jurisdictions and ret
     const textBlock = response.content.find((block) => block.type === "text")
     const resultText = textBlock?.text ?? ""
 
-    // Parse the JSON result
-    let result: { overallRisk?: string; score?: number; summary?: string; findings?: unknown[] }
+    // Parse the JSON verdict. Phase 0 RULE: an unusable verdict (unparseable OR
+    // valid-but-incomplete) must NEVER be recorded as a real regulatory audit — no
+    // fabricated medium/50/[]. Record an explicit 'error' state (clearly NOT a passed
+    // or medium audit) and alert, so a reviewer can never mistake it for a verdict.
+    let result: { overallRisk?: string; score?: number; summary?: string; findings?: unknown[] } | null = null
+    let parseError: unknown = null
     try {
       // Extract JSON from possible markdown code blocks
       const jsonMatch = resultText.match(/\{[\s\S]*\}/)
       result = JSON.parse(jsonMatch?.[0] || resultText)
-    } catch {
-      result = {
-        overallRisk: "medium",
-        score: 50,
-        summary: "Could not parse compliance check results. Please try again.",
-        findings: [],
-      }
+    } catch (e) {
+      parseError = e
+    }
+
+    if (
+      parseError ||
+      !result ||
+      typeof result.overallRisk !== "string" ||
+      result.overallRisk.length === 0 ||
+      typeof result.score !== "number"
+    ) {
+      const err = parseError ?? new LlmOutputError("compliance verdict missing overallRisk/score")
+      await notifyLlmFailure({
+        source: "marketing/compliance-check",
+        error: err,
+        detail: "Compliance LLM output unusable — recorded as status:'error', NO verdict written.",
+      })
+      const errored = await prisma.contentComplianceCheck.update({
+        where: { id: check.id },
+        data: {
+          status: "error",
+          overallRisk: null,
+          score: null,
+          findings: [],
+          summary:
+            "LLM output could not be parsed into a complete verdict — this is NOT a completed audit. Re-run required.",
+          checkedAt: new Date(),
+        },
+      })
+      return NextResponse.json(
+        { error: "Compliance check could not be evaluated — recorded as error, not a verdict", check: errored },
+        { status: 502 },
+      )
     }
 
     // Determine status based on risk

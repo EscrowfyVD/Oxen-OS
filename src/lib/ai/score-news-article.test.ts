@@ -6,6 +6,7 @@
 import { describe, it, expect, vi } from "vitest"
 import Anthropic from "@anthropic-ai/sdk"
 import { scoreNewsArticle } from "./score-news-article"
+import { LlmOutputError } from "./llm-alert"
 
 function clientReturning(text: string): Anthropic {
   return {
@@ -42,5 +43,15 @@ describe("scoreNewsArticle", () => {
     const client = clientThrowing(apiErr)
     await expect(scoreNewsArticle(client, "anything", "…")).rejects.toBe(apiErr)
     // The key guarantee: it did NOT resolve to { score: 0 } (a fabricated irrelevant).
+  })
+
+  it("[4] Phase 0: output with NO JSON THROWS LlmOutputError — never a fabricated score:0", async () => {
+    const client = clientReturning("I could not score this. Sorry!")
+    await expect(scoreNewsArticle(client, "x", "…")).rejects.toBeInstanceOf(LlmOutputError)
+  })
+
+  it("[5] Phase 0: valid JSON but no numeric score THROWS — 'not evaluated' != 'irrelevant'", async () => {
+    const client = clientReturning('{"verticals": [], "reasoning": "unsure"}')
+    await expect(scoreNewsArticle(client, "x", "…")).rejects.toBeInstanceOf(LlmOutputError)
   })
 })

@@ -12,10 +12,32 @@
  * underlying error that is about to fail the job).
  */
 import * as Sentry from "@sentry/node"
+import Anthropic from "@anthropic-ai/sdk"
 import type { PrismaClient } from "@prisma/client"
 import { logger } from "./logger"
 
 const log = logger.child({ component: "llm-alert" })
+
+/**
+ * Thrown when an LLM CALL succeeded but its OUTPUT is unusable (no parseable JSON,
+ * or a required field missing). Unusable output must fail LOUDLY, never become a
+ * fabricated default (score 0). Mirrors src/lib/ai/llm-alert.ts.
+ */
+export class LlmOutputError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "LlmOutputError"
+  }
+}
+
+/** LLM call OR output failure worth alerting on (APIError + parse SyntaxError + LlmOutputError). */
+export function isLlmFailure(err: unknown): boolean {
+  return (
+    err instanceof Anthropic.APIError ||
+    err instanceof SyntaxError ||
+    err instanceof LlmOutputError
+  )
+}
 
 const COOLDOWN_MS = parseInt(
   process.env.LLM_ALERT_COOLDOWN_MS || String(6 * 60 * 60 * 1000),

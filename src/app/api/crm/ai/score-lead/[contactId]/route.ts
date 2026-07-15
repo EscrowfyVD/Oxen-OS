@@ -6,6 +6,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { VERTICALS, GEO_ZONES } from "@/lib/crm-config"
 import { ENABLE_WORKERS, JOB_TYPES } from "@/lib/worker-config"
 import { createJob } from "@/lib/job-queue"
+import { notifyLlmFailure, isLlmFailure, LlmOutputError } from "@/lib/ai/llm-alert"
 
 const anthropic = new Anthropic()
 
@@ -110,13 +111,13 @@ Return ONLY valid JSON with this exact structure:
       reasoning: string
     }
 
-    const total = scores.total ?? (
-      (scores.vertical_match ?? 0) +
-      (scores.geographic_fit ?? 0) +
-      (scores.company_size ?? 0) +
-      (scores.engagement ?? 0) +
-      (scores.revenue_potential ?? 0)
-    )
+    // Phase 0: NO `?? 0` fabrication. A missing/non-numeric total is unusable output —
+    // surface the failure (500), write no icpScore/icpFit, do NOT bump lastScoredAt, so
+    // the contact is re-scored rather than shown a fabricated 0/tier_3.
+    if (typeof scores.total !== "number" || Number.isNaN(scores.total)) {
+      throw new LlmOutputError("ICP scoring returned no numeric total — refusing to fabricate 0/tier_3")
+    }
+    const total = scores.total
 
     // Determine ICP fit tier
     let icpFit: string
@@ -152,6 +153,10 @@ Return ONLY valid JSON with this exact structure:
     })
   } catch (error) {
     console.error("[AI Score Lead]", error)
+    // A parse/output failure was previously invisible here — surface it (Telegram BD).
+    if (isLlmFailure(error)) {
+      await notifyLlmFailure({ source: "crm/ai/score-lead", error })
+    }
     return NextResponse.json({ error: "Failed to score lead" }, { status: 500 })
   }
 }

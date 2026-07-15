@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
-import { notifyLlmFailure } from "@/lib/ai/llm-alert"
+import { notifyLlmFailure, isLlmFailure } from "@/lib/ai/llm-alert"
 
 const anthropic = new Anthropic()
 
@@ -78,8 +78,8 @@ Pending tasks: ${deal.tasks.filter((t) => t.status === "pending").length}`
     return { health: result.health, success: true }
   } catch (err) {
     console.error(`[Health Check All] Failed for deal ${deal.id}:`, err)
-    // errors++ is nobody's dashboard — surface an LLM failure.
-    if (err instanceof Anthropic.APIError) {
+    // errors++ is nobody's dashboard — surface an LLM CALL or OUTPUT(parse) failure.
+    if (isLlmFailure(err)) {
       await notifyLlmFailure({ source: "crm/ai/health-check-all", error: err })
     }
     return { health: "unknown", success: false }

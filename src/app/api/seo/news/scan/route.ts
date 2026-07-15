@@ -5,7 +5,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { ENABLE_WORKERS, JOB_TYPES } from "@/lib/worker-config"
 import { createJob } from "@/lib/job-queue"
 import { scoreNewsArticle } from "@/lib/ai/score-news-article"
-import { notifyLlmFailure } from "@/lib/ai/llm-alert"
+import { notifyLlmFailure, isLlmFailure } from "@/lib/ai/llm-alert"
 
 const client = new Anthropic()
 
@@ -108,12 +108,12 @@ export async function POST(req: Request) {
       } catch (e) {
         // Only RSS/fetch errors are skipped. An LLM/API error must NOT be swallowed
         // into a "green" scan of fake score:0 rows — rethrow so the run fails visibly.
-        if (e instanceof Anthropic.APIError) throw e
+        if (isLlmFailure(e)) throw e
         continue
       }
     }
   } catch (e) {
-    if (e instanceof Anthropic.APIError) {
+    if (isLlmFailure(e)) {
       await notifyLlmFailure({ source: "news-scan", error: e })
       return NextResponse.json(
         { error: "News scoring unavailable — LLM call failed", scored: scoredCount },

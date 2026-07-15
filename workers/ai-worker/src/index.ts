@@ -11,7 +11,7 @@ import { PrismaClient } from "@prisma/client"
 import Anthropic from "@anthropic-ai/sdk"
 import { logger, serializeError } from "./lib/logger"
 import { sentryBeforeSend } from "./lib/sentry"
-import { notifyLlmFailure } from "./lib/llm-alert"
+import { notifyLlmFailure, isLlmFailure, LlmOutputError } from "./lib/llm-alert"
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -184,13 +184,13 @@ Return ONLY valid JSON with this exact structure:
     reasoning: string
   }
 
-  const total = scores.total ?? (
-    (scores.vertical_match ?? 0) +
-    (scores.geographic_fit ?? 0) +
-    (scores.company_size ?? 0) +
-    (scores.engagement ?? 0) +
-    (scores.revenue_potential ?? 0)
-  )
+  // Phase 0: NO `?? 0` fabrication. A missing/non-numeric total is unusable output —
+  // throw so the job fails (visible + retryable) and no icpScore/icpFit is persisted,
+  // instead of writing a fabricated 0/tier_3 with no retry.
+  if (typeof scores.total !== "number" || Number.isNaN(scores.total)) {
+    throw new LlmOutputError("ICP scoring returned no numeric total — refusing to fabricate 0/tier_3")
+  }
+  const total = scores.total
 
   let icpFit: string
   if (total >= 70) icpFit = "tier_1"
@@ -448,9 +448,9 @@ async function handleNewsScan(payload: Record<string, unknown>) {
         data: { lastScanned: new Date() },
       })
     } catch (e) {
-      // An LLM/API failure must NOT be swallowed into a "green" scan — let it fail
-      // the job (visible + retryable). Only RSS/fetch errors are skipped.
-      if (e instanceof Anthropic.APIError) throw e
+      // An LLM CALL or OUTPUT(parse) failure must NOT be swallowed into a "green" scan —
+      // let it fail the job (visible + retryable). Only RSS/fetch errors are skipped.
+      if (isLlmFailure(e)) throw e
       continue
     }
   }
@@ -491,12 +491,15 @@ Snippet: ${snippet?.substring(0, 500) || "No snippet available"}`
 
   const text = msg.content[0].type === "text" ? msg.content[0].text : ""
   const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (jsonMatch) {
-    const parsed = JSON.parse(jsonMatch[0])
-    return { score: parsed.score || 0, verticals: parsed.verticals || [], reasoning: parsed.reasoning || "" }
+  if (!jsonMatch) {
+    // Phase 0: NOT evaluated. Fail loudly; never fabricate score:0/irrelevant.
+    throw new LlmOutputError("news scoring output had no JSON object")
   }
-  // Parser fragility (out of scope) — model responded but no JSON found.
-  return { score: 0, verticals: [], reasoning: "Failed to parse" }
+  const parsed = JSON.parse(jsonMatch[0]) // malformed JSON throws SyntaxError → also a loud failure
+  if (typeof parsed.score !== "number") {
+    throw new LlmOutputError("news scoring output missing a numeric score")
+  }
+  return { score: parsed.score, verticals: parsed.verticals || [], reasoning: parsed.reasoning || "" }
 }
 
 // ─── Main Loop ───
@@ -546,8 +549,8 @@ async function poll() {
           const errorMessage = err instanceof Error ? err.message : String(err)
           log.error({ jobId: job.id, errorMessage }, "failed job")
           await failJob(job.id, errorMessage)
-          // An LLM/API failure that failed a job must ping a human, not just log.
-          if (err instanceof Anthropic.APIError) {
+          // An LLM CALL or OUTPUT(parse) failure that failed a job must ping a human.
+          if (isLlmFailure(err)) {
             await notifyLlmFailure(prisma, { source: job.type, error: err })
           }
         }
