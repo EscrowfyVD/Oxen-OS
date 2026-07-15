@@ -1,0 +1,34 @@
+name: LLM Canary Hourly
+
+on:
+  schedule:
+    # Hourly at :23 — deliberately off :00 (GitHub's scheduler is most congested
+    # at the top of the hour) and off the recompute cron's :17, per repo convention.
+    - cron: '23 * * * *'
+  workflow_dispatch:
+    # Safe to re-run: the canary is a single 1-token read-only probe.
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe LLM canary endpoint
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            https://os.oxen.finance/api/cron/llm-canary \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "HTTP $http_code"
+          echo "$body"
+
+          # 200 = model reachable. 503 = canary detected the model/API is broken
+          # (the route already fired a Telegram/ops alert); the red run is the
+          # secondary signal. Anything else = auth/route problem.
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::LLM canary failed with status $http_code — AI features likely down"
+            exit 1
+          fi
