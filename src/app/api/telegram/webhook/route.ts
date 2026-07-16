@@ -5,6 +5,7 @@ import { sendTelegramMessage, formatBriefForTelegram } from "@/lib/telegram"
 import { requireWebhookSecret } from "@/lib/webhook-auth"
 import { logger, serializeError } from "@/lib/logger"
 import Anthropic from "@anthropic-ai/sdk"
+import { TASKS_HIDDEN } from "@/lib/hidden-modules"
 
 const anthropic = new Anthropic()
 const tgLog = logger.child({ component: "telegram-webhook" })
@@ -96,13 +97,15 @@ export async function POST(request: Request) {
       await handleSupport(chatId, text, fromName)
     } else if (text.startsWith("/pipeline")) {
       await handlePipeline(chatId)
-    } else if (text.startsWith("/tasks")) {
+    } else if (!TASKS_HIDDEN && text.startsWith("/tasks")) {
       await handleTasks(chatId)
     } else if (text.startsWith("/")) {
       // Unknown command
       await sendTelegramMessage(
         chatId,
-        "Unknown command. Available:\n/start — Link account\n/myid — Your chat ID\n/brief — Meeting brief\n/digest — Daily digest\n/pipeline — Pipeline summary\n/tasks — Today's tasks\n/support [msg] — Create ticket",
+        "Unknown command. Available:\n/start — Link account\n/myid — Your chat ID\n/brief — Meeting brief\n/digest — Daily digest\n/pipeline — Pipeline summary\n" +
+          (TASKS_HIDDEN ? "" : "/tasks — Today's tasks\n") +
+          "/support [msg] — Create ticket",
       )
     } else if (pendingNotes.has(chatId)) {
       // User is replying with a contact name to link their note
@@ -143,7 +146,7 @@ async function handleStart(chatId: number) {
       `/brief — Next meeting brief\n` +
       `/digest — Daily digest\n` +
       `/pipeline — Pipeline summary\n` +
-      `/tasks — Today's tasks\n` +
+      (TASKS_HIDDEN ? "" : `/tasks — Today's tasks\n`) +
       `/support [msg] — Create support ticket\n` +
       `/myid — Your chat ID`,
     )
@@ -682,7 +685,7 @@ async function handleRegularMessage(chatId: number, text: string, fromName: stri
     await sendTelegramMessage(
       chatId,
       "💡 Tip: Send a meeting note or call summary (20+ chars) and I'll extract action items.\n\n" +
-      "Or use a command:\n/brief /digest /pipeline /tasks /support",
+      "Or use a command:\n/brief /digest /pipeline " + (TASKS_HIDDEN ? "" : "/tasks ") + "/support",
     )
     return
   }
@@ -838,25 +841,27 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
       },
     })
 
-    // Create tasks for action items
+    // Create tasks for action items (gated — tasks module hidden; reversible via @/lib/hidden-modules)
     let tasksCreated = 0
-    for (const item of noteData.actionItems) {
-      const parts = item.split(" → ")
-      const taskTitle = parts[0] || item
-      const assignee = parts[1] !== "?" ? parts[1] : employee.name
+    if (!TASKS_HIDDEN) {
+      for (const item of noteData.actionItems) {
+        const parts = item.split(" → ")
+        const taskTitle = parts[0] || item
+        const assignee = parts[1] !== "?" ? parts[1] : employee.name
 
-      await prisma.task.create({
-        data: {
-          title: taskTitle,
-          column: "todo",
-          priority: "medium",
-          tag: "follow-up",
-          assignee: assignee || employee.name,
-          createdBy: employee.name,
-          description: `From meeting note by ${employee.name} re: ${contact.company?.name || `${contact.firstName} ${contact.lastName}`}`,
-        },
-      })
-      tasksCreated++
+        await prisma.task.create({
+          data: {
+            title: taskTitle,
+            column: "todo",
+            priority: "medium",
+            tag: "follow-up",
+            assignee: assignee || employee.name,
+            createdBy: employee.name,
+            description: `From meeting note by ${employee.name} re: ${contact.company?.name || `${contact.firstName} ${contact.lastName}`}`,
+          },
+        })
+        tasksCreated++
+      }
     }
 
     pendingNotes.delete(chatId)
@@ -864,7 +869,7 @@ async function handleNoteLinking(chatId: number, contactQuery: string) {
     await sendTelegramMessage(
       chatId,
       `✅ Linked to <b>${esc(contact.firstName)} ${esc(contact.lastName)}</b> (${esc(contact.company?.name || "?")}).\n\n` +
-      `📝 Interaction saved\n📋 ${tasksCreated} task${tasksCreated !== 1 ? "s" : ""} created`,
+      `📝 Interaction saved` + (TASKS_HIDDEN ? "" : `\n📋 ${tasksCreated} task${tasksCreated !== 1 ? "s" : ""} created`),
     )
   } catch (error) {
     tgLog.error({ err: serializeError(error) }, "telegram note linking failed")
@@ -907,7 +912,7 @@ async function handleEmailLinking(chatId: number, email: string) {
     `/brief — Next meeting brief\n` +
     `/digest — Daily digest\n` +
     `/pipeline — Pipeline summary\n` +
-    `/tasks — Today's tasks\n` +
+    (TASKS_HIDDEN ? "" : `/tasks — Today's tasks\n`) +
     `/support [msg] — Create support ticket\n` +
     `/myid — Your chat ID`,
   )
@@ -935,7 +940,7 @@ async function handleCallbackQuery(chatId: number, data: string, queryId: string
     await handleDigest(chatId)
   } else if (data === "cmd_pipeline") {
     await handlePipeline(chatId)
-  } else if (data === "cmd_tasks") {
+  } else if (!TASKS_HIDDEN && data === "cmd_tasks") {
     await handleTasks(chatId)
   }
 }

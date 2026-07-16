@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X } from "lucide-react"
+import { TASKS_HIDDEN, WIKI_HIDDEN } from "@/lib/hidden-modules"
 
 const CARD_BG = "var(--card-bg-solid)"
 const CARD_BORDER = "var(--card-border)"
@@ -19,7 +20,7 @@ interface SearchResult {
   href: string
 }
 
-const PAGES: SearchResult[] = [
+const ALL_PAGES: SearchResult[] = [
   { id: "dashboard", type: "page", label: "Dashboard", href: "/" },
   { id: "crm", type: "page", label: "CRM Pipeline", href: "/crm" },
   { id: "contacts", type: "page", label: "CRM Contacts", href: "/crm/contacts" },
@@ -36,6 +37,11 @@ const PAGES: SearchResult[] = [
   { id: "conferences", type: "page", label: "Conferences", href: "/conferences" },
   { id: "settings", type: "page", label: "Settings", href: "/settings" },
 ]
+
+// Reversible module hides (flip the flag in @/lib/hidden-modules to restore).
+const PAGES: SearchResult[] = ALL_PAGES.filter(
+  (p) => !(p.id === "tasks" && TASKS_HIDDEN) && !(p.id === "wiki" && WIKI_HIDDEN),
+)
 
 export default function CommandPaletteProvider({
   children,

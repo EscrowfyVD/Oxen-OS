@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Counter from "@/components/dashboard/Counter"
 import { getAvatarGradient } from "@/lib/avatar"
+import { TASKS_HIDDEN } from "@/lib/hidden-modules"
 
 /* ── Design tokens (CSS-variable-backed for light/dark) ── */
 const CARD_BORDER = "var(--card-border)"
@@ -133,7 +134,7 @@ export default function DashboardPage() {
     // Modal actions (contact, task, agent) would be handled by parent or dedicated pages
     // For now, navigate to the relevant module page
     if (action.modal === "contact") router.push("/crm")
-    if (action.modal === "task") router.push("/tasks")
+    if (!TASKS_HIDDEN && action.modal === "task") router.push("/tasks") // tasks module hidden
     if (action.modal === "agent") router.push("/crm")
   }
 

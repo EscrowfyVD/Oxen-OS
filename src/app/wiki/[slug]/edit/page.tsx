@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState, useRef, useCallback } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, redirect } from "next/navigation"
+import { WIKI_HIDDEN } from "@/lib/hidden-modules"
 import Link from "next/link"
 import WikiEditor from "@/components/wiki/WikiEditor"
 import type { JSONContent } from "@tiptap/react"
@@ -27,6 +28,7 @@ const EMOJIS = [
 ]
 
 export default function WikiEditPage() {
+  if (WIKI_HIDDEN) redirect("/") // wiki module hidden — reversible via @/lib/hidden-modules
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug as string

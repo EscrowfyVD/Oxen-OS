@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, redirect } from "next/navigation"
+import { WIKI_HIDDEN } from "@/lib/hidden-modules"
 import Link from "next/link"
 import { generateHTML } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
@@ -88,6 +89,7 @@ const EXTENSIONS = [
 ]
 
 export default function WikiViewPage() {
+  if (WIKI_HIDDEN) redirect("/") // wiki module hidden — reversible via @/lib/hidden-modules
   const params = useParams()
   const router = useRouter()
   const slug = params?.slug as string
