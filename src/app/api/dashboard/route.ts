@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getUserRole } from "@/lib/admin"
 import { canAccess, type RoleLevel } from "@/lib/permissions"
+import { TASKS_HIDDEN, WIKI_HIDDEN } from "@/lib/hidden-modules"
 
 const ACTION_META: Record<string, { icon: string; color: string }> = {
   client_onboarded: { icon: "\uD83E\uDD1D", color: "#34D399" },
@@ -191,6 +192,13 @@ export async function GET() {
       { icon: "\uD83C\uDFD6\uFE0F", label: "Request Leave", href: "/absences" },
     ]
   }
+
+  // Reversible module hides \u2014 drop quick-actions for hidden modules (@/lib/hidden-modules).
+  quickActions = quickActions.filter(
+    (qa) =>
+      !(TASKS_HIDDEN && qa.modal === "task") &&
+      !(WIKI_HIDDEN && (qa.href === "/wiki" || qa.href === "/wiki/new")),
+  )
 
   return NextResponse.json({
     stats,

@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { redirect } from "next/navigation"
+import { TASKS_HIDDEN } from "@/lib/hidden-modules"
 
 /* ── Design tokens ── */
 const CARD_BG = "var(--card-bg-solid)"
@@ -395,6 +397,7 @@ function TaskCard({
 
 /* ── Main Tasks Page ── */
 export default function TasksPage() {
+  if (TASKS_HIDDEN) redirect("/") // tasks module hidden — reversible via @/lib/hidden-modules
   const [tasks, setTasks] = useState<Task[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [activeFilter, setActiveFilter] = useState("all")

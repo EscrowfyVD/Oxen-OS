@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useEffect, useState, useMemo, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, redirect } from "next/navigation"
+import { WIKI_HIDDEN } from "@/lib/hidden-modules"
 import Link from "next/link"
 import WikiPageCard, { WikiPage, getCategoryColor } from "@/components/wiki/WikiPageCard"
 
@@ -686,6 +687,7 @@ function SentinelCard({
 
 /* ── Main Wiki List Page ── */
 export default function WikiListPage() {
+  if (WIKI_HIDDEN) redirect("/") // wiki module hidden — reversible via @/lib/hidden-modules
   const router = useRouter()
   const [pages, setPages] = useState<WikiPage[]>([])
   const [search, setSearch] = useState("")

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
+import { WIKI_HIDDEN } from "@/lib/hidden-modules"
 import {
   ArrowLeft, Edit2, ExternalLink, Plus, X, Loader2, Copy, Trash2,
   Star, Users, FileText, BarChart3, DollarSign, ClipboardList,
@@ -1417,7 +1418,7 @@ function ReportTab({ conf, onUpdate }: { conf: Conference; onUpdate: () => void 
           )
         })}
 
-        {r.wikiPageId && (
+        {r.wikiPageId && !WIKI_HIDDEN && (
           <a href={`/wiki/${r.wikiPageId}`} style={{ color: ROSE_GOLD, fontSize: 13, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
             View in Wiki <ExternalLink size={12} />
           </a>

@@ -29,6 +29,7 @@ import { Sun, Moon, Monitor } from "lucide-react"
 import { ROLE_COLORS, ROLE_LABELS, canAccess, canAccessPage, type RoleLevel } from "@/lib/permissions"
 import { getAvatarGradient } from "@/lib/avatar"
 import { useTheme } from "@/lib/theme"
+import { TASKS_HIDDEN, WIKI_HIDDEN } from "@/lib/hidden-modules"
 
 type NavItem = {
   label: string
@@ -83,6 +84,7 @@ export default function Sidebar() {
   const [onboardingEnabled, setOnboardingEnabled] = useState(false)
 
   useEffect(() => {
+    if (WIKI_HIDDEN) return // wiki module hidden — skip the nav-badge count fetch
     fetch("/api/wiki?limit=1")
       .then((r) => r.json())
       .then((data) => { if (data.total != null) setWikiCount(data.total) })
@@ -116,6 +118,9 @@ export default function Sidebar() {
       // enough: when ONBOARDING_CONSOLE_ENABLED is off on prod, the
       // module ships dark even to users who would otherwise qualify.
       if (item.pageKey === "onboarding" && !onboardingEnabled) return false
+      // Reversible module hides (flip the flag in @/lib/hidden-modules to restore).
+      if (item.href === "/tasks" && TASKS_HIDDEN) return false
+      if (item.href === "/wiki" && WIKI_HIDDEN) return false
       return true
     })
     .map((item) =>

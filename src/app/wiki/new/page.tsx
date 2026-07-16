@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams, redirect } from "next/navigation"
+import { WIKI_HIDDEN } from "@/lib/hidden-modules"
 
 const TEXT_TERTIARY = "var(--text-tertiary)"
 
 export default function WikiNewPage() {
+  if (WIKI_HIDDEN) redirect("/") // wiki module hidden — reversible via @/lib/hidden-modules
   const router = useRouter()
   const searchParams = useSearchParams()
   const parentId = searchParams.get("parentId")

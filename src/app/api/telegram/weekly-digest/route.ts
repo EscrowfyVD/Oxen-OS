@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramMessage } from "@/lib/telegram"
 import { serializeMoney, sumDecimals } from "@/lib/decimal"
+import { TASKS_HIDDEN } from "@/lib/hidden-modules"
 
 // No auth required — called by sync worker cron
 export async function POST(request: Request) {
@@ -173,7 +174,7 @@ async function buildMondayPersonalDigest(ownerName: string): Promise<string> {
       daysSinceLastActivity: { gte: 7 },
     },
   })
-  const overdueTasks = await prisma.task.count({
+  const overdueTasks = TASKS_HIDDEN ? 0 : await prisma.task.count({
     where: {
       assignee: { contains: ownerName, mode: "insensitive" },
       column: { not: "done" },
@@ -182,7 +183,7 @@ async function buildMondayPersonalDigest(ownerName: string): Promise<string> {
   })
 
   // Tasks this week
-  const tasksThisWeek = await prisma.task.findMany({
+  const tasksThisWeek = TASKS_HIDDEN ? [] : await prisma.task.findMany({
     where: {
       assignee: { contains: ownerName, mode: "insensitive" },
       column: { not: "done" },
@@ -317,7 +318,7 @@ async function buildMondayTeamDigest(): Promise<string> {
       daysSinceLastActivity: { gte: 7 },
     },
   })
-  const overdueTotal = await prisma.task.count({
+  const overdueTotal = TASKS_HIDDEN ? 0 : await prisma.task.count({
     where: { column: { not: "done" }, deadline: { lt: now } },
   })
   const openTickets = await prisma.supportTicket.count({
@@ -407,14 +408,14 @@ async function buildFridayDigest(ownerName: string): Promise<string> {
   } catch { /* silently ignore */ }
 
   // Tasks
-  const tasksCompleted = await prisma.task.count({
+  const tasksCompleted = TASKS_HIDDEN ? 0 : await prisma.task.count({
     where: {
       assignee: { contains: ownerName, mode: "insensitive" },
       column: "done",
       updatedAt: { gte: weekStart },
     },
   })
-  const tasksTotal = await prisma.task.count({
+  const tasksTotal = TASKS_HIDDEN ? 0 : await prisma.task.count({
     where: {
       assignee: { contains: ownerName, mode: "insensitive" },
       createdAt: { gte: weekStart },
@@ -453,7 +454,7 @@ async function buildFridayDigest(ownerName: string): Promise<string> {
   })
 
   // Carry over
-  const overdueTasks = await prisma.task.count({
+  const overdueTasks = TASKS_HIDDEN ? 0 : await prisma.task.count({
     where: {
       assignee: { contains: ownerName, mode: "insensitive" },
       column: { not: "done" },
@@ -488,7 +489,8 @@ async function buildFridayDigest(ownerName: string): Promise<string> {
   msg += `\u{1F4C8} <b>Your Performance</b>\n`
   msg += `\u2022 Deals moved forward: ${dealsMoved}\n`
   msg += `\u2022 Meetings completed: ${meetingsCompleted}\n`
-  msg += `\u2022 Tasks completed: ${tasksCompleted} / ${tasksTotal} total\n`
+  if (!TASKS_HIDDEN)
+    msg += `\u2022 Tasks completed: ${tasksCompleted} / ${tasksTotal} total\n`
   if (emailsSent > 0 || emailsReceived > 0) {
     msg += `\u2022 Emails sent: ${emailsSent}, Received: ${emailsReceived}\n`
   }

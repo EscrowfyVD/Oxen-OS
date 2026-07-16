@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendTelegramMessage } from "@/lib/telegram"
+import { TASKS_HIDDEN } from "@/lib/hidden-modules"
 
 /**
  * POST /api/telegram/register
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
     // Confirm via Telegram
     await sendTelegramMessage(
       chatIdStr,
-      `✅ Linked to <b>${employee.name}</b>. You'll receive meeting briefs and notifications here.\n\nCommands:\n/brief — Next meeting brief\n/digest — Daily digest\n/pipeline — Pipeline summary\n/tasks — Today's tasks\n/myid — Your chat ID`,
+      `✅ Linked to <b>${employee.name}</b>. You'll receive meeting briefs and notifications here.\n\nCommands:\n/brief — Next meeting brief\n/digest — Daily digest\n/pipeline — Pipeline summary\n${TASKS_HIDDEN ? "" : "/tasks — Today's tasks\n"}/myid — Your chat ID`,
     )
 
     return NextResponse.json({
